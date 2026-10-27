@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\Imports\ListAnalysis;
 use App\Services\Imports\ListImport;
 use App\Services\VisitorSearch;
 use Database\Seeders\DemoSeeder;
@@ -260,7 +261,7 @@ it('accepte 5000 homonymes sans multiplier les fiches dans le rapport', function
 it('ignore les lignes entièrement vides du tableur', function () {
     $path = tempnam(sys_get_temp_dir(), 'l3');
     file_put_contents($path, "nom complet;catégorie\nAlice Fictive;Visiteur\n;\n\n;;\n");
-    $analysis = app(\App\Services\Imports\ListAnalysis::class)->analyse($path, 'csv', $this->event, false);
+    $analysis = app(ListAnalysis::class)->analyse($path, 'csv', $this->event, false);
     unlink($path);
     expect($analysis['summary']['read'])->toBe(1);
 });
