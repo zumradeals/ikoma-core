@@ -24,6 +24,11 @@ it('refuse administration à un agent et journalise le refus', function () {
     $this->actingAs($user)->get('/administration/comptes')->assertForbidden();
     expect(DB::table('audit_logs')->where('actor_id', $user->id)->where('action', 'acces.refuse')->exists())->toBeTrue();
 });
+it('journalise aussi un accès protégé sans connexion', function () {
+    $before = DB::table('audit_logs')->where('action', 'acces.refuse')->count();
+    $this->get('/administration/comptes')->assertRedirect('/login');
+    expect(DB::table('audit_logs')->where('action', 'acces.refuse')->count())->toBe($before + 1);
+});
 it('force le superviseur à activer la double authentification', function () {
     $this->actingAs(account('superviseur'))->get('/espace')->assertRedirect('/securite');
 });
@@ -115,6 +120,13 @@ it('refuse UPDATE DELETE TRUNCATE avec le compte applicatif et détecte une alt�
     } finally {
         $query = $pdo->prepare('UPDATE audit_logs SET action=? WHERE id=?');
         $query->execute([$original, $id]);
+    }
+    $this->artisan('audit:verify')->assertSuccessful();
+    try {
+        $pdo->exec("UPDATE audit_logs SET id=id+1000000000 WHERE id=$id");
+        $this->artisan('audit:verify')->assertFailed();
+    } finally {
+        $pdo->exec("UPDATE audit_logs SET id=$id WHERE id=($id+1000000000)");
     }
     $this->artisan('audit:verify')->assertSuccessful();
 });

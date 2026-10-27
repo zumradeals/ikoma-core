@@ -21,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->respond(function (Response $response) {
-            if (in_array($response->getStatusCode(), [401, 403, 429], true)) {
+            if (in_array($response->getStatusCode(), [401, 403, 429], true) || ($response->isRedirect() && parse_url($response->headers->get('Location', ''), PHP_URL_PATH) === '/login' && request()->path() !== 'login')) {
                 app(Audit::class)->append('acces.refuse', auth()->id(), ['route' => request()->path(), 'statut' => $response->getStatusCode()]);
             }
             if (in_array($response->getStatusCode(), [403, 429], true) && ! request()->expectsJson()) {
