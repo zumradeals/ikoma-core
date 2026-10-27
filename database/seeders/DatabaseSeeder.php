@@ -23,5 +23,6 @@ class DatabaseSeeder extends Seeder
             app(Audit::class)->append('compte.cree', null, ['id' => $user->id, 'role' => $role, 'source' => 'seed']);
             $this->command?->warn($email.' — mot de passe affiché une seule fois : '.$password);
         }
+        $this->call(DemoSeeder::class);
     }
 }

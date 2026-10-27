@@ -13,13 +13,26 @@ jobs:
       - run: make install
       - run: make up
       - run: make lint
+      - name: Vérifier la reconstruction et le seed en moins de deux minutes
+        run: |
+          umask 077
+          start=$(date +%s)
+          if ! make migrate-fresh-seed > /tmp/ikoma-seed-prive.log 2>&1; then
+            sed '/mot de passe affiché une seule fois/d' /tmp/ikoma-seed-prive.log
+            exit 1
+          fi
+          elapsed=$(( $(date +%s) - start ))
+          echo "Reconstruction et seed : ${elapsed} secondes"
+          test "$elapsed" -lt 120
       - run: make test
+      - name: Vérifier la répétabilité des tests PHP
+        run: make test
       - run: make test-front
       - run: make e2e
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: captures-l1
+          name: captures-l2
           path: test-results/
           if-no-files-found: ignore
       - if: failure()
