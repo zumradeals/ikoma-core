@@ -25,8 +25,7 @@ final class ListAnalysis
                 continue;
             }
             if (count(array_filter($cells, fn ($v) => trim($v) !== '')) === 0) {
-                $raw[] = ['line' => $number, 'full_name' => '', 'organisation' => '', 'host' => '', 'category' => '', 'from' => '', 'until' => ''];
-
+                // Les lignes entièrement vides (fréquentes en fin de tableur) sont ignorées.
                 continue;
             }
             $values = [];
