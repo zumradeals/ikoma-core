@@ -76,7 +76,7 @@ final class ListImportsController
         } catch (ValidationException|HttpExceptionInterface $e) {
             throw $e;
         } catch (\Throwable) {
-            return back()->withErrors(['file' => 'L’opération a échoué. Aucun visiteur n’a été ajouté. Réessayez ou contactez l’administrateur.']);
+            return back()->withErrors(['file' => 'L’opération n’a pas pu être terminée. Rechargez l’écran avant de réessayer ou contactez l’administrateur.']);
         }
     }
 }
