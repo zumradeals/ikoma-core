@@ -1,5 +1,11 @@
 <?php
 
+use Tests\Support\LegacyL1Schema;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)->in('Feature');
+
+// Le test FoundationTest garde le contrat de fin de L1 ; les autres suites utilisent le schéma courant.
+pest()->beforeEach(fn () => LegacyL1Schema::start())
+    ->afterEach(fn () => LegacyL1Schema::finish())
+    ->in('Feature/FoundationTest.php');

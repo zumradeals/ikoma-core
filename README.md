@@ -64,3 +64,13 @@ Ouvrir « Se connecter ». Les administrateurs et superviseurs doivent configure
 Vérifier le journal : `docker compose exec php php artisan audit:verify`. Le chaînage signale une ligne modifiée ; il ne constitue pas une protection contre un administrateur PostgreSQL qui réécrirait toute la chaîne. La lecture du journal est aussi accessible au superviseur, sans droit de gestion des comptes. L’export est réservé à un futur lot.
 
 Le correctif PWA calcule une empreinte des sources à chaque build. Le test e2e modifie puis reconstruit réellement la page provisoire, attend l’activation du nouveau service worker et vérifie sa réouverture hors ligne. Aucun écran authentifié n’est mis en cache.
+
+## Lot L2 : modèle et démonstration
+
+Après `make install` et `make up`, `make migrate-fresh-seed` reconstruit la base de développement et charge les comptes et données fictives. **Cette commande efface les données existantes.** Conserver les mots de passe affichés une seule fois pour les cinq comptes fictifs. Pour ajouter seulement le jeu manquant sans effacer les comptes existants : `docker compose exec php php artisan db:seed`.
+
+Le compte administrateur, après activation TOTP, accède à Zones, Catégories et Badges depuis Mon espace. Zones et catégories permettent création/modification ; Badges reste en lecture seule, avec filtres statut, lot et réservation par poste. Aucun écran Événements ni parcours d’accueil, scan, import ou contrôle de groupe n’est disponible dans L2.
+
+Le [schéma et les questions ouvertes](docs/schema.md) décrivent les tables, contraintes et limites. Le seed conserve le comportement des comptes L1 ; un second lancement ne duplique pas la démonstration. Les données sont entièrement fictives.
+
+Vérifications : `make test`, `make test-front`, `make e2e`, `make lint`. La CI mesure aussi la reconstruction et le seed en moins de deux minutes ; elle conserve les captures des trois écrans. Le test Playwright ajoute une zone et une catégorie fictives dans la base de développement.
