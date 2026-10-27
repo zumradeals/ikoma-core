@@ -2,7 +2,7 @@
 
 **Nom de travail (à valider) :** IKOMA Accueil
 **Dépôt suggéré :** `ikoma-accueil` (dépôt séparé, hors des dépôts GAMAD)
-**Version du plan :** 0.2 — pile technique validée par le dirigeant le 27 octobre 2026 ; le reste demeure un projet de travail
+**Version du plan :** 0.3 — pile technique validée par le dirigeant le 27 octobre 2026 ; le reste demeure un projet de travail
 **Date :** 27 octobre 2026
 **Base de référence :** « Système de vérification rapide des visiteurs – Mode de fonctionnement détaillé », v1.0 du 27 octobre 2026
 **Prototype de démonstration :** `docs/prototype/index.html` (maquette interactive, données fictives)
@@ -198,15 +198,16 @@ Règles :
 | L1 | Comptes, rôles, 2FA, journal d'audit chaîné | Connexion par rôle, tentative non autorisée refusée et journalisée |
 | L2 | Modèle de données, données fictives, événements, zones, catégories | Migrations propres, jeu de démo chargeable |
 | L3 | Import de liste, doublons/homonymes | Import de 1 000 lignes avec rapport d'anomalies lisible |
-| L4 | Badges : lots, QR, codes, statuts, étiquettes imprimables | Contrainte « un badge = une personne » prouvée par test |
-| L5 | Poste d'accueil en ligne (parcours 7 étapes, non listé, refus) | Parcours complet < 60 s au chronomètre en recette |
+| L4 | Badges : lots (y compris par catégorie), QR, codes, statuts, étiquettes imprimables | Contrainte « un badge = une personne » prouvée par test |
+| L5 | Poste d'accueil en ligne (parcours 7 étapes, non listé, refus) + conception de l'authentification hors ligne | Parcours complet < 60 s au chronomètre en recette |
 | L6 | Hors ligne et synchronisation | Coupure réseau pendant 30 entrées, resynchro sans perte ni doublon |
 | L7 | Contrôle sur site, sortie, compteur de présents | Contrôle < 5 s, compteur exact |
 | L8 | Pilotage superviseur, alertes, évacuation | Tableau de bord à jour en moins de 5 s |
 | L9 | Groupes / cars | Car de 50 stagiaires traité avec < 20 s par personne |
 | L10 | Espace hôte et notifications | Hôte notifié d'une arrivée, validation d'un non listé |
-| L11 | Durcissement sécurité, purge, sauvegardes | Rapport de revue de sécurité sans faille critique |
-| L12 | Répétition générale et pilote | Simulation complète d'un événement signée par le dirigeant |
+| L11 | Durcissement applicatif et conformité des données (CSP, 2FA, audit, purge, analyses CI) | Rapport de revue de sécurité sans faille critique |
+| L12 | Production : déploiement durci, installation guidée, sauvegardes chiffrées | Restauration testée, installation reproductible |
+| L13 | Répétition générale et pilote | Simulation complète d'un événement signée par le dirigeant |
 
 ### Règles de validation
 Un lot n'est « terminé » que si : tests automatiques verts, critères d'acceptation vérifiés, démonstration filmée ou captures fournies, journal des décisions à jour, validation explicite du dirigeant.

@@ -1,18 +1,31 @@
-# Prompts d'exécution
+# Prompts d'exécution — ikoma-core
 
-À lancer **dans l'ordre**, un seul à la fois :
+Chaque fichier Lx.md est à coller dans ChatGPT Work, un lot à la fois, dans l'ordre.
+Ce sont des projets de travail : l'architecte les ajuste après la relecture de chaque pull request.
 
-1. `L0.md` — Fondations du dépôt
-2. `L1.md` — Comptes, rôles, 2FA, journal d'audit
-3. `L2.md` — Modèle de données et données fictives
+| Lot | Fichier | Sujet |
+|---|---|---|
+| L0 | L0.md | Fondations |
+| L1 | L1.md | Comptes, rôles, audit |
+| L2 | L2.md | Modèle de données |
+| L3 | L3.md | Import des listes |
+| L3b | L3b.md | Droits dédiés et décisions du 27 octobre |
+| L4 | L4.md | Badges |
+| L5 | L5.md | Poste d'accueil en ligne |
+| L6 | L6.md | Hors ligne et synchronisation |
+| L7 | L7.md | Contrôle sur site et sortie |
+| L8 | L8.md | Pilotage du superviseur |
+| L9 | L9.md | Groupes et cars |
+| L10 | L10.md | Espace de l'hôte |
+| L11 | L11.md | Durcissement et conformité |
+| L12 | L12.md | Production et sauvegardes |
+| L13 | L13.md | Répétition générale et pilote |
 
-Les lots L3 à L12 (voir section 11 du plan) seront rédigés par l'architecte après validation des lots précédents.
+## Règle de cycle
+Prompt → pull request par Work → relecture de l'architecte → validation du dirigeant → fusion → lot suivant.
 
-## Méthode
-1. Coller le prompt dans ChatGPT Work (avec accès au dépôt).
-2. Récupérer le rapport de fin de tâche et la pull request.
-3. Le faire relire par l'architecte (Claude) avant fusion.
-4. Le dirigeant valide, puis la décision est notée dans `docs/JOURNAL_DECISIONS.md`.
-5. Seulement ensuite : lot suivant.
-
-Un lot n'est « terminé » que si les tests sont verts, les critères d'acceptation vérifiés et la validation du dirigeant obtenue.
+## Points de décision
+- Décisions validées le 27 octobre 2026 (à confirmer avec le client) : lots par catégorie, badge à usage unique par défaut, contrôle des stagiaires par l'encadreur par défaut, droits dédiés groupes.gerer / postes.gerer / evenements.gerer (lot L3b).
+- Avant L6 : docs/AUTH_HORS_LIGNE.md (livré par L5) doit être validé par le dirigeant.
+- Avant L11 : durées de conservation des données, validées avec le client et un juriste.
+- Avant L12 : lieu d'hébergement de la production (jamais le serveur de démonstration).
