@@ -11,6 +11,8 @@ class User extends Authenticatable
 {
     use HasRoles, HasUuids, TwoFactorAuthenticatable;
 
+    protected $attributes = ['active' => true];
+
     protected $guarded = ['id'];
 
     protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
