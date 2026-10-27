@@ -33,7 +33,7 @@ services:
       - .:/app
     command: [sh, -c, 'npm ci && npm run build']
   nginx:
-    image: nginx:1.30.6-bookworm
+    image: nginx:stable-alpine-slim@sha256:dede8895648b461178c3bc604f7eed4423efe5220b2c4d839f5eb3d34ac3f8f7
     ports: ['127.0.0.1:8080:80']
     volumes:
       - .:/var/www/html:ro
@@ -55,3 +55,4 @@ services:
     command: [sh, -c, 'npx playwright install chromium && npm run e2e']
 volumes:
   postgres:
+
