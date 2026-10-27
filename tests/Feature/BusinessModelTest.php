@@ -66,7 +66,7 @@ it('refuse en base une deuxième association active mais accepte une nouvelle ap
     $assignment = ['id' => (string) Str::uuid(), 'event_id' => DemoSeeder::id('event'), 'badge_id' => $badge->id, 'visitor_id' => $visitor, 'assigned_at' => now()];
     DB::table('badge_assignments')->insert($assignment);
     try {
-        DB::table('badge_assignments')->insert([...$assignment, 'id' => (string) Str::uuid()]);
+        DB::transaction(fn () => DB::table('badge_assignments')->insert([...$assignment, 'id' => (string) Str::uuid()]));
         $this->fail('Seconde association acceptée');
     } catch (QueryException $exception) {
         expect($exception->getCode())->toBe('23505');
@@ -89,7 +89,7 @@ it('conserve le vocabulaire des statuts et refuse toute valeur étrangère', fun
     $badge->status = BadgeStatus::Available;
     $badge->save();
     try {
-        DB::table('badges')->where('id', $badge->id)->update(['status' => 'Inconnu']);
+        DB::transaction(fn () => DB::table('badges')->where('id', $badge->id)->update(['status' => 'Inconnu']));
         $this->fail('Statut invalide accepté');
     } catch (QueryException $e) {
         expect($e->getCode())->toBe('23514');
@@ -102,7 +102,7 @@ it('refuse les collisions de code et de jeton QR', function () {
     $two = DB::table('badges')->where('code', 'B-399')->first();
     foreach (['code', 'qr_token'] as $field) {
         try {
-            DB::table('badges')->where('id', $two->id)->update([$field => $one->$field]);
+            DB::transaction(fn () => DB::table('badges')->where('id', $two->id)->update([$field => $one->$field]));
             $this->fail('Collision acceptée');
         } catch (QueryException $e) {
             expect($e->getCode())->toBe('23505');
@@ -157,7 +157,7 @@ it('refuse des zones d’un autre événement et ne crée aucun journal en cas d
     $this->post('/administration/categories', ['event_id' => DemoSeeder::id('event'), 'name' => 'Catégorie interdite', 'color' => '#0F5AA6', 'priority_circuit' => false, 'zone_ids' => [$zone]])->assertSessionHasErrors('zone_ids.0');
     expect(DB::table('audit_logs')->where('actor_id', $admin->id)->where('action', 'categorie.creee')->count())->toBe($count);
     try {
-        DB::table('category_zone')->insert(['id' => (string) Str::uuid(), 'event_id' => DemoSeeder::id('event'), 'category_id' => DemoSeeder::id('category0'), 'zone_id' => $zone]);
+        DB::transaction(fn () => DB::table('category_zone')->insert(['id' => (string) Str::uuid(), 'event_id' => DemoSeeder::id('event'), 'category_id' => DemoSeeder::id('category0'), 'zone_id' => $zone]));
         $this->fail('Mélange événements accepté');
     } catch (QueryException $e) {
         expect($e->getCode())->toBe('23503');

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\Support\LegacyL1Schema;
 use Tests\TestCase;
 
@@ -9,3 +10,5 @@ pest()->extend(TestCase::class)->in('Feature');
 pest()->beforeEach(fn () => LegacyL1Schema::start())
     ->afterEach(fn () => LegacyL1Schema::finish())
     ->in('Feature/FoundationTest.php');
+
+pest()->use(DatabaseTransactions::class)->in('Feature/BusinessModelTest.php');
