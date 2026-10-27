@@ -54,6 +54,8 @@ it('demande le code TOTP après le mot de passe et accepte un code valide', func
     $user->update(['password' => $password, 'two_factor_secret' => encrypt($secret), 'two_factor_recovery_codes' => encrypt(json_encode([])), 'two_factor_confirmed_at' => now()]);
     $this->post('/login', ['email' => $user->email, 'password' => $password])->assertRedirect('/two-factor-challenge');
     $this->assertGuest();
+    $this->post('/two-factor-challenge', ['code' => '0000000'])->assertSessionHasErrors('code');
+    expect(DB::table('audit_logs')->where('actor_id', $user->id)->where('action', 'connexion.echec')->exists())->toBeTrue();
     $this->post('/two-factor-challenge', ['code' => $totp->getCurrentOtp($secret)])->assertRedirect('/espace');
     $this->assertAuthenticatedAs($user);
 });
