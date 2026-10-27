@@ -34,6 +34,14 @@ services:
       test: [CMD, php, -r, '$$s=@fsockopen("127.0.0.1",9000);exit($$s?0:1);']
       interval: 3s
       retries: 30
+  scheduler:
+    build: ./docker/php
+    working_dir: /var/www/html
+    volumes: ['.:/var/www/html']
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    command: [php, artisan, schedule:work]
   front:
     image: node:24-bookworm
     working_dir: /app
