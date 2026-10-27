@@ -2,6 +2,7 @@ export const roleLabels: Record<string, string> = {
   administrateur: 'Administrateur', superviseur: 'Superviseur sécurité', agent_accueil: "Agent d’accueil", hote: 'Hôte / organisateur', encadreur: 'Encadreur de groupe',
 };
 export const actionLabels: Record<string, string> = {
+  'liste.import_apercu': 'Liste : aperçu contrôlé', 'liste.import_confirme': 'Liste : import confirmé', 'liste.import_abandonne': 'Liste : import abandonné',
   'zone.creee': 'Zone créée', 'zone.modifiee': 'Zone modifiée', 'categorie.creee': 'Catégorie créée', 'categorie.modifiee': 'Catégorie modifiée',
   'connexion.reussie': 'Connexion réussie', 'connexion.echec': 'Échec de connexion', 'deconnexion': 'Déconnexion',
   'acces.refuse': 'Accès refusé', 'compte.cree': 'Compte créé', 'compte.active': 'Compte activé', 'compte.desactive': 'Compte désactivé',

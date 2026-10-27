@@ -64,3 +64,14 @@ FoundationTest de L1 conserve ses assertions d’absence de tables métier. Un s
 3. Réutilisation ou usage unique des badges : décision client attendue. Aucune transition vers Clos.
 4. Quel vocabulaire et quelles transitions pour les statuts des visiteurs, événements et imports ? Colonnes nullable, sans règle inventée ; les modules correspondants viendront ensuite.
 5. Pièce individuelle ou confirmation de l’encadreur pour les stagiaires : règle de contrôle toujours en attente, aucun traitement de groupe activé.
+
+
+## Évolution L3 — Import nominatif
+
+Aucune nouvelle table. Migration additive `2026_10_30_000000_validate_visitor_status` : CHECK sur visitors.status (`attendu`, `present`, `sorti`, `refuse`), les nulls historiques L2 restant tolérés. Toutes les lignes créées par l’import ont source `listé`, statut `attendu`, catégorie de l’événement, hôte éventuel du même événement, dates explicites ou bornes de l’événement, import_batch_id renseigné. Aucun groupe ni badge n’est attribué.
+
+import_batches reçoit uniquement à la confirmation : UUID (identique au jeton d’aperçu), event_id, actor_id, file_reference = **nom du fichier seulement**, status = `termine`, summary JSONB : `read`, `importable`, `blocked`, `warnings`, et horodatages. Les champs existants ne changent pas. Hôtes créés uniquement sur option et dans la même transaction ; toutes les écritures et l’audit sont annulés ensemble en cas d’erreur.
+
+Les aperçus ne sont pas des données métier persistantes : disque privé local, bail par événement, propriétaire UUID, expiration d’une heure, jeton et manifeste chiffré. Le contenu du rapport et le fichier disparaissent après usage ; import_batches ne conserve que les nombres. Le service de recherche L2 est exposé uniquement dans l’écran d’import, sous permission listes.importer, événement validé, maximum dix résultats et projection minimale existante.
+
+Le journal conserve uniquement les identifiants et nombres pour liste.import_apercu, liste.import_confirme et liste.import_abandonne. Les privilèges SQL audit_logs et grant-db restent inchangés. Les questions des statuts visiteurs sont désormais tranchées par les décisions du 27 octobre 2026 ; celles des événements/imports futurs et du contrôle des stagiaires restent ouvertes.

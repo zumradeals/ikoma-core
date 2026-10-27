@@ -74,3 +74,12 @@ Le compte administrateur, après activation TOTP, accède à Zones, Catégories 
 Le [schéma et les questions ouvertes](docs/schema.md) décrivent les tables, contraintes et limites. Le seed conserve le comportement des comptes L1 ; un second lancement ne duplique pas la démonstration. Les données sont entièrement fictives.
 
 Vérifications : `make test`, `make test-front`, `make e2e`, `make lint`. La CI mesure aussi la reconstruction et le seed en moins de deux minutes ; elle conserve les captures des trois écrans. Le test Playwright ajoute une zone et une catégorie fictives dans la base de développement.
+
+
+## Importer une liste (L3)
+
+Connectez-vous avec un compte administrateur, puis **Mon espace → Importer une liste**. Choisissez l’événement et un CSV UTF-8 (virgule ou point-virgule) ou XLSX (première feuille). Téléchargez le modèle depuis cet écran. Nom complet et catégorie sont obligatoires ; catégories et hôtes doivent déjà exister, sauf option explicite pour créer les hôtes manquants. Dates au format AAAA-MM-JJ, heure facultative HH:MM, en UTC ; sans date, la période de l’événement est reprise.
+
+Lisez le rapport : les doublons et erreurs sont exclus ; les homonymes sont signalés et restent importables. Corrigez puis rechargez si nécessaire. **Continuer vers la confirmation**, puis **Importer les lignes valides** enregistre en une seule opération. Aucun visiteur n’est créé avant ce dernier bouton. Le fichier privé disparaît après confirmation ou abandon ; les aperçus abandonnés expirent après une heure et sont purgés automatiquement par le service scheduler, démarré avec `make up`.
+
+Pour la recette fictive, utilisez tests/fixtures/liste-fictive-1000.csv : 985 importables, 15 bloquées, 8 avertissements. Les tests existants (`make test`, `make test-front`, `make e2e`, `make lint`) incluent L3 et vérifient aussi les seuils de temps. Le conteneur reste en PHP 8.5 ; OpenSpout exige PHP 8.4 minimum pour une installation hors Docker.
