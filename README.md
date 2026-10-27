@@ -50,3 +50,17 @@ Les composants et règles visuelles sont décrits dans `docs/design-system.md`. 
 Versions stables consultées le 27 octobre 2026 : PHP 8.5.12, Laravel 13.39.0, Inertia Laravel 3.5.2 / Vue 3.9.1, Vue 3.5.44, Tailwind 4.3.3, Vite 8.3.5, TypeScript 7.0.2, PostgreSQL 18.6 et Nginx stable 1.30.6. PHP local de vérification : 8.3 ; image de référence : 8.5.12.
 
 Sources : [PHP](https://www.php.net/releases/), [Laravel](https://laravel.com/docs/releases), [Inertia](https://github.com/inertiajs/inertia-laravel/releases), [registre npm](https://www.npmjs.com/), [PostgreSQL](https://www.postgresql.org/support/versioning/), [Nginx](https://nginx.org/en/download.html). Les registres ont été interrogés avant installation, les fichiers lock fixent les versions résolues.
+
+## Lot L1 : comptes et audit
+
+Référence fonctionnelle L1/L2 : [document v1.0](docs/reference/Mode_de_fonctionnement_verification_visiteurs.pdf). La [matrice des droits](docs/MATRICE_DROITS.md) doit être validée par le dirigeant.
+
+Les commandes de lancement restent identiques. `make install` prépare aussi un secret propriétaire dans `.secrets/` (jamais commité). L’application utilise `ikoma_app`, sans droits de modification ou suppression du journal ; les migrations utilisent un compte distinct. Conserver `.env` et `.secrets/` ensemble pour redémarrer la même base. Un ancien volume L0 utilise son mot de passe initial, conservé par le script d’installation.
+
+Pour créer les cinq comptes fictifs, exécuter `docker compose exec php php artisan db:seed`. Chaque mot de passe aléatoire est affiché uniquement à la création du compte : ne pas enregistrer cette sortie dans un journal partagé. Un deuxième seed ne réinitialise pas les mots de passe. Aucun mot de passe n’est présent dans Git.
+
+Ouvrir « Se connecter ». Les administrateurs et superviseurs doivent configurer puis confirmer leur application TOTP avant d’ouvrir leur espace. Conserver les codes de secours hors de l’application. Il n’y a pas d’inscription publique. L’administrateur crée les comptes, attribue un rôle, désactive et réinitialise le mot de passe depuis Comptes ; la nouvelle valeur est transmise par un canal sûr. Une modification de compte ferme ses sessions. La durée d’inactivité se règle en bas de Comptes.
+
+Vérifier le journal : `docker compose exec php php artisan audit:verify`. Le chaînage signale une ligne modifiée ; il ne constitue pas une protection contre un administrateur PostgreSQL qui réécrirait toute la chaîne. La lecture du journal est aussi accessible au superviseur, sans droit de gestion des comptes. L’export est réservé à un futur lot.
+
+Le correctif PWA calcule une empreinte des sources à chaque build. Le test e2e modifie puis reconstruit réellement la page provisoire, attend l’activation du nouveau service worker et vérifie sa réouverture hors ligne. Aucun écran authentifié n’est mis en cache.

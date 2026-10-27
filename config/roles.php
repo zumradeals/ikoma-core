@@ -1,0 +1,3 @@
+<?php
+
+return ['administrateur' => ['listes.importer', 'badges.gerer', 'zones.gerer', 'comptes.gerer', 'roles.attribuer', 'journal.consulter', 'journal.exporter'], 'superviseur' => ['pilotage.consulter', 'alertes.consulter', 'presences.consulter', 'badges.annuler', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'journal.consulter'], 'agent_accueil' => ['visiteurs.rechercher', 'visiteurs.verifier', 'visiteurs.valider', 'visiteurs.refuser', 'badges.associer', 'visiteurs.enregistrer_non_liste', 'badges.controler', 'groupes.appel_nominal', 'groupes.remettre_badges', 'visiteurs.enregistrer_mobile'], 'hote' => ['listes.mettre_a_jour', 'visiteurs.valider_non_liste', 'arrivees.recevoir_notification'], 'encadreur' => ['groupes.confirmer_presence']];

@@ -1,9 +1,24 @@
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+function sourceHash(): string {
+  const hash = createHash('sha256');
+  function walk(path: string) {
+    for (const entry of readdirSync(path, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const file = join(path, entry.name);
+      if (entry.isDirectory()) walk(file); else { hash.update(file); hash.update(readFileSync(file)); }
+    }
+  }
+  for (const dir of ['resources', 'routes', 'app']) walk(dir);
+  hash.update(readFileSync('package-lock.json'));
+  return hash.digest('hex');
+}
 export default defineConfig({
   plugins: [
     laravel({ input: ['resources/js/app.ts'], refresh: true }), vue(), tailwindcss(),
@@ -13,7 +28,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,woff2}'], navigateFallback: undefined,
         // L0 uniquement : seule la page publique provisoire est mise en cache.
-        additionalManifestEntries: [{ url: '/', revision: 'l0' }, { url: '/icon.svg', revision: 'l0' }],
+        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }],
         navigateFallbackDenylist: [/^\/build/],
       },
     }),
