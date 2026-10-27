@@ -69,3 +69,13 @@ Source : consignes L3 et [document de fonctionnement v1.0](reference/Mode_de_fon
 - Confidentialité des erreurs PostgreSQL : verbosité serveur `terse` et paramètres d’erreur désactivés pour éviter de recopier une ligne nominative dans les logs techniques. Les messages applicatifs d’échec d’import restent neutres.
 
 - Le rapport regroupe les fiches homonymes une seule fois, avec renvoi depuis chaque ligne concernée : pas de duplication quadratique des références pour un fichier de 5 000 homonymes. Toutes les fiches concernées restent visibles avec organisation/hôte ou mention d’absence.
+
+## Décisions du 27 octobre 2026 (lot L3b)
+
+Statut : validées par le dirigeant le 27 octobre 2026 ; les points marqués « à confirmer » le sont avec le client.
+
+- Lots de badges constitués par catégorie (hypothèse de travail, à confirmer avec le client).
+- Badge à usage unique par défaut (réglage `badge_reutilisable` = non, modifiable) ; règle définitive à confirmer avec le client.
+- Contrôle des stagiaires par confirmation de l’encadreur par défaut (réglage `controle_stagiaires` = encadreur, modifiable) ; à confirmer avec le client, qui peut exiger la pièce d’identité.
+- Droits dédiés `groupes.gerer`, `postes.gerer`, `evenements.gerer`, administrateur uniquement, en remplacement du rattachement provisoire à `badges.gerer`. Aucun écran créé. Les photos ne sont consultables par aucun rôle.
+- Mise en service : après déploiement, relancer le seeder des rôles (`RoleSeeder`) pour synchroniser les permissions sur une base existante.
