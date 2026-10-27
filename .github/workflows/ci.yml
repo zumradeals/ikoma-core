@@ -1,0 +1,22 @@
+name: Fondations L0
+on:
+  pull_request:
+  push:
+    branches: [main, l0-fondations]
+permissions:
+  contents: read
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make install
+      - run: make up
+      - run: make lint
+      - run: make test
+      - run: make test-front
+      - run: make e2e
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: make down

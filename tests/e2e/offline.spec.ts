@@ -1,0 +1,15 @@
+import { test, expect } from '@playwright/test';
+test('la page provisoire se rouvre sans réseau après une première visite', async ({ page, context }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'IKOMA Accueil — en construction' })).toBeVisible();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) await new Promise<void>(resolve => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true }));
+  });
+  await context.setOffline(true);
+  await page.close();
+  const offline = await context.newPage();
+  await offline.goto('/');
+  await expect(offline.getByRole('heading', { name: 'IKOMA Accueil — en construction' })).toBeVisible();
+  await expect(offline.getByRole('status')).toContainText('Page provisoire');
+});
