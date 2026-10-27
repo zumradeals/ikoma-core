@@ -19,7 +19,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: captures-l0
+          name: captures-l1
           path: test-results/
           if-no-files-found: ignore
       - if: failure()
