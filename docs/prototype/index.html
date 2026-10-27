@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vérification rapide des visiteurs – Prototype IKOMA GROUP</title>
+<style>
+:root{--blue:#0F5AA6;--navy:#0B3C6B;--orange:#F26B21;--green:#1E9E5A;--red:#D64545;--gold:#C9962B;--bg:#F2F5F9;--ink:#1B2733;--mut:#6B7A8C;--card:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.4}
+header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{font-weight:900;letter-spacing:1px;font-size:22px}.logo span{color:var(--orange)}
+header h1{font-size:16px;font-weight:600;opacity:.95;flex:1;min-width:200px}
+.net{border:0;border-radius:20px;padding:8px 14px;font-weight:700;cursor:pointer;background:var(--green);color:#fff}
+.net.off{background:var(--red)}
+nav{display:flex;gap:6px;padding:10px 14px;overflow-x:auto;background:#fff;border-bottom:1px solid #dde4ec;position:sticky;top:0;z-index:5}
+nav button{border:0;background:#e8eef5;color:var(--navy);padding:10px 16px;border-radius:10px;font-weight:700;font-size:14px;white-space:nowrap;cursor:pointer}
+nav button.on{background:var(--blue);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:18px 14px 60px}
+section{display:none}section.on{display:block}
+h2{color:var(--navy);font-size:24px;margin-bottom:4px}
+.sub{color:var(--mut);margin-bottom:18px}
+.card{background:var(--card);border-radius:16px;padding:18px;box-shadow:0 2px 10px rgba(11,60,107,.08)}
+.grid{display:grid;gap:14px}.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.kpi{text-align:center}.kpi b{display:block;font-size:40px;color:var(--orange)}.kpi small{color:var(--mut);font-weight:600}
+.flow{display:flex;gap:8px;overflow-x:auto;padding:6px 0 12px}
+.fs{min-width:118px;flex:1;background:#fff;border-radius:14px;padding:14px 8px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.07);position:relative}
+.fs .n{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:inline-flex;align-items:center;justify-content:center;margin-bottom:6px}
+.fs .ic{font-size:30px}.fs p{font-weight:700;font-size:13px;color:var(--navy)}
+.fs.act{outline:3px solid var(--orange)}.fs.done .n{background:var(--green)}
+.pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:800;color:#fff}
+.vip{background:var(--gold)}.vis{background:var(--blue)}.pre{background:#7A5AC8}.sta{background:#2A9D8F}
+.tablet{background:#1c2430;border-radius:26px;padding:14px;max-width:760px;margin:0 auto}
+.screen{background:#fff;border-radius:14px;min-height:430px;padding:18px}
+.phone{background:#1c2430;border-radius:34px;padding:12px;max-width:380px;margin:0 auto}
+.phone .screen{min-height:560px;padding:14px}
+.btn{border:0;border-radius:12px;padding:14px 18px;font-size:16px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff}
+.btn.ok{background:var(--green)}.btn.no{background:var(--red)}.btn.or{background:var(--orange)}.btn.gr{background:#dfe6ee;color:var(--navy)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+input[type=text]{width:100%;padding:14px;font-size:18px;border:2px solid #cdd7e3;border-radius:12px;margin:8px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid #e1e8f0;border-radius:12px;margin:8px 0;cursor:pointer;gap:8px}
+.item:hover{background:#f4f8fc}
+.big{font-size:22px;font-weight:800;color:var(--navy)}
+.ok-box{background:#e7f6ee;border:2px solid var(--green);border-radius:14px;padding:16px;text-align:center}
+.warn-box{background:#fdecec;border:2px solid var(--red);border-radius:14px;padding:12px;margin-top:10px;font-weight:700;color:var(--red)}
+.bar{height:20px;background:#e1e8f0;border-radius:12px;overflow:hidden}.bar i{display:block;height:100%;background:var(--green);width:0;transition:width .3s}
+.cam{width:100%;height:110px;border-radius:12px;background:#222;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;margin:8px 0}
+.cam.ok{background:#2f7d4f}
+.badge{width:150px;border:3px solid var(--navy);border-radius:12px;padding:10px;margin:8px auto;text-align:center}
+.qr{width:70px;height:70px;margin:4px auto;background:repeating-conic-gradient(#000 0 25%,#fff 0 50%) 0 0/14px 14px}
+.counters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cnt{background:#f2f5f9;border-radius:12px;padding:10px;text-align:center}.cnt b{font-size:28px;color:var(--navy);display:block}.cnt small{color:var(--mut);font-weight:700}
+.alert{background:#fff4e5;border-left:5px solid var(--orange);padding:8px 10px;border-radius:8px;margin:6px 0;font-size:13px;font-weight:600}
+.alert.red{background:#fdecec;border-color:var(--red)}
+.offbanner{background:var(--red);color:#fff;padding:8px 12px;border-radius:10px;font-weight:700;margin-bottom:10px;display:none;font-size:14px}
+.offbanner.on{display:block}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px;border-bottom:1px solid #e5ebf2;text-align:left}
+.small{font-size:13px;color:var(--mut)}
+footer{text-align:center;color:var(--mut);font-size:12px;padding:20px}
+@media(max-width:600px){h2{font-size:20px}.kpi b{font-size:32px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">IKOMA <span>GROUP</span></div>
+  <h1>Système de vérification rapide des visiteurs — Démonstration interactive</h1>
+  <button class="net" id="netBtn" onclick="toggleNet()">● Réseau : OK</button>
+</header>
+<nav id="nav">
+  <button class="on" data-t="s0">1. Vue d'ensemble</button>
+  <button data-t="s1">2. Poste d'accueil</button>
+  <button data-t="s2">3. Groupes &amp; cars</button>
+  <button data-t="s3">4. Pilotage mobile</button>
+  <button data-t="s4">5. Urgence &amp; secours</button>
+</nav>
+<main>
+
+<!-- 1 VUE D'ENSEMBLE -->
+<section id="s0" class="on">
+  <h2>Contrôler vite. Tout tracer. Rien laisser au hasard.</h2>
+  <p class="sub">Un visiteur listé est traité en moins d'une minute, de la recherche à la remise du badge.</p>
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="card kpi"><b>&lt; 60 s</b><small>par visiteur listé</small></div>
+    <div class="card kpi"><b>&lt; 20 s</b><small>par stagiaire (groupe en car)</small></div>
+    <div class="card kpi"><b>&lt; 5 s</b><small>contrôle d'un badge sur site</small></div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="big" style="margin-bottom:8px">Le parcours en 7 étapes</div>
+    <div class="flow">
+      <div class="fs"><div class="n">1</div><div class="ic">🔍</div><p>Recherche du nom</p></div>
+      <div class="fs"><div class="n">2</div><div class="ic">📋</div><p>Vérification de la fiche</p></div>
+      <div class="fs"><div class="n">3</div><div class="ic">🪪</div><p>Identité + photo</p></div>
+      <div class="fs"><div class="n">4</div><div class="ic">✅</div><p>Valider ou refuser</p></div>
+      <div class="fs"><div class="n">5</div><div class="ic">📷</div><p>Scan du badge</p></div>
+      <div class="fs"><div class="n">6</div><div class="ic">🎫</div><p>Remise du badge</p></div>
+      <div class="fs"><div class="n">7</div><div class="ic">🚪</div><p>Entrée enregistrée</p></div>
+    </div>
+  </div>
+  <div class="grid g3">
+    <div class="card"><div class="ic" style="font-size:30px">🎫</div><div class="big">1 badge = 1 personne</div><p class="small">QR code unique + code lisible (ex. B-014). Un badge déjà attribué est bloqué automatiquement.</p></div>
+    <div class="card"><div class="ic" style="font-size:30px">🕒</div><div class="big">Tout est horodaté</div><p class="small">Chaque action est attribuée à un agent et enregistrée dans un journal non modifiable.</p></div>
+    <div class="card"><div class="ic" style="font-size:30px">📡</div><div class="big">Fonctionne sans internet</div><p class="small">Liste chargée sur la tablette, synchronisation au retour du réseau, tablette et registre de secours.</p></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="big" style="margin-bottom:8px">Qui fait quoi</div>
+    <div class="grid g3">
+      <div>👮 <b>Agent d'accueil</b><br><span class="small">Contrôle, valide, associe le badge</span></div>
+      <div>🛡️ <b>Superviseur sécurité</b><br><span class="small">Tableau de bord, alertes, annulation de badge</span></div>
+      <div>🤝 <b>Hôte / organisateur</b><br><span class="small">Valide les non listés, notifié des arrivées</span></div>
+      <div>🚌 <b>Encadreur de groupe</b><br><span class="small">Confirme la présence de ses stagiaires</span></div>
+      <div>⚙️ <b>Administrateur</b><br><span class="small">Listes, badges, zones, comptes</span></div>
+      <div>🔒 <b>Sécurité</b><br><span class="small">Chiffrement, authentification renforcée, loi 2013-450 / ARTCI</span></div>
+    </div>
+  </div>
+  <p class="small" style="margin-top:14px">👉 Cliquez sur « 2. Poste d'accueil » pour essayer le système en direct.</p>
+</section>
+
+<!-- 2 POSTE D'ACCUEIL -->
+<section id="s1">
+  <h2>Poste d'accueil — essayez-le</h2>
+  <p class="sub">Tapez « Ko », « Ya » ou « Ai » dans la recherche. Données fictives.</p>
+  <div class="tablet">
+    <div class="offbanner" id="offB1">⚠️ Mode dégradé : réseau coupé — la liste est locale, les badges sont mis en attente de synchronisation.</div>
+    <div class="flow" id="stepper" style="padding:0 0 10px"></div>
+    <div class="screen" id="tabScreen"></div>
+  </div>
+</section>
+
+<!-- 3 GROUPES -->
+<section id="s2">
+  <h2>Groupes de stagiaires — transport en car</h2>
+  <p class="sub">Badges remis au point de départ. Contrôle collectif à l'arrivée sur le site.</p>
+  <div class="grid g2">
+    <div class="card" id="grpCard"></div>
+    <div class="card">
+      <div class="big" style="margin-bottom:10px">Les 8 étapes</div>
+      <table>
+        <tr><td>1</td><td>Rassemblement, ouverture du groupe (Car 1)</td></tr>
+        <tr><td>2</td><td>Appel nominal</td></tr>
+        <tr><td>3</td><td>Contrôle (pièce d'identité ou encadreur)</td></tr>
+        <tr><td>4</td><td>Remise + scan du badge</td></tr>
+        <tr><td>5</td><td>Barre de progression du groupe</td></tr>
+        <tr><td>6</td><td>Groupe complet ou liste des absents</td></tr>
+        <tr><td>7</td><td>Embarquement, liste envoyée au site</td></tr>
+        <tr><td>8</td><td>Arrivée : scan rapide, écarts signalés</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 4 PILOTAGE -->
+<section id="s3">
+  <h2>Application mobile de pilotage</h2>
+  <p class="sub">Le superviseur voit tout en temps réel. Faites une entrée au poste d'accueil : ce tableau se met à jour.</p>
+  <div class="grid g2">
+    <div class="phone"><div class="screen" id="supScreen"></div></div>
+    <div class="card">
+      <div class="big" style="margin-bottom:10px">Fonctions par profil</div>
+      <p><b>🛡️ Superviseur</b> — tableau de bord, alertes, liste des présents, annulation de badge, suivi des cars, journal.</p><br>
+      <p><b>🤝 Hôte</b> — notification d'arrivée de ses invités, validation des non listés.</p><br>
+      <p><b>👮 Agent mobile</b> — contrôle de badge par scan, appel nominal, enregistrement hors poste fixe.</p><br>
+      <p><b>⚙️ Administrateur</b> — import des listes, badges, zones, comptes et droits.</p><br>
+      <p class="small">Authentification renforcée, droits limités au rôle, déconnexion automatique, fonctionnement sans réseau.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5 URGENCE -->
+<section id="s4">
+  <h2>Urgence et continuité</h2>
+  <p class="sub">Le poste ne s'arrête jamais.</p>
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="big" style="margin-bottom:8px">🚨 Liste d'évacuation</div>
+      <p class="small">Personnes présentes en temps réel : nom, catégorie, zone, groupe. Consultable sur smartphone, imprimable.</p>
+      <div id="evac" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <div class="big" style="margin-bottom:8px">Si quelque chose tombe en panne</div>
+      <table>
+        <tr><td>📡 Réseau coupé</td><td>Liste locale, synchronisation au retour, liaison mobile de secours</td></tr>
+        <tr><td>📱 Tablette en panne</td><td>Tablette de secours, sinon registre papier</td></tr>
+        <tr><td>🔌 Électricité</td><td>Onduleur (1 h minimum), puis registre papier</td></tr>
+        <tr><td>🖨️ Imprimante</td><td>Badges pré-imprimés + badges de réserve numérotés</td></tr>
+        <tr><td>🖥️ Serveur</td><td>Copie locale, resynchronisation avec contrôle des doublons</td></tr>
+      </table>
+      <p class="small" style="margin-top:10px">Testez : bouton « Réseau » en haut de page.</p>
+    </div>
+  </div>
+  <div class="card"><div class="big" style="margin-bottom:8px">🔒 Sécurité &amp; données personnelles</div>
+    <p class="small">Comptes nominatifs • authentification renforcée • chiffrement • journal d'audit non modifiable • tablette verrouillée et effaçable à distance • conservation courte • conformité loi n° 2013-450 (ARTCI) • pas de biométrie dans cette version • test d'intrusion avant mise en service.</p></div>
+</section>
+</main>
+<footer>Prototype de démonstration — données fictives — Conçu et réalisé par IKOMA GROUP</footer>
+
+<script>
+const $=s=>document.querySelector(s);
+const CAT={VIP:'vip',Visiteur:'vis',Prestataire:'pre',Stagiaire:'sta'};
+const S={
+ offline:false,pending:0,log:[],alerts:[],
+ visitors:[
+  {id:1,name:'Général A. Koffi',org:'État-Major',host:'Cabinet',cat:'VIP',zone:'Tribune officielle',st:'attendu'},
+  {id:2,name:'Mme Aya Kouadio',org:'Ministère',host:'Dir. Protocole',cat:'VIP',zone:'Tribune officielle',st:'attendu'},
+  {id:3,name:'Yao Brou',org:'Ministère',host:'Dir. Protocole',cat:'Visiteur',zone:'Salle A, Accueil',st:'attendu'},
+  {id:4,name:'Yao Konan',org:'Entreprise SOTRA',host:'Logistique',cat:'Prestataire',zone:'Zone technique',st:'attendu'},
+  {id:5,name:'Koné Mariam',org:'Presse',host:'Communication',cat:'Visiteur',zone:'Zone presse',st:'attendu'},
+  {id:6,name:'Aimé Traoré',org:'Délégation',host:'Dir. Protocole',cat:'Visiteur',zone:'Salle A',st:'attendu'}
+ ],
+ badges:{}
+};
+for(let i=1;i<=60;i++)S.badges['B-'+String(i).padStart(3,'0')]={st:'Disponible',who:null};
+S.badges['B-007']={st:'Associé',who:'Autre personne (démo)'};
+const now=()=>new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function log(t){S.log.unshift(now()+' — '+t);}
+function alertAdd(t,red){S.alerts.unshift({t:now()+' '+t,red});}
+function nextFree(){return Object.keys(S.badges).find(k=>S.badges[k].st==='Disponible'&&!k.startsWith('B-04')&&!k.startsWith('B-05'));}
+
+/* NAV */
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+ document.querySelectorAll('section').forEach(s=>s.classList.remove('on'));$('#'+b.dataset.t).classList.add('on');renderAll();
+});
+function toggleNet(){S.offline=!S.offline;
+ if(!S.offline&&S.pending>0){log('Synchronisation : '+S.pending+' association(s)');alertAdd('Réseau rétabli : '+S.pending+' badge(s) synchronisé(s)');S.pending=0;}
+ else if(S.offline){alertAdd('Réseau coupé : poste en mode dégradé',true);}
+ renderAll();}
+
+/* ACCUEIL */
+let A={step:'search',q:'',cur:null,idOk:false,photo:false,t0:0,badge:null,msg:'',nl:{}};
+function stepper(n){
+ const L=[['🔍','Recherche'],['📋','Fiche'],['🪪','Identité'],['✅','Décision'],['📷','Scan'],['🎫','Remise'],['🚪','Entrée']];
+ $('#stepper').innerHTML=L.map((s,i)=>`<div class="fs ${i+1===n?'act':''} ${i+1<n?'done':''}" style="min-width:70px;padding:8px 4px"><div class="n" style="width:24px;height:24px;font-size:12px">${i+1}</div><p style="font-size:11px">${s[1]}</p></div>`).join('');
+}
+function norm(s){return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+function renderAccueil(){
+ const sc=$('#tabScreen');let h='',n=1;
+ if(A.step==='search'){
+  const r=A.q.length>=2?S.visitors.filter(v=>norm(v.name).includes(norm(A.q))):[];
+  h=`<div class="big">Rechercher un visiteur</div>
+  <input type="text" id="q" placeholder="Quelques lettres du nom…" value="${A.q}" autocomplete="off">
+  ${r.map(v=>`<div class="item" onclick="pick(${v.id})"><div><b>${v.name}</b><br><span class="small">${v.org} → ${v.host}</span></div><span class="pill ${CAT[v.cat]}">${v.cat}</span></div>`).join('')}
+  ${A.q.length>=2&&!r.length?'<p class="small" style="margin:10px 0">Aucune fiche trouvée.</p>':''}
+  ${r.length>1?'<p class="small">Plusieurs noms proches : confirmez avec un second critère (organisation, hôte, pièce).</p>':''}
+  <div class="row"><button class="btn gr" onclick="A.step='nl';renderAccueil()">➕ Visiteur non listé</button></div>`;
+ }
+ else if(A.step==='nl'){n=2;
+  h=`<div class="big">Visiteur non listé</div><p class="small">Fiche rapide. L'hôte doit valider avant l'entrée. Accès limité à la zone d'accueil, avec accompagnement.</p>
+  <input type="text" id="nn" placeholder="Nom" value="${A.nl.n||''}"><input type="text" id="no" placeholder="Organisation" value="${A.nl.o||''}"><input type="text" id="nh" placeholder="Personne à voir" value="${A.nl.h||''}">
+  <div class="row"><button class="btn gr" onclick="A.step='search';renderAccueil()">Retour</button><button class="btn or" onclick="nlSend()">Demander la validation de l'hôte</button></div>`;
+ }
+ else if(A.step==='nlwait'){n=2;
+  h=`<div class="big">⏳ En attente de l'hôte</div><p style="margin:10px 0">Notification envoyée à <b>${A.nl.h||'l\'hôte'}</b>. Pas d'entrée sans sa validation.</p>
+  <button class="btn ok" onclick="nlOk()">Simuler : l'hôte valide</button>`;
+ }
+ else if(A.step==='fiche'){n=3;const v=A.cur;
+  h=`<div class="big">${v.name} <span class="pill ${CAT[v.cat]}">${v.cat}</span></div>
+  ${v.cat==='VIP'?'<div class="alert" style="border-color:var(--gold)">⭐ Personnalité — circuit prioritaire</div>':''}
+  <p style="margin:8px 0">${v.org} → reçu par <b>${v.host}</b><br><span class="small">Zones : ${v.zone}</span></p>
+  <label style="display:flex;gap:10px;align-items:center;font-weight:700;margin:12px 0;font-size:17px"><input type="checkbox" style="width:24px;height:24px" ${A.idOk?'checked':''} onchange="A.idOk=this.checked;renderAccueil()"> Pièce d'identité contrôlée</label>
+  <div class="cam ${A.photo?'ok':''}">${A.photo?'📸 Photo enregistrée ✔':'Caméra de la tablette'}</div>
+  ${A.photo?'':'<button class="btn gr" onclick="A.photo=true;renderAccueil()">📸 Prendre la photo</button>'}
+  <div class="row"><button class="btn ok" ${A.idOk&&A.photo?'':'disabled'} onclick="valider()">✅ Valider</button><button class="btn no" onclick="refuser()">⛔ Refuser</button></div>
+  ${A.idOk&&A.photo?'':'<p class="small" style="margin-top:8px">Valider reste bloqué tant que l\'identité et la photo ne sont pas faites.</p>'}`;
+ }
+ else if(A.step==='badge'){n=5;
+  h=`<div class="big">Associer un badge à ${A.cur.name}</div>
+  <div class="cam">📷 Scanner le QR du badge</div>
+  <div class="row"><button class="btn" onclick="assoc(nextFree())">📷 Scanner (badge neuf)</button>
+  <button class="btn or" onclick="assoc('B-007')">Tester : badge déjà associé</button></div>
+  <p class="small" style="margin:10px 0 2px">QR illisible ? Saisir le code imprimé :</p>
+  <div class="row"><input type="text" id="mc" placeholder="B-014" style="width:140px;margin:0"><button class="btn gr" onclick="assoc(($('#mc').value||'').toUpperCase())">Associer</button></div>
+  ${A.msg?`<div class="warn-box">${A.msg}</div>`:''}`;
+ }
+ else if(A.step==='done'){n=7;const sec=Math.round((Date.now()-A.t0)/1000);
+  h=`<div class="ok-box"><div style="font-size:46px">✅</div><div class="big">Entrée enregistrée</div>
+  <div class="badge"><b>${A.badge}</b><div class="qr"></div><span class="pill ${CAT[A.cur.cat]}">${A.cur.cat}</span><div class="small">${A.cur.name}</div></div>
+  <p>Zones : <b>${A.cur.zone}</b></p><p class="small">🔔 ${A.cur.host} notifié de l'arrivée • ${now()}</p>
+  <p style="margin-top:8px;font-size:20px;font-weight:800;color:${sec<=60?'var(--green)':'var(--red)'}">⏱ ${sec} s ${sec<=60?'(objectif &lt; 60 s atteint)':''}</p>
+  ${S.offline?'<p class="small">Association mise en attente (réseau coupé).</p>':''}</div>
+  <div class="row"><button class="btn" onclick="resetA()">Visiteur suivant</button></div>`;
+ }
+ else if(A.step==='refus'){n=4;
+  h=`<div class="big" style="color:var(--red)">⛔ Accès refusé</div><p style="margin:10px 0">Motif enregistré. Superviseur alerté. Aucun badge associé.</p><div class="row"><button class="btn" onclick="resetA()">Visiteur suivant</button></div>`;
+ }
+ sc.innerHTML=h;stepper(n);
+ const q=$('#q');if(q){q.oninput=e=>{A.q=e.target.value;const p=e.target.selectionStart;renderAccueil();const q2=$('#q');q2.focus();q2.setSelectionRange(p,p);};}
+ $('#offB1').classList.toggle('on',S.offline);
+}
+function pick(id){A.cur=S.visitors.find(v=>v.id===id);A.step='fiche';A.idOk=false;A.photo=false;A.t0=Date.now();log('Recherche/sélection : '+A.cur.name);renderAccueil();}
+function nlSend(){A.nl={n:$('#nn').value||'Visiteur inconnu',o:$('#no').value||'—',h:$('#nh').value||'Dir. Protocole'};log('Visiteur non listé : '+A.nl.n);alertAdd('Visiteur non listé en attente : '+A.nl.n);A.step='nlwait';renderAccueil();}
+function nlOk(){const v={id:100+S.visitors.length,name:A.nl.n,org:A.nl.o,host:A.nl.h,cat:'Visiteur',zone:'Zone d\'accueil (accompagné)',st:'attendu'};S.visitors.push(v);pick(v.id);}
+function valider(){log('Validé : '+A.cur.name);A.step='badge';A.msg='';renderAccueil();}
+function refuser(){A.cur.st='refusé';log('Refusé : '+A.cur.name);alertAdd('Accès refusé : '+A.cur.name,true);A.step='refus';renderAll();}
+function assoc(code){const b=S.badges[code];
+ if(!b){A.msg='Code inconnu : '+code;renderAccueil();return;}
+ if(b.st!=='Disponible'){A.msg='⛔ Badge '+code+' déjà associé à : '+b.who+'. Prenez un autre badge.';log('Badge refusé (déjà associé) : '+code);renderAccueil();return;}
+ b.st='Associé';b.who=A.cur.name;A.badge=code;A.cur.badge=code;A.cur.st='présent';
+ if(S.offline)S.pending++;
+ log('Badge '+code+' associé à '+A.cur.name+' — entrée');alertAdd('Arrivée : '+A.cur.name+' ('+A.cur.cat+')');
+ A.step='done';renderAll();}
+function resetA(){A={step:'search',q:'',cur:null,idOk:false,photo:false,t0:0,badge:null,msg:'',nl:{}};renderAll();}
+
+/* GROUPES */
+const G={names:['Adou Kévin','Bamba Fatou','Coulibaly Ibrahim','Diallo Awa','Essis Marc','Fofana Salif','Gnahoré Estelle','Habib Moussa'],i:0,done:[],absent:[],stage:'appel',arrived:0};
+let gBadge=41;
+function renderGroup(){
+ const tot=G.names.length,rem=G.done.length;let h=`<div class="big">🚌 Car 1 — ${tot} stagiaires</div>
+ <div class="bar" style="margin:10px 0"><i style="width:${(rem/tot*100)}%"></i></div><p class="small">${rem} badge(s) remis sur ${tot}${G.absent.length?' • '+G.absent.length+' absent(s)':''}</p>`;
+ if(G.stage==='appel'){
+  if(G.i<tot){h+=`<div class="item" style="cursor:default;margin-top:12px"><div><b>📣 Appel : ${G.names[G.i]}</b><br><span class="small">Contrôle identité / encadreur</span></div></div>
+  <div class="row"><button class="btn ok" onclick="gGive()">🎫 Remettre + scanner</button><button class="btn gr" onclick="gAbs()">Absent</button></div>`;}
+  else{h+=`<div class="ok-box" style="margin-top:12px"><b>${G.absent.length?'⚠️ Absents signalés à l\'encadreur et au superviseur : '+G.absent.join(', '):'✅ Groupe complet'}</b></div><div class="row"><button class="btn" onclick="G.stage='car';renderGroup()">🚌 Embarquement et départ</button></div>`;}
+ }
+ else if(G.stage==='car'){h+=`<div class="ok-box" style="margin-top:12px"><div style="font-size:40px">🚌💨</div><b>Car en route</b><p class="small">Liste des embarqués transmise au site (${G.done.length} personnes).</p></div><div class="row"><button class="btn or" onclick="gArrive()">📍 Arrivée sur le site : scan collectif</button></div>`;}
+ else{h+=`<div class="ok-box" style="margin-top:12px"><div style="font-size:40px">✅</div><b>${G.arrived} stagiaires marqués « Arrivé »</b><p class="small">Aucun écart avec la liste d'embarquement.</p></div><div class="row"><button class="btn gr" onclick="gReset()">Recommencer la démo</button></div>`;}
+ $('#grpCard').innerHTML=h;
+}
+function gGive(){const c='B-'+gBadge++;S.badges[c]={st:'Associé',who:G.names[G.i]};G.done.push(G.names[G.i]);G.i++;renderGroup();}
+function gAbs(){G.absent.push(G.names[G.i]);alertAdd('Stagiaire absent (Car 1) : '+G.names[G.i],true);G.i++;renderAll();}
+function gArrive(){G.arrived=G.done.length;S.groupArr=G.arrived;G.stage='site';log('Car 1 arrivé : '+G.arrived+' stagiaires');alertAdd('Car 1 arrivé : '+G.arrived+' stagiaires scannés');renderAll();}
+function gReset(){G.i=0;G.done=[];G.absent=[];G.stage='appel';G.arrived=0;S.groupArr=0;gBadge=41;renderAll();}
+
+/* SUPERVISEUR */
+function present(){return S.visitors.filter(v=>v.st==='présent');}
+function renderSup(){
+ const att=S.visitors.filter(v=>v.st==='attendu').length,pr=present(),ref=S.visitors.filter(v=>v.st==='refusé').length,g=S.groupArr||0;
+ let h=`<div class="offbanner ${S.offline?'on':''}">⚠️ Réseau coupé — ${S.pending} en attente</div>
+ <div class="big" style="font-size:16px;margin-bottom:8px">🛡️ Tableau de bord — Superviseur</div>
+ <div class="counters"><div class="cnt"><b>${att}</b><small>ATTENDUS</small></div><div class="cnt"><b>${pr.length+g}</b><small>PRÉSENTS</small></div><div class="cnt"><b>${pr.length+g}</b><small>ARRIVÉS</small></div><div class="cnt"><b style="color:var(--red)">${ref}</b><small>REFUSÉS</small></div></div>
+ <div style="margin-top:12px;font-weight:800;color:var(--navy)">Alertes</div>
+ ${S.alerts.slice(0,4).map(a=>`<div class="alert ${a.red?'red':''}">${a.t}</div>`).join('')||'<p class="small">Aucune alerte.</p>'}
+ <div style="margin-top:10px;font-weight:800;color:var(--navy)">Présents (visiteurs)</div>
+ ${pr.map(v=>`<div class="item" style="cursor:default"><div><b>${v.name}</b><br><span class="small">${v.badge} • ${v.zone}</span></div><button class="btn no" style="padding:6px 10px;font-size:12px" onclick="cancelBadge(${v.id})">Annuler</button></div>`).join('')||'<p class="small">Personne pour l\'instant.</p>'}`;
+ $('#supScreen').innerHTML=h;
+}
+function cancelBadge(id){const v=S.visitors.find(x=>x.id===id);S.badges[v.badge].st='Annulé';alertAdd('Badge '+v.badge+' annulé ('+v.name+') — à remplacer',true);log('Badge annulé : '+v.badge);v.st='attendu';v.badge=null;renderAll();}
+
+/* URGENCE */
+function renderEvac(){
+ const pr=present();
+ $('#evac').innerHTML=pr.length||S.groupArr?`<table><tr><th>Nom</th><th>Catégorie</th><th>Zone</th></tr>${pr.map(v=>`<tr><td>${v.name}</td><td>${v.cat}</td><td>${v.zone}</td></tr>`).join('')}${S.groupArr?`<tr><td>${S.groupArr} stagiaires</td><td>Stagiaire</td><td>Car 1</td></tr>`:''}</table>`:'<p class="small">Aucune présence enregistrée. Faites une entrée à l\'accueil pour voir la liste se remplir.</p>';
+}
+function renderAll(){
+ const b=$('#netBtn');b.textContent=S.offline?'● Réseau : COUPÉ':'● Réseau : OK';b.classList.toggle('off',S.offline);
+ renderAccueil();renderGroup();renderSup();renderEvac();
+}
+renderAll();
+</script>
+</body>
+</html>
