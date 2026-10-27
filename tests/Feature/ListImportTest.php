@@ -63,7 +63,11 @@ it('contrôle 1000 lignes avec des nombres exacts avant toute écriture puis imp
     expect(app(VisitorSearch::class)->search($this->event, 'Personne fictive L3 0001')[0]['full_name'])->toBe('Personne fictive L3 0001');
     $batch = DB::table('import_batches')->find($p['id']);
     expect($batch->file_reference)->toBe('liste-fictive-1000.csv');
-    expect(json_decode($batch->summary, true))->toBe($p['summary']);
+    $stored = json_decode($batch->summary, true);
+    $expected = $p['summary'];
+    ksort($stored);
+    ksort($expected);
+    expect($stored)->toBe($expected);
     $this->service->confirm($this->event, $this->actor->id, $p['id']);
     expect(DB::table('visitors')->count())->toBe($before + 985);
     $audit = DB::table('audit_logs')->where('actor_id', $this->actor->id)->where('action', 'like', 'liste.import_%')->get();
