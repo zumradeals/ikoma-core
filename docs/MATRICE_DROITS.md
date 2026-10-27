@@ -13,8 +13,10 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | cars.suivre | — | Oui | — | — | — |
 | categories.gerer | Oui | — | — | — | — |
 | comptes.gerer | Oui | — | — | — | — |
+| evenements.gerer | Oui | — | — | — | — |
 | groupes.appel_nominal | — | — | Oui | — | — |
 | groupes.confirmer_presence | — | — | — | — | Oui |
+| groupes.gerer | Oui | — | — | — | — |
 | groupes.remettre_badges | — | — | Oui | — | — |
 | groupes.suivre | — | Oui | — | — | — |
 | journal.consulter | Oui | Oui | — | — | — |
@@ -23,6 +25,7 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | listes.mettre_a_jour | — | — | — | Oui | — |
 | litiges.decider | — | Oui | — | — | — |
 | pilotage.consulter | — | Oui | — | — | — |
+| postes.gerer | Oui | — | — | — | — |
 | presences.consulter | — | Oui | — | — | — |
 | roles.attribuer | Oui | — | — | — | — |
 | visiteurs.enregistrer_mobile | — | — | Oui | — | — |
@@ -33,6 +36,8 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | visiteurs.valider_non_liste | — | — | — | Oui | — |
 | visiteurs.verifier | — | — | Oui | — | — |
 | zones.gerer | Oui | — | — | — | — |
+
+Lot L3b (décision du dirigeant, 27 octobre 2026) : `groupes.gerer`, `postes.gerer` et `evenements.gerer` sont ajoutées, réservées à l’administrateur. Les photos de visiteurs ne sont consultables par aucun rôle ; seule leur prise à l’accueil existera.
 
 Les permissions des futurs modules sont enregistrées mais aucune route ni table de ces modules n’est créée. `journal.exporter` est réservé ; aucun export L1.
 

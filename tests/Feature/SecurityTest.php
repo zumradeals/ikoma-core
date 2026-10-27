@@ -76,6 +76,13 @@ it('applique la matrice exacte sans héritage implicite', function () {
     expect(account('administrateur')->can('visiteurs.valider'))->toBeFalse();
     expect(account('superviseur')->can('comptes.gerer'))->toBeFalse();
 });
+it('réserve les droits groupes, postes et événements à l’administrateur', function () {
+    foreach (['groupes.gerer', 'postes.gerer', 'evenements.gerer'] as $permission) {
+        foreach (array_keys(config('roles')) as $role) {
+            expect(account($role)->can($permission))->toBe($role === 'administrateur');
+        }
+    }
+});
 it('crée, attribue, désactive et réinitialise sans journaliser de secret', function () {
     $admin = account('administrateur');
     $admin->update(['two_factor_confirmed_at' => now()]);
