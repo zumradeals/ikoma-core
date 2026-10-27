@@ -231,7 +231,7 @@ final class ListImport
      */
     private function publicPreview(array $p): array
     {
-        return ['id' => $p['id'], 'event_id' => $p['event_id'], 'filename' => $p['filename'], 'create_hosts' => $p['create_hosts'], 'summary' => $p['analysis']['summary'], 'anomalies' => $p['analysis']['anomalies'], 'sample' => $p['analysis']['sample']];
+        return ['id' => $p['id'], 'event_id' => $p['event_id'], 'filename' => $p['filename'], 'create_hosts' => $p['create_hosts'], 'summary' => $p['analysis']['summary'], 'anomalies' => $p['analysis']['anomalies'], 'groups' => $p['analysis']['groups'], 'sample' => $p['analysis']['sample']];
     }
 
     private function fail(string $message): never

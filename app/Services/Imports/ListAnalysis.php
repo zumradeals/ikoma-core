@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 final class ListAnalysis
 {
-    /** @return array{rows: array<int,array<string,mixed>>, summary:array<string,int>, anomalies:array<int,array<string,mixed>>, sample:array<int,array<string,mixed>>} */
+    /** @return array{rows: array<int,array<string,mixed>>, summary:array<string,int>, anomalies:array<int,array<string,mixed>>, sample:array<int,array<string,mixed>>, groups:array<int,array<string,mixed>>} */
     public function analyse(string $path, string $format, string $eventId, bool $createHosts): array
     {
         $event = DB::table('events')->where('id', $eventId)->first();
@@ -113,27 +113,32 @@ final class ListAnalysis
         }
         $valid = [];
         $warnings = 0;
+        $groups = [];
+        $groupNumbers = [];
+        $variants = [];
+        foreach ($identities as $name => $items) {
+            $variants[$name] = count(array_unique(array_column($items, 'key')));
+        }
         foreach ($rows as $r) {
             if ($r['errors']) {
                 $anomalies[] = ['line' => $r['line'], 'name' => $r['full_name'], 'blocking' => true, 'messages' => $r['errors'], 'related' => $r['related']];
 
                 continue;
             }
-            $homonyms = [];
-            foreach ($identities[$r['name_key']] ?? [] as $other) {
-                if ($other['key'] !== $r['identity_key']) {
-                    $homonyms[] = $other['reference'];
-                }
-            }
-            if ($homonyms) {
+            if (($variants[$r['name_key']] ?? 0) > 1) {
                 $warnings++;
-                $anomalies[] = ['line' => $r['line'], 'name' => $r['full_name'], 'blocking' => false, 'messages' => ['Homonyme : demandez un second critère à l’accueil (organisation ou hôte).'], 'related' => $homonyms];
+                if (! isset($groupNumbers[$r['name_key']])) {
+                    $number = count($groups) + 1;
+                    $groupNumbers[$r['name_key']] = $number;
+                    $groups[] = ['number' => $number, 'name' => $r['full_name'], 'references' => array_column($identities[$r['name_key']], 'reference')];
+                }
+                $anomalies[] = ['line' => $r['line'], 'name' => $r['full_name'], 'blocking' => false, 'messages' => ['Homonyme : demandez un second critère à l’accueil (organisation ou hôte).'], 'related' => [], 'group' => $groupNumbers[$r['name_key']]];
             }
             unset($r['errors'],$r['related'],$r['name_key'],$r['identity_key']);
             $valid[] = $r;
         }
 
-        return ['rows' => $valid, 'summary' => ['read' => count($rows), 'importable' => count($valid), 'blocked' => count($rows) - count($valid), 'warnings' => $warnings], 'anomalies' => $anomalies, 'sample' => array_slice($valid, 0, 10)];
+        return ['rows' => $valid, 'summary' => ['read' => count($rows), 'importable' => count($valid), 'blocked' => count($rows) - count($valid), 'warnings' => $warnings], 'anomalies' => $anomalies, 'sample' => array_slice($valid, 0, 10), 'groups' => $groups];
     }
 
     public function clean(string $value, bool $protect = true): string

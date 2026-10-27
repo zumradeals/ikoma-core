@@ -245,3 +245,14 @@ it('la base refuse un statut visiteur inconnu et accepte les quatre valeurs vali
         expect($e->getCode())->toBe('23514');
     }
 });
+it('accepte 5000 homonymes sans multiplier les fiches dans le rapport', function () {
+    $rows = [];
+    for ($i = 1; $i <= 5000; $i++) {
+        $rows[] = ['Homonyme fictif de limite', 'Organisation fictive '.$i, '', 'Visiteur', '', ''];
+    }
+    $p = $this->service->preview($this->event, $this->actor->id, importCsv($rows), false);
+    expect($p['summary'])->toBe(['read' => 5000, 'importable' => 5000, 'blocked' => 0, 'warnings' => 5000]);
+    expect($p['groups'])->toHaveCount(1);
+    expect($p['groups'][0]['references'])->toHaveCount(5000);
+    expect(strlen(json_encode($p)))->toBeLessThan(5 * 1024 * 1024);
+});
