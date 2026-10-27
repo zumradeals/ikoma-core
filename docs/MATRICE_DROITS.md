@@ -1,4 +1,4 @@
-# Matrice des droits L1 — à valider
+# Matrice des droits L1 — validée le 27 octobre 2026
 
 Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_verification_visiteurs.pdf), sections 2 et 10. Aucun héritage implicite de rôle. Un seul rôle attribué par compte dans L1. Tout droit non listé est refusé.
 
@@ -11,6 +11,7 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | badges.controler | — | — | Oui | — | — |
 | badges.gerer | Oui | — | — | — | — |
 | cars.suivre | — | Oui | — | — | — |
+| categories.gerer | Oui | — | — | — | — |
 | comptes.gerer | Oui | — | — | — | — |
 | groupes.appel_nominal | — | — | Oui | — | — |
 | groupes.confirmer_presence | — | — | — | — | Oui |
@@ -35,4 +36,4 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 
 Les permissions des futurs modules sont enregistrées mais aucune route ni table de ces modules n’est créée. `journal.exporter` est réservé ; aucun export L1.
 
-Écart à valider : la section 10 du PDF mentionne les catégories, absentes de la liste limitative transmise pour L1. Aucun droit de gestion des catégories n’est ajouté. La portée des listes de l’hôte et du groupe de l’encadreur devra être limitée aux objets concernés dans leurs futurs modules.
+Validation du dirigeant : la permission `categories.gerer` est attribuée uniquement à l’administrateur, conformément à la section 10 du document de fonctionnement (« gestion des badges, zones et catégories »). La portée des listes de l’hôte et du groupe de l’encadreur devra être limitée aux objets concernés dans leurs futurs modules.

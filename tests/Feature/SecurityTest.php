@@ -70,6 +70,7 @@ it('interdit de désactiver la 2FA obligatoire', function () {
 it('applique la matrice exacte sans héritage implicite', function () {
     foreach (config('roles') as $role => $permissions) {
         $user = account($role);
+        expect($user->can('categories.gerer'))->toBe($role === 'administrateur');
         expect($user->getAllPermissions()->pluck('name')->sort()->values()->all())->toBe(collect($permissions)->sort()->values()->all());
     }
     expect(account('administrateur')->can('visiteurs.valider'))->toBeFalse();
