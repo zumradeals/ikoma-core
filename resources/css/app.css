@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@source "../js";
+@theme {
+  --color-ikoma-blue: #0F5AA6;
+  --color-ikoma-navy: #0B3C6B;
+  --color-ikoma-orange: #F26B21;
+  --color-ikoma-success: #1E9E5A;
+  --color-ikoma-danger: #D64545;
+  --color-ikoma-gold: #C9962B;
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --text-body: 1.125rem;
+  --text-heading: 1.5rem;
+  --text-display: 2rem;
+}
+@layer base {
+  body { @apply m-0 bg-slate-50 font-sans text-body text-ikoma-navy; }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--color-ikoma-blue); outline-offset: 4px; }
+}
