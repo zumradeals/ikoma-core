@@ -44,3 +44,9 @@ make lint        # Style PHP/JS, analyse PHP et TypeScript
 Pour essayer le mode hors ligne : visiter la page une première fois, attendre l'activation du service worker puis couper le réseau et rouvrir l'adresse. Utiliser localhost ou HTTPS : les service workers ne fonctionnent pas sur une adresse HTTP distante. La connexion n'est pas nécessaire pour rouvrir la page provisoire ; aucun parcours métier n'est implémenté.
 
 Les composants et règles visuelles sont décrits dans `docs/design-system.md`. Les versions exactes des bibliothèques sont figées dans `composer.lock` et `package-lock.json`.
+
+### Versions et vérification des sources
+
+Versions stables consultées le 27 octobre 2026 : PHP 8.5.12, Laravel 13.39.0, Inertia Laravel 3.5.2 / Vue 3.9.1, Vue 3.5.44, Tailwind 4.3.3, Vite 8.3.5, TypeScript 7.0.2, PostgreSQL 18.6 et Nginx stable 1.30.6. PHP local de vérification : 8.3 ; image de référence : 8.5.12.
+
+Sources : [PHP](https://www.php.net/releases/), [Laravel](https://laravel.com/docs/releases), [Inertia](https://github.com/inertiajs/inertia-laravel/releases), [registre npm](https://www.npmjs.com/), [PostgreSQL](https://www.postgresql.org/support/versioning/), [Nginx](https://nginx.org/en/download.html). Les registres ont été interrogés avant installation, les fichiers lock fixent les versions résolues.

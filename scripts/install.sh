@@ -6,6 +6,7 @@ if [ ! -f .env ]; then
     $template = str_replace("APP_KEY=", "APP_KEY=base64:".base64_encode(random_bytes(32)), $template);
     $template = str_replace("DB_PASSWORD=", "DB_PASSWORD=".bin2hex(random_bytes(24)), $template);
     file_put_contents(".env", $template);
-    chmod(".env", 0600);
+    chgrp(".env", 33);
+    chmod(".env", 0640);
   '
 fi
