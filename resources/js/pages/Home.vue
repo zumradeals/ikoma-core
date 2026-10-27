@@ -9,6 +9,7 @@ import StatusBanner from '../components/StatusBanner.vue';
       <p class="mb-3 font-semibold text-ikoma-blue">Bienvenue</p>
       <h1 class="mb-6 text-display font-bold leading-tight">IKOMA Accueil — en construction</h1>
       <p class="mb-8">Les fondations de l'application sont en préparation.</p>
+      <a href="/login" class="action mb-6">Se connecter</a>
       <StatusBanner message="Page provisoire : aucune opération de contrôle des visiteurs n'est disponible." />
     </BaseCard>
   </BaseLayout>

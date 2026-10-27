@@ -20,3 +20,7 @@ Police système, disponible sans réseau. Trois tailles : body (18 px), heading 
 - StatusBanner : message annoncé par role=status, accompagné du symbole information.
 
 La page provisoire n'affiche aucune action métier. Le cache PWA ne concerne que cette page publique et les ressources compilées. Ne pas étendre ce cache à des réponses authentifiées ; sa stratégie devra être révisée avant L1.
+
+## Formulaires L1
+
+Champs de 56 px minimum et labels explicites. FormButton conserve la soumission native des formulaires. Les identifiants de rôles et d’actions restent dans le contrat ; leurs libellés sont présentés en français dans l’interface. Dates du journal formatées en français. Aucun secret TOTP ni code de secours n’est inclus dans les captures automatisées.
