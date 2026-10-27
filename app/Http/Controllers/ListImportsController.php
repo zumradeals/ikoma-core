@@ -75,7 +75,9 @@ final class ListImportsController
             return $action();
         } catch (ValidationException|HttpExceptionInterface $e) {
             throw $e;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            // Classe de l’exception seulement : jamais le message, qui pourrait contenir des valeurs nominatives.
+            report(new \RuntimeException('Échec import liste : '.$e::class));
             return back()->withErrors(['file' => 'L’opération n’a pas pu être terminée. Rechargez l’écran avant de réessayer ou contactez l’administrateur.']);
         }
     }
