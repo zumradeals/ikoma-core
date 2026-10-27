@@ -6,6 +6,10 @@ test('la page provisoire se rouvre sans réseau après une première visite', as
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) await new Promise<void>(resolve => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true }));
   });
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.screenshot({ path: 'test-results/accueil-tablette.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/accueil-mobile.png', fullPage: true });
   await context.setOffline(true);
   await page.close();
   const offline = await context.newPage();

@@ -2,7 +2,7 @@ name: Fondations L0
 on:
   pull_request:
   push:
-    branches: [main, l0-fondations]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -16,6 +16,12 @@ jobs:
       - run: make test
       - run: make test-front
       - run: make e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures-l0
+          path: test-results/
+          if-no-files-found: ignore
       - if: failure()
         run: docker compose logs
       - if: always()
