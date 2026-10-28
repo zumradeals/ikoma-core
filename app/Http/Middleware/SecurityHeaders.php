@@ -21,7 +21,9 @@ final class SecurityHeaders
     {
         $camera = in_array($request->path(), ['poste', 'poste/shell', 'controle', 'controle/shell', 'groupe', 'groupe/shell'], true);
         // Les attributs de style Vue servent aux couleurs des catégories et à la progression. Aucun script en ligne n'est permis.
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+        $styleNonce = (string) $request->attributes->get('csp_style_nonce', '');
+        $styleSrc = $styleNonce !== '' ? "'self' 'nonce-{$styleNonce}'" : "'self'";
+        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src {$styleSrc}; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'same-origin');
         $response->headers->set('Permissions-Policy', 'camera='.($camera ? '(self)' : '()').', microphone=(), geolocation=(), payment=(), usb=()');

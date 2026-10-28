@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Étiquettes de badges</title>
-<style>
+<style nonce="{{ $nonce }}">
 * { box-sizing: border-box; }
 body { margin: 0; background: #e2e8f0; color: #000; font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif; }
 .toolbar { background: #fff; padding: 16px; border-bottom: 2px solid #0B3C6B; display: flex; flex-wrap: wrap; gap: 16px; align-items: end; font-size: 18px; }

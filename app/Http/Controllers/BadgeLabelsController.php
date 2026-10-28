@@ -51,7 +51,11 @@ final class BadgeLabelsController
         $bandH = min(9.0, $cellH * 0.2);
         $codeSize = min($cellW / 3.9, $cellH * 0.28);
         $qrSize = max(10.0, min($cellH - $bandH - $codeSize * 1.15 - 2.5, $cellW * 0.62));
+        // La page d'impression porte un bloc de style calculé (marges, colonnes, tailles) : un nonce, valable pour cette réponse seule, l'autorise.
+        $nonce = base64_encode(random_bytes(16));
+        $r->attributes->set('csp_style_nonce', $nonce);
         $html = view('badges.labels', [
+            'nonce' => $nonce,
             'sheets' => array_chunk($labels, $cols * $rows), 'cols' => $cols, 'rows' => $rows, 'query' => $q, 'margin' => self::MARGIN_MM,
             'tooMany' => $tooMany, 'max' => self::MAX_LABELS, 'count' => count($labels),
             'size' => ['band' => round($bandH, 1), 'qr' => round($qrSize, 1), 'code' => round($codeSize, 1), 'bandFont' => round($bandH * 0.55, 1), 'numFont' => round(min($qrSize * 0.22, 6.0), 1)],

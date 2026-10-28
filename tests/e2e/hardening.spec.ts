@@ -34,6 +34,7 @@ test('CSP : aucun script injecté, caméra autorisée au poste, coquille réouve
 });
 
 test('administrateur : politique de conservation proposée et export daté du journal sans nom', async ({ page }) => {
+  test.setTimeout(90_000); // le serveur refuse un code à six chiffres déjà utilisé : l'attente de la période suivante peut durer 30 s
   const fx = JSON.parse(readFileSync('.secrets/screen-account.json', 'utf8')) as { email: string; password: string; secret: string };
   await page.goto('/login');
   await page.getByLabel('Adresse électronique').fill(fx.email);
