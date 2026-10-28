@@ -115,6 +115,7 @@ final class SyncProcessor
                 $body = ['status' => 'applique', ...$result];
                 $status = 200;
             } catch (DeskRefused $e) {
+                $e->runAfterRollback();
                 $body = ['status' => 'conflit', 'code' => $e->code_, 'message' => $e->getMessage()];
                 $status = $e->status;
                 $this->quarantine($device, $id, $type, $op, $visitorId, $payload, $e->code_);

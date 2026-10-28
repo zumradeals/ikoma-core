@@ -98,6 +98,7 @@ final class HostGuests
                 DB::table('visitors')->where('id', $id)->update([...$values, 'updated_at' => $at, ...(SecurityProfile::strict() ? ['approval_status' => VisitorApprovals::PENDING, 'approved_by' => null, 'approved_at' => null] : [])]);
             }
             if (! $v || $fields) {
+                app(Watchlist::class)->checkNew($host->event_id, null, $visitorId);
                 DB::table('events')->where('id', $host->event_id)->increment('list_revision');
                 app(Audit::class)->append($v ? 'liste.invite_modifie' : 'liste.invite_ajoute', $actor->id, ['visitor_id' => $visitorId, 'host_id' => $host->id, 'event_id' => $host->event_id, 'fields' => $fields]);
             }

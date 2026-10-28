@@ -9,6 +9,7 @@ use App\Services\Poste\DeskRefused;
 use App\Services\Poste\ListSnapshot;
 use App\Services\Poste\SiteControl;
 use App\Services\Presence;
+use App\Services\Watchlist;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\Query\Builder;
@@ -450,4 +451,16 @@ it('transforme le code de contrainte rejoué par la tablette en alerte critique 
     $bad['id'] = (string) Str::uuid();
     $bad['agent_id'] = $other->id;
     expect(siteSync([$bad])->assertOk()->json('results.0.status'))->toBe('conflit')->and(DB::table('alerts')->where('type', 'contrainte')->count())->toBe(1);
+});
+
+it('prévient le superviseur et marque la réponse quand une personne de la liste d’interdits se présente au contrôle (audit A2)', function () {
+    $badge = $this->batch0[0];
+    siteEnter(0, $badge);
+    $name = (string) DB::table('visitors')->where('id', DemoSeeder::id('visitor0'))->value('full_name');
+    siteControl($badge->code, siteZone(0))->assertOk()->assertJson(['valid' => true, 'watch' => false]);
+    app(Watchlist::class)->add($name, 'Motif fictif confidentiel', siteUser('officier_securite'));
+    $r = siteControl($badge->code, siteZone(0))->assertOk()->assertJson(['valid' => true, 'watch' => true]);
+    expect($r->getContent())->not->toContain('Motif fictif confidentiel');
+    $alert = DB::table('alerts')->where('type', 'personne_signalee')->where('subject_id', DemoSeeder::id('visitor0'))->first();
+    expect($alert)->not->toBeNull()->and($alert->severity)->toBe('critique')->and($alert->message)->not->toContain($name);
 });

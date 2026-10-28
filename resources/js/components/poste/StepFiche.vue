@@ -24,6 +24,7 @@ const reason = computed(() => (notApproved.value ? 'L’invité n’est pas appr
       <p v-if="fiche.a_rebadger" class="mt-4 rounded-xl border-2 border-orange-600 bg-orange-50 p-3 font-bold text-orange-900" data-testid="a-rebadger"><span aria-hidden="true">▲</span> À rebadger : le badge précédent a été annulé, associez un nouveau badge.</p>
       <p v-if="fiche.hors_periode" class="mt-4 rounded-xl border-2 border-red-700 bg-red-50 p-3 font-bold text-red-900"><span aria-hidden="true">⚠</span> Hors de sa période de validité : l’avis de l’hôte ou du superviseur sera demandé à la décision.</p>
     </div>
+    <p v-if="fiche.watch" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 font-bold text-red-900" data-testid="personne-signalee"><span aria-hidden="true">⛔</span> Personne signalée : appelez le superviseur avant toute décision.</p>
     <p v-if="notApproved" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 font-bold text-red-900" data-testid="non-approuve"><span aria-hidden="true">⛔</span> {{ fiche.approval === 'refuse' ? 'L’officier de sécurité n’a pas approuvé cet invité : appelez le superviseur.' : 'Cet invité attend l’approbation de l’officier de sécurité : l’accueil est impossible pour le moment.' }}</p>
     <div v-if="homonyms > 1" class="rounded-xl border-2 border-red-700 bg-red-50 p-4">
       <p class="font-bold text-red-900"><span aria-hidden="true">⚠</span> Homonyme : {{ homonyms }} personnes portent ce nom.</p>

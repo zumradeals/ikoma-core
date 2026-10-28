@@ -199,3 +199,5 @@ Migrations `2026_11_11_000000_add_security_profile` (réglage `profil_securite`,
 
 
 - L16 : `visitors.approval_status` (`approuve` par défaut | `a_approuver` | `refuse`), `approved_by`, `approved_at` ; contrainte CHECK sur le statut ; index sur (event_id, approval_status).
+
+- L17 : `watchlist_entries` (id, full_name, name_key, reason, created_by, created_at, lifted_at?, lifted_by?) ; index unique des clés actives ; fonction SQL `ikoma_name_key(text)` ; type d'alerte `personne_signalee`.

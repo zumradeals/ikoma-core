@@ -5,7 +5,7 @@ import { displayDate } from '../../labels';
 export type AlertRow = { id: string; type: string; severity: 'critique' | 'haute' | 'normale'; message: string; created_at: string; acknowledged_at: string | null; resolved_at: string | null; escalated_at?: string | null; link: string | null };
 defineProps<{ alert: AlertRow }>();
 const severity = { critique: ['⛔', 'Critique', 'border-red-700 bg-red-50'], haute: ['▲', 'Haute', 'border-orange-600 bg-orange-50'], normale: ['●', 'Normale', 'border-slate-400 bg-white'] } as const;
-const types: Record<string, string> = { refus: 'Accès refusé', non_liste_attente: 'Non listé en attente', badge_annule: 'Badge annulé', conflit_sync: 'Conflit de synchronisation', hors_periode: 'Hors période', car_arrive: 'Car arrivé', groupe_incomplet: 'Groupe incomplet', groupe_ecart: 'Écart de groupe', controle_refuse: 'Badge refusé au contrôle', zone_interdite: 'Zone non autorisée', badge_double: 'Badge présenté deux fois', controle_rafale: 'Refus répétés', contrainte: 'Code de contrainte' };
+const types: Record<string, string> = { refus: 'Accès refusé', non_liste_attente: 'Non listé en attente', badge_annule: 'Badge annulé', conflit_sync: 'Conflit de synchronisation', hors_periode: 'Hors période', car_arrive: 'Car arrivé', groupe_incomplet: 'Groupe incomplet', groupe_ecart: 'Écart de groupe', controle_refuse: 'Badge refusé au contrôle', zone_interdite: 'Zone non autorisée', personne_signalee: 'Personne signalée', badge_double: 'Badge présenté deux fois', controle_rafale: 'Refus répétés', contrainte: 'Code de contrainte' };
 function acknowledge(id: string) { router.post(`/pilotage/alertes/${id}/prendre-en-compte`, {}, { preserveScroll: true }); }
 </script>
 <template>

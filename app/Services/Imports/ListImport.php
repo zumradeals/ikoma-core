@@ -4,6 +4,7 @@ namespace App\Services\Imports;
 
 use App\Services\Audit;
 use App\Services\VisitorApprovals;
+use App\Services\Watchlist;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -114,6 +115,7 @@ final class ListImport
                 DB::table('visitors')->insert($chunk);
             }
             app(Audit::class)->append('liste.import_confirme', $actor, ['id' => $token, 'event_id' => $event, ...$analysis['summary']]);
+            app(Watchlist::class)->checkNew($event, $token);
 
             return ['id' => $token, ...$analysis['summary']];
         });

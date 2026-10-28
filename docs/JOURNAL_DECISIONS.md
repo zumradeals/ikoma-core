@@ -343,3 +343,15 @@ Migration `2026_11_13_000000_add_visitor_approval`, service `VisitorApprovals`, 
 - **Modification par l'hôte** : dans le profil renforcé, modifier un invité déjà approuvé le remet « à approuver ».
 - **Journal** : `liste.approuvee` / `liste.refusee`, nombres seulement, jamais de noms. Chaque décision incrémente la révision de liste pour que les tablettes récupèrent le statut.
 - **À valider par le dirigeant** : niveaux d'habilitation liés aux zones (non faits ici).
+
+## L17 — liste d'interdits persistante (audit global A2), 28 octobre 2026
+
+Migration `2026_11_14_000000_create_watchlist`, service `Watchlist`, écran **Autorité > Liste d'interdits** (`/autorite/interdits`, permission `interdits.gerer`, officier de sécurité seul).
+
+- **Persistante** : la liste n'est liée à aucun événement. Une entrée = un nom + un motif ; levée = date et auteur conservés, jamais effacée.
+- **Correspondance par le nom** : clé sans accent, sans majuscule, sans ponctuation et **sans ordre des mots** (fonction SQL `ikoma_name_key`). Un homonyme est donc possible : **le superviseur tranche**, l'application ne bloque jamais définitivement. Un second critère (pièce d'identité, audit A1) viendra réduire ce risque.
+- **L'agent ne voit jamais le motif** : la copie de la tablette porte seulement un drapeau `watch`. À l'accueil : bandeau « Personne signalée : appelez le superviseur », et la validation exige que l'agent indique l'avis du superviseur (même mécanisme que « hors période »), en ligne comme hors ligne. Au contrôle : bandeau rouge « PERSONNE SIGNALÉE », le passage n'est pas bloqué par la tablette (un agent ne doit pas s'opposer seul), le superviseur est prévenu.
+- **Alertes (critique ou haute, sans nom)** : à l'ajout d'une entrée si des invités des événements en cours correspondent ; à l'import d'une liste et à l'ajout par un hôte ; quand la personne se présente à l'accueil (même si l'agent est refusé : l'alerte est écrite après l'annulation de l'opération, `DeskRefused::afterRollback`) ; quand son badge est contrôlé.
+- **Double validation** : en profil renforcé, **lever** une interdiction crée une demande (`interdit.lever`) qu'un **administrateur** valide (écran Validations) ; l'officier ne se valide pas lui-même. En profil standard, la levée est directe. L'ajout reste une décision de l'officier seul (action de précaution, réversible).
+- **Journal** : `interdit.ajoute` et `interdit.leve` portent un numéro d'entrée, jamais un nom ni un motif.
+- **Limites** : la liste est saisie à la main (pas d'import de fichier) ; à valider avec le client : durée de conservation des entrées, partage avec d'autres services, base légale (à vérifier par un juriste).

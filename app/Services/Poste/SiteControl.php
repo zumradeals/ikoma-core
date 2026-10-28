@@ -10,6 +10,7 @@ use App\Services\BadgeService;
 use App\Services\ControlAlerts;
 use App\Services\Presence;
 use App\Services\QrSvg;
+use App\Services\Watchlist;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -61,12 +62,16 @@ final class SiteControl
                 $this->controlAlerts->zoneDenied($poste->event_id, $badge->id, $badge->code, $checkpoint, $declaredAt);
             }
         }
+        $flagged = $valid && app(Watchlist::class)->isFlagged($verdict->person['id']);
+        if ($flagged) { // audit global A2 : la personne signalée est devant un point de contrôle
+            app(Watchlist::class)->raiseEncounter($poste->event_id, $verdict->person['id'], 'au point « '.$checkpoint['name'].' »');
+        }
         if ($valid && $badge !== null) {
             $this->controlAlerts->doublePresentation($poste->event_id, $badge->id, $badge->code, $eventId, $checkpoint, $declaredAt);
         }
 
         return [
-            'valid' => $valid, 'reason' => $reason, 'message' => $message, 'badge_code' => $badge?->code, 'zone_ok' => $zoneOk, 'point' => $checkpoint['name'],
+            'valid' => $valid, 'watch' => $flagged, 'reason' => $reason, 'message' => $message, 'badge_code' => $badge?->code, 'zone_ok' => $zoneOk, 'point' => $checkpoint['name'],
             'person' => $valid ? ['name' => $verdict->person['name']] : null, 'organisation' => $valid ? $verdict->organisation : null,
             'category' => $category ? ['id' => $category->id, 'name' => $category->name, 'color' => $category->color, 'priority_circuit' => (bool) $category->priority_circuit] : null,
             'zones' => $zones instanceof Collection ? $zones->pluck('name')->all() : [], 'source' => 'serveur',

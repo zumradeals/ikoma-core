@@ -43,7 +43,7 @@ export function controlLocal(list: LocalList, printed: string | null, point: Poi
   const category = list.categories.get(holder.category_id) ?? null;
   const allowed = new Set(list.snapshot.category_zone.filter(cz => cz.category_id === holder.category_id).map(cz => cz.zone_id));
   const zones = list.snapshot.zones.filter(z => allowed.has(z.id)).map(z => z.name).sort((a, b) => a.localeCompare(b, 'fr'));
-  return { ...base, valid: true, reason: null, message: 'Badge valide.', person: { name: holder.full_name }, organisation: holder.organisation, category, zones, zone_ok: point?.type === 'zone' ? allowed.has(point.id) : null };
+  return { ...base, valid: true, reason: null, message: 'Badge valide.', person: { name: holder.full_name }, organisation: holder.organisation, category, zones, zone_ok: point?.type === 'zone' ? allowed.has(point.id) : null, watch: holder.watch === true };
 }
 
 /** Sortie jugée sur la copie locale. Une personne « attendue » sur cette tablette a peut-être été saisie à l'entrée ailleurs : on enregistre, le serveur tranchera. */

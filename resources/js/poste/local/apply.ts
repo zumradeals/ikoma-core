@@ -24,7 +24,7 @@ export function ficheOf(list: LocalList, id: string, now: number): Fiche {
   return {
     id: v.id, full_name: v.full_name, organisation: v.organisation, host: v.host_id ? list.hostNames.get(v.host_id) ?? null : null, category, zones: list.zonesFor(v),
     accueil_limite: v.source === 'non listé', source: v.source, status: v.status, host_validation: v.host_validation, valid_from: v.valid_from, valid_until: v.valid_until,
-    hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, approval: v.approval ?? 'approuve', a_rebadger: v.a_rebadger ?? false,
+    hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, watch: v.watch === true, approval: v.approval ?? 'approuve', a_rebadger: v.a_rebadger ?? false,
   };
 }
 
@@ -73,6 +73,9 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
       if (!v.identity_done || !v.photo_done) throw refuse('identite_requise', 'La pièce d’identité et la photo sont obligatoires avant de valider.');
       if (outsidePeriod(v, now) && p.avis !== 'hote' && p.avis !== 'superviseur') {
         throw refuse('hors_periode', 'Visiteur hors période : avis de l’hôte ou du superviseur requis', 'Demandez l’avis de l’hôte ou du superviseur, puis indiquez-le.');
+      }
+      if (v.watch === true && p.avis !== 'superviseur') {
+        throw refuse('personne_signalee', 'Personne signalée : appelez le superviseur.', 'Appelez le superviseur : lui seul peut autoriser, puis indiquez son avis.');
       }
       v.validated = true;
       return {};

@@ -90,6 +90,7 @@ final class Approvals
             'compte.creer' => $this->createAccount($p, $requester, $approver),
             'compte.modifier' => $this->updateAccount($p, $approver),
             'securite.profil_standard' => $this->downgradeProfile($approver),
+            'interdit.lever' => app(Watchlist::class)->lift((string) $p['entry_id'], $approver, true),
             default => throw ValidationException::withMessages(['approbation' => 'Action inconnue.']),
         };
     }

@@ -41,6 +41,7 @@ final class Operations
                 $body = DB::transaction($handler); // point de sauvegarde : un refus annule les écritures de l'opération, pas son enregistrement
                 $status = 200;
             } catch (DeskRefused $e) {
+                $e->runAfterRollback();
                 $body = $e->toArray();
                 $status = $e->status;
             }

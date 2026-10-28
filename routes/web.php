@@ -23,6 +23,7 @@ use App\Http\Controllers\PostesController;
 use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\SecurityProfileController;
+use App\Http\Controllers\WatchlistController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\RequireTwoFactor;
@@ -112,6 +113,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
 
         Route::get('/autorite/listes', [ListApprovalsController::class, 'index'])->middleware('can:listes.approuver');
+        Route::get('/autorite/interdits', [WatchlistController::class, 'index'])->middleware('can:interdits.gerer');
+        Route::post('/autorite/interdits', [WatchlistController::class, 'store'])->middleware('can:interdits.gerer');
+        Route::delete('/autorite/interdits/{entry}', [WatchlistController::class, 'lift'])->whereUuid('entry')->middleware('can:interdits.gerer');
         Route::post('/autorite/listes/{batch}/{decision}', [ListApprovalsController::class, 'decide'])->where('decision', 'approuver|refuser')->middleware('can:listes.approuver');
         Route::get('/administration/approbations', [ApprovalsController::class, 'index'])->middleware('can:approbations.decider');
         Route::post('/administration/approbations/{approval}/approuver', [ApprovalsController::class, 'approve'])->whereUuid('approval')->middleware('can:approbations.decider');

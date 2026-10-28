@@ -3,6 +3,7 @@
 namespace App\Services\Poste;
 
 use App\Models\Device;
+use App\Services\Watchlist;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,7 @@ final class ListSnapshot
         $setting = fn (string $key, int $default): int => (int) (DB::table('settings')->where('key', $key)->value('value') ?? $default);
         $visitors = DB::select("SELECT v.id, v.full_name, v.organisation, v.host_id, v.category_id, v.valid_from, v.valid_until, v.source, v.status, v.host_validation, v.access_note, v.group_id, v.approval_status, v.updated_at AS rev,
             (v.status IS DISTINCT FROM 'sorti' AND v.status IS DISTINCT FROM 'refuse' AND EXISTS (SELECT 1 FROM badge_assignments x WHERE x.visitor_id = v.id AND x.cancelled_at IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM badge_assignments x WHERE x.visitor_id = v.id AND x.returned_at IS NULL AND x.cancelled_at IS NULL)) AS a_rebadger,
+            ".Watchlist::matchSql('v')." AS watch,
             EXISTS (SELECT 1 FROM identity_checks i WHERE i.visitor_id = v.id) AS identity_done,
             EXISTS (SELECT 1 FROM photos p WHERE p.visitor_id = v.id) AS photo_done,
             EXISTS (SELECT 1 FROM access_events a WHERE a.visitor_id = v.id AND a.type = 'validation') AS validated,
@@ -66,7 +68,7 @@ final class ListSnapshot
             'zones' => DB::table('zones')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
-            'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'approval' => $v->approval_status, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
+            'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'approval' => $v->approval_status, 'watch' => (bool) $v->watch, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
             'postes' => DB::table('devices')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'station'])->map(fn ($d) => ['id' => $d->id, 'name' => $d->station ?? $d->name])->all(),
             // Les jetons QR ne quittent jamais le serveur en clair : la tablette compare le hachage du jeton scanné. Tous les badges de l'événement
             // sont copiés pour le contrôle hors ligne ; `mine` indique ceux que ce poste peut associer (réservés à lui).
