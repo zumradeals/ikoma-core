@@ -71,6 +71,11 @@ async function progress(page: Page, done: number, total: number): Promise<void> 
   try { await expect(page.getByTestId('progression')).toHaveText(`Badges remis : ${done} sur ${total}`, { timeout: 15_000 }); }
   catch (e) {
     const message = await page.getByTestId('erreur').innerText().catch(() => 'aucun message');
+    const state = await page.evaluate(() => {
+      const v = document.querySelector('video');
+      return JSON.stringify({ video: v ? { ready: v.readyState, w: v.videoWidth, paused: v.paused, shown: v.offsetParent !== null, tracks: (v.srcObject as MediaStream | null)?.getTracks().map(t => t.readyState) } : null, courant: document.querySelector('[data-testid=personne-courante]')?.textContent, confirmee: !!document.querySelector('[data-testid=code-badge]'), videos: document.querySelectorAll('video').length });
+    });
+    console.log('DIAG', state);
     throw new Error(`Progression attendue ${done}/${total} — message affiché : ${message} — ${(e as Error).message}`);
   }
 }
