@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ProgressiveLoginThrottle;
+use App\Http\Middleware\ResolvePoste;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SessionSecurity;
 use App\Services\AccessAudit;
@@ -9,6 +10,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -22,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Le conteneur nginx n'écoute que sur 127.0.0.1 : seul le proxy HTTPS du serveur (Caddy) peut l'atteindre, on lui fait donc confiance pour le schéma https.
         $middleware->trustProxies(at: '*');
         $middleware->append(SecurityHeaders::class);
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: ProgressiveLoginThrottle::class);
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: ResolvePoste::class);
         $middleware->web(append: [HandleInertiaRequests::class, SessionSecurity::class, ProgressiveLoginThrottle::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -29,7 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             app(AccessAudit::class)->record(request(), $response);
             if (in_array($response->getStatusCode(), [403, 429], true) && ! request()->expectsJson()) {
                 $retryAfter = $response->headers->get('Retry-After');
-                $response = Inertia::render('Error', ['status' => $response->getStatusCode()])->toResponse(request())->setStatusCode($response->getStatusCode());
+                $response = Inertia::render('Error', ['status' => $response->getStatusCode(), 'retryAfter' => max(1, (int) ($retryAfter ?? 60))])->toResponse(request())->setStatusCode($response->getStatusCode());
                 if ($retryAfter !== null) {
                     $response->headers->set('Retry-After', $retryAfter);
                 }

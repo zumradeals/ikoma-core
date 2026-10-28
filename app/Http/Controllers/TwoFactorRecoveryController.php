@@ -8,9 +8,7 @@ use App\Services\TwoFactorRecovery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 final class TwoFactorRecoveryController
 {
@@ -20,7 +18,7 @@ final class TwoFactorRecoveryController
         abort_unless($r->user()->hasRole('administrateur') && $r->user()->id !== $user->id, 403);
         abort_unless($user->requiresTwoFactor(), 422);
         $token = Str::random(64);
-        $r->session()->put('2fa_reset', ['user_id' => $user->id, 'token_hash' => hash('sha256', $token), 'expires' => now()->addMinutes(5)->timestamp, 'fingerprint' => hash('sha256', (string) $user->two_factor_secret.'|'.$user->updated_at)]);
+        $r->session()->put('2fa_reset', ['user_id' => $user->id, 'token_hash' => hash('sha256', $token), 'expires' => now()->addMinutes(5)->timestamp, 'fingerprint' => app(TwoFactorRecovery::class)->fingerprint($user)]);
         app(Audit::class)->append('compte.2fa_reinitialisation_demandee', $r->user()->id, ['user_id' => $user->id]);
 
         return back()->with('twoFactorReset', ['user_id' => $user->id, 'token' => $token]);
@@ -31,11 +29,8 @@ final class TwoFactorRecoveryController
         Gate::authorize('comptes.gerer');
         $data = $r->validate(['token' => 'required|string|size:64', 'password' => 'required|string', 'confirmation' => 'accepted']);
         $challenge = $r->session()->pull('2fa_reset');
-        abort_unless(is_array($challenge) && $challenge['user_id'] === $user->id && $challenge['expires'] > now()->timestamp && hash_equals($challenge['token_hash'], hash('sha256', $data['token'])) && hash_equals($challenge['fingerprint'], hash('sha256', (string) $user->two_factor_secret.'|'.$user->updated_at)), 409, 'Recommencez la demande de réinitialisation.');
-        if (! Hash::check($data['password'], $r->user()->password)) {
-            throw ValidationException::withMessages(['password' => 'Confirmation non acceptée.']);
-        }
-        $recovery->reset($r->user(), $user);
+        abort_unless(is_array($challenge) && $challenge['user_id'] === $user->id && $challenge['expires'] > now()->timestamp && hash_equals($challenge['token_hash'], hash('sha256', $data['token'])) && hash_equals($challenge['fingerprint'], app(TwoFactorRecovery::class)->fingerprint($user)), 409, 'Recommencez la demande de réinitialisation.');
+        $recovery->reset($r->user(), $user, $challenge['fingerprint'], $data['password']);
 
         return back();
     }

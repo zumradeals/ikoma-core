@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('recherche', fn (Request $r) => Limit::perMinute(240)->by($r->user()?->id));
         RateLimiter::for('exports', fn (Request $r) => Limit::perMinute(3)->by($r->user()?->id));
         Event::listen(Login::class, function ($event): void {
-            app(LoginAttempts::class)->clear(request());
+            app(LoginAttempts::class)->clear(request(), $event->user->email);
             app(Audit::class)->append('connexion.reussie', $event->user->getAuthIdentifier());
         });
         Event::listen(Failed::class, function ($event): void {

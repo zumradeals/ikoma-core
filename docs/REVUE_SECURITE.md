@@ -24,7 +24,7 @@ Les scripts sont de l’origine uniquement. Les workers sont locaux ; les donné
 
 Caméra limitée aux pages de poste, contrôle et groupes (et leurs coquilles précachées) ; microphone, géolocalisation, paiement et USB interdits. Les politiques du système/navigateur restent nécessaires. HTTPS est obligatoire hors développement : HSTS n’est émis que sur HTTPS ; les cookies sont alors Secure. Aucun HSTS sur le HTTP de recette ne transforme ce HTTP en canal sécurisé.
 
-Les photos sont bornées à 1 Mo et 640 px, décodées puis réencodées par GD natif de PHP avant chiffrement Laravel, sans EXIF/IPTC/commentaire ou données ajoutées. Leur chemin UUID reste privé et n’a aucune route de consultation. La clé APP_KEY ne doit jamais être stockée avec une sauvegarde en clair. Un transfert SQL annulé après écriture peut laisser un fichier chiffré orphelin ; l’inventaire et le nettoyage contrôlé du stockage doivent être intégrés à l’exploitation L12.
+Les photos sont bornées à 1 Mo et 640 px, validées par GD natif de PHP ; les JPEG porteurs de segments de métadonnées, de commentaires libres ou de données ajoutées sont réencodés avant chiffrement Laravel, sans EXIF/IPTC/contenu ajouté. Une signature technique GD de forme fixe peut subsister ; les JPEG déjà propres sont conservés identiques pour le contrat d’intégrité L5. Leur chemin UUID reste privé et n’a aucune route de consultation. La clé APP_KEY ne doit jamais être stockée avec une sauvegarde en clair. Un transfert SQL annulé après écriture peut laisser un fichier chiffré orphelin ; l’inventaire et le nettoyage contrôlé du stockage doivent être intégrés à l’exploitation L12.
 
 ## Analyses automatiques et portée
 
@@ -34,8 +34,24 @@ Les outils sont exclusivement exécutés en CI/local, sans dépendance applicati
 
 ### Exceptions observées
 
-Aucune exception d’analyse autorisée à ce stade de la préparation. Toute alerte de recette doit être examinée et ajoutée ici avec règle précise, contexte, justification et risque ; le contrôleur ZAP bloque par défaut toute alerte non justifiée. L’exception CSP de style décrite ci-dessus est une décision explicite, pas une désactivation globale de l’analyse.
+Les exceptions examinées sont listées ci-dessous. Toute alerte supplémentaire doit être examinée et documentée avec règle précise, contexte, justification et risque ; le contrôleur ZAP bloque toute alerte non justifiée. L’exception CSP de style décrite ci-dessus est une décision explicite, pas une désactivation globale de l’analyse.
 
 ## Conditions avant mise en service
 
 Faire valider la politique de données et le cadre applicable par le client/juriste, finaliser hébergement dédié et HTTPS, restrictions proxy, secrets/clefs et sauvegardes avec restauration, matériel dédié, procédure d’incident, double contrôle des consoles, puis faire réaliser une revue/pentest indépendant et une répétition complète. Le serveur de développement ne constitue pas l’environnement de production durci.
+
+### Examen de la baseline du 28 octobre 2026
+
+Source : exécution CI 40678326327, rapport ZAP de l’artefact 12812565036, cible fictive HTTP localhost. Les en-têtes d’isolation d’origine manquants (90004-1/2/3) sont ajoutés à PHP et aux ressources statiques ; Permissions-Policy sur le JavaScript compilé (10063-1) est ajouté à Nginx. Ces constats sont corrigés, pas ignorés.
+
+Exceptions vérifiées par règle, niveau **et** instances dans `scripts/security/zap-gate.py` :
+
+| Règle | Contexte accepté | Justification / limite |
+|---|---|---|
+| 10010, faible | Cookie XSRF-TOKEN uniquement, évidence exacte Set-Cookie | Le client Inertia doit lire le jeton pour l’en-tête CSRF. Le cookie de session reste HttpOnly. L’exception ne couvre aucun autre cookie ; un XSS actif reste un risque traité par CSP et échappement |
+| 10109, information | Page racine contenant le module JavaScript | Identifie une application moderne ; rappelle la limite de l’exploration passive sans authentification. Les parcours authentifiés sont testés par Playwright |
+| 10112, information | Cookie laravel-session reconnu sur la page racine | Détection de mécanisme de session, pas exposition de sa valeur. Aucune exception sur la sécurité du cookie |
+| 10049-1, information | Racine privée et sitemap.xml absent avec no-store | L’absence de cache est attendue pour les réponses de session/erreur ; aucun écran authentifié ne doit être mis en cache |
+| 10049-3, information | Ressources publiques /build/ et robots.txt | Ressources sans identité destinées au navigateur/PWA ; exception non applicable aux routes de données |
+
+Tout nouveau cas, autre cookie, autre niveau ou autre périmètre bloque. Les alertes ne disparaissent pas du rapport. La disponibilité des bases de vulnérabilités n’est jamais contournée. L’audit npm de cette exécution ne contient que des constats faibles dans la chaîne de build Workbox/deepmerge (dont GHSA-gcqx-w48m-w2h4) ; pas de failles élevées/critiques. Ils restent dans le rapport, sous le seuil explicite demandé, à suivre lors des mises à jour compatibles. Aucun rétrogradage majeur de vite-plugin-pwa n’est appliqué automatiquement.

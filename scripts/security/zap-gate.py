@@ -1,13 +1,46 @@
-"""Pas d'ignorance globale : toute alerte doit passer ou être justifiée par règle et contexte."""
+"""Exceptions examinées dans docs/REVUE_SECURITE.md ; toute autre alerte bloque."""
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
+
+
+def approved(alert):
+    ref = alert.get('alertRef')
+    risk = str(alert.get('riskcode'))
+    instances = alert.get('instances', [])
+    if not instances:
+        return False
+    for instance in instances:
+        url = urlparse(instance.get('uri', ''))
+        if url.hostname != 'localhost' or url.scheme != 'http':
+            return False
+        path = url.path or '/'
+        if ref == '10010' and risk == '1':
+            if instance.get('param') != 'XSRF-TOKEN' or instance.get('evidence') != 'Set-Cookie: XSRF-TOKEN':
+                return False
+        elif ref == '10109' and risk == '0':
+            if path != '/' or 'type="module"' not in instance.get('evidence', ''):
+                return False
+        elif ref == '10112' and risk == '0':
+            if path != '/' or instance.get('param') != 'laravel-session':
+                return False
+        elif ref == '10049-1' and risk == '0':
+            if path not in ['/', '/sitemap.xml'] or instance.get('evidence') not in ['private', 'no-store']:
+                return False
+        elif ref == '10049-3' and risk == '0':
+            if not (path.startswith('/build/') or path == '/robots.txt'):
+                return False
+        else:
+            return False
+    return True
+
 
 report = json.loads(Path(sys.argv[1]).read_text())
-blocked = []
+blocked, exceptions = [], []
 for site in report.get('site', []):
     for alert in site.get('alerts', []):
-        # Aucune exception tant que la recette n'a pas produit un cas concret examiné.
-        blocked.append({'regle': alert.get('pluginid'), 'alerte': alert.get('name'), 'risque': alert.get('riskcode')})
-print(json.dumps({'alertes_a_examiner': blocked}, ensure_ascii=False))
+        result = {'regle': alert.get('alertRef'), 'alerte': alert.get('name'), 'risque': alert.get('riskcode')}
+        (exceptions if approved(alert) else blocked).append(result)
+print(json.dumps({'exceptions_documentees': exceptions, 'alertes_a_examiner': blocked}, ensure_ascii=False))
 sys.exit(1 if blocked else 0)

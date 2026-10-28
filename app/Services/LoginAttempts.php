@@ -31,10 +31,16 @@ final class LoginAttempts
         return max(0, (int) Cache::get($this->key($r).':until', 0) - now()->timestamp);
     }
 
-    public function clear(Request $r): void
+    public function clear(Request $r, ?string $email = null): void
     {
-        Cache::forget($this->key($r).':count');
-        Cache::forget($this->key($r).':until');
+        $keys = [$this->key($r)];
+        if ($email !== null) {
+            $keys[] = 'login-progress:'.hash('sha256', strtolower(trim($email)).'|'.$r->ip());
+        }
+        foreach (array_unique($keys) as $key) {
+            Cache::forget($key.':count');
+            Cache::forget($key.':until');
+        }
     }
 
     /** @return array{ip: ?string, appareil_hash:string} */

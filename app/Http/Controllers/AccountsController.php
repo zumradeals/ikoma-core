@@ -30,6 +30,7 @@ class AccountsController
         Gate::authorize('roles.attribuer');
         $data = $r->validate(['name' => 'required|string|max:120', 'email' => 'required|email|max:180|unique:users', 'password' => ['required', Password::min(12)->mixedCase()->numbers()->symbols()], 'role' => ['required', Rule::in(array_keys(config('roles')))]]);
         DB::transaction(function () use ($data): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
             $u = User::create(['name' => $data['name'], 'email' => strtolower($data['email']), 'password' => $data['password']]);
             $u->assignRole($data['role']);
             app(Audit::class)->append('compte.cree', auth()->id(), ['id' => $u->id, 'role' => $data['role']]);
@@ -45,6 +46,8 @@ class AccountsController
         $data = $r->validate(['active' => 'required|boolean', 'role' => ['required', Rule::in(array_keys(config('roles')))]]);
         abort_if($user->id === $r->user()->id && (! $data['active'] || $data['role'] !== 'administrateur'), 422, 'Vous ne pouvez pas retirer votre propre accès administrateur.');
         DB::transaction(function () use ($user, $data): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
+            $user = User::query()->lockForUpdate()->findOrFail($user->id);
             if ($user->active !== $data['active']) {
                 $user->update(['active' => $data['active'], 'remember_token' => null]);
                 app(Audit::class)->append($data['active'] ? 'compte.active' : 'compte.desactive', auth()->id(), ['id' => $user->id]);
@@ -111,6 +114,8 @@ class AccountsController
         Gate::authorize('comptes.gerer');
         $data = $r->validate(['password' => ['required', Password::min(12)->mixedCase()->numbers()->symbols()]]);
         DB::transaction(function () use ($data, $user): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
+            $user = User::query()->lockForUpdate()->findOrFail($user->id);
             $user->update(['password' => $data['password'], 'remember_token' => null]);
             DB::table('sessions')->where('user_id', $user->id)->delete();
             app(Audit::class)->append('mot_de_passe.reinitialise', auth()->id(), ['id' => $user->id]);

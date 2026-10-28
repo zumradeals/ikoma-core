@@ -9,6 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::table('settings', fn (Blueprint $t) => $t->text('value')->change());
         Schema::table('devices', fn (Blueprint $t) => $t->bigInteger('sync_seq')->default(0));
         Schema::table('events', function (Blueprint $t) {
             $t->timestampTz('anonymized_at')->nullable();
@@ -25,6 +26,8 @@ return new class extends Migration
 
     public function down(): void
     {
+        DB::table('settings')->where('key', 'audit_checkpoint')->delete();
+        Schema::table('settings', fn (Blueprint $t) => $t->string('value')->change());
         Schema::table('devices', fn (Blueprint $t) => $t->dropColumn('sync_seq'));
         Schema::table('events', fn (Blueprint $t) => $t->dropColumn(['anonymized_at', 'retention_summary']));
         Schema::table('sync_operations', fn (Blueprint $t) => $t->dropIndex(['device_id', 'seq']));

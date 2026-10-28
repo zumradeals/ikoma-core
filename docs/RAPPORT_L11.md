@@ -2,7 +2,7 @@
 
 ## Fait dans la branche de travail
 
-CSP et en-têtes, politique caméra par page, cookies HTTPS et versions masquées ; refus d’accès dédoublonné, IP/empreinte hachée sur échecs, blocages progressifs et quotas sync/recherche/export ; réinitialisation TOTP par autre administrateur en deux temps et bris de glace CLI ; fermeture des sessions et jetons persistants ; contrôle de séquences clonées et révocation ; photos reconstruites sans métadonnées avant chiffrement ; export journal borné, daté, neutralisé, sans noms ni détails libres ; ancrage RSA externe et vérification par blocs ; politique de conservation proposée non approuvée, commandes privilégiées distinctes avec reçu signé pour le journal.
+CSP et en-têtes, politique caméra par page, cookies HTTPS et versions masquées ; refus d’accès dédoublonné, IP/empreinte hachée sur échecs, blocages progressifs et quotas sync/recherche/export ; réinitialisation TOTP par autre administrateur en deux temps et bris de glace CLI ; fermeture des sessions et jetons persistants ; contrôle de séquences clonées et révocation ; photos validées et nettoyées de leurs métadonnées personnelles avant chiffrement ; export journal borné, daté, neutralisé, sans noms ni détails libres ; ancrage RSA externe et vérification par blocs ; politique de conservation proposée non approuvée, commandes privilégiées distinctes avec reçu signé pour le journal.
 
 Migration additive, pas de table nouvelle ni de permission ajoutée. Aucun élargissement des droits SQL applicatifs. Documents : REVUE_SECURITE.md, CONSERVATION_DONNEES.md, EXPLOITATION.md, schéma et journal.
 

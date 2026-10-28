@@ -112,7 +112,7 @@ it('ne purge pas un événement encore actif ou avec une personne présente', fu
     DB::table('events')->where('id', $event)->update(['ends_at' => now()->addDay()]);
     app(DataRetention::class)->purge();
     expect(DB::table('events')->where('id', $event)->value('anonymized_at'))->toBeNull();
-    DB::table('events')->where('id', $event)->update(['ends_at' => now()->subYear()]);
+    DB::table('events')->where('id', $event)->update(['starts_at' => now()->subYears(2), 'ends_at' => now()->subYear()]);
     DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'visitor_id' => DemoSeeder::id('visitor1'), 'type' => 'entree', 'occurred_at' => now()->subMonth()]);
     app(DataRetention::class)->purge();
     expect(DB::table('events')->where('id', $event)->value('anonymized_at'))->toBeNull();

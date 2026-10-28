@@ -78,6 +78,7 @@ it('exige les droits, la préparation, le secret administrateur et un jeton à u
     expect($target->fresh()->two_factor_secret)->toBeNull()->and($target->fresh()->two_factor_recovery_codes)->toBeNull()->and($target->fresh()->two_factor_confirmed_at)->toBeNull()->and($target->fresh()->remember_token)->toBeNull();
     expect(DB::table('sessions')->where('user_id', $target->id)->exists())->toBeFalse();
     expect(DB::table('audit_logs')->where('action', 'compte.2fa_reinitialisee')->where('actor_id', $admin->id)->count())->toBe(1);
+    $this->travel(61)->seconds();
     $this->post($url.'confirmer', ['token' => $token, 'password' => $password, 'confirmation' => true])->assertStatus(409);
     $this->actingAs($target->fresh())->get('/espace')->assertRedirect('/securite');
 });
@@ -112,7 +113,7 @@ it('renforce progressivement les blocages et journalise IP et empreinte sans ide
     $token = Str::random(64);
     foreach ([60, 300, 900] as $seconds) {
         for ($i = 0; $i < 5; $i++) {
-            $this->withHeaders(['X-Device-Token' => $token])->post('/login', ['email' => $email, 'password' => 'incorrect'])->assertSessionHasErrors('email');
+            $this->withHeaders(['X-Device-Token' => $token])->post('/login', ['email' => $email, 'password' => 'incorrect'])->assertStatus(302)->assertSessionHasErrors('email');
         }
         $this->post('/login', ['email' => $email, 'password' => 'incorrect'])->assertStatus(429)->assertHeader('Retry-After', (string) $seconds);
         $this->travel($seconds + 1)->seconds();
