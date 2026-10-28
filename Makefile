@@ -14,6 +14,7 @@ e2e:
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-account.json'
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-business.json'
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-import.json'
+	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-badges.json'
 	docker compose run --rm e2e
 lint:
 	docker compose exec -T php composer lint

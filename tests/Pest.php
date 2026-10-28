@@ -14,3 +14,5 @@ pest()->beforeEach(fn () => LegacyL1Schema::start())
 pest()->use(DatabaseTransactions::class)->in('Feature/BusinessModelTest.php');
 
 pest()->use(DatabaseTransactions::class)->in('Feature/ListImportTest.php');
+
+pest()->use(DatabaseTransactions::class)->in('Feature/BadgeLifecycleTest.php');
