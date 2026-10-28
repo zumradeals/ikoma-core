@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { initial, reduce, stepNumber, validateBlockedReason, type Ev } from '../../poste/machine';
 import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../poste/repository';
-import { ApiError, type Avis, type DeskContext, type Fiche, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
+import { ApiError, type Avis, type DeskContext, type DeskSummary, type Fiche, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
 import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.vue'; import PosteSelect from './PosteSelect.vue'; import StepSearch from './StepSearch.vue'; import StepFiche from './StepFiche.vue';
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
-import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
+import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
 
 import type { SyncState } from '../../poste/local/sync';
 const props = defineProps<{ agent: string; repository?: PosteRepository; sync?: SyncState | null; autoSelect?: boolean }>();
@@ -24,6 +24,17 @@ const posteName = computed(() => { const p = postes.value.find(x => x.id === pos
 const elapsed = computed(() => (ctx.value.startedAt === null ? 0 : Math.max(0, Math.round((now.value - ctx.value.startedAt) / 1000))));
 const clockLabel = computed(() => `${Math.floor(elapsed.value / 60)}:${String(elapsed.value % 60).padStart(2, '0')}`);
 const blockedReason = computed(() => validateBlockedReason(ctx.value));
+
+// Panneau du poste : recalculé quand l'agent revient à la recherche, quand la file ou la synchronisation changent.
+const summary = ref<DeskSummary | null>(null);
+let summarySeq = 0;
+async function refreshSummary() {
+  if (!repo.deskSummary || !context.value) return;
+  const mine = ++summarySeq;
+  try { const fresh = await repo.deskSummary(); if (mine === summarySeq) summary.value = fresh; }
+  catch { /* le panneau est un confort : son échec ne doit jamais gêner l'accueil */ }
+}
+watch([() => ctx.value.step, () => props.sync?.pending, () => props.sync?.lastSyncAt, context], () => { void refreshSummary(); });
 
 function send(event: Ev) { ctx.value = reduce(ctx.value, event); }
 function readStored(): string | null { try { return window.localStorage.getItem(STORAGE_KEY); } catch { return null; } }
@@ -45,9 +56,10 @@ async function choosePoste(id: string) {
 }
 async function refreshFiche(id: string) { fiche.value = await repo.visitor(id); return fiche.value; }
 
-function onSelect(result: SearchResult) {
-  return run(async () => { const f = await repo.visitor(result.id); fiche.value = f; homonyms.value = result.homonyms; send({ type: 'SELECT', fiche: f }); });
+function selectVisitor(id: string, homonymCount: number) {
+  return run(async () => { const f = await repo.visitor(id); fiche.value = f; homonyms.value = homonymCount; send({ type: 'SELECT', fiche: f }); });
 }
+const onSelect = (result: SearchResult) => selectVisitor(result.id, result.homonyms);
 const onConfirm = () => send({ type: 'CONFIRM_FICHE' });
 function onIdentity(photo: Blob) {
   return run(async () => {
@@ -123,7 +135,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
 <template>
   <div class="min-h-screen bg-slate-50 text-ikoma-navy">
     <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
-    <main id="contenu" class="mx-auto max-w-4xl space-y-6 px-4 py-6">
+    <main id="contenu" class="mx-auto space-y-6 px-4 py-6" :class="context && summary ? 'max-w-6xl' : 'max-w-4xl'">
       <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur">
         <p class="font-bold"><span aria-hidden="true">⚠</span> {{ error.message }}</p>
         <p v-if="error.action && !error.message.includes(error.action)" class="mt-1 font-semibold">{{ error.action }}</p>
@@ -134,7 +146,10 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
           <StepTracker :current="stepNumber[ctx.step]" class="min-w-64 flex-1" />
           <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><span aria-hidden="true">⏱</span> {{ clockLabel }}</p>
         </div>
-        <StepSearch v-if="ctx.step === 'recherche'" :repository="repo" @select="onSelect" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
+        <div v-if="ctx.step === 'recherche'" class="grid gap-6" :class="summary ? 'lg:grid-cols-[minmax(0,1fr)_21rem]' : ''">
+          <StepSearch :repository="repo" @select="onSelect" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
+          <DeskPanel v-if="summary" :summary="summary" :online="online" :syncing="sync?.syncing" @sync="emit('sync')" @select="id => selectVisitor(id, 1)" />
+        </div>
         <UnlistedForm v-else-if="ctx.step === 'non_liste'" :context="context" :busy="busy" @submit="onCreateUnlisted" @back="onBack" />
         <StepFiche v-else-if="ctx.step === 'fiche' && fiche" :key="fiche.id" :fiche="fiche" :homonyms="homonyms" @confirm="onConfirm" @back="onBack" />
         <StepWaitHost v-else-if="ctx.step === 'attente_hote' && fiche" :fiche="fiche" :refused="ctx.hostRefused" :busy="busy" @refresh="onHostRefresh" @next="onNext" />

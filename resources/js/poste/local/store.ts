@@ -64,6 +64,21 @@ export class PosteStore {
     return Promise.all(rows.map(r => openJson<LocalOp>(this.key, r.data, `op:${r.id}`)));
   }
 
+  /**
+   * Chiffres du poste. Le type et l'état d'une opération sont en clair dans IndexedDB : on compte sans rien déchiffrer,
+   * et seules les dernières opérations affichées sont ouvertes.
+   */
+  async deskOps(recentTypes: string[], limit: number): Promise<{ counts: Record<string, number>; pending: Record<string, number>; recent: LocalOp[] }> {
+    const rows = await this.db.ops.toArray();
+    const counts: Record<string, number> = {}; const pending: Record<string, number> = {};
+    for (const r of rows) {
+      if (r.status !== 'conflict') counts[r.type] = (counts[r.type] ?? 0) + 1;
+      if (r.status === 'pending') pending[r.type] = (pending[r.type] ?? 0) + 1;
+    }
+    const last = rows.filter(r => r.status !== 'conflict' && recentTypes.includes(r.type)).sort((a, b) => b.seq - a.seq).slice(0, limit);
+    return { counts, pending, recent: await Promise.all(last.map(r => openJson<LocalOp>(this.key, r.data, `op:${r.id}`))) };
+  }
+
   async count(status: 'pending' | 'done' | 'conflict'): Promise<number> { return this.db.ops.where('status').equals(status).count(); }
 
   async photoBase64(id: string): Promise<string> {
