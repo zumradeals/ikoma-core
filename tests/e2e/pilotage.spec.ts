@@ -93,8 +93,7 @@ test('alertes : voir, prendre en compte, trier par gravité', async () => {
   await shot(sup, 'l8-alertes');
   const target = sup.getByTestId('alerte-refus').first();
   await expect(target.getByTestId('prendre-en-compte')).toBeVisible();
-  const box = await target.getByTestId('prendre-en-compte').boundingBox();
-  expect(box!.height).toBeGreaterThanOrEqual(56);
+  await expect.poll(async () => (await target.getByTestId('prendre-en-compte').boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(56);
   const before = await sup.locator('[data-testid^="alerte-"]').count();
   await target.getByTestId('prendre-en-compte').click();
   await expect(sup.locator('[data-testid^="alerte-"]')).toHaveCount(before - 1);
