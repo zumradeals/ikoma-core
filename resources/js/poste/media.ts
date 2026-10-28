@@ -35,12 +35,13 @@ type DetectorCtor = { new (options: { formats: string[] }): DetectorLike; getSup
 export type ScanHandle = { stop(): void };
 
 /** Lit les QR devant la caméra et appelle `onCode` pour chaque nouvelle valeur lue. */
-export async function startScan(video: HTMLVideoElement, onCode: (text: string) => void): Promise<ScanHandle> {
+export async function startScan(video: HTMLVideoElement, onCode: (text: string) => boolean | void): Promise<ScanHandle> {
   const stream = await openCamera(video, 'environment');
   let stopped = false;
   let last = ''; let lastAt = 0;
   // Un même QR n'est pas renvoyé en rafale, mais il l'est de nouveau après 3 s : une lecture ignorée (opération déjà en cours) ou refusée peut être retentée en gardant le badge devant la caméra.
-  const emit = (text: string) => { const now = Date.now(); if (!stopped && text && (text !== last || now - lastAt > 3000)) { last = text; lastAt = now; onCode(text); } };
+  // Si le receveur répond `false` (il n'était pas prêt), la lecture n'est pas comptée : elle sera renvoyée à la prochaine image.
+  const emit = (text: string) => { const now = Date.now(); if (!stopped && text && (text !== last || now - lastAt > 3000) && onCode(text) !== false) { last = text; lastAt = now; } };
   const Detector = (window as unknown as { BarcodeDetector?: DetectorCtor }).BarcodeDetector;
   const supported = Detector ? await (Detector.getSupportedFormats?.() ?? Promise.resolve(['qr_code'])).catch(() => []) : [];
   if (Detector && supported.includes('qr_code')) {

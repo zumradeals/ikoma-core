@@ -72,9 +72,9 @@ async function check() {
   finally { busy.value = false; }
 }
 
-async function deliver(raw: string) {
+async function deliver(raw: string): Promise<boolean> {
   const person = current.value; const value = raw.trim();
-  if (!person || !person.checked || !groupId.value || !value || busy.value) return;
+  if (!person || !person.checked || !groupId.value || !value || busy.value) return false;
   busy.value = true; error.value = null;
   try {
     await props.repository.groupDeliver(crypto.randomUUID(), groupId.value, person.visitor_id, value);
@@ -82,6 +82,7 @@ async function deliver(raw: string) {
     await refresh();
   } catch (e) { error.value = explain(e); }
   finally { busy.value = false; }
+  return true;
 }
 
 async function depart() {
@@ -92,9 +93,9 @@ async function depart() {
   finally { busy.value = false; }
 }
 
-async function arrive(raw: string) {
+async function arrive(raw: string): Promise<boolean> {
   const value = raw.trim();
-  if (!value || busy.value) return;
+  if (!value || busy.value) return false;
   busy.value = true; error.value = null;
   try {
     const result = await props.repository.arrive(crypto.randomUUID(), value);
@@ -103,6 +104,7 @@ async function arrive(raw: string) {
     await refresh();
   } catch (e) { error.value = explain(e); }
   finally { busy.value = false; }
+  return true;
 }
 
 async function endArrival(g: GroupSummary) {
@@ -114,7 +116,13 @@ async function endArrival(g: GroupSummary) {
 }
 
 // La caméra reste ouverte tant que la personne à appeler existe (l'élément vidéo n'est que masqué avant le contrôle) : pas de réouverture à chaque stagiaire.
-function onCode(text: string) { if (tab.value === 'arrivee') void arrive(text); else void deliver(text); }
+function onCode(text: string): boolean {
+  const person = current.value;
+  // Retour immédiat « pas prêt » (opération en cours, correspondance pas encore validée) : le lecteur renverra la même lecture à l'image suivante.
+  if (busy.value || (tab.value !== 'arrivee' && !person?.checked)) return false;
+  void (tab.value === 'arrivee' ? arrive(text) : deliver(text));
+  return true;
+}
 async function startCamera() {
   scanError.value = '';
   if (!video.value || handle) return;
