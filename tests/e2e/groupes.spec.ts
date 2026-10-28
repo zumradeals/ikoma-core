@@ -187,7 +187,7 @@ test('sans réseau pendant la remise : rien n’est perdu ni dupliqué à la res
   await page.close();
 });
 
-test('arrivée du car : scan continu, écarts signalés au superviseur', async () => {
+test('arrivée du car : scan continu, écarts signalés au superviseur', async ({ browser }, info) => {
   test.setTimeout(240_000);
   const car = fx.cars['4'];
   const page = await tablet.newPage();
@@ -209,17 +209,16 @@ test('arrivée du car : scan continu, écarts signalés au superviseur', async (
   await page.close();
 
   // Le superviseur voit l'avancement et les deux écarts.
-  const sup = await phone.newPage();
-  await sup.goto('/login'); await sup.getByLabel('Adresse électronique').fill(fx.supervisor.email); await sup.getByLabel('Mot de passe', { exact: true }).fill(fx.supervisor.password); await sup.getByRole('button', { name: 'Se connecter' }).click();
-  await sup.getByLabel('Code à six chiffres').fill(await freshOtp(fx.supervisor.secret)); await sup.getByRole('button', { name: 'Vérifier', exact: true }).click();
-  await expect(sup).toHaveURL(/\/espace/);
+  const supervisor = await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 380, height: 800 }, hasTouch: true, isMobile: true });
+  await login(supervisor, fx.supervisor.email, fx.supervisor.password, fx.supervisor.secret);
+  const sup = await supervisor.newPage();
   await sup.goto('/pilotage/groupes');
   const card = sup.getByTestId('liste-groupes').locator('li').filter({ hasText: car.bus });
   await expect(card).toContainText('car parti'); await expect(card.getByTestId('ecarts-groupe')).toBeVisible(); await shot(sup, 'pilotage-groupes');
   await sup.goto('/pilotage/alertes');
   await expect(sup.getByText('n’étaient pas embarquée').or(sup.getByText('alors que la personne n’était pas embarquée')).first()).toBeVisible();
   await expect(sup.getByText(/embarqué\(s\) du car Car 4 n’ont pas été scannés/)).toBeVisible();
-  await sup.close();
+  await supervisor.close();
 });
 
 test('administration : règle de contrôle des stagiaires et groupes', async ({ browser }, info) => {
