@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Le conteneur nginx n'écoute que sur 127.0.0.1 : seul le proxy HTTPS du serveur (Caddy) peut l'atteindre, on lui fait donc confiance pour le schéma https.
+        $middleware->trustProxies(at: '*');
         $middleware->web(append: [HandleInertiaRequests::class, SessionSecurity::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
