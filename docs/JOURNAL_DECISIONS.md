@@ -208,3 +208,22 @@ Choix techniques :
 - Journal : notification.creee, hote.decision_non_liste, hote.avis_hors_periode, liste.invite_ajoute/modifie/retire, hote.rattache, hote.delai_modifie ; identifiants, noms de champs ou nombres uniquement, jamais de valeur nominative ni de motif libre. Les privilèges de audit_logs, access_events et identity_checks restent inchangés.
 
 - Les demandes non listées sans compte hôte lié remontent aussi après le délai ; un rattachement ultérieur rattrape les demandes en attente. Une alerte normale L8 existante est élevée à « haute » sans duplication. Les changements de rattachement et les décisions/saisies verrouillent la fiche hôte pour éviter une course d’autorisation. Le retrait se propage aussi aux effectifs actifs des groupes, sans effacer group_members.
+
+## Tableau de bord de l’administrateur, 28 octobre 2026
+
+Demande du dirigeant (« implémente-le maintenant »), à partir de la maquette publiée. Page `/administration`, permission `evenements.gerer`, double authentification comme le reste de l’administration.
+
+- **Lecture seule, aucun nom de personne** : `app/Services/AdminDashboard.php` ne renvoie que des nombres, des noms de postes et des libellés d’actions. Aucune table nouvelle, aucun réglage nouveau.
+- **Six étapes** (zones, liste, badges, tablettes, groupes, comptes) avec trois états en toutes lettres et en icône (« ✓ Fait », « ● En cours », « ○ À faire ») : jamais la couleur seule. Le bouton principal mène à la première étape non terminée.
+- **« À surveiller »** : tablette sans synchronisation depuis plus de 60 minutes, code d’enrôlement qui expire sous 15 minutes, noms identiques dans la liste, badges sans catégorie. Seuils en constantes du service (pas de réglage d’exploitation dans les fichiers techniques : **à déplacer dans Administration si le dirigeant veut les régler**).
+- **Mise en page** : nouveau gabarit `AdminLayout` (menu latéral filtré par permission, menu repliable sur téléphone). Les autres écrans d’administration gardent leur gabarit actuel tant que le dirigeant ne demande pas leur refonte.
+- **À valider par le dirigeant** : `jsqr` est passé de dépendance de développement à dépendance d’exécution en L9 (lecteur de secours des QR des badges, `resources/js/poste/media.ts`). Aucune autre dépendance ajoutée ici.
+
+## Accueil du superviseur (pilotage), 28 octobre 2026
+
+Refonte de l'écran `/pilotage` à la demande du dirigeant. Aucune route, permission ni table nouvelle ; les écrans Alertes, Présents, Litiges, Groupes et Évacuation ne changent pas.
+
+- **Ordre de lecture** : la situation en une phrase (« Tout est calme », « N alertes à traiter », « N cas à décider »), puis les alertes, puis les compteurs avec la part des attendus déjà arrivés, puis « Sur le terrain » (cas à décider, cars, tablettes). Gravité et état toujours en mots et en symbole, jamais la couleur seule.
+- **Nouvelle lecture** `Pilotage::overview` : nombres seulement (alertes critiques et hautes, cas à décider, cars partis/arrivés/en écart, tablettes sans nouvelles), rechargée par la même interrogation automatique de 3 s (`overview` ajouté aux propriétés partielles).
+- **Tablettes sans nouvelles** : le superviseur ne voit qu'un nombre, sans lien vers l'administration des postes (droit réservé à l'administrateur). Le seuil de 60 minutes est partagé avec le tableau de bord de l'administrateur (`Pilotage::SILENT_AFTER_MINUTES`), toujours en constante : à déplacer dans Administration si le dirigeant veut le régler.
+- Les identifiants de test des parcours existants (`compteur-*`, `valeur`, `aucune-alerte`, `alerte-*`, `mis-a-jour`) sont conservés.
