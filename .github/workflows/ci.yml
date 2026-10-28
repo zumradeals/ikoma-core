@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - run: make install
       - run: make up
       - run: make lint
@@ -29,6 +31,52 @@ jobs:
         run: make test
       - run: make test-front
       - run: make e2e
+      - name: Vérifier le contrôle des exceptions de sécurité
+        run: python3 -m unittest discover -s tests/security
+      - name: Auditer les dépendances applicatives (blocage élevé et critique)
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p security-results
+          set +e
+          docker compose exec -T php composer audit --locked --format=json --ignore-severity=low --ignore-severity=medium > security-results/composer.json
+          composer_result=$?
+          docker compose run --rm --no-deps front npm audit --audit-level=high --json > security-results/npm.json
+          npm_result=$?
+          test "$composer_result" -eq 0 && test "$npm_result" -eq 0
+      - name: Installer les outils d’analyse vérifiés
+        if: ${{ !cancelled() }}
+        run: sh scripts/security/install-tools.sh
+      - name: Rechercher les secrets dans tout l’historique Git
+        if: ${{ !cancelled() }}
+        run: /tmp/ikoma-security-tools/gitleaks git . --redact=100 --report-format=json --report-path=security-results/secrets.json
+      - name: Analyser les images de production (blocage élevé et critique)
+        if: ${{ !cancelled() }}
+        run: |
+          result=0
+          for service in php nginx db; do
+            image=$(docker inspect --format '{{.Image}}' "$(docker compose ps -q "$service")")
+            /tmp/ikoma-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "security-results/image-$service.json" "$image" || result=1
+          done
+          exit "$result"
+      - name: OWASP ZAP baseline sur l’application de test
+        if: ${{ !cancelled() }}
+        run: |
+          chmod 777 security-results
+          set +e
+          docker run --rm --network "container:$(docker compose ps -q nginx)" -v "$PWD/security-results:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:2.17.0 zap-baseline.py -t http://localhost -m 1 -T 5 -J zap.json -r zap.html
+          result=$?
+          set -e
+          test "$result" -lt 3
+          python3 scripts/security/zap-gate.py security-results/zap.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: analyses-securite
+          path: security-results/
+          if-no-files-found: ignore
+      - name: Retirer les secrets de recette des instantanés textuels
+        if: always()
+        run: python3 scripts/security/redact-test-artifacts.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

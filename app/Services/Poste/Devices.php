@@ -67,7 +67,7 @@ final class Devices
             }
             $token = bin2hex(random_bytes(32));
             $secret = base64_encode(random_bytes(32));
-            DB::table('devices')->where('id', $device->id)->update(['token_hash' => hash('sha256', $token), 'enrollment_hash' => null, 'enrollment_expires_at' => null, 'enrolled_at' => now(), 'revoked_at' => null, 'wipe_acknowledged_at' => null, 'updated_at' => now()]);
+            DB::table('devices')->where('id', $device->id)->update(['sync_seq' => 0, 'token_hash' => hash('sha256', $token), 'enrollment_hash' => null, 'enrollment_expires_at' => null, 'enrolled_at' => now(), 'revoked_at' => null, 'wipe_acknowledged_at' => null, 'updated_at' => now()]);
             RateLimiter::clear($key);
             $this->audit->append('poste.enrole', $agent->id, ['device_id' => $device->id, 'event_id' => $device->event_id]);
 
