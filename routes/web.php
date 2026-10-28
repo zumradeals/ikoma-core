@@ -11,6 +11,8 @@ use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ListImportsController;
 use App\Http\Controllers\PosteApiController;
 use App\Http\Controllers\PosteController;
+use App\Http\Controllers\PostesController;
+use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\RequireTwoFactor;
@@ -19,6 +21,8 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', fn () => Inertia::render('Home'))->name('home');
+// Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
+Route::get('/poste/shell', fn () => Inertia::render('Poste'));
 Route::middleware(['auth'])->group(function (): void {
     Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => (bool) auth()->user()->two_factor_confirmed_at]))->middleware('password.confirm')->name('security');
     Route::middleware(RequireTwoFactor::class)->group(function (): void {
@@ -42,7 +46,12 @@ Route::middleware(['auth'])->group(function (): void {
         Route::middleware(EnsureAgentAccueil::class)->group(function (): void {
             Route::get('/poste', PosteController::class)->middleware('can:visiteurs.rechercher');
             Route::get('/poste/api/postes', [PosteApiController::class, 'postes'])->middleware('can:visiteurs.rechercher');
+            Route::post('/poste/api/enroler', [PosteSyncController::class, 'enroler'])->middleware('can:visiteurs.rechercher');
             Route::middleware(ResolvePoste::class)->group(function (): void {
+                Route::get('/poste/api/liste', [PosteSyncController::class, 'liste'])->middleware('can:visiteurs.rechercher');
+                Route::get('/poste/api/liste/version', [PosteSyncController::class, 'version'])->middleware('can:visiteurs.rechercher');
+                Route::post('/poste/api/sync', [PosteSyncController::class, 'sync'])->middleware('can:visiteurs.rechercher');
+                Route::post('/poste/api/efface', [PosteSyncController::class, 'efface'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/contexte', [PosteApiController::class, 'contexte'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');
@@ -54,6 +63,12 @@ Route::middleware(['auth'])->group(function (): void {
                 Route::post('/poste/api/non-listes', [PosteApiController::class, 'nonListe'])->middleware('can:visiteurs.enregistrer_non_liste');
             });
         });
+
+        Route::get('/administration/postes', [PostesController::class, 'index'])->middleware('can:postes.gerer');
+        Route::post('/administration/postes', [PostesController::class, 'store'])->middleware('can:postes.gerer');
+        Route::put('/administration/postes/reglages', [PostesController::class, 'settings'])->middleware('can:postes.gerer');
+        Route::post('/administration/postes/{device}/code', [PostesController::class, 'code'])->middleware('can:postes.gerer');
+        Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
 
         Route::get('/espace', fn () => Inertia::render('Space'))->name('space');
         Route::get('/administration/comptes', [AccountsController::class, 'index'])->middleware('can:comptes.gerer');
