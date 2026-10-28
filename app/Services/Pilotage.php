@@ -102,15 +102,20 @@ final class Pilotage
     {
         $sql = "SELECT * FROM (
             SELECT v.id, v.full_name, v.organisation, c.id AS category_id, c.name AS category_name, c.color, c.priority_circuit, g.name AS group_name, l.occurred_at AS entered_at,
-                coalesce((SELECT a.checkpoint FROM access_events a WHERE a.visitor_id = v.id AND a.type = 'controle' AND a.details->>'point_type' = 'zone' AND a.occurred_at >= l.occurred_at ORDER BY a.occurred_at DESC LIMIT 1), 'Accueil') AS zone
+                coalesce(z.checkpoint, 'Accueil') AS zone
             FROM (
                 SELECT DISTINCT ON (e.visitor_id) e.visitor_id, e.type, e.occurred_at FROM access_events e
                 WHERE e.event_id = ? AND e.type IN ('entree', 'sortie') AND e.visitor_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM access_events x WHERE x.corrige_id = e.id)
                 ORDER BY e.visitor_id, e.occurred_at DESC, e.created_at DESC, e.id DESC
             ) l JOIN visitors v ON v.id = l.visitor_id JOIN categories c ON c.id = v.category_id LEFT JOIN groups g ON g.id = v.group_id
+            LEFT JOIN (
+                SELECT DISTINCT ON (a.visitor_id) a.visitor_id, a.checkpoint, a.occurred_at FROM access_events a
+                WHERE a.event_id = ? AND a.type = 'controle' AND a.details->>'point_type' = 'zone' AND a.visitor_id IS NOT NULL
+                ORDER BY a.visitor_id, a.occurred_at DESC
+            ) z ON z.visitor_id = v.id AND z.occurred_at >= l.occurred_at
             WHERE l.type = 'entree'
         ) p WHERE true";
-        $bindings = [$eventId];
+        $bindings = [$eventId, $eventId];
         if (! empty($filters['q'])) {
             $sql .= ' AND public.ikoma_normalize(p.full_name) LIKE ?';
             $bindings[] = '%'.str_replace(['%', '_'], ['\\%', '\\_'], mb_strtolower(DB::selectOne('SELECT public.ikoma_normalize(?) AS v', [trim($filters['q'])])->v)).'%';
