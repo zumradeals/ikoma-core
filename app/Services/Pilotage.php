@@ -79,11 +79,18 @@ final class Pilotage
     {
         [$sql, $bindings] = $this->presentSql($eventId, $filters);
         $sql .= ' ORDER BY p.entered_at DESC, p.full_name, p.id'.($limit !== null ? ' LIMIT '.(int) $limit.' OFFSET '.(int) $offset : '');
+        // Des statistiques de table faussées (tables vidées puis remplies, comme dans les tests) font choisir des boucles imbriquées : le temps explose
+        // avec le nombre de présents. Des jointures par hachage restent rapides dans tous les cas ; le réglage ne vaut que pour cette requête.
+        $rows = DB::transaction(function () use ($sql, $bindings): array {
+            DB::statement("SELECT set_config('enable_nestloop', 'off', true)");
+
+            return DB::select($sql, $bindings);
+        });
 
         return array_map(fn ($r) => [
             'id' => $r->id, 'full_name' => $r->full_name, 'organisation' => $r->organisation, 'group' => $r->group_name, 'zone' => $r->zone, 'entered_at' => $r->entered_at,
             'category' => ['id' => $r->category_id, 'name' => $r->category_name, 'color' => $r->color, 'priority_circuit' => (bool) $r->priority_circuit],
-        ], DB::select($sql, $bindings));
+        ], $rows);
     }
 
     /** @param array{q?:?string,category?:?string,zone?:?string}  $filters */
