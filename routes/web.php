@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\ApprovalsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgeReservationsController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\ControleController;
 use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\HostController;
 use App\Http\Controllers\JournalController;
+use App\Http\Controllers\ListApprovalsController;
 use App\Http\Controllers\ListImportsController;
 use App\Http\Controllers\MonGroupeController;
 use App\Http\Controllers\PilotageController;
@@ -20,6 +22,7 @@ use App\Http\Controllers\PosteController;
 use App\Http\Controllers\PostesController;
 use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
+use App\Http\Controllers\SecurityProfileController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\RequireTwoFactor;
@@ -107,6 +110,14 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/postes/reglages', [PostesController::class, 'settings'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/code', [PostesController::class, 'code'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
+
+        Route::get('/autorite/listes', [ListApprovalsController::class, 'index'])->middleware('can:listes.approuver');
+        Route::post('/autorite/listes/{batch}/{decision}', [ListApprovalsController::class, 'decide'])->where('decision', 'approuver|refuser')->middleware('can:listes.approuver');
+        Route::get('/administration/approbations', [ApprovalsController::class, 'index'])->middleware('can:approbations.decider');
+        Route::post('/administration/approbations/{approval}/approuver', [ApprovalsController::class, 'approve'])->whereUuid('approval')->middleware('can:approbations.decider');
+        Route::post('/administration/approbations/{approval}/refuser', [ApprovalsController::class, 'refuse'])->whereUuid('approval')->middleware('can:approbations.decider');
+        Route::get('/administration/profil-securite', [SecurityProfileController::class, 'show'])->middleware('can:securite.gerer');
+        Route::put('/administration/profil-securite', [SecurityProfileController::class, 'update'])->middleware('can:securite.gerer');
 
         Route::get('/espace', fn () => Inertia::render('Space'))->name('space');
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');

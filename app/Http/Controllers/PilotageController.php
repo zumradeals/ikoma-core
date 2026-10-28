@@ -36,6 +36,7 @@ final class PilotageController
             'event' => $event ? ['id' => $event->id, 'name' => $event->name] : null,
             'events' => DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']),
             'openAlerts' => $event ? $this->pilotage->openAlertCount($event->id) : 0,
+            'criticalAlerts' => $event ? $this->pilotage->criticalAlertCount($event->id) : 0,
         ];
     }
 

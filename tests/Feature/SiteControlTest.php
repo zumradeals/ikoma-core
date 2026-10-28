@@ -418,3 +418,36 @@ it('date l’alerte d’un contrôle fait hors ligne à l’heure déclarée par
     $alert = controlAlerts('controle_refuse')->first();
     expect($alert->message)->toContain('Contrôle fait hors ligne à '.$declared->format('H:i'));
 });
+
+it('copie sur la tablette les seuils réglés, et change de version quand un seuil change pour qu’elle les reçoive', function () {
+    $poste = Device::findOrFail(DemoSeeder::id('device'));
+    $snapshot = app(ListSnapshot::class);
+    expect($snapshot->build($poste)['settings'])->toMatchArray(['offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
+    $before = $snapshot->version($poste);
+    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '6']);
+    DB::table('settings')->where('key', 'poste_delai_appel_minutes')->update(['value' => '10']);
+    expect($snapshot->build($poste)['settings'])->toMatchArray(['offline_call_minutes' => 10, 'offline_max_hours' => 6])->and($snapshot->version($poste))->not->toBe($before);
+});
+
+it('transforme le code de contrainte rejoué par la tablette en alerte critique silencieuse, une seule fois, sans nom de personne', function () {
+    $op = siteOp('contrainte', [], 1);
+    $result = siteSync([$op])->assertOk()->json();
+    expect($result['results'][0]['status'])->toBe('applique');
+    $alert = DB::table('alerts')->where('type', 'contrainte')->first();
+    expect($alert)->not->toBeNull()->and($alert->severity)->toBe('critique')->and($alert->subject_type)->toBe('poste')->and($alert->subject_id)->toBe(DemoSeeder::id('device'))
+        ->and($alert->message)->toContain('Code de contrainte saisi au poste « Poste fictif A »')->toContain('hors ligne à')->and($alert->event_id)->toBe(DemoSeeder::id('event'));
+    foreach (DB::table('visitors')->where('event_id', DemoSeeder::id('event'))->pluck('full_name') as $name) {
+        expect($alert->message)->not->toContain($name);
+    }
+    $log = siteAudit()->where('action', 'poste.contrainte')->first();
+    expect($log)->not->toBeNull()->and($log->actor_id ?? null)->toBe($this->agent->id);
+    // un renvoi de la même opération ne crée ni seconde alerte ni seconde ligne de journal
+    $replay = siteSync([$op])->assertOk()->json();
+    expect($replay['results'][0]['replayed'] ?? false)->toBeTrue()->and(DB::table('alerts')->where('type', 'contrainte')->count())->toBe(1)->and(siteAudit()->where('action', 'poste.contrainte')->count())->toBe(1);
+    // seul un agent d'accueil enrôlé peut la déclarer
+    $other = siteUser('hote');
+    $bad = $op;
+    $bad['id'] = (string) Str::uuid();
+    $bad['agent_id'] = $other->id;
+    expect(siteSync([$bad])->assertOk()->json('results.0.status'))->toBe('conflit')->and(DB::table('alerts')->where('type', 'contrainte')->count())->toBe(1);
+});

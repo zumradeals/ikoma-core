@@ -9,8 +9,11 @@ final class Pilotage
 {
     public const PER_PAGE = 50;
 
-    /** Une tablette enrôlée sans synchronisation depuis ce délai est signalée au superviseur. */
-    public const SILENT_AFTER_MINUTES = 60;
+    /** Une tablette enrôlée sans synchronisation depuis ce délai (réglage d'Administration, 60 minutes au départ) est signalée au superviseur. */
+    public static function silentAfterMinutes(): int
+    {
+        return max(1, (int) (DB::table('settings')->where('key', 'pilotage_poste_silencieux_minutes')->value('value') ?? 60));
+    }
 
     public function __construct(private readonly Presence $presence) {}
 
@@ -49,19 +52,19 @@ final class Pilotage
      * Vue d'ensemble du terrain pour l'écran d'accueil du superviseur : alertes par gravité, cas à décider, cars et tablettes sans nouvelles.
      * Nombres seulement : aucun nom de personne.
      *
-     * @return array{critiques:int,hautes:int,litiges:int,cars:array{total:int,partis:int,arrives:int,ecarts:int},postes_silencieux:int}
+     * @return array{critiques:int,hautes:int,escaladees:int,litiges:int,cars:array{total:int,partis:int,arrives:int,ecarts:int},postes_silencieux:int}
      */
     public function overview(string $eventId): array
     {
-        $alerts = DB::selectOne("SELECT count(*) FILTER (WHERE severity = 'critique') AS critiques, count(*) FILTER (WHERE severity = 'haute') AS hautes
+        $alerts = DB::selectOne("SELECT count(*) FILTER (WHERE severity = 'critique') AS critiques, count(*) FILTER (WHERE severity = 'haute') AS hautes, count(*) FILTER (WHERE escalated_at IS NOT NULL) AS escaladees
             FROM alerts WHERE event_id = ? AND acknowledged_at IS NULL AND resolved_at IS NULL", [$eventId]);
         $litiges = (int) DB::selectOne('SELECT count(*) AS n FROM refusals f JOIN visitors v ON v.id = f.visitor_id WHERE v.event_id = ? AND f.decision IS NULL', [$eventId])->n;
         $groups = $this->groups($eventId);
         $silent = (int) DB::table('devices')->where('event_id', $eventId)->whereNotNull('token_hash')->whereNull('revoked_at')
-            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(self::SILENT_AFTER_MINUTES)))->count();
+            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(self::silentAfterMinutes())))->count();
 
         return [
-            'critiques' => (int) $alerts->critiques, 'hautes' => (int) $alerts->hautes, 'litiges' => $litiges,
+            'critiques' => (int) $alerts->critiques, 'hautes' => (int) $alerts->hautes, 'escaladees' => (int) $alerts->escaladees, 'litiges' => $litiges,
             'cars' => [
                 'total' => count($groups), 'partis' => count(array_filter($groups, fn ($g) => (bool) $g['parti'])),
                 'arrives' => count(array_filter($groups, fn ($g) => (int) $g['total'] > 0 && (int) $g['arrives'] >= (int) $g['total'])),
@@ -78,8 +81,14 @@ final class Pilotage
         $state === 'prises' ? $q->where(fn ($w) => $w->whereNotNull('acknowledged_at')->orWhereNotNull('resolved_at')) : $q->whereNull('acknowledged_at')->whereNull('resolved_at');
 
         return $q->orderByRaw("CASE severity WHEN 'critique' THEN 0 WHEN 'haute' THEN 1 ELSE 2 END")->orderByDesc('created_at')->limit($limit)
-            ->get(['id', 'type', 'severity', 'subject_type', 'subject_id', 'message', 'created_at', 'acknowledged_at', 'resolved_at'])
+            ->get(['id', 'type', 'severity', 'subject_type', 'subject_id', 'message', 'created_at', 'acknowledged_at', 'resolved_at', 'escalated_at'])
             ->map(fn ($a) => (array) $a + ['link' => $this->link($a->subject_type, $a->subject_id, $a->type)])->all();
+    }
+
+    /** Alertes critiques encore ouvertes : l'application du superviseur sonne plus fort pour celles-ci. */
+    public function criticalAlertCount(string $eventId): int
+    {
+        return DB::table('alerts')->where('event_id', $eventId)->where('severity', 'critique')->whereNull('acknowledged_at')->whereNull('resolved_at')->count();
     }
 
     public function openAlertCount(string $eventId): int

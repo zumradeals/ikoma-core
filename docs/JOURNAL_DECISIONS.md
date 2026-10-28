@@ -258,3 +258,88 @@ Priorité n°1 de docs/AUDIT_GLOBAL.md, lancée sur « go » du dirigeant. Un ba
 - **Migration** `2026_11_07_000000_create_control_alerts` : quatre types d'alerte ajoutés au CHECK `alerts_type_valid` (`controle_refuse`, `zone_interdite`, `badge_double`, `controle_rafale`) et les trois réglages.
 - **Pas fait dans ce lot** (reste dans L14) : alertes de dépassement et de non-restitution (B4), comptage par zone (B5), gel d'urgence d'un poste, d'une zone ou d'un car (C5). Alerte sonore et escalade : lot L16 (C1).
 - **Limite connue** : la détection de double présentation compare les événements **déjà reçus par le serveur**. Deux contrôles faits hors ligne sur deux tablettes ne sont comparés qu'au moment où les deux sont synchronisés ; l'alerte arrive donc en retard, pas jamais.
+
+## L14b — hors réseau et seuils réglables (audit global F2 et C1 en partie), 28 octobre 2026
+
+Cinq réglages d'exploitation quittent le code et deviennent des réglages d'Administration > Postes (règle 6 de AGENTS.md). Migration `2026_11_08_000000_add_offline_and_threshold_settings`. **Valeurs de départ proposées, à confirmer avec le client.**
+
+| Réglage (clé) | Départ | Effet |
+|---|---|---|
+| `poste_delai_appel_minutes` | 15 | Sans réseau depuis N minutes, la barre d'état de la tablette affiche « Sans réseau depuis N minutes : prévenez le superviseur ». C'est un message à l'agent, pas une alerte envoyée : sans réseau, la tablette ne peut prévenir personne. |
+| `poste_hors_reseau_max_heures` | 12 (0 = jamais) | **Audit F2.** Sans synchronisation réussie depuis N heures, la tablette se verrouille et n'accepte plus le PIN qu'avec le réseau : à l'ouverture, elle tente une synchronisation, et si elle échoue la tablette reste verrouillée avec le message « connectez-la au réseau pour reprendre. Rien n'est perdu. » Le contrôle est refait chaque minute. **Rien n'est effacé** : le PIN reste valable et les opérations en attente restent intactes. |
+| `poste_badges_bas_pourcent` / `poste_badges_bas_minimum` | 10 % / 5 | Avertissement « Il reste peu de badges » au poste d'accueil : badges restants ≤ le plus grand des deux seuils. |
+| `pilotage_poste_silencieux_minutes` | 60 | Une tablette enrôlée sans synchronisation depuis N minutes est signalée au superviseur et à l'administrateur. Remplace la constante `Pilotage::SILENT_AFTER_MINUTES`. |
+
+- **Compromis à trancher avec le client (F2)** : la règle n°7 du plan (« le poste ne s'arrête jamais ») s'oppose à la sécurité d'une tablette volée. Avec 12 heures, un événement d'une journée n'est jamais bloqué par une coupure ordinaire, mais une panne réseau de plus de 12 heures arrête le poste jusqu'au retour du réseau. Le client peut monter la valeur ou mettre 0.
+- **Les tablettes reçoivent les seuils par la copie de travail** (`settings.offline_call_minutes`, `offline_max_hours`, `low_badges_percent`, `low_badges_min`). La version de la copie tient maintenant compte de ces réglages : sans cela, une tablette n'aurait jamais reçu un seuil modifié.
+- **Pas fait** : alerte sonore et escalade des alertes du superviseur (C1, lot suivant), code de contrainte (C2).
+
+## L14c — alerte sonore et escalade (audit global C1), 28 octobre 2026
+
+Deux volets, dans les limites déjà décidées en L10 (aucun e-mail, SMS ni notification poussée avant l'avis du client).
+
+- **Escalade** : une alerte **critique ou haute** encore ouverte après `alerte_escalade_minutes` (**5 minutes au départ, à confirmer avec le client**) est marquée une seule fois comme escaladée (`alerts.escalated_at`, migration `2026_11_09_000000_add_alert_escalation`) par la tâche planifiée `alertes:escalader` (toutes les 30 secondes). Elle est alors **visible** : carte du superviseur marquée « escaladée à l'administrateur » (en mots et avec ⏰), et ligne « N alerte(s) sans prise en compte » en tête de « À surveiller » du tableau de l'administrateur. L'escalade disparaît quand l'alerte est prise en compte ou réglée. Journalisée (`alerte.escaladee`, identifiants et types seulement). **Limite** : l'administrateur doit regarder son tableau ; sans canal externe, rien ne le sonne.
+- **Alerte sonore et vibrante** (application du superviseur, `useAlertSound`) : un bouton « Son des alertes » dans l'en-tête du pilotage. Le navigateur interdit un son sans geste : le superviseur l'active une fois, son choix est conservé sur sa tablette. Un nouveau cas sonne (un bip) ; un cas critique sonne trois fois et vibre ; tant qu'une alerte critique reste ouverte, un rappel sonne chaque minute. **Limite** : le son ne joue que **dans l'application ouverte** et seulement tant que la page est visible (l'interrogation s'arrête sur un onglet caché). Un téléphone en poche, écran éteint, ne sonne pas : c'est la raison d'être d'un canal externe, à décider avec le client.
+- Réglage ajouté à Administration > Postes (« Une alerte critique ou haute sans prise en compte depuis… »).
+- **Pas fait (reste de C1)** : canal externe (SMS, radio, notification poussée) : décision du client. **Pas fait** : code de contrainte (C2).
+
+## L14d — code de contrainte (audit global C2), 28 octobre 2026
+
+Un agent menacé peut prévenir en silence. Au moment de l'enrôlement de la tablette, l'agent peut choisir un **second code de 6 chiffres** (« code de contrainte »), différent du PIN et soumis aux mêmes règles (pas de suite ni de répétition).
+
+- **Fonctionnement** : saisi à la place du PIN, il **ouvre la tablette normalement** (même coffre, même liste, même écran) et met dans la file chiffrée une opération silencieuse `contrainte`. À la synchronisation, le serveur crée une **alerte critique** « Code de contrainte saisi au poste « X » : l'agent est peut-être menacé. Agissez avec discrétion. » (type `contrainte`, sujet = le poste) et une ligne de journal `poste.contrainte` (identifiants seulement). Elle bénéficie de l'alerte sonore et de l'escalade de L14c.
+- **Chiffrement** : le même coffre est enveloppé une seconde fois par le code de contrainte (`VaultRecord.duress`), sans second jeu de données. Les deux ouvertures sont toujours tentées, même quand il n'y a pas de code de contrainte : la durée ne dit pas lequel a été saisi. Le code de contrainte n'est stocké nulle part en clair.
+- **Discrétion à l'écran** : l'opération n'apparaît ni dans « À envoyer au serveur » ni dans « Derniers passages » (le décompte de la barre d'état peut afficher une opération en attente pendant quelques secondes : c'est le seul indice, jugé acceptable).
+- **Limites connues, à connaître du client** : (1) une tablette **déjà enrôlée** n'a pas de code de contrainte : il faut la réenrôler pour en choisir un ; (2) hors réseau, l'alerte n'arrive qu'au retour du réseau (la file attend) ; (3) elle ne couvre **que le PIN des tablettes** : la connexion web du superviseur et de l'administrateur (mot de passe et 2FA) n'a pas de code de contrainte ; (4) elle suppose que l'agent a mémorisé son code et que l'agresseur ne lui fait pas saisir le PIN lui-même ; (5) le champ est **facultatif** : le rendre obligatoire est une décision du client.
+- Migration `2026_11_10_000000_add_duress_alert` : type d'alerte `contrainte` et sujet `poste`.
+
+## Décisions du dirigeant du 28 octobre 2026 : recommandations de l'architecte adoptées
+
+Le dirigeant a demandé de **retirer les décisions bloquées de l'audit global (section 8) en adoptant les recommandations de l'architecte**, et de satisfaire l'audit entier en commençant par les priorités. Les onze décisions ci-dessous sont donc **décidées** ; chacune garde la réserve indiquée. Elles restent modifiables par le dirigeant ou par le client.
+
+| N° | Décision adoptée | Réserve |
+|---|---|---|
+| 1 | **Photo au contrôle** : l'agent de contrôle voit la photo enregistrée au scan, **5 secondes**, sans conservation sur l'écran. Les enquêtes y accèdent par un **accès exceptionnel à deux personnes**, motivé et journalisé. Cette décision **remplace** celle de L3b (« photos consultables par aucun rôle »). | Protection des données : à valider par le juriste. |
+| 2 | **Numéro de pièce d'identité** : type et numéro **chiffrés** (clé applicative), durée de conservation courte, jamais affichés après saisie ; obligatoire seulement dans le profil de sécurité renforcé. | Durée et licéité : juriste et client. |
+| 3 | **Liste d'interdits** : tenue par une **autorité de sécurité** (nouveau rôle « officier de sécurité »), ajout et retrait journalisés avec un motif, l'agent voit « personne signalée » sans le motif. | Durée de conservation : juriste. |
+| 4 | **Habilitation** : approbation **binaire** (approuvé ou non) par l'officier de sécurité, **deuxième personne** distincte de celle qui importe la liste. Aucun niveau hiérarchique n'est inventé : le client définira ses niveaux s'il en a. | Niveaux : client. |
+| 5 | **Alertes** : son et vibration dans l'application, escalade à l'administrateur (L14c). Canal externe (SMS, radio, notification poussée) **non retenu** avant l'avis du client. | Canal externe : client. |
+| 6 | **2FA pour tous les rôles** (TOTP, sans nouvelle dépendance). Clé physique (WebAuthn) **non retenue** : elle exige une dépendance majeure, soumise à accord écrit (règle 3 de AGENTS.md). | Dépendance WebAuthn : accord écrit. |
+| 7 | **Objets et véhicules** : registre **générique** (plaque, équipements déclarés dans une liste réglable, dépôt) ; les règles propres au site restent au client. | Règles du site : client. |
+| 8 | **Hébergement** : sur site ou chez un hébergeur de confiance dédié, jamais un serveur partagé ni le serveur de démonstration. Classification en **trois niveaux proposés** (public, restreint, confidentiel), à adapter à l'échelle du client. | Niveau et lieu : client. |
+| 9 | **Outil d'événement seulement** pour cette version ; l'accréditation permanente est un lot distinct, non réalisé. | Client. |
+| 10 | **VIP** : traitement discret (déjà en place). **Badges** : usage unique (réglage `badge_reutilisable` = non). **Conservation** : durées prudentes proposées, non approuvées par le client. **Propriété du code, maintenance, séquestre** : non tranchés (contrat). | Contrat et juriste. |
+| 11 | **Seuils** : 15 minutes avant d'appeler le superviseur, badges bas à 10 % ou 5, tablette silencieuse à 60 minutes, escalade à 5 minutes, blocage hors réseau à 12 heures. | Client. |
+
+### Mécanisme : le « profil de sécurité » (décision d'architecture)
+Pour que les contrôles les plus contraignants ne bloquent pas la démonstration, ni les essais automatiques, et soient **actifs par défaut en production**, un réglage `profil_securite` vaut `standard` ou `renforce`. La migration pose toujours `standard` (l'environnement `APP_ENV` ne dit pas si les données sont réelles : le serveur de démonstration tourne avec `APP_ENV=production` et des données fictives) ; **l'installation de production (lot L12) doit poser `renforce` explicitement** ; un réglage absent ou illisible vaut `renforce` (échec sûr). Le tableau de bord de l'administrateur affiche une alerte tant qu'il est à `standard` : **un profil `standard` n'est pas adapté à des données réelles**. Chaque fonction de l'audit est construite, testée dans les deux profils, et activée par le profil `renforce` quand elle est contraignante (2FA pour tous, double validation, approbation des listes, numéro de pièce obligatoire).
+
+## L15a — profil de sécurité et 2FA pour tous les rôles (audit global D1), 28 octobre 2026
+
+- **Profil de sécurité** (`settings.profil_securite`, service `SecurityProfile`) : voir la décision d'architecture ci-dessus. Écran **Administration > Profil de sécurité** (permission `securite.gerer`, administrateur seul), changement journalisé (`securite.profil_modifie`, valeurs avant et après). Tant que le profil est `standard`, une ligne « Profil de sécurité « standard » » reste en tête de « À surveiller » du tableau de l'administrateur (même sans événement créé).
+- **D1** : dans le profil `renforce`, `User::requiresTwoFactor()` vaut vrai pour **tous** les rôles (agent d'accueil, hôte, encadreur comme administrateur et superviseur). Un compte sans second facteur confirmé est dirigé vers la page « Sécurité » à sa prochaine connexion ; à la connexion suivante le code à six chiffres est demandé. TOTP seulement, **aucune nouvelle dépendance** ; la clé physique (WebAuthn) reste soumise à accord écrit pour une dépendance.
+- **Conséquence sur les tablettes** : un agent doit saisir son code à six chiffres en plus du mot de passe pour enrôler une tablette ou rouvrir une session expirée. Le PIN de la tablette, lui, ne change pas.
+- **Constat qui a motivé le changement de règle** : `APP_ENV` n'est pas défini en local ni sans configuration, donc Laravel le prend pour « production » ; et le serveur de démonstration fixe `APP_ENV=production` avec des données fictives. Le profil ne peut donc pas se déduire de l'environnement.
+- Les essais automatiques (Pest) couvrent les deux profils ; les parcours Playwright et la CI restent en profil `standard`. **À faire au lot L12** : l'installation de production pose `renforce`.
+
+## L15b — double validation des actions critiques (audit global D2), 28 octobre 2026
+
+Migration `2026_11_12_000000_create_approvals`, service `Approvals`, écran **Administration > Validations** (permission `approbations.decider`, administrateur seul).
+
+- **Principe** : dans le profil `renforce` et dès qu'il y a **au moins deux administrateurs actifs**, une action critique n'est pas exécutée : elle devient une demande que **un autre administrateur** valide ou refuse. L'auteur ne peut pas valider sa propre demande : contrôlé par le service **et** par une contrainte SQL (`decided_by <> requested_by`). Une demande est valable **24 heures**, puis expire.
+- **Actions couvertes** : création d'un compte **administrateur ou superviseur** ; changement de rôle **vers ou depuis** un rôle privilégié ; **réactivation** d'un compte privilégié ; **retour au profil « standard »**. La **désactivation** d'un compte privilégié reste directe (mesure d'urgence, pas une élévation de droits). Un changement entre rôles de terrain reste direct.
+- **Aucun secret en clair** : un mot de passe de compte n'est conservé dans la demande que sous forme d'**empreinte** ; il n'apparaît ni dans le résumé affiché ni dans le journal. Journal : `approbation.demandee`, `approbation.approuvee`, `approbation.refusee`, puis l'action exécutée porte `demande_par` et `double_validation`.
+- **Amorçage** : avec **un seul** administrateur actif, la double validation ne peut pas s'appliquer ; la création directe reste possible (c'est ainsi qu'on crée le deuxième administrateur) et le tableau de l'administrateur signale « Un seul administrateur actif ». Dès le deuxième, la règle s'applique.
+- **Pas encore branché** (leurs fonctions sont sur la branche L11 de ChatGPT Work, non fusionnée) : export du journal, purge de fin d'événement, réinitialisation du 2FA. Le service `Approvals` est fait pour qu'on y ajoute ces actions : une entrée dans `execute()` et un appel `request()`.
+- **Message de statut** : le serveur envoie un message (`flash.status`) affiché par la mise en page de base, pour dire « Demande envoyée : un second administrateur doit la valider ».
+
+## L16 — approbation des invités par l'officier de sécurité (audit global A3), 28 octobre 2026
+
+Migration `2026_11_13_000000_add_visitor_approval`, service `VisitorApprovals`, rôle **`officier_securite`** (permissions `listes.approuver`, `interdits.gerer`), écran **Autorité > Approbation des listes** (`/autorite/listes`).
+
+- **Principe** : dans le profil `renforce`, tout invité importé par liste ou ajouté par un hôte naît « à approuver » (`visitors.approval_status`). Dans le profil `standard`, il naît « approuvé » : comportement inchangé.
+- **Deuxième personne** : l'administrateur ne peut pas approuver ; seul l'officier de sécurité le peut, par lot ou par sélection. Il peut aussi refuser.
+- **Blocage partout** : un invité non approuvé ou refusé ne peut ni recevoir de badge ni être validé, côté serveur (`Desk`, `BadgeService`) comme sur la tablette hors ligne (`assertApproved`). Refuser l'accès reste toujours possible.
+- **Modification par l'hôte** : dans le profil renforcé, modifier un invité déjà approuvé le remet « à approuver ».
+- **Journal** : `liste.approuvee` / `liste.refusee`, nombres seulement, jamais de noms. Chaque décision incrémente la révision de liste pour que les tablettes récupèrent le statut.
+- **À valider par le dirigeant** : niveaux d'habilitation liés aux zones (non faits ici).

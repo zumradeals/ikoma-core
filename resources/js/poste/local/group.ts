@@ -1,4 +1,5 @@
 import { ApiError } from '../types';
+import { assertApproved } from './approval';
 import type { LocalList, SnapGroup, SnapMember, SnapVisitor } from './list';
 
 /** Règles des groupes appliquées à la copie de la tablette (mêmes refus que le serveur, App\Services\Groups). */
@@ -57,7 +58,8 @@ function holderOf(list: LocalList, code: string): SnapVisitor | undefined {
 export function applyGroupOp(list: LocalList, type: string, p: Record<string, unknown>): GroupDelta {
   switch (type) {
     case 'groupe_controle': {
-      const { group, member } = memberOf(list, p.group_id, p.visitor_id);
+      const { group, member, visitor: person } = memberOf(list, p.group_id, p.visitor_id);
+      assertApproved(person);
       if (group.departed || member.absent) throw refuse('car_ferme', 'Le car est déjà parti : plus aucun contrôle de ce groupe n’est possible.');
       group.opened = true;
       if (member.checked) return {};
@@ -71,6 +73,7 @@ export function applyGroupOp(list: LocalList, type: string, p: Record<string, un
     }
     case 'groupe_badge': {
       const { group, member, visitor } = memberOf(list, p.group_id, p.visitor_id);
+      assertApproved(visitor);
       if (group.departed) throw refuse('car_ferme', 'Le car est déjà parti : plus aucun badge ne peut être remis.');
       group.opened = true;
       if (!member.checked) throw refuse('controle_requis', 'Contrôlez d’abord la correspondance de cette personne.', groupMode(list) === 'encadreur' ? 'Attendez la confirmation de l’encadreur.' : 'Cochez la pièce d’identité contrôlée.');

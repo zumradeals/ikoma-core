@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { useAlertSound } from '../pilotage/useAlertSound';
 
+// Les propriétés partagées par le serveur (criticalAlerts…) arrivent aussi aux pages : elles ne doivent pas se retrouver en attributs HTML.
+defineOptions({ inheritAttrs: false });
 const props = defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'litiges' | 'evacuation' | 'plus'; event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; title: string; bare?: boolean }>();
+const page = usePage<{ criticalAlerts?: number }>();
+const sound = useAlertSound(() => props.openAlerts, () => page.props.criticalAlerts ?? 0);
 const suffix = computed(() => (props.event && props.events.length > 1 ? `?event=${props.event.id}` : ''));
 const items = computed(() => [
   { key: 'tableau', label: 'Tableau', icon: '▦', href: '/pilotage' }, { key: 'alertes', label: 'Alertes', icon: '▲', href: '/pilotage/alertes' }, { key: 'presents', label: 'Présents', icon: '●', href: '/pilotage/presents' },
@@ -15,6 +20,7 @@ function change(event: Event) { router.get(window.location.pathname, { event: (e
     <header class="no-print border-b-4 border-ikoma-orange bg-ikoma-navy px-4 py-3 text-white">
       <div class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2">
         <p class="font-bold">IKOMA <span class="font-normal">Pilotage</span></p>
+        <button v-if="!bare" type="button" class="inline-flex min-h-14 items-center gap-2 rounded-xl border-2 border-white px-3 font-semibold no-print" :aria-pressed="sound.enabled.value" data-testid="son-alertes" @click="sound.toggle"><span aria-hidden="true">{{ sound.enabled.value ? '♪' : '✕' }}</span> Son des alertes : {{ sound.enabled.value ? 'activé' : 'désactivé' }}</button>
         <Link v-if="!bare" href="/espace" class="inline-flex min-h-14 items-center underline no-print">Mon espace</Link>
       </div>
       <div v-if="event" class="mx-auto max-w-3xl">

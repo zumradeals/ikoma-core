@@ -13,6 +13,8 @@ export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manue
 type Enrolled = { device_token: string; device_secret: string; poste: { id: string; name: string; station: string | null; event_id: string; event_name: string } };
 
 /** Assemble le coffre, le magasin chiffré, la synchronisation et le dépôt local d'une tablette. Un seul exemplaire par page. */
+export const syncRequiredMessage = (hours: number): string => `Cette tablette n’a pas communiqué avec le serveur depuis plus de ${hours} heure${hours > 1 ? 's' : ''} : connectez-la au réseau pour reprendre. Rien n’est perdu.`;
+
 export class PosteRuntime {
   readonly db: PosteDb;
   readonly vault: PosteVault;
@@ -44,11 +46,11 @@ export class PosteRuntime {
     if (this.repo) { this.repo.setClockOffset(offset); await this.repo.replaceSnapshot(snapshot); }
   }
 
-  async enrol(code: string, pin: string, agent: { id: string; name: string }): Promise<void> {
+  async enrol(code: string, pin: string, agent: { id: string; name: string }, duressPin?: string): Promise<void> {
     const response = await this.fetcher('/poste/api/enroler', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN') }, body: JSON.stringify({ code }), credentials: 'same-origin' }).catch(() => { throw new ApiError('reseau', 'Pas de connexion au serveur : l’enrôlement demande le réseau.'); });
     const data = await response.json().catch(() => null) as (Enrolled & { message?: string; code?: string; errors?: Record<string, string[]> }) | null;
     if (!response.ok || !data?.device_token) throw new ApiError(data?.code ?? 'erreur', data?.message ?? Object.values(data?.errors ?? {})[0]?.[0] ?? 'Enrôlement impossible. Vérifiez le code ou demandez-en un nouveau.', null, response.status);
-    await this.vault.enrol({ token: data.device_token, secret: data.device_secret, pin, agent, poste: { id: data.poste.id, name: data.poste.station || data.poste.name }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    await this.vault.enrol({ token: data.device_token, secret: data.device_secret, pin, duressPin: duressPin || undefined, agent, poste: { id: data.poste.id, name: data.poste.station || data.poste.name }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
     await this.sync.sync();
     if (!(await this.db.chunks.get('list:head'))) {
       await this.vault.wipe();
@@ -58,7 +60,8 @@ export class PosteRuntime {
   }
 
   async unlock(pin: string): Promise<void> {
-    try { await this.vault.unlock(pin); }
+    let mode: 'normal' | 'contrainte';
+    try { mode = await this.vault.unlock(pin); }
     catch (e) { if (e instanceof Error && 'code' in e && (e as { code: string }).code === 'efface') this.handlers.onWiped('echecs_pin'); throw e; }
     if (await this.expired()) {
       this.vault.lock();
@@ -66,7 +69,32 @@ export class PosteRuntime {
       return;
     }
     await this.open();
+    if (mode === 'contrainte') await this.raiseDuress();
+    // Audit global F2 : une tablette restée trop longtemps sans réseau (volée, oubliée) ne reprend le travail qu'après une synchronisation réussie.
+    const hours = await this.syncRequiredHours();
+    if (hours !== null) {
+      await this.sync.sync();
+      if ((await this.syncRequiredHours()) !== null) { this.lock(); throw new ApiError('synchronisation_requise', syncRequiredMessage(hours)); }
+    }
     this.sync.kick();
+  }
+
+  /**
+   * Code de contrainte saisi (audit global C2) : une opération silencieuse part avec la prochaine synchronisation et déclenche une alerte critique.
+   * Rien ne change à l'écran de l'agent. Si le réseau manque, l'opération attend dans la file chiffrée comme les autres.
+   */
+  private async raiseDuress(): Promise<void> {
+    const agent = this.profile?.id ?? (await this.vault.getSecret<{ id: string }>('profile'))?.id ?? '';
+    await this.store.addOp({ id: crypto.randomUUID(), seq: await this.store.nextSeq(), type: 'contrainte', agent_id: agent, client_time: new Date().toISOString(), visitor_rev: null, payload: {} });
+    await this.sync.refreshCounts();
+  }
+
+  /** Nombre d'heures au-delà duquel le réseau est exigé, si la dernière synchronisation est plus ancienne ; sinon null (0 dans les réglages : jamais). */
+  async syncRequiredHours(): Promise<number | null> {
+    const max = (await getMeta(this.db, 'settings'))?.offline_max_hours ?? 0;
+    const last = await getMeta(this.db, 'lastSyncAt');
+    if (!max || !last) return null;
+    return Date.now() - Date.parse(last) > max * 3_600_000 ? max : null;
   }
 
   private async open(): Promise<void> {

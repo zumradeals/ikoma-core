@@ -88,10 +88,12 @@ export class LocalPosteRepository implements GroupPosteRepository {
   async deskSummary(): Promise<DeskSummary> {
     const { counts, pending, recent } = await this.store.deskOps(['badge', 'refuser'], 3);
     const mine = [...this.list.badges.values()].filter(b => b.mine && !b.group_id);
+    const left = mine.filter(b => b.status === 'Disponible').length;
+    const thresholds = this.list.snapshot.settings;
     const waiting = [...this.list.visitors.values()].filter(v => v.source === 'non listé' && v.host_validation === 'en_attente' && !['refuse', 'present', 'sorti'].includes(v.status));
     return {
       accueillis: counts.entree ?? 0, refuses: counts.refuser ?? 0,
-      badges: { restants: mine.filter(b => b.status === 'Disponible').length, total: mine.length },
+      badges: { restants: left, total: mine.length }, lowBadges: mine.length > 0 && left <= Math.max(thresholds.low_badges_min ?? 5, Math.ceil(mine.length * (thresholds.low_badges_percent ?? 10) / 100)), offlineCallMinutes: thresholds.offline_call_minutes ?? 15,
       waiting: waiting.map(v => ({ id: v.id, name: v.full_name })),
       pending: Object.entries(pending).map(([type, count]) => ({ type, count })),
       recent: recent.map(op => ({ kind: op.type === 'refuser' ? 'refus' as const : 'badge' as const, name: this.list.visitors.get(String(op.payload.visitor_id))?.full_name ?? 'Visiteur inconnu', at: op.client_time })),

@@ -24,6 +24,26 @@ final class Alerts
         DB::table('alerts')->insertOrIgnore(['id' => (string) Str::uuid(), 'event_id' => $eventId, 'type' => $type, 'severity' => $severity, 'subject_type' => $subjectType, 'subject_id' => $subjectId, 'dedupe_key' => $dedupeKey, 'message' => mb_substr($message, 0, 200), 'created_at' => $now, 'updated_at' => $now]);
     }
 
+    /**
+     * Escalade (audit global C1) : une alerte critique ou haute encore ouverte après le délai réglé (alerte_escalade_minutes) est marquée une seule fois
+     * comme escaladée ; l'administrateur la voit sur son tableau et le superviseur la voit marquée sur sa carte. Journalisé sans nom de personne.
+     */
+    public function escalate(): int
+    {
+        $minutes = max(1, (int) (DB::table('settings')->where('key', 'alerte_escalade_minutes')->value('value') ?? 5));
+
+        return DB::transaction(function () use ($minutes): int {
+            $rows = DB::table('alerts')->whereNull('acknowledged_at')->whereNull('resolved_at')->whereNull('escalated_at')->whereIn('severity', ['critique', 'haute'])
+                ->where('created_at', '<', now()->subMinutes($minutes))->lockForUpdate()->get(['id', 'event_id', 'type', 'severity']);
+            foreach ($rows as $alert) {
+                DB::table('alerts')->where('id', $alert->id)->update(['escalated_at' => now(), 'updated_at' => now()]);
+                $this->audit->append('alerte.escaladee', null, ['alert_id' => $alert->id, 'type' => $alert->type, 'severity' => $alert->severity, 'event_id' => $alert->event_id, 'delai_minutes' => $minutes]);
+            }
+
+            return $rows->count();
+        });
+    }
+
     /** Ferme, sans intervention humaine, les alertes ouvertes dont la cause a disparu. */
     public function resolve(string $subjectType, string $subjectId, ?string $type = null): void
     {

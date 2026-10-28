@@ -63,3 +63,32 @@ describe('alertes du contrôle d’accès', () => {
     expect(critical.text()).toContain('Critique'); expect(critical.text()).toContain('⛔');
   });
 });
+
+describe('alerte sonore et escalade du superviseur (audit global C1)', () => {
+  it('marque en mots une alerte escaladée à l’administrateur, tant qu’elle est ouverte', async () => {
+    const { default: AlertCard } = await import('../../resources/js/components/pilotage/AlertCard.vue');
+    const base = { id: 'a', type: 'controle_refuse', severity: 'critique' as const, message: 'Badge B-014 annulé présenté au point « Porte nord ».', created_at: '2027-01-10T10:00:00Z', acknowledged_at: null, resolved_at: null, link: null };
+    expect(mount(AlertCard, { props: { alert: { ...base, escalated_at: '2027-01-10T10:06:00Z' } } }).get('[data-testid=escaladee]').text()).toContain('escaladée à l’administrateur');
+    expect(mount(AlertCard, { props: { alert: base } }).find('[data-testid=escaladee]').exists()).toBe(false);
+    expect(mount(AlertCard, { props: { alert: { ...base, escalated_at: '2027-01-10T10:06:00Z', acknowledged_at: '2027-01-10T10:07:00Z' } } }).find('[data-testid=escaladee]').exists()).toBe(false);
+  });
+
+  it('sonne et vibre quand un cas arrive, plus fort pour un cas critique, seulement une fois activé par le superviseur', async () => {
+    const { useAlertSound } = await import('../../resources/js/pilotage/useAlertSound');
+    const { defineComponent, h, ref, nextTick } = await import('vue');
+    const tones: number[] = []; const vibrate = vi.fn();
+    class FakeAudio { currentTime = 0; destination = {}; resume = async () => undefined; close = async () => undefined; createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; } createOscillator() { const o = { frequency: { value: 0 }, connect() {}, start: () => { tones.push(o.frequency.value); }, stop() {} }; return o; } }
+    vi.stubGlobal('AudioContext', FakeAudio); Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    window.localStorage.removeItem('ikoma.son-alertes');
+    const open = ref(0); const critical = ref(0); let api!: ReturnType<typeof useAlertSound>;
+    mount(defineComponent({ setup() { api = useAlertSound(() => open.value, () => critical.value); return () => h('div'); } }));
+    open.value = 1; await nextTick();
+    expect(tones).toEqual([]); // désactivé par défaut : aucun son avant le geste du superviseur
+    api.toggle(); expect(api.enabled.value).toBe(true); expect(tones).toEqual([660]); expect(window.localStorage.getItem('ikoma.son-alertes')).toBe('1');
+    tones.length = 0; open.value = 2; await nextTick(); expect(tones).toEqual([740]); // un nouveau cas ordinaire : un bip
+    tones.length = 0; open.value = 3; critical.value = 1; await nextTick(); expect(tones).toEqual([1000, 1000, 1000]); expect(vibrate).toHaveBeenLastCalledWith([250, 120, 250, 120, 250]); // un cas critique : trois bips
+    tones.length = 0; open.value = 2; await nextTick(); expect(tones).toEqual([]); // une alerte qui se ferme ne sonne pas
+    api.toggle(); open.value = 5; await nextTick(); expect(tones).toEqual([]); expect(window.localStorage.getItem('ikoma.son-alertes')).toBe('0');
+    vi.unstubAllGlobals();
+  });
+});

@@ -24,7 +24,7 @@ final class AdminDashboard
         $event = $this->pilotage->event($requestedEvent);
         $events = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->all();
         if ($event === null) {
-            return ['event' => null, 'events' => $events, 'steps' => [], 'summary' => ['done' => 0, 'total' => 0, 'next' => null], 'tiles' => null, 'watch' => [], 'recent' => $this->recent()];
+            return ['event' => null, 'events' => $events, 'steps' => [], 'summary' => ['done' => 0, 'total' => 0, 'next' => null], 'tiles' => null, 'watch' => $this->profileWatch(), 'recent' => $this->recent()];
         }
         $e = $event->id;
         $zones = (int) DB::table('zones')->where('event_id', $e)->count();
@@ -114,7 +114,7 @@ final class AdminDashboard
     {
         $rows = [];
         $silent = DB::table('devices')->where('event_id', $eventId)->whereNotNull('token_hash')->whereNull('revoked_at')
-            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(Pilotage::SILENT_AFTER_MINUTES)))
+            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(Pilotage::silentAfterMinutes())))
             ->orderBy('name')->get(['name', 'station', 'last_synced_at']);
         foreach ($silent as $d) {
             $label = $d->station ?? $d->name;
@@ -135,7 +135,34 @@ final class AdminDashboard
             $rows[] = ['severity' => 'info', 'title' => $badgesWithoutCategory.' badge'.($badgesWithoutCategory > 1 ? 's' : '').' sans catégorie', 'text' => 'Ils viennent d’anciens lots et ne peuvent pas être remis : utilisez les lots par catégorie.', 'href' => '/administration/badges'];
         }
 
+        $rows = [...$this->profileWatch(), ...$rows];
+        $escalated = (int) DB::table('alerts')->where('event_id', $eventId)->whereNotNull('escalated_at')->whereNull('acknowledged_at')->whereNull('resolved_at')->count();
+        if ($escalated > 0) {
+            $minutes = max(1, (int) (DB::table('settings')->where('key', 'alerte_escalade_minutes')->value('value') ?? 5));
+            array_unshift($rows, ['severity' => 'haute', 'title' => $escalated.' alerte'.($escalated > 1 ? 's' : '').' sans prise en compte', 'text' => 'Le superviseur n’a pas pris en compte '.($escalated > 1 ? $escalated.' alertes' : 'une alerte').' depuis plus de '.$minutes.' minute'.($minutes > 1 ? 's' : '').'. Appelez-le.', 'href' => '/administration/journal']);
+        }
+
         return $rows;
+    }
+
+    /**
+     * Le profil « standard » ne convient pas à des données réelles : la ligne reste en tête tant que l'administrateur n'a pas choisi « renforcé ».
+     *
+     * @return list<array{severity:string,title:string,text:string,href:string}>
+     */
+    private function profileWatch(): array
+    {
+        $approvals = app(Approvals::class);
+        $rows = [];
+        $pending = $approvals->pendingCount();
+        if ($pending > 0) {
+            $rows[] = ['severity' => 'haute', 'title' => $pending.' demande'.($pending > 1 ? 's' : '').' de validation en attente', 'text' => 'Une demande d’action critique attend la validation d’un second administrateur.', 'href' => '/administration/approbations'];
+        }
+        if (SecurityProfile::strict() && $approvals->soleAdministrator()) {
+            $rows[] = ['severity' => 'haute', 'title' => 'Un seul administrateur actif', 'text' => 'La double validation ne peut pas s’appliquer : créez un second administrateur.', 'href' => '/administration/comptes'];
+        }
+
+        return SecurityProfile::strict() ? $rows : [...$rows, ['severity' => 'haute', 'title' => 'Profil de sécurité « standard »', 'text' => 'Ce profil convient à une démonstration avec des données fictives. Passez au profil renforcé avant toute donnée réelle.', 'href' => '/administration/profil-securite']];
     }
 
     private function since(string $at): string

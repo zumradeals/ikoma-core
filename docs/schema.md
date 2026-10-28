@@ -180,3 +180,22 @@ L’hôte peut attribuer la catégorie **Visiteur uniquement**. Une catégorie i
 ## Évolution L14a — alertes du contrôle d'accès
 
 Migration `2026_11_07_000000_create_control_alerts`. Aucune table nouvelle. `alerts_type_valid` accepte en plus `controle_refuse`, `zone_interdite`, `badge_double`, `controle_rafale` (sujet `badge` ou aucun ; message sans nom de personne). Réglages ajoutés dans `settings` : `controle_delai_min_points` (15, secondes), `controle_rafale_nombre` (5), `controle_rafale_minutes` (5). Service : `ControlAlerts`, appelé par `SiteControl::control` et `SiteControl::exit`. Détails et décisions : JOURNAL_DECISIONS.md, rubrique L14a.
+
+## Évolution L14b — réglages hors réseau et seuils
+
+Migration `2026_11_08_000000_add_offline_and_threshold_settings`. Aucune table nouvelle. Réglages ajoutés dans `settings` : `poste_delai_appel_minutes` (15), `poste_hors_reseau_max_heures` (12, 0 = désactivé), `poste_badges_bas_pourcent` (10), `poste_badges_bas_minimum` (5), `pilotage_poste_silencieux_minutes` (60). La copie de travail (`ListSnapshot`) porte `settings.offline_call_minutes`, `offline_max_hours`, `low_badges_percent`, `low_badges_min`, et sa version dépend de ces réglages. Décisions : JOURNAL_DECISIONS.md, rubrique L14b.
+
+## Évolution L14c — escalade des alertes
+
+Migration `2026_11_09_000000_add_alert_escalation` : `alerts.escalated_at` (timestamptz, nul tant que l'alerte n'a pas été escaladée) et le réglage `alerte_escalade_minutes` (5). Tâche planifiée `alertes:escalader` (30 s). Journal : `alerte.escaladee`. Décisions : JOURNAL_DECISIONS.md, rubrique L14c.
+
+## Évolution L14d — code de contrainte
+
+Migration `2026_11_10_000000_add_duress_alert` : `alerts_type_valid` accepte `contrainte` et `alerts_subject_valid` accepte le sujet `poste`. Nouvelle opération de synchronisation `contrainte` (droit `visiteurs.rechercher`, rôle agent d'accueil). Journal : `poste.contrainte`. Côté tablette : `VaultRecord.duress` (second enveloppement du coffre). Décisions : JOURNAL_DECISIONS.md, rubrique L14d.
+
+## Évolution L15a et L15b — profil de sécurité et double validation
+
+Migrations `2026_11_11_000000_add_security_profile` (réglage `profil_securite`, `standard` au départ) et `2026_11_12_000000_create_approvals`. **approvals** (nouvelle) : `action`, `payload` (jsonb, sans secret en clair), `summary`, `requested_by`, `expires_at`, `decided_by`, `decided_at`, `decision` (`approuve` / `refuse`), `executed_at`. Contraintes : décision, auteur et date vont ensemble ; `decided_by <> requested_by` ; une demande n'est exécutée que si elle est approuvée. Permissions ajoutées : `securite.gerer`, `approbations.decider` (administrateur). Journal : `securite.profil_modifie`, `approbation.demandee`, `approbation.approuvee`, `approbation.refusee`. Décisions : JOURNAL_DECISIONS.md, rubriques L15a et L15b.
+
+
+- L16 : `visitors.approval_status` (`approuve` par défaut | `a_approuver` | `refuse`), `approved_by`, `approved_at` ; contrainte CHECK sur le statut ; index sur (event_id, approval_status).

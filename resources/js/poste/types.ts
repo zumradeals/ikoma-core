@@ -6,7 +6,7 @@ export type Fiche = {
   id: string; full_name: string; organisation: string | null; host: string | null; category: Category; zones: string[]; accueil_limite: boolean; source: string; status: string;
   host_advice?: {state:string|null};
   host_validation: 'en_attente' | 'accepte' | 'refuse' | null; valid_from: string; valid_until: string; hors_periode: boolean;
-  identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null; access_note?: string | null; a_rebadger?: boolean;
+  identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null; access_note?: string | null; a_rebadger?: boolean; approval?: 'approuve' | 'a_approuver' | 'refuse';
 };
 export type Checkpoint = { type: 'zone' | 'poste'; id: string; name: string };
 export type PointRef = { type: 'zone' | 'poste'; id: string };
@@ -20,7 +20,7 @@ export type Avis = 'hote' | 'superviseur';
 /** Chiffres du poste d'accueil, calculés sur la copie de la tablette (donc disponibles sans réseau). */
 export type DeskSummary = {
   accueillis: number; refuses: number; badges: { restants: number; total: number }; waiting: { id: string; name: string }[];
-  pending: { type: string; count: number }[]; recent: { kind: 'badge' | 'refus'; name: string; at: string }[]; asOf: string | null;
+  pending: { type: string; count: number }[]; lowBadges: boolean; offlineCallMinutes: number; recent: { kind: 'badge' | 'refus'; name: string; at: string }[]; asOf: string | null;
 };
 export type UnlistedInput = { name: string; organisation: string; host_id: string; category_id: string };
 
