@@ -47,9 +47,20 @@ grep -q '^APP_URL=' .env || printf 'APP_URL=https://%s\n' "$DOMAIN" >> .env
 grep -q '^APP_ENV=' .env || printf 'APP_ENV=production\nAPP_DEBUG=false\n' >> .env
 
 say "5/7 Construction et démarrage (plusieurs minutes la première fois)"
-if ss -ltnH 'sport = :8080' 2>/dev/null | grep -q . && ! $COMPOSE ps --status running 2>/dev/null | grep -q nginx; then
-  fail "le port local 8080 est déjà utilisé par un autre service de ce serveur. Libérez-le ou demandez à l'architecte de changer le port."
+# Port local de l'application (127.0.0.1 seulement) : 8080 si libre, sinon le premier port libre suivant, puis mémorisé dans .env.
+PORT="$(grep '^IKOMA_PORT=' .env | cut -d= -f2 || true)"
+if [ -z "$PORT" ]; then
+  PORT=8080
+  while ss -ltnH "sport = :$PORT" 2>/dev/null | grep -q .; do
+    PORT=$((PORT + 1))
+    [ "$PORT" -le 8199 ] || fail "aucun port local libre entre 8080 et 8199 sur ce serveur."
+  done
+  printf 'IKOMA_PORT=%s\n' "$PORT" >> .env
 fi
+if ss -ltnH "sport = :$PORT" 2>/dev/null | grep -q . && ! $COMPOSE ps --status running 2>/dev/null | grep -q nginx; then
+  fail "le port local $PORT (IKOMA_PORT dans $DIR/.env) est déjà utilisé par un autre service : supprimez la ligne IKOMA_PORT de .env puis relancez, un port libre sera choisi."
+fi
+echo "Port local de l'application : 127.0.0.1:$PORT"
 $COMPOSE up -d --build --wait
 
 say "6/7 Comptes et données fictives (idempotent : aucun compte existant n'est modifié)"
@@ -57,12 +68,12 @@ umask 077
 $COMPOSE exec -T php php artisan db:seed --force | tee /root/ikoma-comptes-demo.txt
 echo "Mots de passe créés cette fois-ci : /root/ikoma-comptes-demo.txt (lisez-le, notez-les dans un gestionnaire de mots de passe, puis supprimez-le)."
 
-say "7/7 HTTPS : site $DOMAIN devant l'application (127.0.0.1:8080)"
+say "7/7 HTTPS : site $DOMAIN devant l'application (127.0.0.1:$PORT)"
 # Le serveur peut déjà héberger d'autres sites : on s'intègre au serveur web en place, sans toucher aux sites existants.
 if systemctl is-active --quiet nginx 2>/dev/null; then WEB=nginx
 elif systemctl is-active --quiet apache2 2>/dev/null; then WEB=apache
 elif ! ss -ltnH 'sport = :80 or sport = :443' 2>/dev/null | grep -q .; then WEB=caddy
-else fail "un service inconnu utilise déjà les ports 80/443. L'application tourne sur 127.0.0.1:8080 : ajoutez un site vers cette adresse (voir docs/DEPLOIEMENT_DEMO.md)."
+else fail "un service inconnu utilise déjà les ports 80/443. L'application tourne sur 127.0.0.1:$PORT : ajoutez un site vers cette adresse (voir docs/DEPLOIEMENT_DEMO.md)."
 fi
 echo "Serveur web détecté : $WEB"
 CERT_ARGS="--non-interactive --agree-tos --redirect"
@@ -77,7 +88,7 @@ server {
     server_name $DOMAIN;
     client_max_body_size 6m;
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:$PORT;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$remote_addr;
@@ -99,8 +110,8 @@ NGINX
     ServerName $DOMAIN
     ProxyPreserveHost On
     RequestHeader set X-Forwarded-Proto expr=%{REQUEST_SCHEME}
-    ProxyPass / http://127.0.0.1:8080/
-    ProxyPassReverse / http://127.0.0.1:8080/
+    ProxyPass / http://127.0.0.1:$PORT/
+    ProxyPassReverse / http://127.0.0.1:$PORT/
 </VirtualHost>
 APACHE
     a2ensite -q ikoma-demo >/dev/null
@@ -117,7 +128,7 @@ APACHE
       curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt -o /etc/apt/sources.list.d/caddy-stable.list
       apt-get update -qq && apt-get install -y -qq caddy
     fi
-    sed "s/ikoma.dgafrique.com/$DOMAIN/" deploy/demo/Caddyfile > /etc/caddy/Caddyfile
+    sed -e "s/ikoma.dgafrique.com/$DOMAIN/" -e "s/127.0.0.1:8080/127.0.0.1:$PORT/" deploy/demo/Caddyfile > /etc/caddy/Caddyfile
     systemctl enable --now caddy >/dev/null 2>&1 || true
     systemctl reload caddy ;;
 esac
