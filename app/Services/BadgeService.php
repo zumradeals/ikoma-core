@@ -18,14 +18,15 @@ final class BadgeService
 {
     public function __construct(private readonly Audit $audit) {}
 
-    public function associer(Badge|string $badge, Visitor|string $visitor, User $agent, Device|string|null $device = null): BadgeAssignment
+    /** $avis : avis de l'hôte ou du superviseur (« hote » ou « superviseur »), seul moyen d'associer un badge à un visiteur hors période. */
+    public function associer(Badge|string $badge, Visitor|string $visitor, User $agent, Device|string|null $device = null, ?string $avis = null): BadgeAssignment
     {
         $this->require($agent, 'badges.associer');
         $badgeId = $badge instanceof Badge ? $badge->id : $badge;
         $visitorId = $visitor instanceof Visitor ? $visitor->id : $visitor;
         $deviceId = $device instanceof Device ? $device->id : $device;
 
-        return DB::transaction(function () use ($badgeId, $visitorId, $deviceId, $agent): BadgeAssignment {
+        return DB::transaction(function () use ($badgeId, $visitorId, $deviceId, $agent, $avis): BadgeAssignment {
             $badge = $this->lockBadge($badgeId);
             $visitor = Visitor::query()->lockForUpdate()->find($visitorId) ?? throw new BadgeRefused('visiteur_inconnu', 'Visiteur introuvable.');
             if ($badge->event_id !== $visitor->event_id) {
@@ -56,12 +57,12 @@ final class BadgeService
                 throw new BadgeRefused('poste_inconnu', 'Poste inconnu pour cet événement.');
             }
             $now = now();
-            if ($now->lt($visitor->valid_from) || $now->gt($visitor->valid_until)) {
+            if (($now->lt($visitor->valid_from) || $now->gt($visitor->valid_until)) && ! in_array($avis, ['hote', 'superviseur'], true)) {
                 throw new BadgeRefused('hors_periode', "Visiteur hors période : avis de l'hôte ou du superviseur requis");
             }
             $assignment = BadgeAssignment::create(['event_id' => $badge->event_id, 'badge_id' => $badge->id, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'device_id' => $deviceId, 'assigned_at' => $now]);
             $this->setStatus($badge, BadgeStatus::Assigned);
-            $this->audit->append('badge.associe', $agent->id, ['badge_id' => $badge->id, 'visitor_id' => $visitor->id, 'assignment_id' => $assignment->id, 'device_id' => $deviceId, 'event_id' => $badge->event_id]);
+            $this->audit->append('badge.associe', $agent->id, ['badge_id' => $badge->id, 'visitor_id' => $visitor->id, 'assignment_id' => $assignment->id, 'device_id' => $deviceId, 'event_id' => $badge->event_id, ...($avis !== null ? ['avis' => $avis] : [])]);
 
             return $assignment;
         });

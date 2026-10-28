@@ -84,12 +84,4 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   expect(payloads).toHaveLength(22);
   for (const payload of payloads) expect(payload).toMatch(/^IKOMA1:[0-9a-f]{64}$/);
   expect(new Set(payloads).size).toBe(22);
-
-  // 5. Le jeton lu est reconnu par le contrôle de démonstration (badge disponible, donc « non associé »), sans identité.
-  const xsrf = decodeURIComponent((await page.context().cookies()).find(c => c.name === 'XSRF-TOKEN')!.value);
-  const response = await page.request.post('/administration/badges/controle-demo', { data: { code: payloads[0] }, headers: { 'X-XSRF-TOKEN': xsrf, Accept: 'application/json' } });
-  expect(response.ok()).toBe(true);
-  expect(await response.json()).toMatchObject({ valide: false, raison: 'non_associe', categorie: null });
-  const unknown = await page.request.post('/administration/badges/controle-demo', { data: { code: 'IKOMA1:' + '0'.repeat(64) }, headers: { 'X-XSRF-TOKEN': xsrf, Accept: 'application/json' } });
-  expect(await unknown.json()).toMatchObject({ valide: false, raison: 'inconnu' });
 });

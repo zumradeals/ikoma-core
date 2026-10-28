@@ -487,7 +487,6 @@ it('réserve la création de lots, réservations, réglages, étiquettes et dém
         $this->post('/administration/badges/reservations', [])->assertForbidden();
         $this->put('/administration/badges/reglages', ['margin' => 5, 'reusable' => 'oui'])->assertForbidden();
         $this->get('/administration/badges/etiquettes?batch='.DemoSeeder::id('batch'))->assertForbidden();
-        $this->post('/administration/badges/controle-demo', ['code' => 'B-001'])->assertForbidden();
     }
     expect(DB::table('settings')->where('key', 'badge_marge_pourcent')->value('value'))->toBe('10');
     $this->actingAs($admin)->post('/administration/badges', [])->assertStatus(405);
@@ -564,13 +563,7 @@ it('limite le nombre d’étiquettes par page et affiche un message clair', func
     expect($html)->toContain('Choisissez une plage')->and(substr_count($html, '<article'))->toBe(0);
 });
 
-it('propose une route de contrôle de démonstration qui ne révèle jamais l’identité', function () {
-    $lot = demoLot(3);
-    $this->service->associer($lot, demoVisitor(1), $this->agent);
-    $name = DB::table('visitors')->where('id', demoVisitor(1))->value('full_name');
+it('ne propose plus de route de contrôle de démonstration (retirée au lot L5)', function () {
     $this->actingAs(badgeAccount('administrateur'));
-    $response = $this->postJson('/administration/badges/controle-demo', ['code' => $lot->code, 'event_id' => $lot->event_id])->assertOk()->assertJson(['valide' => true, 'raison' => null, 'categorie' => 'Visiteur']);
-    expect($response->getContent())->not->toContain($name);
-    $this->postJson('/administration/badges/controle-demo', ['code' => 'B-9999', 'event_id' => $lot->event_id])->assertOk()->assertJson(['valide' => false, 'raison' => 'inconnu']);
-    $this->postJson('/administration/badges/controle-demo', [])->assertUnprocessable();
+    $this->postJson('/administration/badges/controle-demo', ['code' => 'B-001'])->assertNotFound();
 });

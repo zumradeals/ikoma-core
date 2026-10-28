@@ -23,7 +23,7 @@ class SessionSecurity
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
 
-                return redirect('/login');
+                return $request->expectsJson() ? response()->json(['code' => 'session_expiree', 'message' => 'Votre session a expiré : reconnectez-vous.', 'action' => null], 401) : redirect('/login');
             }
             $request->session()->put('last_interaction', now()->timestamp);
         }
