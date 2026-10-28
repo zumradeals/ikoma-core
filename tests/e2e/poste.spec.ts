@@ -306,8 +306,9 @@ test('la révocation par l’administrateur efface la tablette à sa prochaine s
   await expect(admin).toHaveURL(/\/espace/);
   await admin.goto('/administration/postes');
   admin.once('dialog', dialog => dialog.accept());
-  await admin.locator(`xpath=//h2[contains(., "${fx.poste}")]/ancestor::*[self::section or self::div][1]`).getByRole('button', { name: 'Révoquer ce poste' }).click();
-  await expect(admin.getByText('Révoqué')).toBeVisible(); await shot(admin, 'l6-admin-revoque');
+  const card = admin.locator(`xpath=//h2[contains(., "${fx.poste}")]/ancestor::*[self::section or self::div][1]`);
+  await card.getByRole('button', { name: 'Révoquer ce poste' }).click();
+  await expect(card.getByText('Révoqué')).toBeVisible(); await shot(admin, 'l6-admin-revoque');
   await button(page, 'Synchroniser maintenant').click();
   await expect(page.getByTestId('ecran-enrolement')).toBeVisible(); await expect(page.getByTestId('message-efface')).toContainText('déconnectée par l’administrateur'); await shot(page, 'l6-efface');
   const rows = await page.evaluate(async () => {

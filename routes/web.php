@@ -8,8 +8,10 @@ use App\Http\Controllers\BadgesController;
 use App\Http\Controllers\BadgeSettingsController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
+use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ListImportsController;
+use App\Http\Controllers\MonGroupeController;
 use App\Http\Controllers\PilotageController;
 use App\Http\Controllers\PosteApiController;
 use App\Http\Controllers\PosteController;
@@ -27,6 +29,7 @@ Route::get('/', fn () => Inertia::render('Home'))->name('home');
 // Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
 Route::get('/poste/shell', fn () => Inertia::render('Poste'));
 Route::get('/controle/shell', fn () => Inertia::render('Controle'));
+Route::get('/groupe/shell', fn () => Inertia::render('Groupe'));
 Route::get('/pilotage/evacuation/shell', fn () => Inertia::render('Pilotage/Evacuation'));
 Route::middleware(['auth'])->group(function (): void {
     Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => (bool) auth()->user()->two_factor_confirmed_at]))->middleware('password.confirm')->name('security');
@@ -63,6 +66,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::middleware(EnsureAgentAccueil::class)->group(function (): void {
             Route::get('/poste', PosteController::class)->middleware('can:visiteurs.rechercher');
             Route::get('/controle', ControleController::class)->middleware('can:badges.controler');
+            Route::get('/groupe', fn () => Inertia::render('Groupe'))->middleware('can:groupes.appel_nominal');
             Route::get('/poste/api/postes', [PosteApiController::class, 'postes'])->middleware('can:visiteurs.rechercher');
             Route::post('/poste/api/enroler', [PosteSyncController::class, 'enroler'])->middleware('can:visiteurs.rechercher');
             Route::middleware(ResolvePoste::class)->group(function (): void {
@@ -98,5 +102,13 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/comptes/{user}', [AccountsController::class, 'update'])->middleware(['can:comptes.gerer', 'can:roles.attribuer']);
         Route::put('/administration/comptes/{user}/mot-de-passe', [AccountsController::class, 'password'])->middleware('can:comptes.gerer');
         Route::get('/administration/journal', JournalController::class)->middleware('can:journal.consulter');
+        Route::get('/administration/groupes', [GroupesController::class, 'index'])->middleware('can:groupes.gerer');
+        Route::post('/administration/groupes', [GroupesController::class, 'store'])->middleware('can:groupes.gerer');
+        Route::put('/administration/groupes/reglage', [GroupesController::class, 'mode'])->middleware('can:groupes.gerer');
+        Route::put('/administration/groupes/{group}/encadreur', [GroupesController::class, 'designate'])->whereUuid('group')->middleware('can:groupes.gerer');
+        Route::post('/administration/groupes/{group}/stagiaires', [GroupesController::class, 'attach'])->whereUuid('group')->middleware('can:groupes.gerer');
+        Route::delete('/administration/groupes/{group}/stagiaires/{visitor}', [GroupesController::class, 'detach'])->whereUuid(['group', 'visitor'])->middleware('can:groupes.gerer');
+        Route::get('/mon-groupe', [MonGroupeController::class, 'index'])->middleware('can:groupes.confirmer_presence');
+        Route::post('/mon-groupe/{visitor}/confirmer', [MonGroupeController::class, 'confirm'])->whereUuid('visitor')->middleware('can:groupes.confirmer_presence');
     });
 });

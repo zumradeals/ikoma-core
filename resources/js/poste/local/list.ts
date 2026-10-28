@@ -3,14 +3,16 @@ import { normalize, trigrams, type Indexed } from './search';
 
 export type SnapVisitor = {
   id: string; full_name: string; organisation: string | null; host_id: string | null; category_id: string; valid_from: string; valid_until: string; source: string; status: string;
-  host_validation: 'en_attente' | 'accepte' | 'refuse' | null; access_note?: string | null; a_rebadger?: boolean; rev: string | null; identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
+  host_validation: 'en_attente' | 'accepte' | 'refuse' | null; access_note?: string | null; group_id?: string | null; a_rebadger?: boolean; rev: string | null; identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
 };
-export type SnapBadge = { code: string; token_hash: string; category_id: string | null; status: string; mine: boolean };
+export type SnapBadge = { code: string; token_hash: string; category_id: string | null; status: string; mine: boolean; group_id?: string | null };
+export type SnapGroup = { id: string; name: string; bus_number: string | null; opened: boolean; departed: boolean; arrival_closed: boolean };
+export type SnapMember = { group_id: string; visitor_id: string; checked: boolean; confirmed: boolean; absent: boolean; boarded: boolean; arrived: boolean };
 export type Snapshot = {
   version: string; server_time: string; poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string; starts_at: string; ends_at: string };
-  settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number };
+  settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; controle_stagiaires?: 'identite' | 'encadreur' };
   categories: Category[]; zones: { id: string; name: string; est_accueil: boolean }[]; category_zone: { category_id: string; zone_id: string }[];
-  hosts: { id: string; name: string; service: string | null }[]; postes: { id: string; name: string }[]; visitors: SnapVisitor[]; badges: SnapBadge[];
+  hosts: { id: string; name: string; service: string | null }[]; postes: { id: string; name: string }[]; visitors: SnapVisitor[]; badges: SnapBadge[]; groups?: SnapGroup[]; members?: SnapMember[];
 };
 
 /** Copie de travail en mémoire (déchiffrée seulement tant que la tablette est déverrouillée). */
@@ -19,6 +21,8 @@ export class LocalList {
   readonly categories = new Map<string, Category>();
   readonly badges = new Map<string, SnapBadge>();
   readonly hostNames = new Map<string, string>();
+  readonly groups = new Map<string, SnapGroup>();
+  readonly members = new Map<string, SnapMember>(); // par identifiant de stagiaire : un stagiaire n'est que dans un groupe
   private index: Indexed[] | null = null;
 
   constructor(readonly snapshot: Snapshot) {
@@ -26,6 +30,8 @@ export class LocalList {
     for (const c of snapshot.categories) this.categories.set(c.id, c);
     for (const b of snapshot.badges) this.badges.set(b.code.toUpperCase(), { ...b });
     for (const h of snapshot.hosts) this.hostNames.set(h.id, h.name);
+    for (const g of snapshot.groups ?? []) this.groups.set(g.id, { ...g });
+    for (const m of snapshot.members ?? []) this.members.set(m.visitor_id, { ...m });
   }
 
   touch(): void { this.index = null; }

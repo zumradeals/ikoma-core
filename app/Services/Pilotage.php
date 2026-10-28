@@ -79,11 +79,18 @@ final class Pilotage
     {
         [$sql, $bindings] = $this->presentSql($eventId, $filters);
         $sql .= ' ORDER BY p.entered_at DESC, p.full_name, p.id'.($limit !== null ? ' LIMIT '.(int) $limit.' OFFSET '.(int) $offset : '');
+        // Des statistiques de table faussées (tables vidées puis remplies, comme dans les tests) font choisir des boucles imbriquées : le temps explose
+        // avec le nombre de présents. Des jointures par hachage restent rapides dans tous les cas ; le réglage ne vaut que pour cette requête.
+        $rows = DB::transaction(function () use ($sql, $bindings): array {
+            DB::statement("SELECT set_config('enable_nestloop', 'off', true)");
+
+            return DB::select($sql, $bindings);
+        });
 
         return array_map(fn ($r) => [
             'id' => $r->id, 'full_name' => $r->full_name, 'organisation' => $r->organisation, 'group' => $r->group_name, 'zone' => $r->zone, 'entered_at' => $r->entered_at,
             'category' => ['id' => $r->category_id, 'name' => $r->category_name, 'color' => $r->color, 'priority_circuit' => (bool) $r->priority_circuit],
-        ], DB::select($sql, $bindings));
+        ], $rows);
     }
 
     /** @param array{q?:?string,category?:?string,zone?:?string}  $filters */
@@ -102,15 +109,20 @@ final class Pilotage
     {
         $sql = "SELECT * FROM (
             SELECT v.id, v.full_name, v.organisation, c.id AS category_id, c.name AS category_name, c.color, c.priority_circuit, g.name AS group_name, l.occurred_at AS entered_at,
-                coalesce((SELECT a.checkpoint FROM access_events a WHERE a.visitor_id = v.id AND a.type = 'controle' AND a.details->>'point_type' = 'zone' AND a.occurred_at >= l.occurred_at ORDER BY a.occurred_at DESC LIMIT 1), 'Accueil') AS zone
+                coalesce(z.checkpoint, 'Accueil') AS zone
             FROM (
                 SELECT DISTINCT ON (e.visitor_id) e.visitor_id, e.type, e.occurred_at FROM access_events e
                 WHERE e.event_id = ? AND e.type IN ('entree', 'sortie') AND e.visitor_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM access_events x WHERE x.corrige_id = e.id)
                 ORDER BY e.visitor_id, e.occurred_at DESC, e.created_at DESC, e.id DESC
             ) l JOIN visitors v ON v.id = l.visitor_id JOIN categories c ON c.id = v.category_id LEFT JOIN groups g ON g.id = v.group_id
+            LEFT JOIN (
+                SELECT DISTINCT ON (a.visitor_id) a.visitor_id, a.checkpoint, a.occurred_at FROM access_events a
+                WHERE a.event_id = ? AND a.type = 'controle' AND a.details->>'point_type' = 'zone' AND a.visitor_id IS NOT NULL
+                ORDER BY a.visitor_id, a.occurred_at DESC
+            ) z ON z.visitor_id = v.id AND z.occurred_at >= l.occurred_at
             WHERE l.type = 'entree'
         ) p WHERE true";
-        $bindings = [$eventId];
+        $bindings = [$eventId, $eventId];
         if (! empty($filters['q'])) {
             $sql .= ' AND public.ikoma_normalize(p.full_name) LIKE ?';
             $bindings[] = '%'.str_replace(['%', '_'], ['\\%', '\\_'], mb_strtolower(DB::selectOne('SELECT public.ikoma_normalize(?) AS v', [trim($filters['q'])])->v)).'%';
@@ -161,7 +173,10 @@ final class Pilotage
                 (SELECT count(*) FROM visitors v WHERE v.group_id = g.id AND EXISTS (SELECT 1 FROM badge_assignments a WHERE a.visitor_id = v.id AND a.returned_at IS NULL AND a.cancelled_at IS NULL)) AS badges_remis,
                 (SELECT count(*) FROM group_members m WHERE m.group_id = g.id AND m.boarded_at IS NOT NULL) AS embarques,
                 (SELECT count(*) FROM group_members m WHERE m.group_id = g.id AND m.arrived_at IS NOT NULL) AS arrives,
-                (SELECT count(*) FROM visitors v WHERE v.group_id = g.id AND NOT EXISTS (SELECT 1 FROM group_members m WHERE m.visitor_id = v.id AND m.arrived_at IS NOT NULL)) AS absents
+                (SELECT count(*) FROM visitors v WHERE v.group_id = g.id AND NOT EXISTS (SELECT 1 FROM group_members m WHERE m.visitor_id = v.id AND m.arrived_at IS NOT NULL)) AS absents,
+                (SELECT count(*) FROM group_members m WHERE m.group_id = g.id AND m.absent_at IS NOT NULL) AS absents_depart,
+                (SELECT count(*) FROM alerts al WHERE al.subject_type = \'groupe\' AND al.subject_id = g.id AND al.type IN (\'groupe_ecart\',\'groupe_incomplet\') AND al.resolved_at IS NULL) AS ecarts,
+                (g.departed_at IS NOT NULL) AS parti
              FROM groups g WHERE g.event_id = ? ORDER BY g.name',
             [$eventId],
         ));

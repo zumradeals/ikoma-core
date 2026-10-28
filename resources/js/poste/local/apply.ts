@@ -1,8 +1,9 @@
 import { ApiError, type Avis, type Fiche, type SearchResult } from '../types';
 import type { LocalList, SnapVisitor } from './list';
+import { applyGroupOp, type GroupDelta } from './group';
 import { searchIndex } from './search';
 
-export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie';
+export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie' | 'groupe_controle' | 'groupe_badge' | 'groupe_depart' | 'groupe_arrivee' | 'groupe_arrivee_fin';
 export type LocalOp = {
   id: string; seq: number; type: OpType; agent_id: string; client_time: string; visitor_rev: string | null; payload: Record<string, unknown>; photoId?: string;
   result?: { code: string; message: string } | null;
@@ -51,7 +52,8 @@ export function findBadge(list: LocalList, input: string, hash: (token: string) 
 }
 
 /** Règles du poste appliquées à la copie locale ; lève la même erreur que le serveur quand l'action est impossible. Le badge est déjà résolu en code imprimé. */
-export function applyOp(list: LocalList, op: LocalOp, now: number): { badge_code?: string; zones?: string[]; visitor_id?: string } {
+export type ApplyResult = { badge_code?: string; zones?: string[]; visitor_id?: string } & GroupDelta;
+export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult {
   const p = op.payload;
   switch (op.type) {
     case 'identite': {
@@ -105,6 +107,8 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): { badge_code
       v.status = 'present'; list.touch();
       return { zones: list.zonesFor(v) };
     }
+    case 'groupe_controle': case 'groupe_badge': case 'groupe_depart': case 'groupe_arrivee': case 'groupe_arrivee_fin':
+      return applyGroupOp(list, op.type, p);
     case 'controle':
       return {}; // un contrôle ne change rien à la copie locale ; l'événement est écrit par le serveur au rejeu
     case 'sortie': {

@@ -22,3 +22,4 @@ pest()->use(DatabaseTransactions::class)->in('Feature/PosteTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/SyncTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/SiteControlTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/SupervisorTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/GroupsTest.php');
