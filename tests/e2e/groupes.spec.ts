@@ -203,7 +203,7 @@ test('arrivée du car : scan continu, écarts signalés au superviseur', async (
   await setQr(page, car.badges[5], car);
   await expect(page.getByTestId('ecart')).toBeVisible({ timeout: 15_000 }); await shot(page, 'arrivee-ecart');
   await setQr(page, null);
-  await button(page, 'Terminer').first().click();
+  await page.getByTestId('terminer-arrivee').filter({ hasText: car.bus }).click();
   await expect(page.getByTestId('bilan-arrivee')).toContainText('1 embarqué non scanné'); await shot(page, 'arrivee-bilan');
   await expect(pendingOps(page)).toHaveText('0', { timeout: 60_000 });
   await page.close();
