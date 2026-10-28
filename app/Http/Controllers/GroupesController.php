@@ -84,7 +84,7 @@ final class GroupesController
         Gate::authorize('groupes.gerer');
         $data = $r->validate(['mode' => ['required', Rule::in(Groups::MODES)]]);
         DB::transaction(function () use ($data, $r): void {
-            DB::table('settings')->where('key', 'controle_stagiaires')->update(['value' => $data['mode'], 'updated_at' => now()]);
+            DB::table('settings')->where('key', 'controle_stagiaires')->update(['value' => $data['mode']]);
             $this->audit->append('groupe.reglage_modifie', $r->user()->id, ['controle_stagiaires' => $data['mode']]);
         });
 

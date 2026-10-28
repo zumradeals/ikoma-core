@@ -200,3 +200,11 @@ it('journalise le parcours avec des identifiants et des nombres uniquement', fun
     $actions = DB::table('audit_logs')->where('id', '>', $this->auditStart)->pluck('action')->unique()->all();
     expect($actions)->toContain('groupe.ouvert', 'groupe.badge_remis', 'groupe.embarque', 'groupe.absent', 'groupe.confirme_par_encadreur');
 });
+
+it('enregistre la règle de contrôle depuis l\'administration et l\'affiche au rechargement', function () {
+    $this->actingAs($this->admin)->put('/administration/groupes/reglage', ['mode' => 'identite'])->assertRedirect();
+    expect(DB::table('settings')->where('key', 'controle_stagiaires')->value('value'))->toBe('identite');
+    $this->actingAs($this->admin)->get('/administration/groupes')->assertOk()->assertInertia(fn ($page) => $page->where('mode', 'identite'));
+    $this->actingAs($this->admin)->put('/administration/groupes/reglage', ['mode' => 'nimporte'])->assertSessionHasErrors('mode');
+    expect(DB::table('audit_logs')->where('action', 'groupe.reglage_modifie')->count())->toBe(1);
+});
