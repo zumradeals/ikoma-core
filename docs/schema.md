@@ -75,3 +75,14 @@ import_batches reçoit uniquement à la confirmation : UUID (identique au jeton 
 Les aperçus ne sont pas des données métier persistantes : disque privé local, bail par événement, propriétaire UUID, expiration d’une heure, jeton et manifeste chiffré. Le contenu du rapport et le fichier disparaissent après usage ; import_batches ne conserve que les nombres. Le service de recherche L2 est exposé uniquement dans l’écran d’import, sous permission listes.importer, événement validé, maximum dix résultats et projection minimale existante.
 
 Le journal conserve uniquement les identifiants et nombres pour liste.import_apercu, liste.import_confirme et liste.import_abandonne. Les privilèges SQL audit_logs et grant-db restent inchangés. Les questions des statuts visiteurs sont désormais tranchées par les décisions du 27 octobre 2026 ; celles des événements/imports futurs et du contrôle des stagiaires restent ouvertes.
+
+
+## Évolution L4 — vie d’un badge
+
+Migration `2026_10_31_000000_create_badge_lifecycle`. Ajouts : `badge_batches.category_id`, `badges.category_id`, `badges.reserved_group_id` (CHECK : jamais poste et groupe à la fois), `badges.cancellation_reason`, `badge_assignments.cancellation_reason`, `access_events.corrige_id` (référence vers l’événement corrigé : une correction est un nouvel événement). Clés étrangères composites (id, event_id) comme en L2. Unicité du code : `(event_id, code)` au lieu de globale ; jeton QR toujours unique globalement.
+
+Invariants : index unique partiel `badge_assignments_one_active_visitor` (un seul badge actif par visiteur) en plus de `badge_assignments_one_active` ; déclencheur `badges_status_guard` (transitions Disponible→Associé, Associé→Restitué, Disponible→Annulé, Associé→Annulé, Restitué→Disponible, Restitué→Clos ; Annulé et Clos définitifs). `access_events` et `identity_checks` : le compte applicatif n’a plus UPDATE, DELETE ni TRUNCATE.
+
+Réglages ajoutés dans `settings` : `badge_marge_pourcent` (10), `badge_reutilisable` (non). Lot : `quantity` = fabriqués, `margin` = nombre de badges de marge. Les lots hérités du seed ont `category_id` nul.
+
+Services : `BadgeLots` (génération, réservation), `BadgeService` (associer, restituer, annuler, controler), `QrSvg`, `CategorySymbol`. Détails et décisions : JOURNAL_DECISIONS.md, rubrique L4.

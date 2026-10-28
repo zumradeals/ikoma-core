@@ -81,13 +81,11 @@ it('refuse en base une deuxième association active mais accepte une nouvelle ap
 it('conserve le vocabulaire des statuts et refuse toute valeur étrangère', function () {
     expect(array_column(BadgeStatus::cases(), 'value'))->toBe(['Disponible', 'Associé', 'Restitué', 'Annulé', 'Clos']);
     $badge = Badge::where('code', 'B-400')->firstOrFail();
+    // Depuis L4 un déclencheur n'autorise que les transitions du cycle de vie : chaque statut est donc stocké sur un badge créé à ce statut.
     foreach (BadgeStatus::cases() as $status) {
-        $badge->status = $status;
-        $badge->save();
-        expect($badge->fresh()->status)->toBe($status);
+        $copy = Badge::create(['event_id' => $badge->event_id, 'badge_batch_id' => $badge->badge_batch_id, 'code' => 'V-'.$status->name, 'qr_token' => bin2hex(random_bytes(32)), 'status' => $status]);
+        expect($copy->fresh()->status)->toBe($status);
     }
-    $badge->status = BadgeStatus::Available;
-    $badge->save();
     try {
         DB::transaction(fn () => DB::table('badges')->where('id', $badge->id)->update(['status' => 'Inconnu']));
         $this->fail('Statut invalide accepté');

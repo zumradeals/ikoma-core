@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property BadgeStatus $status
+ */
 class Badge extends Model
 {
     use HasUuids;
@@ -37,6 +40,18 @@ class Badge extends Model
     public function reservedDevice(): BelongsTo
     {
         return $this->belongsTo(Device::class);
+    }
+
+    /** @return BelongsTo<Category, $this> */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    /** @return BelongsTo<Group, $this> */
+    public function reservedGroup(): BelongsTo
+    {
+        return $this->belongsTo(Group::class, 'reserved_group_id');
     }
 
     /** @return HasMany<BadgeAssignment, $this> */
