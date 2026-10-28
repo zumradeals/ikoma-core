@@ -4,7 +4,7 @@ import PosteApp from './PosteApp.vue';
 import ControleApp from './ControleApp.vue';
 import GroupeApp from './GroupeApp.vue';
 import type { GroupPosteRepository, SitePosteRepository } from '../../poste/repository';
-import { PosteRuntime, type WipeReason } from '../../poste/local/runtime';
+import { PosteRuntime, syncRequiredMessage, type WipeReason } from '../../poste/local/runtime';
 import { getMeta } from '../../poste/local/db';
 import { pinProblem, PinError } from '../../poste/local/vault';
 import type { LocalOp } from '../../poste/local/apply';
@@ -97,6 +97,8 @@ onMounted(async () => {
   loop = window.setInterval(async () => {
     if (phase.value !== 'ouvert') return;
     if (await runtime.expired()) { lock(); await runtime.wipe('fin_evenement'); return; }
+    const required = await runtime.syncRequiredHours();
+    if (required !== null && !navigator.onLine) { lock(); message.value = syncRequiredMessage(required); return; }
     if (navigator.onLine) void runtime.sync.sync();
   }, 60_000);
   phase.value = (await runtime.state()) === 'vide' ? 'vide' : 'verrouille';

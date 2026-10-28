@@ -13,6 +13,8 @@ export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manue
 type Enrolled = { device_token: string; device_secret: string; poste: { id: string; name: string; station: string | null; event_id: string; event_name: string } };
 
 /** Assemble le coffre, le magasin chiffré, la synchronisation et le dépôt local d'une tablette. Un seul exemplaire par page. */
+export const syncRequiredMessage = (hours: number): string => `Cette tablette n’a pas communiqué avec le serveur depuis plus de ${hours} heure${hours > 1 ? 's' : ''} : connectez-la au réseau pour reprendre. Rien n’est perdu.`;
+
 export class PosteRuntime {
   readonly db: PosteDb;
   readonly vault: PosteVault;
@@ -66,7 +68,21 @@ export class PosteRuntime {
       return;
     }
     await this.open();
+    // Audit global F2 : une tablette restée trop longtemps sans réseau (volée, oubliée) ne reprend le travail qu'après une synchronisation réussie.
+    const hours = await this.syncRequiredHours();
+    if (hours !== null) {
+      await this.sync.sync();
+      if ((await this.syncRequiredHours()) !== null) { this.lock(); throw new ApiError('synchronisation_requise', syncRequiredMessage(hours)); }
+    }
     this.sync.kick();
+  }
+
+  /** Nombre d'heures au-delà duquel le réseau est exigé, si la dernière synchronisation est plus ancienne ; sinon null (0 dans les réglages : jamais). */
+  async syncRequiredHours(): Promise<number | null> {
+    const max = (await getMeta(this.db, 'settings'))?.offline_max_hours ?? 0;
+    const last = await getMeta(this.db, 'lastSyncAt');
+    if (!max || !last) return null;
+    return Date.now() - Date.parse(last) > max * 3_600_000 ? max : null;
   }
 
   private async open(): Promise<void> {

@@ -21,7 +21,7 @@ export function pinProblem(pin: string): string | null {
 
 export type EnrolInput = {
   token: string; secret: string; pin: string; agent: { id: string; name: string }; poste: { id: string; name: string }; eventEndsAt: string | null;
-  settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number };
+  settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; offline_max_hours?: number };
 };
 
 /**

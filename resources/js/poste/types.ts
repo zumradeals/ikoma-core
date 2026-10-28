@@ -20,7 +20,7 @@ export type Avis = 'hote' | 'superviseur';
 /** Chiffres du poste d'accueil, calculés sur la copie de la tablette (donc disponibles sans réseau). */
 export type DeskSummary = {
   accueillis: number; refuses: number; badges: { restants: number; total: number }; waiting: { id: string; name: string }[];
-  pending: { type: string; count: number }[]; recent: { kind: 'badge' | 'refus'; name: string; at: string }[]; asOf: string | null;
+  pending: { type: string; count: number }[]; lowBadges: boolean; offlineCallMinutes: number; recent: { kind: 'badge' | 'refus'; name: string; at: string }[]; asOf: string | null;
 };
 export type UnlistedInput = { name: string; organisation: string; host_id: string; category_id: string };
 

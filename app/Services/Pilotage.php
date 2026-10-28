@@ -9,8 +9,11 @@ final class Pilotage
 {
     public const PER_PAGE = 50;
 
-    /** Une tablette enrôlée sans synchronisation depuis ce délai est signalée au superviseur. */
-    public const SILENT_AFTER_MINUTES = 60;
+    /** Une tablette enrôlée sans synchronisation depuis ce délai (réglage d'Administration, 60 minutes au départ) est signalée au superviseur. */
+    public static function silentAfterMinutes(): int
+    {
+        return max(1, (int) (DB::table('settings')->where('key', 'pilotage_poste_silencieux_minutes')->value('value') ?? 60));
+    }
 
     public function __construct(private readonly Presence $presence) {}
 
@@ -58,7 +61,7 @@ final class Pilotage
         $litiges = (int) DB::selectOne('SELECT count(*) AS n FROM refusals f JOIN visitors v ON v.id = f.visitor_id WHERE v.event_id = ? AND f.decision IS NULL', [$eventId])->n;
         $groups = $this->groups($eventId);
         $silent = (int) DB::table('devices')->where('event_id', $eventId)->whereNotNull('token_hash')->whereNull('revoked_at')
-            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(self::SILENT_AFTER_MINUTES)))->count();
+            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(self::silentAfterMinutes())))->count();
 
         return [
             'critiques' => (int) $alerts->critiques, 'hautes' => (int) $alerts->hautes, 'litiges' => $litiges,

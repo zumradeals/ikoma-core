@@ -4,6 +4,7 @@ use App\Models\Badge;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\BadgeLots;
+use App\Services\Pilotage;
 use App\Services\Poste\Devices;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
@@ -158,7 +159,7 @@ it('envoie la copie de travail sans jeton QR en clair, avec tous les badges de l
     $number = (int) substr($this->badges[0]->code, 2);
     app(BadgeLots::class)->reserve($this->badges[0]->badge_batch_id, $number, $number + 2, Device::findOrFail($this->deviceA), syncUser('administrateur'));
     $liste = $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->json();
-    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur']);
+    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
     expect(array_keys($liste['visitors'][0]))->toBe(['id', 'full_name', 'organisation', 'host_id', 'category_id', 'valid_from', 'valid_until', 'source', 'status', 'host_validation', 'access_note', 'group_id', 'a_rebadger', 'rev', 'identity_done', 'photo_done', 'validated', 'badge_code']);
     $codes = array_column($liste['badges'], 'code');
     expect($codes)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->toContain($this->badges[3]->code);
@@ -323,6 +324,14 @@ it('gère les postes depuis l’administration : création, code affiché une fo
     $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, 'pointsDelay' => 45, 'burstCount' => 7, 'burstMinutes' => 3])->assertRedirect();
     expect(DB::table('settings')->whereIn('key', ['controle_delai_min_points', 'controle_rafale_nombre', 'controle_rafale_minutes'])->orderBy('key')->pluck('value', 'key')->all())->toEqual(['controle_delai_min_points' => '45', 'controle_rafale_minutes' => '3', 'controle_rafale_nombre' => '7']);
     expect(json_decode((string) syncAudit()->where('action', 'poste.reglage_modifie')->orderByDesc('id')->value('details'), true))->toMatchArray(['controle_delai_min_points' => 45, 'controle_rafale_nombre' => 7, 'controle_rafale_minutes' => 3]);
+    // hors réseau, badges bas et tablette silencieuse : réglables, bornés, journalisés
+    $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, 'offlineCall' => 20, 'offlineMaxHours' => 0, 'lowBadgesPercent' => 15, 'lowBadgesMin' => 8, 'silentMinutes' => 30])->assertRedirect();
+    expect(DB::table('settings')->whereIn('key', ['poste_delai_appel_minutes', 'poste_hors_reseau_max_heures', 'poste_badges_bas_pourcent', 'poste_badges_bas_minimum', 'pilotage_poste_silencieux_minutes'])->orderBy('key')->pluck('value', 'key')->all())
+        ->toEqual(['pilotage_poste_silencieux_minutes' => '30', 'poste_badges_bas_minimum' => '8', 'poste_badges_bas_pourcent' => '15', 'poste_delai_appel_minutes' => '20', 'poste_hors_reseau_max_heures' => '0']);
+    expect(app(Pilotage::class)::silentAfterMinutes())->toBe(30);
+    foreach (['offlineCall' => 0, 'offlineMaxHours' => 200, 'lowBadgesPercent' => 95, 'lowBadgesMin' => -1, 'silentMinutes' => 0] as $field => $bad) {
+        $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, $field => $bad])->assertSessionHasErrors($field);
+    }
     foreach (['pointsDelay' => 0, 'burstCount' => 1, 'burstMinutes' => 500] as $field => $bad) {
         $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, $field => $bad])->assertSessionHasErrors($field);
     }

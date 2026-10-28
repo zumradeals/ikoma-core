@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { SyncState } from '../../poste/local/sync';
-const props = defineProps<{ poste: string | null; agent: string; online: boolean; pending: number; sync?: SyncState | null }>();
+const props = defineProps<{ poste: string | null; agent: string; online: boolean; pending: number; sync?: SyncState | null; offlineMinutes?: number | null; callAfter?: number }>();
 const emit = defineEmits<{ sync: []; lock: [] }>();
 const last = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSyncAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais'));
 </script>
@@ -21,6 +21,7 @@ const last = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSy
       <button type="button" class="btn-soft !min-h-12 !py-1" data-testid="verrouiller" @click="emit('lock')">Verrouiller</button>
     </div>
     <p v-if="!online" role="status" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-lg text-amber-950" data-testid="bandeau-reseau"><span aria-hidden="true">⚠</span> <strong>Vous continuez à travailler.</strong> Les opérations sont enregistrées sur la tablette et partiront toutes seules au retour du réseau. Ne fermez pas l’application.</p>
+    <p v-if="!online && offlineMinutes != null && offlineMinutes >= (callAfter ?? 15)" role="alert" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-lg font-bold text-amber-950" data-testid="appel-superviseur"><span aria-hidden="true">☎</span> Sans réseau depuis {{ offlineMinutes }} minutes : prévenez le superviseur.</p>
     <p v-if="sync?.needsLogin" role="alert" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="reconnexion"><span aria-hidden="true">⚠</span> Votre session a expiré : <a class="underline" href="/login">reconnectez-vous</a> pour envoyer vos opérations (elles restent enregistrées sur la tablette).</p>
     <p v-if="sync?.stale" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="liste-ancienne"><span aria-hidden="true">⚠</span> La liste des visiteurs n’a pas été actualisée depuis plus d’une heure : un visiteur ajouté ou modifié depuis peut manquer.</p>
     <p v-if="sync?.clockWarning" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="horloge"><span aria-hidden="true">⚠</span> L’heure de cette tablette est décalée : signalez-le au superviseur.</p>

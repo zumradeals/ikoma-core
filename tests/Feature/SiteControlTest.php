@@ -418,3 +418,13 @@ it('date l’alerte d’un contrôle fait hors ligne à l’heure déclarée par
     $alert = controlAlerts('controle_refuse')->first();
     expect($alert->message)->toContain('Contrôle fait hors ligne à '.$declared->format('H:i'));
 });
+
+it('copie sur la tablette les seuils réglés, et change de version quand un seuil change pour qu’elle les reçoive', function () {
+    $poste = Device::findOrFail(DemoSeeder::id('device'));
+    $snapshot = app(ListSnapshot::class);
+    expect($snapshot->build($poste)['settings'])->toMatchArray(['offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
+    $before = $snapshot->version($poste);
+    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '6']);
+    DB::table('settings')->where('key', 'poste_delai_appel_minutes')->update(['value' => '10']);
+    expect($snapshot->build($poste)['settings'])->toMatchArray(['offline_call_minutes' => 10, 'offline_max_hours' => 6])->and($snapshot->version($poste))->not->toBe($before);
+});

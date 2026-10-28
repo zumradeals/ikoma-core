@@ -258,3 +258,18 @@ Priorité n°1 de docs/AUDIT_GLOBAL.md, lancée sur « go » du dirigeant. Un ba
 - **Migration** `2026_11_07_000000_create_control_alerts` : quatre types d'alerte ajoutés au CHECK `alerts_type_valid` (`controle_refuse`, `zone_interdite`, `badge_double`, `controle_rafale`) et les trois réglages.
 - **Pas fait dans ce lot** (reste dans L14) : alertes de dépassement et de non-restitution (B4), comptage par zone (B5), gel d'urgence d'un poste, d'une zone ou d'un car (C5). Alerte sonore et escalade : lot L16 (C1).
 - **Limite connue** : la détection de double présentation compare les événements **déjà reçus par le serveur**. Deux contrôles faits hors ligne sur deux tablettes ne sont comparés qu'au moment où les deux sont synchronisés ; l'alerte arrive donc en retard, pas jamais.
+
+## L14b — hors réseau et seuils réglables (audit global F2 et C1 en partie), 28 octobre 2026
+
+Cinq réglages d'exploitation quittent le code et deviennent des réglages d'Administration > Postes (règle 6 de AGENTS.md). Migration `2026_11_08_000000_add_offline_and_threshold_settings`. **Valeurs de départ proposées, à confirmer avec le client.**
+
+| Réglage (clé) | Départ | Effet |
+|---|---|---|
+| `poste_delai_appel_minutes` | 15 | Sans réseau depuis N minutes, la barre d'état de la tablette affiche « Sans réseau depuis N minutes : prévenez le superviseur ». C'est un message à l'agent, pas une alerte envoyée : sans réseau, la tablette ne peut prévenir personne. |
+| `poste_hors_reseau_max_heures` | 12 (0 = jamais) | **Audit F2.** Sans synchronisation réussie depuis N heures, la tablette se verrouille et n'accepte plus le PIN qu'avec le réseau : à l'ouverture, elle tente une synchronisation, et si elle échoue la tablette reste verrouillée avec le message « connectez-la au réseau pour reprendre. Rien n'est perdu. » Le contrôle est refait chaque minute. **Rien n'est effacé** : le PIN reste valable et les opérations en attente restent intactes. |
+| `poste_badges_bas_pourcent` / `poste_badges_bas_minimum` | 10 % / 5 | Avertissement « Il reste peu de badges » au poste d'accueil : badges restants ≤ le plus grand des deux seuils. |
+| `pilotage_poste_silencieux_minutes` | 60 | Une tablette enrôlée sans synchronisation depuis N minutes est signalée au superviseur et à l'administrateur. Remplace la constante `Pilotage::SILENT_AFTER_MINUTES`. |
+
+- **Compromis à trancher avec le client (F2)** : la règle n°7 du plan (« le poste ne s'arrête jamais ») s'oppose à la sécurité d'une tablette volée. Avec 12 heures, un événement d'une journée n'est jamais bloqué par une coupure ordinaire, mais une panne réseau de plus de 12 heures arrête le poste jusqu'au retour du réseau. Le client peut monter la valeur ou mettre 0.
+- **Les tablettes reçoivent les seuils par la copie de travail** (`settings.offline_call_minutes`, `offline_max_hours`, `low_badges_percent`, `low_badges_min`). La version de la copie tient maintenant compte de ces réglages : sans cela, une tablette n'aurait jamais reçu un seuil modifié.
+- **Pas fait** : alerte sonore et escalade des alertes du superviseur (C1, lot suivant), code de contrainte (C2).

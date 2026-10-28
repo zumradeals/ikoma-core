@@ -36,7 +36,7 @@ const percent = computed(() => (props.summary.badges.total > 0 ? Math.round((pro
       <div v-if="summary.badges.total > 0" data-testid="badges-poste">
         <p class="flex justify-between gap-2 font-bold"><span>Badges de ce poste</span><span>{{ summary.badges.restants }} restant{{ summary.badges.restants > 1 ? 's' : '' }} sur {{ summary.badges.total }}</span></p>
         <div class="mt-2 h-3 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Badges restants à ce poste" aria-valuemin="0" :aria-valuemax="summary.badges.total" :aria-valuenow="summary.badges.restants"><div class="h-full rounded-full bg-ikoma-blue" :style="{ width: percent + '%' }" /></div>
-        <p v-if="summary.badges.restants <= Math.max(5, summary.badges.total * 0.1)" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="badges-bas"><span aria-hidden="true">⚠</span> Il reste peu de badges : prévenez le superviseur.</p>
+        <p v-if="summary.lowBadges" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="badges-bas"><span aria-hidden="true">⚠</span> Il reste peu de badges : prévenez le superviseur.</p>
       </div>
     </section>
 

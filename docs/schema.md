@@ -180,3 +180,8 @@ L’hôte peut attribuer la catégorie **Visiteur uniquement**. Une catégorie i
 ## Évolution L14a — alertes du contrôle d'accès
 
 Migration `2026_11_07_000000_create_control_alerts`. Aucune table nouvelle. `alerts_type_valid` accepte en plus `controle_refuse`, `zone_interdite`, `badge_double`, `controle_rafale` (sujet `badge` ou aucun ; message sans nom de personne). Réglages ajoutés dans `settings` : `controle_delai_min_points` (15, secondes), `controle_rafale_nombre` (5), `controle_rafale_minutes` (5). Service : `ControlAlerts`, appelé par `SiteControl::control` et `SiteControl::exit`. Détails et décisions : JOURNAL_DECISIONS.md, rubrique L14a.
+
+## Évolution L14b — réglages hors réseau et seuils
+
+Migration `2026_11_08_000000_add_offline_and_threshold_settings`. Aucune table nouvelle. Réglages ajoutés dans `settings` : `poste_delai_appel_minutes` (15), `poste_hors_reseau_max_heures` (12, 0 = désactivé), `poste_badges_bas_pourcent` (10), `poste_badges_bas_minimum` (5), `pilotage_poste_silencieux_minutes` (60). La copie de travail (`ListSnapshot`) porte `settings.offline_call_minutes`, `offline_max_hours`, `low_badges_percent`, `low_badges_min`, et sa version dépend de ces réglages. Décisions : JOURNAL_DECISIONS.md, rubrique L14b.
+

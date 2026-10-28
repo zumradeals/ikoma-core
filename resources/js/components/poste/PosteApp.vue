@@ -119,7 +119,9 @@ async function onAdviceRefresh(){const id=ctx.value.visitorId;if(!id)return;awai
 function onNext() { ctx.value = reduce(ctx.value, { type: 'NEXT' }); if (ctx.value.step === 'recherche') { fiche.value = null; error.value = null; homonyms.value = 1; } }
 function onBack() { error.value = null; send({ type: 'BACK' }); }
 
-const setOnline = () => { online.value = navigator.onLine; };
+const offlineSince = ref<number | null>(navigator.onLine ? null : Date.now());
+const offlineMinutes = computed(() => (offlineSince.value === null ? null : Math.max(0, Math.floor((now.value - offlineSince.value) / 60_000))));
+const setOnline = () => { online.value = navigator.onLine; offlineSince.value = navigator.onLine ? null : (offlineSince.value ?? Date.now()); };
 onMounted(async () => {
   window.addEventListener('online', setOnline); window.addEventListener('offline', setOnline);
   clock = window.setInterval(() => { now.value = Date.now(); }, 1000);
@@ -134,7 +136,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
 
 <template>
   <div class="min-h-screen bg-slate-50 text-ikoma-navy">
-    <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
+    <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" :offline-minutes="offlineMinutes" :call-after="summary?.offlineCallMinutes" @sync="emit('sync')" @lock="emit('lock')" />
     <main id="contenu" class="mx-auto space-y-6 px-4 py-6" :class="context && summary ? 'max-w-6xl' : 'max-w-4xl'">
       <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur">
         <p class="font-bold"><span aria-hidden="true">⚠</span> {{ error.message }}</p>

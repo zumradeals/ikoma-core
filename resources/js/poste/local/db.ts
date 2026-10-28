@@ -20,7 +20,7 @@ export class PosteDb extends Dexie {
 
 export type PlainMeta = {
   vault: VaultRecord; deviceKey: CryptoKey; serverSecret: Uint8Array; posteId: string; posteName: string; eventEndsAt: string | null;
-  settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number };
+  settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; offline_call_minutes?: number; offline_max_hours?: number; low_badges_percent?: number; low_badges_min?: number };
   listVersion: string; lastSyncAt: string | null; clockOffsetMs: number; lastSeq: number;
 };
 

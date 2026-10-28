@@ -114,7 +114,7 @@ final class AdminDashboard
     {
         $rows = [];
         $silent = DB::table('devices')->where('event_id', $eventId)->whereNotNull('token_hash')->whereNull('revoked_at')
-            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(Pilotage::SILENT_AFTER_MINUTES)))
+            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(Pilotage::silentAfterMinutes())))
             ->orderBy('name')->get(['name', 'station', 'last_synced_at']);
         foreach ($silent as $d) {
             $label = $d->station ?? $d->name;
