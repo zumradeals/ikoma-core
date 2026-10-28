@@ -13,6 +13,7 @@ const PIN = '482915';
 
 let tablet: BrowserContext; let phone: BrowserContext;
 test.describe.configure({ mode: 'serial' });
+test.use({ actionTimeout: 15_000 });
 
 const shot = async (page: Page, name: string) => { if (shots) await page.screenshot({ path: `docs/captures/L9/${name}.png`, fullPage: true }); };
 const button = (page: Page, name: string | RegExp) => page.getByRole('button', { name });
