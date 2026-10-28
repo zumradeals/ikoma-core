@@ -83,3 +83,17 @@ it('n’est pas disponible quand un administrateur existe déjà', function () {
     User::create(['name' => 'Existant', 'email' => 'existant@exemple.test', 'password' => 'Mot-de-passe-Fictif-2027!'])->assignRole('administrateur');
     $this->get('/installation')->assertNotFound();
 });
+
+it('limite l’écriture de l’assistant sans que les lectures de /sante ni de la page ne consomment son compteur', function () {
+    config(['ikoma.install_token_file' => $this->tokenFile]);
+    for ($i = 0; $i < 20; $i++) {
+        $this->getJson('/sante')->assertOk();
+        $this->get('/installation')->assertOk();
+    }
+    // 40 lectures plus tard, les six premières écritures passent encore (refusées pour mauvais jeton, mais pas limitées)…
+    for ($i = 0; $i < 6; $i++) {
+        $this->post('/installation', installationPayload(['token' => 'mauvais']))->assertSessionHasErrors('token');
+    }
+    // … et la septième est limitée.
+    $this->post('/installation', installationPayload(['token' => 'mauvais']))->assertStatus(429);
+});

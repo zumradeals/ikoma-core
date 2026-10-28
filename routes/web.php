@@ -32,9 +32,9 @@ use App\Http\Middleware\ResolvePoste;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/sante', HealthController::class)->middleware('throttle:60,1');
-Route::get('/installation', [InstallationController::class, 'show'])->middleware('throttle:30,1');
-Route::post('/installation', [InstallationController::class, 'store'])->middleware('throttle:6,1');
+Route::get('/sante', HealthController::class)->middleware('throttle:sante');
+Route::get('/installation', [InstallationController::class, 'show'])->middleware('throttle:installation-lecture');
+Route::post('/installation', [InstallationController::class, 'store'])->middleware('throttle:installation-ecriture');
 Route::get('/', fn () => Inertia::render('Home'))->name('home');
 // Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
 Route::get('/poste/shell', fn () => Inertia::render('Poste'));

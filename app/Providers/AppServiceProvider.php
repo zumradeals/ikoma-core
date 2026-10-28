@@ -31,6 +31,10 @@ class AppServiceProvider extends ServiceProvider
     {
         RateLimiter::for('sync', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id.'|'.$r->attributes->get('poste')?->id));
         RateLimiter::for('recherche', fn (Request $r) => Limit::perMinute(240)->by($r->user()?->id));
+        // Limiteurs nommés et indépendants : « throttle:N,M » partage un seul compteur par adresse entre toutes les routes qui l'utilisent.
+        RateLimiter::for('sante', fn (Request $r) => Limit::perMinute(60)->by($r->ip()));
+        RateLimiter::for('installation-lecture', fn (Request $r) => Limit::perMinute(30)->by($r->ip()));
+        RateLimiter::for('installation-ecriture', fn (Request $r) => Limit::perMinute(6)->by($r->ip()));
         RateLimiter::for('exports', fn (Request $r) => Limit::perMinute(3)->by($r->user()?->id));
         Event::listen(Login::class, function ($event): void {
             app(LoginAttempts::class)->clear(request(), $event->user->email);
