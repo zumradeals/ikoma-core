@@ -1,7 +1,12 @@
 <?php
 
 use App\Http\Controllers\AccountsController;
+use App\Http\Controllers\BadgeControlDemoController;
+use App\Http\Controllers\BadgeLabelsController;
+use App\Http\Controllers\BadgeLotsController;
+use App\Http\Controllers\BadgeReservationsController;
 use App\Http\Controllers\BadgesController;
+use App\Http\Controllers\BadgeSettingsController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ListImportsController;
@@ -26,6 +31,12 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
         Route::get('/administration/badges', BadgesController::class)->middleware('can:badges.gerer');
+        Route::post('/administration/badges/lots', [BadgeLotsController::class, 'store'])->middleware('can:badges.gerer');
+        Route::post('/administration/badges/reservations', [BadgeReservationsController::class, 'store'])->middleware('can:badges.gerer');
+        Route::put('/administration/badges/reglages', [BadgeSettingsController::class, 'update'])->middleware('can:badges.gerer');
+        Route::get('/administration/badges/etiquettes', BadgeLabelsController::class)->middleware('can:badges.gerer');
+        // Démonstration L4 : à supprimer en L5, quand les routes d'accueil appelleront BadgeService.
+        Route::post('/administration/badges/controle-demo', BadgeControlDemoController::class)->middleware('can:badges.gerer');
 
         Route::get('/espace', fn () => Inertia::render('Space'))->name('space');
         Route::get('/administration/comptes', [AccountsController::class, 'index'])->middleware('can:comptes.gerer');

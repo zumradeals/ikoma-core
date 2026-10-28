@@ -24,6 +24,12 @@ class BadgeBatch extends Model
         return $this->belongsTo(Event::class);
     }
 
+    /** @return BelongsTo<Category, $this> */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
     /** @return HasMany<Badge, $this> */
     public function badges(): HasMany
     {
