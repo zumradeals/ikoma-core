@@ -7,7 +7,9 @@ import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
 import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
 
-const props = defineProps<{ agent: string; repository?: PosteRepository }>();
+import type { SyncState } from '../../poste/local/sync';
+const props = defineProps<{ agent: string; repository?: PosteRepository; sync?: SyncState | null; autoSelect?: boolean }>();
+const emit = defineEmits<{ sync: []; lock: [] }>();
 const STORAGE_KEY = 'ikoma.poste';
 const posteId = ref<string | null>(null);
 const repo: PosteRepository = props.repository ?? new HttpPosteRepository(() => posteId.value);
@@ -107,14 +109,15 @@ onMounted(async () => {
   try { postes.value = await repo.listPostes(); pending.value = await repo.pendingCount(); }
   catch (e) { if (e instanceof ApiError) error.value = e; return; }
   const saved = readStored();
-  if (saved && postes.value.some(p => p.id === saved)) await choosePoste(saved);
+  if (props.autoSelect && postes.value.length === 1) await choosePoste(postes.value[0].id);
+  else if (saved && postes.value.some(p => p.id === saved)) await choosePoste(saved);
 });
 onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.removeEventListener('offline', setOnline); window.clearInterval(clock); });
 </script>
 
 <template>
   <div class="min-h-screen bg-slate-50 text-ikoma-navy">
-    <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="pending" />
+    <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
     <main id="contenu" class="mx-auto max-w-4xl space-y-6 px-4 py-6">
       <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur">
         <p class="font-bold"><span aria-hidden="true">⚠</span> {{ error.message }}</p>

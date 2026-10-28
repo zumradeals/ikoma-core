@@ -102,3 +102,18 @@ Migration `2026_11_01_000000_create_reception_desk`.
 Routes JSON (rôle `agent_accueil` seulement, session + CSRF + permission) : `GET /poste`, `GET /poste/api/postes|contexte|recherche|visiteurs/{id}`, `POST /poste/api/identite|valider|refuser|badge|entree|non-listes`. Hors `postes`, chaque requête porte `X-Poste-Id` ; l'événement est toujours celui du poste.
 
 Services : `Poste\Desk` (règles du parcours), `Poste\Operations` (idempotence), `VisitorSearch` (recherche par mot). La décision de l'hôte sur un non listé est la méthode `Desk::decideHost` (écran de l'hôte au lot L10).
+
+## Évolution L6 — hors ligne et synchronisation
+
+Migration `2026_11_02_000000_create_offline_sync`.
+
+- **devices** (déjà `token_hash`, créé en L2) : ajout de `enrollment_hash` (SHA-256 du code d'enrôlement, unique, vidé après usage), `enrollment_expires_at` (15 minutes), `enrolled_at`, `revoked_at` (révocation immédiate), `wipe_acknowledged_at` (l'ordre d'effacement a été donné une fois). `last_synced_at` est mis à jour à chaque lot reçu. L'état « non enrôlé / enrôlé / révoqué » se déduit de `token_hash` et `revoked_at`.
+- **sync_operations** (créée en L5) : ajout de `seq` (numéro de séquence de la tablette), `client_time` (heure déclarée de la tablette, `received_at` reste l'heure du serveur) et `visitor_id` (pour reconnaître une fiche modifiée entre-temps). `status_code` et `result` restent ceux de L5 : une opération rejouée renvoie le résultat enregistré.
+- **sync_conflicts** (nouvelle) : une ligne par opération mise en quarantaine (`kind = conflit`, `operation_id` unique, `reason`, `details` en identifiants et nombres) ou par écart d'horloge (`kind = horloge`, sans opération). `status` : `ouvert` / `resolu` (CHECK) ; l'écran de traitement arrive au lot L8, la liste des conflits ouverts est déjà visible dans Administration > Postes. Les clés étrangères sont en `RESTRICT` : un conflit n'est jamais supprimé avec son poste.
+- **settings** : `poste_inactivite_minutes` (5), `poste_ecart_horloge_secondes` (300), `poste_echecs_pin_max` (15) ; modifiables dans Administration > Postes.
+
+Routes (agent connecté + jeton d'appareil `X-Device-Token`, sauf `enroler`) : `POST /poste/api/enroler`, `GET /poste/api/liste`, `GET /poste/api/liste/version`, `POST /poste/api/sync` (50 opérations au plus), `POST /poste/api/efface`. Publique : `GET /poste/shell` (coquille précachée, sans donnée). Administration (`postes.gerer`) : `GET|POST /administration/postes`, `POST .../{poste}/code`, `POST .../{poste}/revoquer`, `PUT .../reglages`.
+
+Services : `Poste\Devices` (création, code, enrôlement, révocation), `Poste\ListSnapshot` (copie de travail et numéro de version), `Poste\SyncProcessor` (rejeu, conflits, écart d'horloge). Journal : `poste.cree`, `poste.code_emis`, `poste.enrole`, `poste.enrolement_refuse`, `poste.revoque`, `poste.efface`, `poste.reglage_modifie`, `sync.recue`, `sync.conflit`.
+
+Côté tablette (IndexedDB `ikoma-poste`, Dexie) : `meta` (clés d'appareil non exportables, enregistrement du coffre, compteurs en clair : version de liste, dernière synchronisation), `chunks` (liste de travail, secrets, compteur d'échecs : blocs scellés), `ops` (file : identifiant, séquence, type et état en clair ; contenu scellé), `photos` (scellées, supprimées à l'envoi).

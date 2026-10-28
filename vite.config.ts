@@ -27,9 +27,15 @@ export default defineConfig({
       manifest: { name: 'IKOMA Accueil', short_name: 'IKOMA', lang: 'fr', start_url: '/', scope: '/', display: 'standalone', theme_color: '#0F5AA6', background_color: '#f8fafc', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }] },
       workbox: {
         globPatterns: ['**/*.{js,css,woff2}'], navigateFallback: undefined,
-        // L0 uniquement : seule la page publique provisoire est mise en cache.
-        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }],
+        // Page publique provisoire et coquille publique du poste (/poste/shell : aucune session, aucun nom, aucune donnée).
+        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }],
         navigateFallbackDenylist: [/^\/build/],
+        // /poste passe toujours par le serveur (session, droits) ; sans réseau, on rend la coquille publique précachée. Jamais de contenu authentifié en cache.
+        runtimeCaching: [{
+          urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && url.pathname === '/poste',
+          handler: 'NetworkOnly',
+          options: { plugins: [{ handlerDidError: async () => caches.match('/poste/shell', { ignoreSearch: true }) }] },
+        }],
       },
     }),
   ],

@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/** Jeton d'appareil de test : le poste du seed est enrôlé avec ce jeton (seul son hachage est en base). */
+const DESK_TOKEN = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
 function deskUser(string $role): User
 {
     $user = User::create(['name' => 'Compte fictif L5', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24)]);
@@ -41,7 +44,7 @@ function deskPng(): string
 /** En-têtes d'une écriture du poste : poste choisi et identifiant d'opération neuf (ou imposé pour tester le rejeu). */
 function deskHeaders(?string $operation = null): array
 {
-    return ['X-Poste-Id' => DemoSeeder::id('device'), 'X-Operation-Id' => $operation ?? (string) Str::uuid(), 'Accept' => 'application/json'];
+    return ['X-Device-Token' => DESK_TOKEN, 'X-Operation-Id' => $operation ?? (string) Str::uuid(), 'Accept' => 'application/json'];
 }
 
 /** Visiteur n°$i du seed (0 VIP, 1 Visiteur, 2 Prestataire, i % 3). */
@@ -75,6 +78,7 @@ function deskValidated(int $i, ?string $avis = null): string
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
     $this->seed(DemoSeeder::class);
+    DB::table('devices')->where('id', DemoSeeder::id('device'))->update(['token_hash' => hash('sha256', DESK_TOKEN)]);
     $this->travelTo('2027-01-10 10:00:00');
     $this->auditStart = (int) DB::table('audit_logs')->max('id');
     $this->agent = deskUser('agent_accueil');
@@ -102,7 +106,7 @@ it('réserve le poste au rôle agent_accueil et refuse tous les autres rôles su
 it('exige un poste valide et un identifiant d’opération pour écrire', function () {
     $this->getJson('/poste/api/contexte')->assertStatus(422)->assertJson(['code' => 'poste_requis']);
     $this->getJson('/poste/api/contexte', ['X-Poste-Id' => (string) Str::uuid()])->assertStatus(422);
-    $this->postJson('/poste/api/refuser', ['visitor_id' => deskVisitor(1), 'motif' => 'x'], ['X-Poste-Id' => DemoSeeder::id('device')])->assertStatus(422)->assertJson(['code' => 'operation_requise']);
+    $this->postJson('/poste/api/refuser', ['visitor_id' => deskVisitor(1), 'motif' => 'x'], ['X-Device-Token' => DESK_TOKEN])->assertStatus(422)->assertJson(['code' => 'operation_requise']);
     $this->postJson('/poste/api/refuser', ['visitor_id' => deskVisitor(1), 'motif' => 'x'], [...deskHeaders(), 'X-Operation-Id' => 'pas-un-uuid'])->assertStatus(422)->assertJson(['code' => 'operation_requise']);
     $context = $this->getJson('/poste/api/contexte', deskHeaders())->assertOk()->json();
     expect($context['poste']['id'])->toBe(DemoSeeder::id('device'))->and($context['hosts'])->toHaveCount(3)->and($context['categories'])->toHaveCount(4);

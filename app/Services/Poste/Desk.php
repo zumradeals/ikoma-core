@@ -95,7 +95,7 @@ final class Desk
     }
 
     /** @return array<string, mixed> */
-    public function validate(Device $poste, User $agent, string $visitorId, ?string $avis): array
+    public function validate(Device $poste, User $agent, string $visitorId, ?string $avis, ?string $declaredAt = null): array
     {
         $visitor = $this->openVisitor($poste, $visitorId, true);
         if ($visitor->source === 'non listé' && $visitor->host_validation !== 'accepte') {
@@ -109,7 +109,7 @@ final class Desk
             throw new DeskRefused('hors_periode', "Visiteur hors période : avis de l'hôte ou du superviseur requis", 422, 'Demandez l’avis de l’hôte ou du superviseur, puis indiquez-le.');
         }
         if ($this->validation($visitor) === null) {
-            $this->insertEvent($poste, $agent, $visitor, 'validation', null, ['hors_periode' => $outside, 'avis' => $outside ? $avis : null]);
+            $this->insertEvent($poste, $agent, $visitor, 'validation', null, ['hors_periode' => $outside, 'avis' => $outside ? $avis : null, ...($declaredAt !== null ? ['heure_declaree' => $declaredAt] : [])]);
             $this->audit->append('visiteur.valide', $agent->id, ['visitor_id' => $visitor->id, 'device_id' => $poste->id, 'hors_periode' => $outside, 'avis' => $outside ? $avis : null]);
         }
 
@@ -175,15 +175,18 @@ final class Desk
      *
      * @return array<string, mixed>
      */
-    public function enter(Device $poste, User $agent, string $visitorId, int $durationMs): array
+    public function enter(Device $poste, User $agent, string $visitorId, int $durationMs, bool $strict = false, ?string $declaredAt = null): array
     {
         $visitor = $this->openVisitor($poste, $visitorId, true, true);
         $badgeId = DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNull('returned_at')->whereNull('cancelled_at')->value('badge_id');
         if ($this->validation($visitor) === null || $badgeId === null) {
             throw new DeskRefused('badge_requis', 'Le visiteur doit être validé et avoir un badge avant d’entrer.');
         }
+        if ($visitor->status === 'present' && $strict) {
+            throw new DeskRefused('deja_present', 'Ce visiteur est déjà entré : l’entrée enregistrée ici est en conflit.', 409);
+        }
         if ($visitor->status !== 'present') {
-            $this->insertEvent($poste, $agent, $visitor, 'entree', $badgeId, ['duree_ms' => max(0, min($durationMs, 86_400_000))]);
+            $this->insertEvent($poste, $agent, $visitor, 'entree', $badgeId, ['duree_ms' => max(0, min($durationMs, 86_400_000)), ...($declaredAt !== null ? ['heure_declaree' => $declaredAt] : [])]);
             DB::table('visitors')->where('id', $visitor->id)->update(['status' => 'present', 'updated_at' => now()]);
             $this->audit->append('visiteur.entree', $agent->id, ['visitor_id' => $visitor->id, 'badge_id' => $badgeId, 'device_id' => $poste->id, 'duree_ms' => max(0, min($durationMs, 86_400_000))]);
         }
@@ -196,7 +199,7 @@ final class Desk
      *
      * @return array<string, mixed>
      */
-    public function createUnlisted(Device $poste, User $agent, string $name, ?string $organisation, string $hostId, string $categoryId): array
+    public function createUnlisted(Device $poste, User $agent, string $name, ?string $organisation, string $hostId, string $categoryId, ?string $id = null): array
     {
         $name = trim($name);
         if ($name === '' || ! DB::table('hosts')->where('id', $hostId)->where('event_id', $poste->event_id)->exists() || ! DB::table('categories')->where('id', $categoryId)->where('event_id', $poste->event_id)->exists()) {
@@ -204,7 +207,10 @@ final class Desk
         }
         $event = DB::table('events')->where('id', $poste->event_id)->first(['starts_at', 'ends_at']);
         $now = now();
-        $id = (string) Str::uuid();
+        $id ??= (string) Str::uuid();
+        if (DB::table('visitors')->where('id', $id)->exists()) {
+            throw new DeskRefused('fiche_existante', 'Cette fiche existe déjà.', 409);
+        }
         DB::table('visitors')->insert(['id' => $id, 'event_id' => $poste->event_id, 'full_name' => mb_substr($name, 0, 160), 'organisation' => $organisation !== null && trim($organisation) !== '' ? mb_substr(trim($organisation), 0, 160) : null, 'host_id' => $hostId, 'category_id' => $categoryId, 'valid_from' => min($now, new \DateTimeImmutable($event->starts_at)), 'valid_until' => $event->ends_at, 'source' => 'non listé', 'status' => 'attendu', 'host_validation' => 'en_attente', 'created_at' => $now, 'updated_at' => $now]);
         $this->audit->append('visiteur.non_liste_cree', $agent->id, ['visitor_id' => $id, 'event_id' => $poste->event_id, 'host_id' => $hostId, 'device_id' => $poste->id]);
 
