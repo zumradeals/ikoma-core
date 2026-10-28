@@ -81,7 +81,6 @@ async function unlock() {
   } finally { busy.value = false; }
 }
 
-async function wipeNow() { await runtime.wipe('manuel'); }
 async function syncNow() { await runtime.sync.sync(); }
 
 onMounted(async () => {
@@ -135,7 +134,7 @@ onBeforeUnmount(() => {
   </main>
 
   <template v-else>
-    <PosteApp :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" @wipe="wipeNow" />
+    <PosteApp :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
     <section v-if="conflicts.length" class="mx-auto max-w-4xl px-4 pb-8" aria-labelledby="conflits-titre" data-testid="conflits">
       <div class="rounded-2xl border-2 border-red-700 bg-red-50 p-5">
         <h2 id="conflits-titre" class="text-xl font-bold text-red-900"><span aria-hidden="true">⚠</span> {{ conflicts.length }} opération{{ conflicts.length > 1 ? 's' : '' }} refusée{{ conflicts.length > 1 ? 's' : '' }} par le serveur</h2>

@@ -9,7 +9,7 @@ import StepRefused from './StepRefused.vue'; import UnlistedForm from './Unliste
 
 import type { SyncState } from '../../poste/local/sync';
 const props = defineProps<{ agent: string; repository?: PosteRepository; sync?: SyncState | null; autoSelect?: boolean }>();
-const emit = defineEmits<{ sync: []; lock: []; wipe: [] }>();
+const emit = defineEmits<{ sync: []; lock: [] }>();
 const STORAGE_KEY = 'ikoma.poste';
 const posteId = ref<string | null>(null);
 const repo: PosteRepository = props.repository ?? new HttpPosteRepository(() => posteId.value);
@@ -117,7 +117,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
 
 <template>
   <div class="min-h-screen bg-slate-50 text-ikoma-navy">
-    <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" @wipe="emit('wipe')" />
+    <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
     <main id="contenu" class="mx-auto max-w-4xl space-y-6 px-4 py-6">
       <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur">
         <p class="font-bold"><span aria-hidden="true">⚠</span> {{ error.message }}</p>

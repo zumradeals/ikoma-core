@@ -299,11 +299,20 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
   await page.close();
 });
 
-test('« Effacer cette tablette » supprime toutes les données locales et redemande un enrôlement', async () => {
+test('la révocation par l’administrateur efface la tablette à sa prochaine synchronisation', async ({ browser, baseURL }) => {
   const page = await desk();
-  await button(page, 'Effacer cette tablette').click(); await shot(page, 'l6-effacer-confirmation');
-  await page.getByTestId('effacer-oui').click();
-  await expect(page.getByTestId('ecran-enrolement')).toBeVisible(); await expect(page.getByTestId('message-efface')).toBeVisible(); await shot(page, 'l6-efface');
+  await expect(page.getByRole('button', { name: 'Effacer cette tablette' })).toHaveCount(0); // l'effacement n'est pas à la portée de l'agent
+  const adminContext = await browser.newContext({ baseURL });
+  const admin = await adminContext.newPage();
+  await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
+  await admin.getByLabel('Code à six chiffres').fill(otp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await expect(admin).toHaveURL(/\/espace/);
+  await admin.goto('/administration/postes');
+  admin.once('dialog', dialog => dialog.accept());
+  await admin.locator(`xpath=//h2[contains(., "${fx.poste}")]/ancestor::*[self::section or self::div][1]`).getByRole('button', { name: 'Révoquer ce poste' }).click();
+  await expect(admin.getByText('Révoqué')).toBeVisible(); await shot(admin, 'l6-admin-revoque');
+  await button(page, 'Synchroniser maintenant').click();
+  await expect(page.getByTestId('ecran-enrolement')).toBeVisible(); await expect(page.getByTestId('message-efface')).toContainText('déconnectée par l’administrateur'); await shot(page, 'l6-efface');
   const rows = await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => { const request = indexedDB.open('ikoma-poste'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
     let total = 0;
@@ -312,5 +321,6 @@ test('« Effacer cette tablette » supprime toutes les données locales et redem
     return total;
   });
   expect(rows).toBe(0);
+  await adminContext.close();
   await page.close();
 });
