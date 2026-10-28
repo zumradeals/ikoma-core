@@ -76,7 +76,7 @@ async function progress(page: Page, done: number, total: number): Promise<void> 
       return JSON.stringify({ video: v ? { ready: v.readyState, w: v.videoWidth, paused: v.paused, shown: v.offsetParent !== null, tracks: (v.srcObject as MediaStream | null)?.getTracks().map(t => t.readyState) } : null, courant: document.querySelector('[data-testid=personne-courante]')?.textContent, confirmee: !!document.querySelector('[data-testid=code-badge]'), videos: document.querySelectorAll('video').length });
     });
     console.log('DIAG', state);
-    throw new Error(`Progression attendue ${done}/${total} — message affiché : ${message} — ${(e as Error).message}`);
+    throw new Error(`Progression attendue ${done}/${total} — message affiché : ${message} — ${(e as Error).message}`, { cause: e });
   }
 }
 const pendingOps = (page: Page) => page.getByTestId('en-attente');
