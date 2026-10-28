@@ -22,5 +22,5 @@ test('un administrateur crée une zone puis une catégorie qui l’utilise', asy
  await expect(page.getByText(category, { exact: true })).toBeVisible(); await page.reload();
  const card = page.locator('section').filter({ has: page.getByText(category, { exact: true }) }); await expect(card).toContainText(zone);
  await page.screenshot({ path: 'test-results/l2-categories.png', fullPage: true });
- await page.goto('/administration/badges'); await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible(); await expect(page.getByText('B-001', { exact: true })).toBeVisible(); await page.screenshot({ path: 'test-results/l2-badges.png', fullPage: true });
+ await page.goto('/administration/badges'); await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible(); await expect(page.getByText('B-001', { exact: true }).first()).toBeVisible(); await page.screenshot({ path: 'test-results/l2-badges.png', fullPage: true });
 });
