@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\HostNotifications;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -83,6 +84,9 @@ class AccountsController
             }
             DB::table('hosts')->where('user_id', $user->id)->update(['user_id' => null, 'updated_at' => now()]);
             DB::table('hosts')->whereIn('id', $data['host_ids'])->update(['user_id' => $user->id, 'updated_at' => now()]);
+            foreach ($data['host_ids'] as $hostId) {
+                app(HostNotifications::class)->pendingFor($hostId);
+            }
             app(Audit::class)->append('hote.rattache', auth()->id(), ['user_id' => $user->id, 'host_ids' => $data['host_ids']]);
         });
 

@@ -4,14 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Services\HostGuests;
 use App\Services\HostNotifications;
+use App\Services\Poste\DeskRefused;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final class HostController
 {
@@ -36,26 +39,35 @@ final class HostController
     public function store(Request $r): RedirectResponse
     {
         Gate::authorize('listes.mettre_a_jour');
-        $out = $this->guests->save($r->user(), $this->input($r, true));
 
-        return redirect('/hote/invites')->with('host_feedback', $out['homonym'] ? '⚠ Invité ajouté. Homonyme dans l’événement : l’accueil demandera un second critère.' : '✓ Invité ajouté.');
+        return $this->perform($r, function () use ($r) {
+            $out = $this->guests->save($r->user(), $this->input($r, true));
+
+            return redirect('/hote/invites')->with('host_feedback', $out['homonym'] ? '⚠ Invité ajouté. Homonyme dans l’événement : l’accueil demandera un second critère.' : '✓ Invité ajouté.');
+        });
     }
 
     public function update(Request $r, string $visitor): RedirectResponse
     {
         Gate::authorize('listes.mettre_a_jour');
-        $this->guests->owned($r->user(), $visitor);
-        $out = $this->guests->save($r->user(), $this->input($r, false), $visitor);
 
-        return back()->with('host_feedback', $out['homonym'] ? '⚠ Homonyme : l’accueil demandera un second critère.' : '✓ Modification enregistrée.');
+        return $this->perform($r, function () use ($r, $visitor) {
+            $this->guests->owned($r->user(), $visitor);
+            $out = $this->guests->save($r->user(), $this->input($r, false), $visitor);
+
+            return back()->with('host_feedback', $out['homonym'] ? '⚠ Homonyme : l’accueil demandera un second critère.' : '✓ Modification enregistrée.');
+        });
     }
 
     public function destroy(Request $r, string $visitor): RedirectResponse
     {
         Gate::authorize('listes.mettre_a_jour');
-        $this->guests->withdraw($r->user(), $visitor);
 
-        return redirect('/hote/invites')->with('host_feedback', '✓ Invité retiré.');
+        return $this->perform($r, function () use ($r, $visitor) {
+            $this->guests->withdraw($r->user(), $visitor);
+
+            return redirect('/hote/invites')->with('host_feedback', '✓ Invité retiré.');
+        });
     }
 
     public function notifications(Request $r): Response
@@ -78,11 +90,30 @@ final class HostController
     public function decide(Request $r, string $notification): RedirectResponse
     {
         Gate::authorize('visiteurs.valider_non_liste');
-        abort_unless($this->mine($r)->where('n.id', $notification)->exists(), 403);
-        $data = $r->validate(['accepted' => 'required|boolean', 'reason' => 'nullable|string|max:500']);
-        $this->notifications->answer($notification, $r->user(), $r->boolean('accepted'), $data['reason'] ?? null);
 
-        return back();
+        return $this->perform($r, function () use ($r, $notification) {
+            abort_unless($this->mine($r)->where('n.id', $notification)->exists(), 403);
+            $data = $r->validate(['accepted' => 'required|boolean', 'reason' => 'nullable|string|max:500']);
+            $this->notifications->answer($notification, $r->user(), $r->boolean('accepted'), $data['reason'] ?? null);
+
+            return back();
+        });
+    }
+
+    /** Aucune exception technique ne recopie les valeurs nominatives des paramètres SQL dans les logs. */
+    private function perform(Request $r, \Closure $action): RedirectResponse
+    {
+        try {
+            return $action();
+        } catch (DeskRefused $e) {
+            if ($r->header('X-Inertia') && $e->status !== 403) {
+                return back()->withErrors(['request' => $e->getMessage()]);
+            }throw $e;
+        } catch (ValidationException|HttpExceptionInterface $e) {
+            throw $e;
+        } catch (\Throwable) {
+            return back()->withErrors(['request' => 'L’opération n’a pas abouti. Rechargez l’écran puis réessayez.']);
+        }
     }
 
     /** @return Collection<int,\stdClass> */

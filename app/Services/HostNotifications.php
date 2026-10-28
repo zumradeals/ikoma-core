@@ -70,10 +70,11 @@ final class HostNotifications
     public function answer(string $id, User $actor, bool $accepted, ?string $reason): void
     {
         DB::transaction(function () use ($id, $actor, $accepted, $reason) {
+            $request = DB::table('notifications')->where('id', $id)->where('recipient_id', $actor->id)->first();
+            abort_unless($request !== null, 403);
+            $v = app(HostGuests::class)->owned($actor, $request->visitor_id, true);
             $n = DB::table('notifications')->where('id', $id)->where('recipient_id', $actor->id)->lockForUpdate()->first();
             abort_unless($n !== null, 403);
-            $v = Visitor::query()->whereHas('host', fn ($q) => $q->where('user_id', $actor->id))->lockForUpdate()->where('id', $n->visitor_id)->first();
-            abort_unless($v && $v->withdrawn_at === null, 403);
             if ($n->type === 'arrivee' || $n->decided_at !== null) {
                 throw new DeskRefused('deja_traite', 'Cette demande a déjà été traitée.', 409);
             }
@@ -98,6 +99,16 @@ final class HostNotifications
         });
     }
 
+    /** Rattrape les demandes en attente lorsqu’un compte vient d’être rattaché à une fiche. */
+    public function pendingFor(string $hostId): void
+    {
+        foreach (DB::table('visitors')->where('host_id', $hostId)->whereNull('withdrawn_at')->where('host_validation', 'en_attente')->pluck('id') as $id) {
+            $request = DB::table('audit_logs')->where('action', 'visiteur.non_liste_cree')->whereRaw("details::jsonb->>'visitor_id' = ?", [$id])->orderByDesc('id')->first(['actor_id', 'details']);
+            $details = $request ? json_decode($request->details, true) : [];
+            $this->send($id, 'non_liste', $request?->actor_id ? User::find($request->actor_id) : null, isset($details['device_id']) ? Device::find($details['device_id']) : null);
+        }
+    }
+
     public function escalate(): int
     {
         $minutes = (int) (DB::table('settings')->where('key', 'hote_delai_reponse_minutes')->value('value') ?? 2);
@@ -113,12 +124,39 @@ final class HostNotifications
                 if (! $v || $v->withdrawn_at || ($n->type === 'non_liste' && $v->host_validation !== 'en_attente')) {
                     return;
                 }
-                app(Alerts::class)->raise($n->event_id, $n->type === 'non_liste' ? 'non_liste_attente' : 'hors_periode', 'haute', 'visiteur', $n->visitor_id, 'L’hôte n’a pas répondu dans le délai prévu.', 'hote_delai:'.$n->id);
+                $this->raiseTimeout($n->event_id, $n->visitor_id, $n->type, 'hote_delai:'.$n->id);
                 DB::table('notifications')->where('id', $id)->update(['escalated_at' => now(), 'updated_at' => now()]);
                 $count++;
             });
         }
 
+        // L’absence de compte lié ne doit pas empêcher la remontée au superviseur.
+        $unlinked = DB::table('visitors as v')->where('v.host_validation', 'en_attente')->whereNull('v.withdrawn_at')->where('v.created_at', '<=', now()->subMinutes($minutes))->whereNotExists(fn ($q) => $q->selectRaw('1')->from('notifications as n')->whereColumn('n.visitor_id', 'v.id')->where('n.type', 'non_liste'))->get(['v.id', 'v.event_id']);
+        foreach ($unlinked as $v) {
+            if ($this->raiseTimeout($v->event_id, $v->id, 'non_liste', 'hote_delai_sans_compte:'.$v->id)) {
+                $count++;
+            }
+        }
+
         return $count;
+    }
+
+    private function raiseTimeout(string $event, string $visitor, string $type, string $key): bool
+    {
+        $alertType = $type === 'non_liste' ? 'non_liste_attente' : 'hors_periode';
+        $existing = DB::table('alerts')->where('subject_id', $visitor)->where('type', $alertType)->whereNull('acknowledged_at')->whereNull('resolved_at')->orderBy('id')->first(['id', 'severity']);
+        if ($existing) {
+            if ($existing->severity === 'haute') {
+                return false;
+            }
+            DB::table('alerts')->where('id', $existing->id)->update(['severity' => 'haute', 'message' => 'L’hôte n’a pas répondu dans le délai prévu.', 'updated_at' => now()]);
+
+            return true;
+        } else {
+            $known = DB::table('alerts')->where('dedupe_key', $key)->exists();
+            app(Alerts::class)->raise($event, $alertType, 'haute', 'visiteur', $visitor, 'L’hôte n’a pas répondu dans le délai prévu.', $key);
+
+            return ! $known;
+        }
     }
 }

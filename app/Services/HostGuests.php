@@ -15,12 +15,18 @@ final class HostGuests
 {
     public function owned(User $actor, string $id, bool $lock = false): Visitor
     {
-        $q = Visitor::query()->whereHas('host', fn ($h) => $h->where('user_id', $actor->id))->whereNull('withdrawn_at');
         if ($lock) {
-            $q->lockForUpdate();
+            $host = DB::table('hosts')->where('user_id', $actor->id)->whereExists(fn ($q) => $q->selectRaw('1')->from('visitors')->where('visitors.id', $id)->whereColumn('visitors.host_id', 'hosts.id'))->lockForUpdate()->first(['id']);
+            if (! $host) {
+                throw new DeskRefused('invite_interdit', 'Cet invité ne fait pas partie de votre liste.', 403);
+            }
+        }
+        $query = Visitor::query()->whereHas('host', fn ($h) => $h->where('user_id', $actor->id))->whereNull('withdrawn_at');
+        if ($lock) {
+            $query->lockForUpdate();
         }
 
-        return $q->find($id) ?? throw new DeskRefused('invite_interdit', 'Cet invité ne fait pas partie de votre liste.', 403);
+        return $query->find($id) ?? throw new DeskRefused('invite_interdit', 'Cet invité ne fait pas partie de votre liste.', 403);
     }
 
     private function editable(Visitor $v): void
@@ -43,6 +49,8 @@ final class HostGuests
         return DB::transaction(function () use ($actor, $data, $id, $host) {
             // Même verrou que les imports L3 : pas de doublons créés par deux saisies/imports concurrents.
             DB::statement('SELECT pg_advisory_xact_lock(hashtextextended(?,3))', [$host->event_id]);
+            $host = DB::table('hosts')->where('id', $host->id)->where('user_id', $actor->id)->lockForUpdate()->first();
+            abort_unless($host !== null, 403);
             $v = $id ? $this->owned($actor, $id, true) : null;
             if ($v) {
                 $this->editable($v);

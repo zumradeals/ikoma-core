@@ -2,6 +2,7 @@
 
 use App\Models\Device;
 use App\Models\User;
+use App\Services\Groups;
 use App\Services\HostNotifications;
 use App\Services\Poste\Desk;
 use App\Services\Poste\DeskRefused;
@@ -164,4 +165,26 @@ it('limite le rattachement des fiches et le réglage du délai à l’administra
             expect(DB::selectOne("SELECT has_table_privilege(current_user, '$table', '$right') AS ok")->ok)->toBeFalse();
         }
     }
+});
+
+it('remonte aussi un non listé sans compte hôte lié puis notifie après rattachement', function () {
+    $host = DemoSeeder::id('host2');
+    $id = hostInvite('Demande fictive sans compte', $host, 'non listé');
+    expect(app(HostNotifications::class)->send($id, 'non_liste', $this->agent))->toBeNull();
+    $this->travel(121)->seconds();
+    app(HostNotifications::class)->escalate();
+    expect(DB::table('alerts')->where('subject_id', $id)->where('severity', 'haute')->count())->toBe(1);
+    DB::table('hosts')->where('id', $host)->update(['user_id' => $this->a->id]);
+    app(HostNotifications::class)->pendingFor($host);
+    expect(DB::table('notifications')->where('visitor_id', $id)->where('recipient_id', $this->a->id)->count())->toBe(1);
+});
+
+it('retire aussi un stagiaire de la copie et des compteurs sans effacer son historique', function () {
+    $id = DB::table('visitors')->where('host_id', DemoSeeder::id('host0'))->where('group_id', DemoSeeder::id('group'))->value('id');
+    $before = app(Groups::class)->state(DemoSeeder::id('group'))['progress']['total'];
+    $this->delete('/hote/invites/'.$id)->assertRedirect();
+    expect(app(Groups::class)->state(DemoSeeder::id('group'))['progress']['total'])->toBe($before - 1);
+    expect(DB::table('group_members')->where('visitor_id', $id)->exists())->toBeTrue();
+    $snapshot = app(ListSnapshot::class)->build(Device::findOrFail(DemoSeeder::id('device')));
+    expect(collect($snapshot['members'])->pluck('visitor_id')->all())->not->toContain($id);
 });
