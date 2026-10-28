@@ -178,7 +178,8 @@ final class SyncProcessor
      */
     private function quarantine(Device $device, string $operationId, string $type, array $op, ?string $visitorId, array $payload, string $reason): void
     {
-        $badge = isset($payload['code']) ? mb_substr((string) $payload['code'], 0, 40) : null;
+        // Seul un code imprimé est conservé : le contenu d'un QR (jeton) ne doit jamais se retrouver, même en partie, dans la table des conflits.
+        $badge = isset($payload['code']) && preg_match('/^B-[0-9]{1,9}$/i', (string) $payload['code']) === 1 ? strtoupper((string) $payload['code']) : null;
         DB::table('sync_conflicts')->insert(['id' => (string) Str::uuid(), 'operation_id' => $operationId, 'event_id' => $device->event_id, 'device_id' => $device->id, 'agent_id' => $op['agent_id'], 'visitor_id' => $visitorId, 'operation_type' => $type, 'kind' => 'conflit', 'reason' => $reason, 'details' => json_encode(array_filter(['badge_code' => $badge, 'seq' => $op['seq'] ?? null]), JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now()]);
         $this->audit->append('sync.conflit', null, ['operation_id' => $operationId, 'device_id' => $device->id, 'type' => $type, 'raison' => $reason, 'visitor_id' => $visitorId]);
     }

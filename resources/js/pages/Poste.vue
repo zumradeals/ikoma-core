@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import PosteApp from '../components/poste/PosteApp.vue';
-const page = usePage<{ auth: { name: string } }>();
+import PosteGate from '../components/poste/PosteGate.vue';
+const page = usePage<{ auth: { id: string; name: string } | null }>();
 </script>
-<template><PosteApp :agent="page.props.auth.name" /></template>
+<template><PosteGate :agent="page.props.auth ? { id: page.props.auth.id, name: page.props.auth.name } : null" /></template>

@@ -20,7 +20,7 @@ export interface PosteRepository {
   pendingCount(): Promise<number>;
 }
 
-function cookie(name: string): string {
+export function cookie(name: string): string {
   const match = document.cookie.split('; ').find(c => c.startsWith(name + '='));
   return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
 }
