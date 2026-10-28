@@ -2,7 +2,6 @@
 
 use App\Models\User;
 use App\Services\Audit;
-use App\Services\SecurityProfile;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -139,62 +138,4 @@ it('refuse UPDATE DELETE TRUNCATE avec le compte applicatif et détecte une alt�
         $pdo->exec("UPDATE audit_logs SET id=$id WHERE id=($id+1000000000)");
     }
     $this->artisan('audit:verify')->assertSuccessful();
-});
-
-it('démarre en profil standard, et le profil renforcé impose le 2FA à tous les rôles', function () {
-    expect(SecurityProfile::current())->toBe('standard');
-    foreach (['agent_accueil', 'hote', 'encadreur'] as $role) {
-        $user = account($role);
-        $user->update(['two_factor_confirmed_at' => null]);
-        expect($user->requiresTwoFactor())->toBeFalse();
-        $this->actingAs($user)->get('/espace')->assertOk(); // profil standard : le 2FA reste facultatif pour les rôles de terrain
-    }
-    DB::table('settings')->where('key', 'profil_securite')->update(['value' => 'renforce']);
-    try {
-        foreach (['agent_accueil', 'hote', 'encadreur'] as $role) {
-            $user = account($role);
-            $user->update(['two_factor_confirmed_at' => null]);
-            expect($user->requiresTwoFactor())->toBeTrue();
-            $this->actingAs($user)->get('/espace')->assertRedirect('/securite');
-            $user->update(['two_factor_confirmed_at' => now()]);
-            $this->actingAs($user)->get('/espace')->assertOk();
-        }
-    } finally {
-        DB::table('settings')->where('key', 'profil_securite')->update(['value' => 'standard']);
-    }
-});
-
-it('prend « renforcé » quand le réglage manque ou est illisible, jamais « standard » par défaut', function () {
-    DB::table('settings')->where('key', 'profil_securite')->delete();
-    try {
-        expect(SecurityProfile::current())->toBe('renforce')->and(SecurityProfile::strict())->toBeTrue();
-        DB::table('settings')->insert(['key' => 'profil_securite', 'value' => 'n’importe quoi']);
-        expect(SecurityProfile::current())->toBe('renforce');
-    } finally {
-        DB::table('settings')->where('key', 'profil_securite')->delete();
-        DB::table('settings')->insert(['key' => 'profil_securite', 'value' => 'standard']);
-    }
-});
-
-it('réserve le profil de sécurité à l’administrateur, le journalise et l’affiche sur son tableau tant qu’il est standard', function () {
-    $admin = account('administrateur');
-    $admin->update(['two_factor_confirmed_at' => now()]);
-    foreach (['superviseur', 'agent_accueil', 'hote', 'encadreur'] as $role) {
-        $other = account($role);
-        $other->update(['two_factor_confirmed_at' => now()]);
-        $this->actingAs($other)->get('/administration/profil-securite')->assertForbidden();
-        $this->put('/administration/profil-securite', ['profile' => 'renforce'])->assertForbidden();
-    }
-    $this->actingAs($admin)->get('/administration/profil-securite')->assertOk()->assertInertia(fn ($p) => $p->component('Admin/ProfilSecurite')->where('profile', 'standard'));
-    $this->get('/administration')->assertInertia(fn ($p) => expect(collect($p->toArray()['props']['watch'])->pluck('title')->all())->toContain('Profil de sécurité « standard »'));
-    $this->put('/administration/profil-securite', ['profile' => 'n’importe quoi'])->assertSessionHasErrors('profile');
-    try {
-        $this->put('/administration/profil-securite', ['profile' => 'renforce'])->assertRedirect();
-        expect(SecurityProfile::strict())->toBeTrue();
-        $log = DB::table('audit_logs')->where('action', 'securite.profil_modifie')->orderByDesc('id')->first();
-        expect(json_decode($log->details, true))->toBe(['avant' => 'standard', 'apres' => 'renforce'])->and($log->actor_id)->toBe($admin->id);
-        $this->get('/administration')->assertInertia(fn ($p) => expect(collect($p->toArray()['props']['watch'])->pluck('title')->all())->not->toContain('Profil de sécurité « standard »'));
-    } finally {
-        DB::table('settings')->where('key', 'profil_securite')->update(['value' => 'standard']);
-    }
 });

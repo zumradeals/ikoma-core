@@ -12,7 +12,6 @@ use App\Services\BadgeService;
 use App\Services\HostNotifications;
 use App\Services\QrSvg;
 use App\Services\VisitorSearch;
-use App\Services\Watchlist;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -66,7 +65,7 @@ final class Desk
             'zones' => $zones->all(), 'accueil_limite' => $unlisted, 'source' => $visitor->source, 'status' => $visitor->status ?? 'attendu', 'host_validation' => $visitor->host_validation,
             'valid_from' => Carbon::parse($visitor->valid_from)->toIso8601String(), 'valid_until' => Carbon::parse($visitor->valid_until)->toIso8601String(), 'hors_periode' => $this->outsidePeriod($visitor),
             'identity_done' => DB::table('identity_checks')->where('visitor_id', $visitor->id)->exists(), 'photo_done' => DB::table('photos')->where('visitor_id', $visitor->id)->exists(),
-            'watch' => app(Watchlist::class)->isFlagged($visitor->id), 'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge, 'access_note' => $visitor->access_note, 'approval' => $visitor->approval_status,
+            'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge, 'access_note' => $visitor->access_note,
             'host_advice' => app(HostNotifications::class)->advice($visitor->id),
             'a_rebadger' => $badge === null && DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNotNull('cancelled_at')->exists() && ! in_array($visitor->status, ['sorti', 'refuse'], true),
         ];
@@ -103,15 +102,6 @@ final class Desk
     public function validate(Device $poste, User $agent, string $visitorId, ?string $avis, ?string $declaredAt = null): array
     {
         $visitor = $this->openVisitor($poste, $visitorId, true);
-        $flagged = app(Watchlist::class)->isFlagged($visitor->id);
-        if ($flagged) {
-            if ($avis !== 'superviseur') {
-                // L'alerte est écrite après l'annulation des écritures de l'opération refusée, sinon elle serait annulée avec elle.
-                throw (new DeskRefused('personne_signalee', 'Personne signalée : appelez le superviseur.', 422, 'Appelez le superviseur : lui seul peut autoriser, puis indiquez son avis.'))
-                    ->afterRollback(fn () => app(Watchlist::class)->raiseEncounter($visitor->event_id, $visitor->id, 'au poste d’accueil'));
-            }
-            app(Watchlist::class)->raiseEncounter($visitor->event_id, $visitor->id, 'au poste d’accueil');
-        }
         if ($visitor->source === 'non listé' && $visitor->host_validation !== 'accepte') {
             throw new DeskRefused('hote_en_attente', $visitor->host_validation === 'refuse' ? 'L’hôte a refusé cette visite : l’entrée est impossible.' : 'En attente de l’accord de l’hôte : la validation et l’entrée sont impossibles pour le moment.', 422, 'Attendez la réponse de l’hôte ou appelez-le.');
         }
@@ -130,8 +120,8 @@ final class Desk
             throw new DeskRefused('hors_periode', "Visiteur hors période : avis de l'hôte ou du superviseur requis", 422, 'Demandez l’avis de l’hôte ou du superviseur, puis indiquez-le.');
         }
         if ($this->validation($visitor) === null) {
-            $this->insertEvent($poste, $agent, $visitor, 'validation', null, ['hors_periode' => $outside, 'avis' => $outside || $flagged ? $avis : null, ...($flagged ? ['signalee' => true] : []), ...($declaredAt !== null ? ['heure_declaree' => $declaredAt] : [])]);
-            $this->audit->append('visiteur.valide', $agent->id, ['visitor_id' => $visitor->id, 'device_id' => $poste->id, 'hors_periode' => $outside, 'avis' => $outside || $flagged ? $avis : null, ...($flagged ? ['signalee' => true] : [])]);
+            $this->insertEvent($poste, $agent, $visitor, 'validation', null, ['hors_periode' => $outside, 'avis' => $outside ? $avis : null, ...($declaredAt !== null ? ['heure_declaree' => $declaredAt] : [])]);
+            $this->audit->append('visiteur.valide', $agent->id, ['visitor_id' => $visitor->id, 'device_id' => $poste->id, 'hors_periode' => $outside, 'avis' => $outside ? $avis : null]);
             if ($outside) {
                 app(Alerts::class)->raise($visitor->event_id, 'hors_periode', 'normale', 'visiteur', $visitor->id, 'Visiteur validé hors de sa période, sur avis '.($avis === 'hote' ? 'de l’hôte' : 'du superviseur').'.', 'hors_periode:'.$visitor->id);
             }
@@ -143,7 +133,7 @@ final class Desk
     /** @return array<string, mixed> */
     public function refuse(Device $poste, User $agent, string $visitorId, string $motif): array
     {
-        $visitor = $this->openVisitor($poste, $visitorId, true, false, false);
+        $visitor = $this->openVisitor($poste, $visitorId, true);
         $motif = trim($motif);
         if ($motif === '') {
             throw new DeskRefused('motif_obligatoire', 'Le motif du refus est obligatoire.');
@@ -285,7 +275,7 @@ final class Desk
     }
 
     /** Visiteur encore traitable (ni refusé ni déjà présent), sauf $allowPresent pour rejouer une entrée. */
-    private function openVisitor(Device $poste, string $id, bool $lock = false, bool $allowPresent = false, bool $approvedOnly = true): Visitor
+    private function openVisitor(Device $poste, string $id, bool $lock = false, bool $allowPresent = false): Visitor
     {
         $visitor = $this->visitor($poste, $id, $lock);
         if ($visitor->withdrawn_at !== null) {
@@ -296,10 +286,6 @@ final class Desk
         }
         if (in_array($visitor->status, ['present', 'sorti'], true) && ! $allowPresent) {
             throw new DeskRefused('deja_present', 'Ce visiteur est déjà entré.');
-        }
-        // Audit global A3 : sans l'approbation de l'officier de sécurité (profil renforcé), l'accueil est impossible ; refuser une personne reste toujours possible.
-        if ($approvedOnly && $visitor->approval_status !== 'approuve') {
-            throw new DeskRefused('non_approuve', $visitor->approval_status === 'refuse' ? 'L’officier de sécurité n’a pas approuvé cet invité : appelez le superviseur.' : 'Cet invité attend l’approbation de l’officier de sécurité : l’accueil est impossible pour le moment.');
         }
 
         return $visitor;

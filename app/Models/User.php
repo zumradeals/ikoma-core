@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Services\SecurityProfile;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -25,7 +24,6 @@ class User extends Authenticatable
 
     public function requiresTwoFactor(): bool
     {
-        // Administrateur et superviseur toujours ; tous les rôles dans le profil de sécurité renforcé (audit global D1).
-        return $this->hasAnyRole(['administrateur', 'superviseur', 'officier_securite']) || SecurityProfile::strict();
+        return $this->hasAnyRole(['administrateur', 'superviseur']);
     }
 }

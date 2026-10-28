@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Device;
-use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +13,7 @@ final class ControlAlerts
 {
     private const BUCKET_SECONDS = 300;
 
-    public function __construct(private readonly Alerts $alerts, private readonly Audit $audit) {}
+    public function __construct(private readonly Alerts $alerts) {}
 
     /**
      * Un badge refusé à un contrôle ou à une sortie. Un badge annulé est critique : c'est le cas du badge perdu ou volé que quelqu'un essaie encore.
@@ -77,17 +75,6 @@ final class ControlAlerts
             return;
         }
         $this->alerts->raise($eventId, 'badge_double', 'haute', 'badge', $badgeId, 'Badge '.$badgeCode.' présenté à « '.$other->checkpoint.' » puis à « '.$point['name'].' » en moins de '.$seconds.' s : copie possible.'.$this->offlineSuffix($declaredAt, $at), $this->key('dbl', [$eventId, $badgeId, $point['name'], (string) $other->checkpoint], $at));
-    }
-
-    /**
-     * Code de contrainte saisi à la place du PIN d'une tablette (audit global C2) : alerte critique, journal, sans rien changer à l'écran de l'agent.
-     * Le message ne contient aucun nom de personne.
-     */
-    public function duress(Device $poste, User $agent, ?string $declaredAt): void
-    {
-        $at = $this->at($declaredAt);
-        $this->alerts->raise($poste->event_id, 'contrainte', 'critique', 'poste', $poste->id, 'Code de contrainte saisi au poste « '.($poste->station ?? $poste->name).' » : l’agent est peut-être menacé. Agissez avec discrétion.'.$this->offlineSuffix($declaredAt, $at));
-        $this->audit->append('poste.contrainte', $agent->id, ['device_id' => $poste->id, 'event_id' => $poste->event_id]);
     }
 
     /**

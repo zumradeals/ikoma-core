@@ -28,8 +28,6 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | postes.gerer | Oui | — | — | — | — |
 | presences.consulter | — | Oui | — | — | — |
 | roles.attribuer | Oui | — | — | — | — |
-| securite.gerer | Oui | — | — | — | — |
-| approbations.decider | Oui | — | — | — | — |
 | visiteurs.enregistrer_mobile | — | — | Oui | — | — |
 | visiteurs.enregistrer_non_liste | — | — | Oui | — | — |
 | visiteurs.rechercher | — | — | Oui | — | — |
@@ -44,9 +42,3 @@ Lot L3b (décision du dirigeant, 27 octobre 2026) : `groupes.gerer`, `postes.ger
 Les permissions des futurs modules sont enregistrées mais aucune route ni table de ces modules n’est créée. `journal.exporter` est réservé ; aucun export L1.
 
 Validation du dirigeant : la permission `categories.gerer` est attribuée uniquement à l’administrateur, conformément à la section 10 du document de fonctionnement (« gestion des badges, zones et catégories »). La portée des listes de l’hôte et du groupe de l’encadreur devra être limitée aux objets concernés dans leurs futurs modules.
-
-Lot L15a (décision du dirigeant, 28 octobre 2026) : `securite.gerer` est ajoutée, réservée à l'administrateur (choix du profil de sécurité). Dans le profil renforcé, le 2FA devient obligatoire pour tous les rôles. Lot L15b : `approbations.decider` (valider ou refuser la demande d'un autre administrateur), réservée à l'administrateur.
-
-Lot L16 : nouveau rôle `officier_securite` (hors tableau ci-dessus, un seul rôle par compte) avec `listes.approuver` (approuver ou refuser les invités en attente) et `interdits.gerer` (réservée à la future liste d'interdits, A2). L'administrateur n'a pas `listes.approuver`.
-
-Lot L17 : `interdits.gerer` (ajouter ou lever une personne de la liste d'interdits) est effectivement utilisée ; réservée à `officier_securite`. Lever en profil renforcé demande la validation d'un administrateur (`approbations.decider`).

@@ -138,7 +138,6 @@ onBeforeUnmount(() => { stopCamera(); window.clearTimeout(dismissTimer); window.
           <div v-if="control.category" class="rounded-2xl bg-white px-4 py-2 text-ikoma-navy"><CategorySwatch :name="control.category.name" :color="control.category.color" :priority="control.category.priority_circuit" /></div>
           <p class="text-2xl">{{ control.organisation || 'Organisation non indiquée' }}</p>
           <p class="text-2xl" data-testid="zones">Zones autorisées : {{ control.zones.join(', ') || 'aucune' }}</p>
-          <p v-if="control.watch" class="rounded-2xl border-4 border-white bg-red-950 px-5 py-3 text-3xl font-extrabold text-white" data-testid="personne-signalee"><span aria-hidden="true">⛔</span> PERSONNE SIGNALÉE : appelez le superviseur</p>
           <p v-if="control.zone_ok === false" class="rounded-2xl border-4 border-white bg-amber-300 px-5 py-3 text-3xl font-extrabold text-red-900" data-testid="zone-non-autorisee"><span aria-hidden="true">⚠</span> ZONE NON AUTORISÉE : {{ control.point }}</p>
         </template>
         <template v-else>

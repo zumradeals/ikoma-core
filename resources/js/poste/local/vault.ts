@@ -1,4 +1,4 @@
-import { createDeviceKey, createVault, fromB64, openBytes, openJson, openVaultMode, sealBytes, sealJson, toB64, PBKDF2_ITERATIONS } from './crypto';
+import { createDeviceKey, createVault, fromB64, openBytes, openJson, openVault, sealBytes, sealJson, toB64, PBKDF2_ITERATIONS } from './crypto';
 import { getMeta, setMeta, type PosteDb } from './db';
 
 export class PinError extends Error {
@@ -20,7 +20,7 @@ export function pinProblem(pin: string): string | null {
 }
 
 export type EnrolInput = {
-  token: string; secret: string; pin: string; duressPin?: string; agent: { id: string; name: string }; poste: { id: string; name: string }; eventEndsAt: string | null;
+  token: string; secret: string; pin: string; agent: { id: string; name: string }; poste: { id: string; name: string }; eventEndsAt: string | null;
   settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; offline_max_hours?: number };
 };
 
@@ -44,15 +44,10 @@ export class PosteVault {
   async enrol(input: EnrolInput): Promise<void> {
     const problem = pinProblem(input.pin);
     if (problem) throw new PinError('pin_incorrect', problem);
-    if (input.duressPin) { // le code de contrainte suit les mêmes règles que le PIN et doit en être différent
-      const duressProblem = pinProblem(input.duressPin);
-      if (duressProblem) throw new PinError('pin_incorrect', `Code de contrainte : ${duressProblem}`);
-      if (input.duressPin === input.pin) throw new PinError('pin_incorrect', 'Le code de contrainte doit être différent du PIN.');
-    }
     await this.wipe();
     const deviceKey = await createDeviceKey();
     const secret = fromB64(input.secret);
-    const { record, dek } = await createVault(input.pin, secret, deviceKey, this.options.iterations ?? PBKDF2_ITERATIONS, input.duressPin);
+    const { record, dek } = await createVault(input.pin, secret, deviceKey, this.options.iterations ?? PBKDF2_ITERATIONS);
     await setMeta(this.db, 'deviceKey', deviceKey);
     await setMeta(this.db, 'serverSecret', await sealBytes(deviceKey, secret, 'serverSecret')); // scellé par la clé de l'appareil : jamais en clair
     await setMeta(this.db, 'vault', record);
@@ -70,8 +65,7 @@ export class PosteVault {
     await this.putSecret('profile', input.agent);
   }
 
-  /** Ouvre le coffre. Renvoie « contrainte » quand c'est le code de contrainte qui a été saisi : l'écran n'en montre rien, l'appelant prévient en silence. */
-  async unlock(pin: string): Promise<'normal' | 'contrainte'> {
+  async unlock(pin: string): Promise<void> {
     const record = await getMeta(this.db, 'vault');
     const deviceKey = await getMeta(this.db, 'deviceKey');
     const sealedSecret = await getMeta(this.db, 'serverSecret');
@@ -84,10 +78,8 @@ export class PosteVault {
       throw new PinError('efface', 'Les données de cette tablette ont été effacées par sécurité.');
     }
     if (failures.lockedUntil > this.now()) throw new PinError('verrouille', 'Trop d’essais : patientez avant de réessayer.', Math.max(0, max - failures.count), failures.lockedUntil);
-    let mode: 'normal' | 'contrainte';
     try {
-      const opened = await openVaultMode(pin, record, await openBytes(deviceKey, sealedSecret, 'serverSecret'), deviceKey);
-      this.dek = opened.dek; mode = opened.duress ? 'contrainte' : 'normal';
+      this.dek = await openVault(pin, record, await openBytes(deviceKey, sealedSecret, 'serverSecret'), deviceKey);
     } catch {
       failures = { count: failures.count + 1, lockedUntil: 0 };
       if (failures.count >= max) {
@@ -99,8 +91,6 @@ export class PosteVault {
       throw new PinError(failures.lockedUntil ? 'verrouille' : 'pin_incorrect', failures.lockedUntil ? 'Trop d’essais : patientez avant de réessayer.' : 'PIN incorrect.', max - failures.count, failures.lockedUntil);
     }
     await this.writeFailures(deviceKey, { count: 0, lockedUntil: 0 });
-
-    return mode;
   }
 
   lock(): void { this.dek = null; }

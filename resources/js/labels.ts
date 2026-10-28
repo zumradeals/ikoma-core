@@ -1,5 +1,5 @@
 export const roleLabels: Record<string, string> = {
-  administrateur: 'Administrateur', officier_securite: 'Officier de sécurité', superviseur: 'Superviseur sécurité', agent_accueil: "Agent d’accueil", hote: 'Hôte / organisateur', encadreur: 'Encadreur de groupe',
+  administrateur: 'Administrateur', superviseur: 'Superviseur sécurité', agent_accueil: "Agent d’accueil", hote: 'Hôte / organisateur', encadreur: 'Encadreur de groupe',
 };
 export const actionLabels: Record<string, string> = {
   'notification.creee':'Notification créée', 'hote.decision_non_liste':'Réponse de l’hôte au non-listé', 'hote.avis_hors_periode':'Avis de l’hôte hors période', 'liste.invite_ajoute':'Invité ajouté par l’hôte', 'liste.invite_modifie':'Invité modifié par l’hôte', 'liste.invite_retire':'Invité retiré par l’hôte', 'hote.rattache':'Fiches hôte rattachées', 'hote.delai_modifie':'Délai de réponse hôte modifié',

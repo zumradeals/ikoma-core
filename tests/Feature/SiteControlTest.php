@@ -9,7 +9,6 @@ use App\Services\Poste\DeskRefused;
 use App\Services\Poste\ListSnapshot;
 use App\Services\Poste\SiteControl;
 use App\Services\Presence;
-use App\Services\Watchlist;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\Query\Builder;
@@ -428,39 +427,4 @@ it('copie sur la tablette les seuils réglés, et change de version quand un seu
     DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '6']);
     DB::table('settings')->where('key', 'poste_delai_appel_minutes')->update(['value' => '10']);
     expect($snapshot->build($poste)['settings'])->toMatchArray(['offline_call_minutes' => 10, 'offline_max_hours' => 6])->and($snapshot->version($poste))->not->toBe($before);
-});
-
-it('transforme le code de contrainte rejoué par la tablette en alerte critique silencieuse, une seule fois, sans nom de personne', function () {
-    $op = siteOp('contrainte', [], 1);
-    $result = siteSync([$op])->assertOk()->json();
-    expect($result['results'][0]['status'])->toBe('applique');
-    $alert = DB::table('alerts')->where('type', 'contrainte')->first();
-    expect($alert)->not->toBeNull()->and($alert->severity)->toBe('critique')->and($alert->subject_type)->toBe('poste')->and($alert->subject_id)->toBe(DemoSeeder::id('device'))
-        ->and($alert->message)->toContain('Code de contrainte saisi au poste « Poste fictif A »')->toContain('hors ligne à')->and($alert->event_id)->toBe(DemoSeeder::id('event'));
-    foreach (DB::table('visitors')->where('event_id', DemoSeeder::id('event'))->pluck('full_name') as $name) {
-        expect($alert->message)->not->toContain($name);
-    }
-    $log = siteAudit()->where('action', 'poste.contrainte')->first();
-    expect($log)->not->toBeNull()->and($log->actor_id ?? null)->toBe($this->agent->id);
-    // un renvoi de la même opération ne crée ni seconde alerte ni seconde ligne de journal
-    $replay = siteSync([$op])->assertOk()->json();
-    expect($replay['results'][0]['replayed'] ?? false)->toBeTrue()->and(DB::table('alerts')->where('type', 'contrainte')->count())->toBe(1)->and(siteAudit()->where('action', 'poste.contrainte')->count())->toBe(1);
-    // seul un agent d'accueil enrôlé peut la déclarer
-    $other = siteUser('hote');
-    $bad = $op;
-    $bad['id'] = (string) Str::uuid();
-    $bad['agent_id'] = $other->id;
-    expect(siteSync([$bad])->assertOk()->json('results.0.status'))->toBe('conflit')->and(DB::table('alerts')->where('type', 'contrainte')->count())->toBe(1);
-});
-
-it('prévient le superviseur et marque la réponse quand une personne de la liste d’interdits se présente au contrôle (audit A2)', function () {
-    $badge = $this->batch0[0];
-    siteEnter(0, $badge);
-    $name = (string) DB::table('visitors')->where('id', DemoSeeder::id('visitor0'))->value('full_name');
-    siteControl($badge->code, siteZone(0))->assertOk()->assertJson(['valid' => true, 'watch' => false]);
-    app(Watchlist::class)->add($name, 'Motif fictif confidentiel', siteUser('officier_securite'));
-    $r = siteControl($badge->code, siteZone(0))->assertOk()->assertJson(['valid' => true, 'watch' => true]);
-    expect($r->getContent())->not->toContain('Motif fictif confidentiel');
-    $alert = DB::table('alerts')->where('type', 'personne_signalee')->where('subject_id', DemoSeeder::id('visitor0'))->first();
-    expect($alert)->not->toBeNull()->and($alert->severity)->toBe('critique')->and($alert->message)->not->toContain($name);
 });
