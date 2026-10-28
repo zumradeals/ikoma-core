@@ -136,3 +136,19 @@ Routes : page `GET /controle` (rôle `agent_accueil`, permission `badges.control
 Services : `Poste\SiteControl` (contrôle, sortie), `Presence` (compteur, correction), `BadgeService::controler` (paramètre `$journaliser`). Opérations de la file hors ligne : `controle` et `sortie` (permission `badges.controler`). Journal : `controle.refuse`, `sortie.enregistree`, `sortie.refusee`, `presence.corrigee` (identifiants et nombres seulement).
 
 Conflits à la synchronisation (`sync_conflicts`) : `sortie_sans_entree`, `deja_sorti`, `annule`, `non_associe`, `restitue`, `visiteur_refuse` (sortie), et `annule_entre_temps` (contrôle jugé valide hors ligne, refusé par le serveur au rejeu).
+
+## Évolution L8 — pilotage du superviseur
+
+Migration `2026_11_04_000000_create_supervisor_dashboard`.
+
+- **alerts** (nouvelle) : `event_id`, `type` (CHECK : `refus`, `non_liste_attente`, `badge_annule`, `conflit_sync`, `hors_periode`, `car_arrive`, `groupe_incomplet` ; les deux derniers sont réservés au lot L9), `severity` (CHECK : `critique`, `haute`, `normale`), objet concerné (`subject_type` : `visiteur`, `badge`, `conflit`, `groupe` ; `subject_id`), `message` (200 caractères, **sans nom**), `dedupe_key` (unique : une cause ne crée qu'une alerte), `created_at`, `acknowledged_by` / `acknowledged_at` (prise en compte, CHECK : les deux ou aucun), `resolved_at` (alerte réglée d'elle-même : le non listé a reçu sa réponse, le badge annulé a été remplacé, le refus a reçu une décision). Index sur (événement, prise en compte, réglée).
+- **refusals** : ajout `decision` (CHECK : `maintenu`, `autorise`, `a_revoir`) et `decided_at` ; `supervisor_id` et `supervisor_decision` (déjà créés en L2) portent le superviseur et ses conditions.
+- **visitors.access_note** : mention de l'autorisation donnée par le superviseur après un refus ; affichée à l'agent d'accueil (fiche du poste et copie de la tablette). Avec `a_rebadger` (calculé : un badge a été annulé et aucun n'est actif), elle est ajoutée à la fiche du poste et à la copie de la tablette.
+
+Sources des alertes : refus d'accès (`Desk::refuse`), non listé en attente (`Desk::createUnlisted`, réglée par `Desk::decideHost`), badge annulé (`BadgeService::annuler`, réglée par `associer`), conflit de synchronisation et écart d'horloge (`SyncProcessor`), visiteur validé hors période (`Desk::validate`).
+
+Compteurs (`Pilotage::counters`) : **attendus** = personnes attendues, refusées exclues ; **arrivés** = personnes ayant une entrée non corrigée (même sorties depuis) ; **présents** = compteur exact du lot L7 ; **refusés** = personnes dont l'accès est refusé (décision « autorisé » exclue). **Zone d'un présent** = nom du dernier point de contrôle de type zone depuis son entrée, sinon « Accueil ».
+
+Routes (session, 2FA, permission) : `GET /pilotage` (`pilotage.consulter`), `GET /pilotage/alertes` et `POST /pilotage/alertes/{alerte}/prendre-en-compte` (`alertes.consulter`), `GET /pilotage/presents` (`presences.consulter`), `GET /pilotage/visiteurs/{visiteur}` (`pilotage.consulter`), `POST /pilotage/badges/annuler` (`badges.annuler`), `GET /pilotage/litiges` et `POST /pilotage/litiges/{refus}/decision` (`litiges.decider`), `GET /pilotage/groupes` (`groupes.suivre` et `cars.suivre`), `GET /pilotage/evacuation` et `GET /pilotage/api/evacuation` (`presences.consulter`) ; publique : `GET /pilotage/evacuation/shell` (coquille sans donnée, précachée). Journal : `alerte.prise_en_compte`, `litige.decide`, `badge.annule` (existant), `evacuation.consultee` (identifiants et nombres).
+
+Côté appareil du superviseur (IndexedDB `ikoma-pilotage`, même coffre que le poste) : la dernière liste d'évacuation, chiffrée par un PIN de 6 chiffres choisi par le superviseur ; effacée à la déconnexion explicite, après 15 PIN faux et 24 h après la fin de l'événement.

@@ -13,6 +13,8 @@ function go(page = 1) {
   router.get('/pilotage/presents', { q: q.value || undefined, category: category.value || undefined, zone: zone.value || undefined, page: page > 1 ? page : undefined, event: props.events.length > 1 ? props.event?.id : undefined }, { preserveState: true, preserveScroll: true, replace: true });
 }
 watch(q, () => { window.clearTimeout(timer); timer = window.setTimeout(() => go(), 300); });
+// Ouvrir une fiche pendant que la recherche attend son délai : la recherche en attente ne doit pas annuler cette ouverture.
+const leaving = () => window.clearTimeout(timer);
 watch([category, zone], () => go());
 const time = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 </script>
@@ -28,7 +30,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: 
     <p role="status" data-testid="total">{{ total }} personne{{ total > 1 ? 's' : '' }} présente{{ total > 1 ? 's' : '' }}</p>
     <ul class="space-y-3" data-testid="liste-presents">
       <li v-for="row in rows" :key="row.id">
-        <Link :href="'/pilotage/visiteurs/' + row.id" class="block rounded-2xl border-2 border-slate-300 bg-white p-4">
+        <Link :href="'/pilotage/visiteurs/' + row.id" class="block rounded-2xl border-2 border-slate-300 bg-white p-4" @click="leaving">
           <span class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xl">{{ row.full_name }}</strong><CategorySwatch :name="row.category.name" :color="row.category.color" :priority="row.category.priority_circuit" /></span>
           <span class="mt-1 block">{{ row.organisation || 'Organisation non indiquée' }}</span>
           <span class="mt-1 block text-sm">Zone : {{ row.zone }} · Groupe : {{ row.group || '—' }} · Entrée : {{ time(row.entered_at) }}</span>

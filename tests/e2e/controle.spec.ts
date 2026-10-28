@@ -1,18 +1,11 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { createHmac } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { freshOtp } from './otp';
 
 type Fixtures = { email: string; password: string; names: Record<string, string>; enrolCode2: string; poste2: string; controlNames: string[]; controlBadges: string[]; controlQrSvg: string; admin: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
 const shots = process.env.L7_CAPTURES === '1';
 const PIN = '739261';
-function otp(secret: string): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = ''; for (const c of secret) bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
-  const bytes = []; for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
-  const hash = createHmac('sha1', Buffer.from(bytes)).update(counter).digest(); const offset = hash[19] & 15;
-  return ((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');
-}
 
 // Une seule tablette pour tout le fichier : accueil et contrôle partagent son enrôlement et son PIN.
 let tablet: BrowserContext;
@@ -106,7 +99,7 @@ test('contrôle d’un badge valide : QR lu par la caméra en moins de 5 s, verd
   await expect(page.getByTestId('choix-point')).toBeVisible(); await shot(page, 'l7-choix-point');
   const started = Date.now();
   await button(page, /Salle principale/).first().click(); // la caméra s'ouvre ici
-  await expect(page.getByTestId('resultat')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('resultat')).toBeVisible({ timeout: 20_000 }).catch(async e => { { const info = await page.locator('video').evaluate(v => ({ ...(v as HTMLVideoElement).dataset, rs: (v as HTMLVideoElement).readyState, w: (v as HTMLVideoElement).videoWidth })) as Record<string, string>; if (info.dbgImg) writeFileSync('/tmp/dbg-frame.png', Buffer.from(info.dbgImg.split(',')[1], 'base64')); delete info.dbgImg; console.log('DBG', JSON.stringify(info)); } throw e; });
   const elapsed = Date.now() - started;
   expect(elapsed, `${elapsed} ms entre l'ouverture de la caméra et le verdict`).toBeLessThan(5000);
   await expect(page.getByTestId('resultat')).toHaveAttribute('data-verdict', 'valide');
@@ -163,7 +156,7 @@ test('sans réseau : contrôles et sortie sur la situation connue, puis resynchr
   const adminContext = await browser.newContext({ baseURL });
   const admin = await adminContext.newPage();
   await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
-  await admin.getByLabel('Code à six chiffres').fill(otp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
   await expect(admin).toHaveURL(/\/espace/);
   const before = await adminCounters(admin);
   const presentBefore = await presents(online);

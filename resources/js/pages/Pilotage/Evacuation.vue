@@ -112,6 +112,7 @@ onBeforeUnmount(() => {
 
     <template v-else-if="data">
       <section class="no-print space-y-3" aria-label="Actions">
+        <p class="text-lg" data-testid="evenement-liste">{{ data.event.name }}</p>
         <p class="text-2xl font-bold" data-testid="total">{{ data.total }} personne{{ data.total > 1 ? 's' : '' }} présente{{ data.total > 1 ? 's' : '' }}</p>
         <div class="grid gap-3">
           <button type="button" class="btn-main" data-testid="imprimer" @click="print">Exporter pour impression</button>

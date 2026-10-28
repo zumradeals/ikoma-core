@@ -51,6 +51,9 @@ class DeskFixtures extends Command
         // Deuxième tablette (accueil + contrôle sur site) : son propre lot de badges réservé, utilisée par le parcours « contrôle » (L7).
         $device2 = (string) Str::uuid();
         DB::table('devices')->insert(['id' => $device2, 'event_id' => $event, 'name' => "Tablette contrôle {$s}", 'station' => "Poste contrôle {$s}", 'created_at' => $now, 'updated_at' => $now]);
+        // Troisième tablette, réservée au parcours du superviseur (L8) : son propre lot de badges et son code d'enrôlement.
+        $device3 = (string) Str::uuid();
+        DB::table('devices')->insert(['id' => $device3, 'event_id' => $event, 'name' => "Tablette supervision {$s}", 'station' => "Poste supervision {$s}", 'created_at' => $now, 'updated_at' => $now]);
         $visitor = function (string $name, string $category, ?string $from = null, ?string $until = null) use ($event, $host, $categories, $now): string {
             $id = (string) Str::uuid();
             DB::table('visitors')->insert(['id' => $id, 'event_id' => $event, 'full_name' => $name, 'organisation' => 'Organisation fictive de recette', 'host_id' => $host, 'category_id' => $categories[$category], 'valid_from' => $from ?? $now->copy()->subHour(), 'valid_until' => $until ?? $now->copy()->addDay(), 'source' => 'listé', 'status' => 'attendu', 'created_at' => $now, 'updated_at' => $now]);
@@ -73,6 +76,11 @@ class DeskFixtures extends Command
             $controlNames[] = sprintf('Contrôle Fictif %02d %s', $i, $s);
             $visitor(end($controlNames), 'Visiteur');
         }
+        $pilotageNames = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $pilotageNames[] = sprintf('Pilotage Fictif %02d %s', $i, $s);
+            $visitor(end($pilotageNames), 'Visiteur');
+        }
         $password = Str::password(24);
         $secret = (new Google2FA)->generateSecretKey();
         $agent = User::create(['name' => "Agent fictif {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $password]);
@@ -92,6 +100,14 @@ class DeskFixtures extends Command
         $numbers2 = Badge::where('badge_batch_id', $controlBatch->id)->pluck('code')->map(fn (string $code) => (int) substr($code, 2));
         $lots->reserve($controlBatch->id, $numbers2->min(), $numbers2->max(), Device::findOrFail($device2), $admin);
         $controlBadges = Badge::where('badge_batch_id', $controlBatch->id)->orderBy('code')->get();
+        $pilotageBatch = $lots->generate($event, $categories['Visiteur'], 20, $admin);
+        $numbers3 = Badge::where('badge_batch_id', $pilotageBatch->id)->pluck('code')->map(fn (string $code) => (int) substr($code, 2));
+        $lots->reserve($pilotageBatch->id, $numbers3->min(), $numbers3->max(), Device::findOrFail($device3), $admin);
+        $pilotageBadges = Badge::where('badge_batch_id', $pilotageBatch->id)->orderBy('code')->get();
+        $supervisorPassword = Str::password(24).'aA1!';
+        $supervisorSecret = (new Google2FA)->generateSecretKey();
+        $supervisor = User::create(['name' => "Superviseur fictif {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $supervisorPassword, 'two_factor_secret' => encrypt($supervisorSecret), 'two_factor_recovery_codes' => encrypt(json_encode([])), 'two_factor_confirmed_at' => $now]);
+        $supervisor->assignRole('superviseur');
         $visitorBadges = Badge::where('badge_batch_id', $visitorBatch->id)->orderBy('code')->get();
         $vipBadges = Badge::where('badge_batch_id', $vipBatch->id)->orderBy('code')->get();
         // Deux badges déjà remis : l'un à « Koffi Occupant » (refus « déjà associé »), l'autre à « Diallo Déjàbadgé » (visiteur déjà badgé).
@@ -100,10 +116,12 @@ class DeskFixtures extends Command
         // Code d'enrôlement de la tablette de recette : en recette seulement, sa validité est prolongée pour couvrir tout le parcours.
         $enrolCode = app(Devices::class)->issueCode($deviceModel, $admin);
         $enrolCode2 = app(Devices::class)->issueCode(Device::findOrFail($device2), $admin);
+        $enrolCode3 = app(Devices::class)->issueCode(Device::findOrFail($device3), $admin);
+        DB::table('devices')->where('id', $device3)->update(['enrollment_expires_at' => now()->addHours(6)]);
         DB::table('devices')->where('id', $device2)->update(['enrollment_expires_at' => now()->addHours(6)]);
         DB::table('devices')->where('id', $device)->update(['enrollment_expires_at' => now()->addHours(6)]);
         $this->line(json_encode([
-            'enrolCode' => $enrolCode, 'enrolCode2' => $enrolCode2, 'poste2' => "Poste contrôle {$s}", 'controlNames' => $controlNames, 'controlBadges' => $controlBadges->pluck('code')->values(), 'controlQrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $controlBadges[0]->id)->value('qr_token')), 'QR du badge '.$controlBadges[0]->code), 'zonesNames' => array_keys($zones), 'admin' => ['email' => $admin->email, 'password' => $adminPassword, 'secret' => $secret], 'bulk' => $bulk, 'bulkPrefix' => 'Rafale Fictif',
+            'enrolCode' => $enrolCode, 'enrolCode2' => $enrolCode2, 'enrolCode3' => $enrolCode3, 'poste3' => "Poste supervision {$s}", 'pilotageNames' => $pilotageNames, 'pilotageBadges' => $pilotageBadges->pluck('code')->values(), 'supervisor' => ['email' => $supervisor->email, 'password' => $supervisorPassword, 'secret' => $supervisorSecret], 'poste2' => "Poste contrôle {$s}", 'controlNames' => $controlNames, 'controlBadges' => $controlBadges->pluck('code')->values(), 'controlQrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $controlBadges[0]->id)->value('qr_token')), 'QR du badge '.$controlBadges[0]->code), 'zonesNames' => array_keys($zones), 'admin' => ['email' => $admin->email, 'password' => $adminPassword, 'secret' => $secret], 'bulk' => $bulk, 'bulkPrefix' => 'Rafale Fictif',
             'email' => $agent->email, 'password' => $password, 'suffix' => $s, 'poste' => "Poste recette {$s}", 'names' => $names, 'ids' => $ids,
             'takenBadge' => $visitorBadges[0]->code, 'vipBadges' => $vipBadges->pluck('code'), 'freeBadges' => $visitorBadges->skip(3)->pluck('code')->values(),
             'qrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $visitorBadges[2]->id)->value('qr_token')), 'QR du badge '.$visitorBadges[2]->code), 'qrBadge' => $visitorBadges[2]->code,

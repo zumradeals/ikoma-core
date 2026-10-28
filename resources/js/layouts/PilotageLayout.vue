@@ -28,7 +28,7 @@ function change(event: Event) { router.get(window.location.pathname, { event: (e
     </header>
     <main id="contenu" class="mx-auto max-w-3xl space-y-5 px-4 py-5">
       <h1 class="no-print text-display font-bold">{{ title }}</h1>
-      <p v-if="!event" role="status" class="rounded-xl bg-white p-4">Aucun événement n’est encore créé.</p>
+      <p v-if="!event && !bare" role="status" class="rounded-xl bg-white p-4">Aucun événement n’est encore créé.</p>
       <slot />
     </main>
     <nav v-if="!bare" aria-label="Navigation du pilotage" class="no-print fixed inset-x-0 bottom-0 z-40 border-t-2 border-ikoma-navy bg-white">

@@ -38,3 +38,6 @@
   .zone-sheet:last-of-type { break-after: auto; }
   .zone-sheet li { break-inside: avoid; }
 }
+
+/* La navigation fixe du pilotage ne doit jamais masquer un champ ou un bouton atteint par le clavier ou par un défilement automatique. */
+html { scroll-padding-bottom: 6rem; }

@@ -1,4 +1,5 @@
-/** Caméra de la tablette : photo réduite (640 px maximum, JPEG) et lecture de QR (BarcodeDetector sinon @zxing/browser, sans aucun appel réseau). */
+import { BrowserQRCodeReader } from '@zxing/browser';
+/** Caméra de la tablette : photo réduite (640 px maximum, JPEG) et lecture de QR (BarcodeDetector sinon @zxing/browser, sans aucun appel réseau). zxing est importé avec la page, pas à la demande : un chargement différé pouvait rester en attente pendant l'activation du service worker et le QR n'était jamais lu. */
 
 export const PHOTO_MAX_SIDE = 640;
 
@@ -52,15 +53,18 @@ export async function startScan(video: HTMLVideoElement, onCode: (text: string) 
   }
   // Lecture image par image : on ne confie pas le flux à la boucle interne de zxing (decodeFromStream), qui attend un événement « loadedmetadata »
   // déjà passé quand la caméra est ouverte avant et pouvait ne jamais lire le QR (blocage intermittent constaté en recette).
-  const { BrowserQRCodeReader } = await import('@zxing/browser');
   const reader = new BrowserQRCodeReader();
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { willReadFrequently: true });
   const timer = window.setInterval(() => {
+    video.dataset.dbgTicks = String(Number(video.dataset.dbgTicks ?? 0) + 1); video.dataset.dbgState = `${video.readyState}/${video.videoWidth}/${video.paused}`;
     if (stopped || !context || video.readyState < 2 || !video.videoWidth) return;
+    video.dataset.dbgDecodes = String(Number(video.dataset.dbgDecodes ?? 0) + 1);
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
     context.drawImage(video, 0, 0);
-    try { emit(reader.decodeFromCanvas(canvas).getText()); } catch { /* aucun QR lisible dans cette image */ }
+    try { const px = context.getImageData(0, 0, canvas.width, canvas.height).data; let sum = 0; for (let i = 0; i < px.length; i += 400) sum += px[i]; video.dataset.dbgLum = String(Math.round(sum / (px.length / 400))); } catch { /* debug */ }
+    if (video.dataset.dbgTicks === '60') video.dataset.dbgImg = canvas.toDataURL('image/png');
+    try { emit(reader.decodeFromCanvas(canvas).getText()); } catch (e) { video.dataset.dbgErr = (e as Error).name; /* aucun QR lisible dans cette image */ }
   }, 150);
   return { stop() { stopped = true; window.clearInterval(timer); closeCamera(video, stream); } };
 }

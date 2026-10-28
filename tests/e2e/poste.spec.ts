@@ -1,18 +1,11 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { createHmac } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { freshOtp } from './otp';
 
 type Fixtures = { email: string; password: string; poste: string; names: Record<string, string>; takenBadge: string; vipBadges: string[]; freeBadges: string[]; qrSvg: string; qrBadge: string; enrolCode: string; bulk: string[]; bulkPrefix: string; admin: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
 const shots = process.env.L5_CAPTURES === '1' || process.env.L6_CAPTURES === '1';
 const PIN = '482915';
-function otp(secret: string): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = ''; for (const c of secret) bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
-  const bytes = []; for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
-  const hash = createHmac('sha1', Buffer.from(bytes)).update(counter).digest(); const offset = hash[19] & 15;
-  return ((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');
-}
 
 // Une seule tablette (un seul contexte de navigateur) pour tout le fichier : elle est enrôlée une fois, puis verrouillée/déverrouillée par PIN comme sur le terrain.
 let tablet: BrowserContext;
@@ -179,7 +172,7 @@ test('le QR du badge est lu par la caméra (flux simulé), sans appel réseau ex
   await page.goto('/poste'); await openDesk(page);
   await toDecision(page, 'scanner', fx.names.scan);
   await button(page, /Valider/).click();
-  await expect(page.getByRole('heading', { name: `Remettez le badge ${fx.qrBadge}` })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('heading', { name: `Remettez le badge ${fx.qrBadge}` })).toBeVisible({ timeout: 20000 }).catch(async e => { { const info = await page.locator('video').evaluate(v => ({ ...(v as HTMLVideoElement).dataset, rs: (v as HTMLVideoElement).readyState, w: (v as HTMLVideoElement).videoWidth })) as Record<string, string>; if (info.dbgImg) writeFileSync('/tmp/dbg-frame.png', Buffer.from(info.dbgImg.split(',')[1], 'base64')); delete info.dbgImg; console.log('DBG', JSON.stringify(info)); } throw e; });
   expect(external).toEqual([]);
   await page.close();
 });
@@ -243,7 +236,7 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
   const adminContext = await browser.newContext({ baseURL });
   const admin = await adminContext.newPage();
   await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
-  await admin.getByLabel('Code à six chiffres').fill(otp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
   await expect(admin).toHaveURL(/\/espace/);
   const before = await adminCounters(admin);
 
@@ -305,7 +298,7 @@ test('la révocation par l’administrateur efface la tablette à sa prochaine s
   const adminContext = await browser.newContext({ baseURL });
   const admin = await adminContext.newPage();
   await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
-  await admin.getByLabel('Code à six chiffres').fill(otp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
   await expect(admin).toHaveURL(/\/espace/);
   await admin.goto('/administration/postes');
   admin.once('dialog', dialog => dialog.accept());
