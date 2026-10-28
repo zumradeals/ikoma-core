@@ -4,11 +4,11 @@ import BaseLayout from '../../layouts/BaseLayout.vue'; import BaseCard from '../
 import { displayDate } from '../../labels';
 type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
 const props = defineProps<{
-  events: { id: string; name: string }[]; postes: Poste[]; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number };
+  events: { id: string; name: string }[]; postes: Poste[]; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; escalationMinutes: number };
   newCode: { device_id: string; code: string } | null; conflicts: { id: string; kind: string; reason: string; operation_type: string | null; created_at: string; device_name: string }[];
 }>();
 const create = useForm({ event_id: props.events[0]?.id || '', name: '', station: '' });
-const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes });
+const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, escalationMinutes: props.settings.escalationMinutes });
 const states = { non_enrole: ['○', 'Non enrôlé'], enrole: ['●', 'Enrôlé'], revoque: ['⛔', 'Révoqué'] } as const;
 const reasons: Record<string, string> = { deja_associe: 'Badge déjà associé', autre_poste: 'Badge réservé à un autre poste', deja_present: 'Visiteur déjà entré', agent_desactive: 'Agent désactivé', fiche_modifiee: 'Fiche modifiée entre-temps', horloge_suspecte: 'Horloge de la tablette décalée', hote_en_attente: 'Accord de l’hôte manquant', visiteur_refuse: 'Visiteur refusé', annule: 'Badge annulé' };
 function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station || poste.name} » ? La tablette sera effacée à sa prochaine connexion.`)) router.post(`/administration/postes/${poste.id}/revoquer`); }
@@ -60,6 +60,7 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <label class="block">« Il reste peu de badges » sous (pourcentage du lot du poste)<input v-model.number="settings.lowBadgesPercent" type="number" min="1" max="90" class="field" required data-testid="reglage-badges-pourcent"></label>
 <label class="block">… ou sous (nombre de badges)<input v-model.number="settings.lowBadgesMin" type="number" min="0" max="1000" class="field" required data-testid="reglage-badges-minimum"></label>
 <label class="block">Une tablette sans nouvelles depuis (minutes) est signalée au superviseur<input v-model.number="settings.silentMinutes" type="number" min="1" max="1440" class="field" required data-testid="reglage-silencieuse"></label>
+<label class="block">Une alerte critique ou haute sans prise en compte depuis (minutes) est signalée à l’administrateur<input v-model.number="settings.escalationMinutes" type="number" min="1" max="120" class="field" required data-testid="reglage-escalade"></label>
 </fieldset>
 <p v-for="error in settings.errors" :key="error" role="alert">{{ error }}</p>
 <FormButton :busy="settings.processing">Enregistrer les réglages</FormButton>

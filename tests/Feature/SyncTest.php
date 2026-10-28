@@ -325,7 +325,9 @@ it('gère les postes depuis l’administration : création, code affiché une fo
     expect(DB::table('settings')->whereIn('key', ['controle_delai_min_points', 'controle_rafale_nombre', 'controle_rafale_minutes'])->orderBy('key')->pluck('value', 'key')->all())->toEqual(['controle_delai_min_points' => '45', 'controle_rafale_minutes' => '3', 'controle_rafale_nombre' => '7']);
     expect(json_decode((string) syncAudit()->where('action', 'poste.reglage_modifie')->orderByDesc('id')->value('details'), true))->toMatchArray(['controle_delai_min_points' => 45, 'controle_rafale_nombre' => 7, 'controle_rafale_minutes' => 3]);
     // hors réseau, badges bas et tablette silencieuse : réglables, bornés, journalisés
-    $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, 'offlineCall' => 20, 'offlineMaxHours' => 0, 'lowBadgesPercent' => 15, 'lowBadgesMin' => 8, 'silentMinutes' => 30])->assertRedirect();
+    $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, 'offlineCall' => 20, 'offlineMaxHours' => 0, 'lowBadgesPercent' => 15, 'lowBadgesMin' => 8, 'silentMinutes' => 30, 'escalationMinutes' => 7])->assertRedirect();
+    expect(DB::table('settings')->where('key', 'alerte_escalade_minutes')->value('value'))->toBe('7');
+    $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, 'escalationMinutes' => 0])->assertSessionHasErrors('escalationMinutes');
     expect(DB::table('settings')->whereIn('key', ['poste_delai_appel_minutes', 'poste_hors_reseau_max_heures', 'poste_badges_bas_pourcent', 'poste_badges_bas_minimum', 'pilotage_poste_silencieux_minutes'])->orderBy('key')->pluck('value', 'key')->all())
         ->toEqual(['pilotage_poste_silencieux_minutes' => '30', 'poste_badges_bas_minimum' => '8', 'poste_badges_bas_pourcent' => '15', 'poste_delai_appel_minutes' => '20', 'poste_hors_reseau_max_heures' => '0']);
     expect(app(Pilotage::class)::silentAfterMinutes())->toBe(30);

@@ -4,7 +4,7 @@ import { usePolling } from '../../pilotage/usePolling';
 
 type Group = { id: string; name: string; bus_number: string | null; total: number; badges_remis: number; embarques: number; arrives: number; absents: number; absents_depart: number; ecarts: number; parti: boolean };
 defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; groups: Group[] }>();
-usePolling(['groups', 'openAlerts'], 5000);
+usePolling(['groups', 'openAlerts', 'criticalAlerts'], 5000);
 const cells = (g: Group) => [['Badges remis', g.badges_remis], ['Embarqués', g.embarques], ['Arrivés', g.arrives], ['Absents au départ', g.absents_depart]] as const;
 </script>
 <template>

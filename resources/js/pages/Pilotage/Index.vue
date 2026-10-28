@@ -9,7 +9,7 @@ import { usePolling } from '../../pilotage/usePolling';
 type Counters = { attendus: number; arrives: number; presents: number; refuses: number; as_of: string };
 type Overview = { critiques: number; hautes: number; litiges: number; cars: { total: number; partis: number; arrives: number; ecarts: number }; postes_silencieux: number };
 const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; counters: Counters | null; alerts: AlertRow[]; overview: Overview | null }>();
-usePolling(['counters', 'alerts', 'openAlerts', 'overview'], 3000);
+usePolling(['counters', 'alerts', 'openAlerts', 'criticalAlerts', 'overview'], 3000);
 
 const tiles = computed(() => [
   { key: 'attendus', label: 'Attendus', icon: '☰', value: props.counters?.attendus }, { key: 'arrives', label: 'Arrivés', icon: '➜', value: props.counters?.arrives },

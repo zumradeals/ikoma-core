@@ -2,7 +2,7 @@
 import { Link, router } from '@inertiajs/vue3';
 import { displayDate } from '../../labels';
 
-export type AlertRow = { id: string; type: string; severity: 'critique' | 'haute' | 'normale'; message: string; created_at: string; acknowledged_at: string | null; resolved_at: string | null; link: string | null };
+export type AlertRow = { id: string; type: string; severity: 'critique' | 'haute' | 'normale'; message: string; created_at: string; acknowledged_at: string | null; resolved_at: string | null; escalated_at?: string | null; link: string | null };
 defineProps<{ alert: AlertRow }>();
 const severity = { critique: ['⛔', 'Critique', 'border-red-700 bg-red-50'], haute: ['▲', 'Haute', 'border-orange-600 bg-orange-50'], normale: ['●', 'Normale', 'border-slate-400 bg-white'] } as const;
 const types: Record<string, string> = { refus: 'Accès refusé', non_liste_attente: 'Non listé en attente', badge_annule: 'Badge annulé', conflit_sync: 'Conflit de synchronisation', hors_periode: 'Hors période', car_arrive: 'Car arrivé', groupe_incomplet: 'Groupe incomplet', groupe_ecart: 'Écart de groupe', controle_refuse: 'Badge refusé au contrôle', zone_interdite: 'Zone non autorisée', badge_double: 'Badge présenté deux fois', controle_rafale: 'Refus répétés' };
@@ -12,7 +12,7 @@ function acknowledge(id: string) { router.post(`/pilotage/alertes/${id}/prendre-
   <li class="rounded-2xl border-2 p-4" :class="severity[alert.severity][2]" :data-testid="'alerte-' + alert.type" :data-severity="alert.severity">
     <p class="flex flex-wrap items-center gap-2 font-bold"><span aria-hidden="true">{{ severity[alert.severity][0] }}</span> {{ severity[alert.severity][1] }} · {{ types[alert.type] ?? alert.type }}</p>
     <p class="mt-1 text-lg">{{ alert.message }}</p>
-    <p class="text-sm">{{ displayDate(alert.created_at) }}<template v-if="alert.acknowledged_at"> · prise en compte</template><template v-else-if="alert.resolved_at"> · réglée</template></p>
+    <p class="text-sm">{{ displayDate(alert.created_at) }}<template v-if="alert.acknowledged_at"> · prise en compte</template><template v-else-if="alert.resolved_at"> · réglée</template><template v-else-if="alert.escalated_at"> · <strong data-testid="escaladee"><span aria-hidden="true">⏰</span> escaladée à l’administrateur</strong></template></p>
     <div class="mt-3 flex flex-wrap gap-3">
       <Link v-if="alert.link" :href="alert.link" class="btn-soft">Voir</Link>
       <button v-if="!alert.acknowledged_at && !alert.resolved_at" type="button" class="btn-main !w-auto" data-testid="prendre-en-compte" @click="acknowledge(alert.id)">Prendre en compte</button>

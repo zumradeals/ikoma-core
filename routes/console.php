@@ -11,3 +11,5 @@ Artisan::command('inspire', function () {
 Schedule::command('imports:purge')->everyMinute()->withoutOverlapping();
 
 Schedule::command('hotes:relancer')->everyTenSeconds()->withoutOverlapping();
+
+Schedule::command('alertes:escalader')->everyThirtySeconds()->withoutOverlapping();

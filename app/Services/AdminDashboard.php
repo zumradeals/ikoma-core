@@ -135,6 +135,12 @@ final class AdminDashboard
             $rows[] = ['severity' => 'info', 'title' => $badgesWithoutCategory.' badge'.($badgesWithoutCategory > 1 ? 's' : '').' sans catégorie', 'text' => 'Ils viennent d’anciens lots et ne peuvent pas être remis : utilisez les lots par catégorie.', 'href' => '/administration/badges'];
         }
 
+        $escalated = (int) DB::table('alerts')->where('event_id', $eventId)->whereNotNull('escalated_at')->whereNull('acknowledged_at')->whereNull('resolved_at')->count();
+        if ($escalated > 0) {
+            $minutes = max(1, (int) (DB::table('settings')->where('key', 'alerte_escalade_minutes')->value('value') ?? 5));
+            array_unshift($rows, ['severity' => 'haute', 'title' => $escalated.' alerte'.($escalated > 1 ? 's' : '').' sans prise en compte', 'text' => 'Le superviseur n’a pas pris en compte '.($escalated > 1 ? $escalated.' alertes' : 'une alerte').' depuis plus de '.$minutes.' minute'.($minutes > 1 ? 's' : '').'. Appelez-le.', 'href' => '/administration/journal']);
+        }
+
         return $rows;
     }
 

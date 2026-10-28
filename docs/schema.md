@@ -185,3 +185,7 @@ Migration `2026_11_07_000000_create_control_alerts`. Aucune table nouvelle. `ale
 
 Migration `2026_11_08_000000_add_offline_and_threshold_settings`. Aucune table nouvelle. Réglages ajoutés dans `settings` : `poste_delai_appel_minutes` (15), `poste_hors_reseau_max_heures` (12, 0 = désactivé), `poste_badges_bas_pourcent` (10), `poste_badges_bas_minimum` (5), `pilotage_poste_silencieux_minutes` (60). La copie de travail (`ListSnapshot`) porte `settings.offline_call_minutes`, `offline_max_hours`, `low_badges_percent`, `low_badges_min`, et sa version dépend de ces réglages. Décisions : JOURNAL_DECISIONS.md, rubrique L14b.
 
+## Évolution L14c — escalade des alertes
+
+Migration `2026_11_09_000000_add_alert_escalation` : `alerts.escalated_at` (timestamptz, nul tant que l'alerte n'a pas été escaladée) et le réglage `alerte_escalade_minutes` (5). Tâche planifiée `alertes:escalader` (30 s). Journal : `alerte.escaladee`. Décisions : JOURNAL_DECISIONS.md, rubrique L14c.
+

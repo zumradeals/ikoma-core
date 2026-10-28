@@ -5,7 +5,7 @@ import AlertCard, { type AlertRow } from '../../components/pilotage/AlertCard.vu
 import { usePolling } from '../../pilotage/usePolling';
 
 defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; state: 'a_traiter' | 'prises'; alerts: AlertRow[] }>();
-usePolling(['alerts', 'openAlerts'], 3000);
+usePolling(['alerts', 'openAlerts', 'criticalAlerts'], 3000);
 </script>
 <template>
   <PilotageLayout active="alertes" :event="event" :events="events" :open-alerts="openAlerts" title="Alertes">
