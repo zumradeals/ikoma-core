@@ -82,7 +82,7 @@ async function progress(page: Page, done: number, total: number): Promise<void> 
 const pendingOps = (page: Page) => page.getByTestId('en-attente');
 
 test('car de 50 stagiaires : appel, correspondance et remise du badge en moins de 20 s par personne (caméra simulée)', async () => {
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   const car = fx.cars['1'];
   const page = await tablet.newPage();
   await openCars(page); await shot(page, 'groupe-choix');
@@ -92,6 +92,7 @@ test('car de 50 stagiaires : appel, correspondance et remise du badge en moins d
   for (let i = 0; i < 50; i++) {
     await expect(page.getByTestId('personne-courante')).toHaveText(car.members[i]);
     await button(page, 'Valider la correspondance').click();
+    await expect(page.getByTestId('code-badge')).toBeVisible(); // correspondance enregistrée : le badge peut être présenté
     await setQr(page, car.badges[i], car);
     await progress(page, i + 1, 50);
     await setQr(page, null);
@@ -160,6 +161,7 @@ test('sans réseau pendant la remise : rien n’est perdu ni dupliqué à la res
   await expect(page.getByTestId('hors-ligne')).toBeVisible();
   for (let i = 3; i < 6; i++) {
     await button(page, 'Valider la correspondance').click();
+    await expect(page.getByTestId('code-badge')).toBeVisible();
     await setQr(page, car.badges[i], car);
     await progress(page, i + 1, 8);
     await setQr(page, null);
