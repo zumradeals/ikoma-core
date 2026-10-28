@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/** @property CarbonImmutable|null $withdrawn_at */
 class Visitor extends Model
 {
     use HasUuids;
@@ -15,7 +17,7 @@ class Visitor extends Model
 
     protected function casts(): array
     {
-        return ['valid_from' => 'immutable_datetime', 'valid_until' => 'immutable_datetime'];
+        return ['withdrawn_at' => 'immutable_datetime', 'valid_from' => 'immutable_datetime', 'valid_until' => 'immutable_datetime'];
     }
 
     /** @return BelongsTo<Event, $this> */
