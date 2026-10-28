@@ -26,6 +26,6 @@ class User extends Authenticatable
     public function requiresTwoFactor(): bool
     {
         // Administrateur et superviseur toujours ; tous les rôles dans le profil de sécurité renforcé (audit global D1).
-        return $this->hasAnyRole(['administrateur', 'superviseur']) || SecurityProfile::strict();
+        return $this->hasAnyRole(['administrateur', 'superviseur', 'officier_securite']) || SecurityProfile::strict();
     }
 }

@@ -65,7 +65,7 @@ final class Desk
             'zones' => $zones->all(), 'accueil_limite' => $unlisted, 'source' => $visitor->source, 'status' => $visitor->status ?? 'attendu', 'host_validation' => $visitor->host_validation,
             'valid_from' => Carbon::parse($visitor->valid_from)->toIso8601String(), 'valid_until' => Carbon::parse($visitor->valid_until)->toIso8601String(), 'hors_periode' => $this->outsidePeriod($visitor),
             'identity_done' => DB::table('identity_checks')->where('visitor_id', $visitor->id)->exists(), 'photo_done' => DB::table('photos')->where('visitor_id', $visitor->id)->exists(),
-            'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge, 'access_note' => $visitor->access_note,
+            'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge, 'access_note' => $visitor->access_note, 'approval' => $visitor->approval_status,
             'host_advice' => app(HostNotifications::class)->advice($visitor->id),
             'a_rebadger' => $badge === null && DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNotNull('cancelled_at')->exists() && ! in_array($visitor->status, ['sorti', 'refuse'], true),
         ];
@@ -133,7 +133,7 @@ final class Desk
     /** @return array<string, mixed> */
     public function refuse(Device $poste, User $agent, string $visitorId, string $motif): array
     {
-        $visitor = $this->openVisitor($poste, $visitorId, true);
+        $visitor = $this->openVisitor($poste, $visitorId, true, false, false);
         $motif = trim($motif);
         if ($motif === '') {
             throw new DeskRefused('motif_obligatoire', 'Le motif du refus est obligatoire.');
@@ -275,7 +275,7 @@ final class Desk
     }
 
     /** Visiteur encore traitable (ni refusé ni déjà présent), sauf $allowPresent pour rejouer une entrée. */
-    private function openVisitor(Device $poste, string $id, bool $lock = false, bool $allowPresent = false): Visitor
+    private function openVisitor(Device $poste, string $id, bool $lock = false, bool $allowPresent = false, bool $approvedOnly = true): Visitor
     {
         $visitor = $this->visitor($poste, $id, $lock);
         if ($visitor->withdrawn_at !== null) {
@@ -286,6 +286,10 @@ final class Desk
         }
         if (in_array($visitor->status, ['present', 'sorti'], true) && ! $allowPresent) {
             throw new DeskRefused('deja_present', 'Ce visiteur est déjà entré.');
+        }
+        // Audit global A3 : sans l'approbation de l'officier de sécurité (profil renforcé), l'accueil est impossible ; refuser une personne reste toujours possible.
+        if ($approvedOnly && $visitor->approval_status !== 'approuve') {
+            throw new DeskRefused('non_approuve', $visitor->approval_status === 'refuse' ? 'L’officier de sécurité n’a pas approuvé cet invité : appelez le superviseur.' : 'Cet invité attend l’approbation de l’officier de sécurité : l’accueil est impossible pour le moment.');
         }
 
         return $visitor;

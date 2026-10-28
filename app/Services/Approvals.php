@@ -18,7 +18,7 @@ final class Approvals
 {
     public const TTL_HOURS = 24;
 
-    public const PRIVILEGED_ROLES = ['administrateur', 'superviseur'];
+    public const PRIVILEGED_ROLES = ['administrateur', 'superviseur', 'officier_securite'];
 
     public function __construct(private readonly Audit $audit) {}
 

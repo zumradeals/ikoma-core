@@ -2,6 +2,7 @@ import { ApiError, type Avis, type Fiche, type SearchResult } from '../types';
 import type { LocalList, SnapVisitor } from './list';
 import { applyGroupOp, type GroupDelta } from './group';
 import { searchIndex } from './search';
+import { assertApproved } from './approval';
 
 export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie' | 'groupe_controle' | 'groupe_badge' | 'groupe_depart' | 'groupe_arrivee' | 'groupe_arrivee_fin' | 'contrainte';
 export type LocalOp = {
@@ -23,7 +24,7 @@ export function ficheOf(list: LocalList, id: string, now: number): Fiche {
   return {
     id: v.id, full_name: v.full_name, organisation: v.organisation, host: v.host_id ? list.hostNames.get(v.host_id) ?? null : null, category, zones: list.zonesFor(v),
     accueil_limite: v.source === 'non listé', source: v.source, status: v.status, host_validation: v.host_validation, valid_from: v.valid_from, valid_until: v.valid_until,
-    hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, a_rebadger: v.a_rebadger ?? false,
+    hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, approval: v.approval ?? 'approuve', a_rebadger: v.a_rebadger ?? false,
   };
 }
 
@@ -34,11 +35,12 @@ export function searchOf(list: LocalList, query: string): SearchResult[] {
   });
 }
 
-function open(list: LocalList, id: unknown, allowPresent = false): SnapVisitor {
+function open(list: LocalList, id: unknown, allowPresent = false, approvedOnly = true): SnapVisitor {
   const v = typeof id === 'string' ? list.visitors.get(id) : undefined;
   if (!v) throw new ApiError('visiteur_inconnu', 'Visiteur introuvable pour ce poste.', null, 404);
   if (v.status === 'refuse') throw refuse('visiteur_refuse', 'L’accès a été refusé à ce visiteur.');
   if ((v.status === 'present' || v.status === 'sorti') && !allowPresent) throw refuse('deja_present', 'Ce visiteur est déjà entré.');
+  if (approvedOnly) assertApproved(v);
   return v;
 }
 
@@ -76,7 +78,7 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
       return {};
     }
     case 'refuser': {
-      const v = open(list, p.visitor_id);
+      const v = open(list, p.visitor_id, false, false);
       if (String(p.motif ?? '').trim() === '') throw refuse('motif_obligatoire', 'Le motif du refus est obligatoire.');
       if (v.badge_code) throw refuse('badge_deja_remis', 'Un badge est déjà associé à ce visiteur : le refus doit passer par le superviseur.');
       v.status = 'refuse'; list.touch();

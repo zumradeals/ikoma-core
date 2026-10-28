@@ -28,3 +28,4 @@ pest()->use(DatabaseTransactions::class)->in('Feature/HostSpaceTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/AdminDashboardTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/PilotageOverviewTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/ApprovalsTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/ListApprovalsTest.php');

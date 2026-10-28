@@ -6,7 +6,7 @@ export type Fiche = {
   id: string; full_name: string; organisation: string | null; host: string | null; category: Category; zones: string[]; accueil_limite: boolean; source: string; status: string;
   host_advice?: {state:string|null};
   host_validation: 'en_attente' | 'accepte' | 'refuse' | null; valid_from: string; valid_until: string; hors_periode: boolean;
-  identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null; access_note?: string | null; a_rebadger?: boolean;
+  identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null; access_note?: string | null; a_rebadger?: boolean; approval?: 'approuve' | 'a_approuver' | 'refuse';
 };
 export type Checkpoint = { type: 'zone' | 'poste'; id: string; name: string };
 export type PointRef = { type: 'zone' | 'poste'; id: string };

@@ -197,3 +197,5 @@ Migration `2026_11_10_000000_add_duress_alert` : `alerts_type_valid` accepte `co
 
 Migrations `2026_11_11_000000_add_security_profile` (réglage `profil_securite`, `standard` au départ) et `2026_11_12_000000_create_approvals`. **approvals** (nouvelle) : `action`, `payload` (jsonb, sans secret en clair), `summary`, `requested_by`, `expires_at`, `decided_by`, `decided_at`, `decision` (`approuve` / `refuse`), `executed_at`. Contraintes : décision, auteur et date vont ensemble ; `decided_by <> requested_by` ; une demande n'est exécutée que si elle est approuvée. Permissions ajoutées : `securite.gerer`, `approbations.decider` (administrateur). Journal : `securite.profil_modifie`, `approbation.demandee`, `approbation.approuvee`, `approbation.refusee`. Décisions : JOURNAL_DECISIONS.md, rubriques L15a et L15b.
 
+
+- L16 : `visitors.approval_status` (`approuve` par défaut | `a_approuver` | `refuse`), `approved_by`, `approved_at` ; contrainte CHECK sur le statut ; index sur (event_id, approval_status).

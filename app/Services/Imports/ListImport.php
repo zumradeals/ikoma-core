@@ -3,6 +3,7 @@
 namespace App\Services\Imports;
 
 use App\Services\Audit;
+use App\Services\VisitorApprovals;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -107,7 +108,7 @@ final class ListImport
                     }
                     $host = $hostIds[$key];
                 }
-                $visitors[] = ['id' => (string) Str::uuid(), 'event_id' => $event, 'full_name' => $row['full_name'], 'organisation' => $row['organisation'] ?: null, 'host_id' => $host, 'category_id' => $row['category_id'], 'import_batch_id' => $token, 'valid_from' => $row['valid_from'], 'valid_until' => $row['valid_until'], 'source' => 'listé', 'status' => 'attendu', 'created_at' => $at, 'updated_at' => $at];
+                $visitors[] = ['id' => (string) Str::uuid(), 'event_id' => $event, 'full_name' => $row['full_name'], 'organisation' => $row['organisation'] ?: null, 'host_id' => $host, 'category_id' => $row['category_id'], 'import_batch_id' => $token, 'valid_from' => $row['valid_from'], 'valid_until' => $row['valid_until'], 'source' => 'listé', 'status' => 'attendu', 'approval_status' => VisitorApprovals::initialStatus(), 'created_at' => $at, 'updated_at' => $at];
             }
             foreach (array_chunk($visitors, 200) as $chunk) {
                 DB::table('visitors')->insert($chunk);

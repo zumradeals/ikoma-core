@@ -332,3 +332,14 @@ Migration `2026_11_12_000000_create_approvals`, service `Approvals`, écran **Ad
 - **Amorçage** : avec **un seul** administrateur actif, la double validation ne peut pas s'appliquer ; la création directe reste possible (c'est ainsi qu'on crée le deuxième administrateur) et le tableau de l'administrateur signale « Un seul administrateur actif ». Dès le deuxième, la règle s'applique.
 - **Pas encore branché** (leurs fonctions sont sur la branche L11 de ChatGPT Work, non fusionnée) : export du journal, purge de fin d'événement, réinitialisation du 2FA. Le service `Approvals` est fait pour qu'on y ajoute ces actions : une entrée dans `execute()` et un appel `request()`.
 - **Message de statut** : le serveur envoie un message (`flash.status`) affiché par la mise en page de base, pour dire « Demande envoyée : un second administrateur doit la valider ».
+
+## L16 — approbation des invités par l'officier de sécurité (audit global A3), 28 octobre 2026
+
+Migration `2026_11_13_000000_add_visitor_approval`, service `VisitorApprovals`, rôle **`officier_securite`** (permissions `listes.approuver`, `interdits.gerer`), écran **Autorité > Approbation des listes** (`/autorite/listes`).
+
+- **Principe** : dans le profil `renforce`, tout invité importé par liste ou ajouté par un hôte naît « à approuver » (`visitors.approval_status`). Dans le profil `standard`, il naît « approuvé » : comportement inchangé.
+- **Deuxième personne** : l'administrateur ne peut pas approuver ; seul l'officier de sécurité le peut, par lot ou par sélection. Il peut aussi refuser.
+- **Blocage partout** : un invité non approuvé ou refusé ne peut ni recevoir de badge ni être validé, côté serveur (`Desk`, `BadgeService`) comme sur la tablette hors ligne (`assertApproved`). Refuser l'accès reste toujours possible.
+- **Modification par l'hôte** : dans le profil renforcé, modifier un invité déjà approuvé le remet « à approuver ».
+- **Journal** : `liste.approuvee` / `liste.refusee`, nombres seulement, jamais de noms. Chaque décision incrémente la révision de liste pour que les tablettes récupèrent le statut.
+- **À valider par le dirigeant** : niveaux d'habilitation liés aux zones (non faits ici).
