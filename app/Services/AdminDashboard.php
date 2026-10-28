@@ -141,6 +141,16 @@ final class AdminDashboard
             array_unshift($rows, ['severity' => 'haute', 'title' => $escalated.' alerte'.($escalated > 1 ? 's' : '').' sans prise en compte', 'text' => 'Le superviseur n’a pas pris en compte '.($escalated > 1 ? $escalated.' alertes' : 'une alerte').' depuis plus de '.$minutes.' minute'.($minutes > 1 ? 's' : '').'. Appelez-le.', 'href' => '/administration/journal']);
         }
 
+        $backup = app(BackupStatus::class)->state();
+        if (in_array($backup['etat'], ['jamais', 'ancienne', 'echec'], true)) {
+            $text = match ($backup['etat']) {
+                'echec' => 'La dernière sauvegarde a échoué. Prévenez la personne qui exploite le serveur.',
+                'jamais' => 'Aucune sauvegarde n’a encore réussi. Prévenez la personne qui exploite le serveur.',
+                default => 'La dernière sauvegarde réussie date de plus de '.$backup['seuil_heures'].' heures. Prévenez la personne qui exploite le serveur.',
+            };
+            array_unshift($rows, ['severity' => 'haute', 'title' => 'Sauvegarde à vérifier', 'text' => $text, 'href' => '/administration']);
+        }
+
         return $rows;
     }
 

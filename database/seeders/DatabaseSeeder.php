@@ -12,6 +12,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException('Refus : les données de démonstration ne sont jamais créées en production (APP_ENV=production).');
+        }
         $this->call(RoleSeeder::class);
         foreach (array_keys(config('roles')) as $role) {
             $email = $role.'@exemple.test';

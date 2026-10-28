@@ -16,6 +16,9 @@ final class DemoSeeder extends Seeder
 
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException('Refus : les données de démonstration ne sont jamais créées en production (APP_ENV=production).');
+        }
         DB::transaction(function (): void {
             $event = self::id('event');
             if (DB::table('events')->where('id', $event)->exists()) {
