@@ -201,7 +201,7 @@ it('reconstruit la photo sans métadonnées et la conserve uniquement chiffrée 
     $withExif = substr($jpeg, 0, 2)."\xff\xe1".pack('n', strlen($metadata) + 2).$metadata.substr($jpeg, 2).'CONTENU_FICTIF_APRES_IMAGE';
     $agent = hardeningUser('agent_accueil');
     $device = Device::findOrFail(DemoSeeder::id('device'));
-    app(Desk::class)->saveIdentity($device, $agent, DemoSeeder::id('visitor1'), true, $withExif);
+    app(Desk::class)->saveIdentity($device, $agent, DemoSeeder::id('visitor1'), true, $withExif, 'cni', 'CI0123456');
     $photo = DB::table('photos')->where('visitor_id', DemoSeeder::id('visitor1'))->first();
     expect($photo->file_reference)->toMatch('~^photos/[0-9a-f-]{36}\.enc$~');
     $cipher = Storage::disk('local')->get($photo->file_reference);
@@ -211,7 +211,7 @@ it('reconstruit la photo sans métadonnées et la conserve uniquement chiffrée 
     expect(getimagesizefromstring($clean)[0])->toBe(16);
     $this->get('/storage/'.$photo->file_reference)->assertNotFound();
     $this->get('/photos/'.$photo->id)->assertNotFound();
-    expect(fn () => app(Desk::class)->saveIdentity($device, $agent, DemoSeeder::id('visitor4'), true, str_repeat('x', 1_000_001)))->toThrow(DeskRefused::class);
+    expect(fn () => app(Desk::class)->saveIdentity($device, $agent, DemoSeeder::id('visitor4'), true, str_repeat('x', 1_000_001), 'cni', 'CI0123456'))->toThrow(DeskRefused::class);
 });
 
 it('limite la synchronisation et la recherche sans exécuter une requête au-delà du quota', function () {
