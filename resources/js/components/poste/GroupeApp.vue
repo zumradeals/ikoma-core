@@ -161,7 +161,7 @@ function statusOf(m: GroupMemberView): string {
 <template>
   <div class="min-h-screen bg-slate-50 text-ikoma-navy">
     <StatusBar :poste="view?.group.bus_number ?? view?.group.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
-    <main id="contenu" class="mx-auto max-w-3xl space-y-5 px-4 py-6">
+    <main id="contenu" class="mx-auto max-w-3xl space-y-5 px-4 py-6" :data-busy="busy">
       <div class="grid grid-cols-2 gap-3" role="group" aria-label="Mode">
         <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="tab === 'appel' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="tab === 'appel'" data-testid="onglet-appel" @click="tab = 'appel'">Appel et badges</button>
         <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="tab === 'arrivee' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="tab === 'arrivee'" data-testid="onglet-arrivee" @click="tab = 'arrivee'">Arrivée du car</button>

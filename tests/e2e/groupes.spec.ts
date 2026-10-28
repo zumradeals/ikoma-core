@@ -74,7 +74,7 @@ async function progress(page: Page, done: number, total: number): Promise<void> 
     const message = await page.getByTestId('erreur').innerText().catch(() => 'aucun message');
     const state = await page.evaluate(() => {
       const v = document.querySelector('video');
-      return JSON.stringify({ video: v ? { ready: v.readyState, w: v.videoWidth, paused: v.paused, shown: v.offsetParent !== null, tracks: (v.srcObject as MediaStream | null)?.getTracks().map(t => t.readyState) } : null, courant: document.querySelector('[data-testid=personne-courante]')?.textContent, confirmee: !!document.querySelector('[data-testid=code-badge]'), videos: document.querySelectorAll('video').length });
+      return JSON.stringify({ video: v ? { ready: v.readyState, w: v.videoWidth, paused: v.paused, shown: v.offsetParent !== null, tracks: (v.srcObject as MediaStream | null)?.getTracks().map(t => t.readyState) } : null, courant: document.querySelector('[data-testid=personne-courante]')?.textContent, confirmee: !!document.querySelector('[data-testid=code-badge]'), videos: document.querySelectorAll('video').length, busy: document.querySelector('#contenu')?.getAttribute('data-busy'), erreur: document.querySelector('[data-testid=erreur]')?.textContent, attente: document.querySelector('[data-testid=en-attente]')?.textContent });
     });
     console.log('DIAG', state);
     await page.locator('video').first().screenshot({ path: '/tmp/video-diag.png' }).catch(() => undefined);
