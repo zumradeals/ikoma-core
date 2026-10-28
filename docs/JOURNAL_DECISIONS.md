@@ -292,3 +292,24 @@ Un agent menacé peut prévenir en silence. Au moment de l'enrôlement de la tab
 - **Discrétion à l'écran** : l'opération n'apparaît ni dans « À envoyer au serveur » ni dans « Derniers passages » (le décompte de la barre d'état peut afficher une opération en attente pendant quelques secondes : c'est le seul indice, jugé acceptable).
 - **Limites connues, à connaître du client** : (1) une tablette **déjà enrôlée** n'a pas de code de contrainte : il faut la réenrôler pour en choisir un ; (2) hors réseau, l'alerte n'arrive qu'au retour du réseau (la file attend) ; (3) elle ne couvre **que le PIN des tablettes** : la connexion web du superviseur et de l'administrateur (mot de passe et 2FA) n'a pas de code de contrainte ; (4) elle suppose que l'agent a mémorisé son code et que l'agresseur ne lui fait pas saisir le PIN lui-même ; (5) le champ est **facultatif** : le rendre obligatoire est une décision du client.
 - Migration `2026_11_10_000000_add_duress_alert` : type d'alerte `contrainte` et sujet `poste`.
+
+## Décisions du dirigeant du 28 octobre 2026 : recommandations de l'architecte adoptées
+
+Le dirigeant a demandé de **retirer les décisions bloquées de l'audit global (section 8) en adoptant les recommandations de l'architecte**, et de satisfaire l'audit entier en commençant par les priorités. Les onze décisions ci-dessous sont donc **décidées** ; chacune garde la réserve indiquée. Elles restent modifiables par le dirigeant ou par le client.
+
+| N° | Décision adoptée | Réserve |
+|---|---|---|
+| 1 | **Photo au contrôle** : l'agent de contrôle voit la photo enregistrée au scan, **5 secondes**, sans conservation sur l'écran. Les enquêtes y accèdent par un **accès exceptionnel à deux personnes**, motivé et journalisé. Cette décision **remplace** celle de L3b (« photos consultables par aucun rôle »). | Protection des données : à valider par le juriste. |
+| 2 | **Numéro de pièce d'identité** : type et numéro **chiffrés** (clé applicative), durée de conservation courte, jamais affichés après saisie ; obligatoire seulement dans le profil de sécurité renforcé. | Durée et licéité : juriste et client. |
+| 3 | **Liste d'interdits** : tenue par une **autorité de sécurité** (nouveau rôle « officier de sécurité »), ajout et retrait journalisés avec un motif, l'agent voit « personne signalée » sans le motif. | Durée de conservation : juriste. |
+| 4 | **Habilitation** : approbation **binaire** (approuvé ou non) par l'officier de sécurité, **deuxième personne** distincte de celle qui importe la liste. Aucun niveau hiérarchique n'est inventé : le client définira ses niveaux s'il en a. | Niveaux : client. |
+| 5 | **Alertes** : son et vibration dans l'application, escalade à l'administrateur (L14c). Canal externe (SMS, radio, notification poussée) **non retenu** avant l'avis du client. | Canal externe : client. |
+| 6 | **2FA pour tous les rôles** (TOTP, sans nouvelle dépendance). Clé physique (WebAuthn) **non retenue** : elle exige une dépendance majeure, soumise à accord écrit (règle 3 de AGENTS.md). | Dépendance WebAuthn : accord écrit. |
+| 7 | **Objets et véhicules** : registre **générique** (plaque, équipements déclarés dans une liste réglable, dépôt) ; les règles propres au site restent au client. | Règles du site : client. |
+| 8 | **Hébergement** : sur site ou chez un hébergeur de confiance dédié, jamais un serveur partagé ni le serveur de démonstration. Classification en **trois niveaux proposés** (public, restreint, confidentiel), à adapter à l'échelle du client. | Niveau et lieu : client. |
+| 9 | **Outil d'événement seulement** pour cette version ; l'accréditation permanente est un lot distinct, non réalisé. | Client. |
+| 10 | **VIP** : traitement discret (déjà en place). **Badges** : usage unique (réglage `badge_reutilisable` = non). **Conservation** : durées prudentes proposées, non approuvées par le client. **Propriété du code, maintenance, séquestre** : non tranchés (contrat). | Contrat et juriste. |
+| 11 | **Seuils** : 15 minutes avant d'appeler le superviseur, badges bas à 10 % ou 5, tablette silencieuse à 60 minutes, escalade à 5 minutes, blocage hors réseau à 12 heures. | Client. |
+
+### Mécanisme : le « profil de sécurité » (décision d'architecture)
+Pour que les contrôles les plus contraignants ne bloquent pas la démonstration, ni les essais automatiques, et soient **actifs par défaut en production**, un réglage `profil_securite` vaut `standard` ou `renforce`. Il est `renforce` à l'installation en production (`APP_ENV=production`) et `standard` ailleurs. Le tableau de bord de l'administrateur affiche une alerte tant qu'il est à `standard` : **un profil `standard` n'est pas adapté à des données réelles**. Chaque fonction de l'audit est construite, testée dans les deux profils, et activée par le profil `renforce` quand elle est contraignante (2FA pour tous, double validation, approbation des listes, numéro de pièce obligatoire).

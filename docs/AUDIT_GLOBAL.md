@@ -155,6 +155,8 @@ Les lots L11 à L13 existent déjà ; je propose d'insérer six lots entre L12 e
 
 ## 8. Décisions à prendre (par le dirigeant, puis le client)
 
+> **28 octobre 2026 : le dirigeant a adopté les recommandations de l'architecte pour ces onze décisions** (voir docs/JOURNAL_DECISIONS.md, rubrique « Décisions du dirigeant du 28 octobre 2026 »). Elles ne sont plus bloquantes ; les réserves (juriste, client) demeurent.
+
 1. **Photo au contrôle (B1 contre D4)** : l'agent de contrôle voit-il la photo enregistrée en scannant ? Je recommande oui, en l'affichant 5 secondes sans la stocker sur l'écran, et en autorisant un accès exceptionnel à deux personnes pour les enquêtes.
 2. **Numéro de pièce (A1)** : le conserver chiffré, le conserver haché (comparaison seulement), ou ne rien conserver ? Je recommande chiffré avec durée courte, sous réserve du juriste.
 3. **Liste d'interdits (A2)** : qui la tient, qui peut ajouter ou retirer, quelle durée de conservation ?
