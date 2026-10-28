@@ -21,7 +21,13 @@ login_page() { [[ "$(tls_get /login)" == *IKOMA* ]]; }
 manifest() { [[ "$(tls_get /build/manifest.webmanifest)" == *IKOMA* ]]; }
 header_present() { [[ "$HEADERS" =~ (^|$'\n')"$1": ]] || [[ "${HEADERS,,}" == *$'\n'"${1,,}:"* ]] || [[ "${HEADERS,,}" == "${1,,}:"* ]]; }
 no_version_headers() { ! grep -qiE '^(x-powered-by|server): .*[0-9]' <<<"$HEADERS"; }
-db_not_published() { [ -z "$(dc port db 5432 2>/dev/null)" ]; }
+# Ports réellement publiés sur la machine par le conteneur de la base (liste vide = aucun).
+db_not_published() {
+  local id published
+  id="$(dc ps -q db)"; [ -n "$id" ] || return 1
+  published="$(docker inspect --format '{{range $port, $bindings := .NetworkSettings.Ports}}{{if $bindings}}{{$port}} {{end}}{{end}}' "$id")"
+  [ -z "${published// /}" ]
+}
 not_root() { [ "$(dc exec -T "$1" id -u)" != 0 ]; }
 installer_closed() { [ "$(tls_code /installation)" = 404 ]; }
 
