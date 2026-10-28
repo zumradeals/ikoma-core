@@ -1,3 +1,5 @@
+// Ce fichier s'exécute en dernier (ordre alphabétique de Playwright) : les parcours des cars créent des alertes (absents, écarts, car arrivé)
+// dans l'événement de recette, et le test d'alertes du pilotage compte précisément les siennes.
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { freshOtp } from './otp';
