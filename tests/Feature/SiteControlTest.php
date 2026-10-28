@@ -7,6 +7,7 @@ use App\Services\BadgeLots;
 use App\Services\BadgeService;
 use App\Services\Poste\DeskRefused;
 use App\Services\Poste\ListSnapshot;
+use App\Services\Poste\SiteControl;
 use App\Services\Presence;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
@@ -311,4 +312,109 @@ it('met en quarantaine une sortie ou un contrôle d’un agent sans droit de con
     DB::table('users')->where('id', $this->agent->id)->update(['active' => false]);
     $result = siteSync([$op])->assertOk()->json();
     expect($result['results'][0])->toMatchArray(['status' => 'conflit', 'code' => 'agent_desactive']);
+});
+
+function controlAlerts(?string $type = null)
+{
+    $q = DB::table('alerts')->where('event_id', DemoSeeder::id('event'))->whereIn('type', ['controle_refuse', 'zone_interdite', 'badge_double', 'controle_rafale']);
+
+    return $type === null ? $q : $q->where('type', $type);
+}
+
+it('prévient le superviseur quand un badge annulé est présenté au contrôle ou à la sortie, sans nom de personne et sans doublon', function () {
+    siteEnter(2, $this->batch2[0]);
+    app(BadgeService::class)->annuler($this->batch2[0], siteUser('superviseur'), 'Perdu');
+    expect(controlAlerts()->count())->toBe(0);
+
+    siteControl($this->batch2[0]->code, siteZone(1))->assertOk();
+    $alert = controlAlerts('controle_refuse')->first();
+    expect($alert)->not->toBeNull()->and($alert->severity)->toBe('critique')->and($alert->subject_type)->toBe('badge')->and($alert->subject_id)->toBe($this->batch2[0]->id)
+        ->and($alert->message)->toContain($this->batch2[0]->code)->toContain('annulé')->and($alert->acknowledged_at)->toBeNull();
+    // le même badge refusé au même point dans les cinq minutes ne crée pas une seconde alerte ; un autre point en crée une
+    siteControl($this->batch2[0]->code, siteZone(1))->assertOk();
+    expect(controlAlerts('controle_refuse')->count())->toBe(1);
+    siteControl($this->batch2[0]->code, siteZone(2))->assertOk();
+    expect(controlAlerts('controle_refuse')->count())->toBe(2);
+    // à la sortie, le message le dit
+    $this->postJson('/poste/api/sortie', ['code' => $this->batch2[0]->code], siteHeaders())->assertOk();
+    expect(controlAlerts('controle_refuse')->where('message', 'like', '%à la sortie%')->count())->toBe(1);
+    // aucune alerte ne porte le nom d'une personne
+    foreach (DB::table('visitors')->where('event_id', DemoSeeder::id('event'))->pluck('full_name') as $name) {
+        expect(controlAlerts()->where('message', 'like', '%'.$name.'%')->count())->toBe(0);
+    }
+});
+
+it('donne à chaque refus de contrôle la gravité qui convient', function () {
+    siteEnter(3, $this->batch0[0]);
+    app(BadgeService::class)->restituer($this->batch0[0], $this->agent);
+    siteEnter(4, $this->batch1[1]);
+    DB::table('visitors')->where('id', DemoSeeder::id('visitor4'))->update(['valid_until' => '2027-01-10 09:00:00+00']);
+    foreach ([$this->batch0[0]->code, $this->batch1[5]->code, 'B-INCONNU-1', 'IKOMA1:'.str_repeat('a', 64), $this->batch1[1]->code] as $code) {
+        siteControl($code)->assertOk();
+    }
+    $severities = fn (string $word) => controlAlerts('controle_refuse')->where('message', 'like', '%'.$word.'%')->orderBy('severity')->pluck('severity')->all();
+    expect($severities('restitué'))->toBe(['haute'])->and($severities('non associé'))->toBe(['haute'])->and($severities('hors de sa période'))->toBe(['normale'])
+        ->and($severities('inconnu'))->toBe(['haute', 'normale']); // le QR inconnu est plus suspect qu'un code tapé à la main
+});
+
+it('prévient quand un badge valide est présenté dans une zone que sa catégorie n’autorise pas, et pas quand elle l’autorise', function () {
+    siteEnter(1, $this->batch1[0]);
+    $this->travel(60)->seconds();
+    siteControl($this->batch1[0]->code, siteZone(1))->assertOk()->assertJson(['zone_ok' => true]);
+    expect(controlAlerts()->count())->toBe(0);
+    siteControl($this->batch1[0]->code, siteZone(2))->assertOk()->assertJson(['zone_ok' => false]);
+    $alert = controlAlerts('zone_interdite')->first();
+    expect($alert->severity)->toBe('haute')->and($alert->message)->toContain($this->batch1[0]->code)->toContain('zone non autorisée');
+});
+
+it('détecte le même badge présenté à deux points différents en moins du délai réglé, et pas au même point', function () {
+    siteEnter(1, $this->batch1[0]);
+    $this->travel(60)->seconds(); // l'entrée à l'accueil est loin derrière
+    siteControl($this->batch1[0]->code, siteZone(1))->assertOk();
+    siteControl($this->batch1[0]->code, siteZone(1))->assertOk(); // même point : un double passage n'est pas une copie
+    expect(controlAlerts('badge_double')->count())->toBe(0);
+
+    $this->travel(5)->seconds();
+    siteControl($this->batch1[0]->code, siteZone(0))->assertOk(); // autre point 5 s plus tard : impossible
+    $alert = controlAlerts('badge_double')->first();
+    expect($alert)->not->toBeNull()->and($alert->severity)->toBe('haute')->and($alert->message)->toContain($this->batch1[0]->code)->toContain('en moins de 15 s')->toContain('copie possible');
+
+    // au-delà du délai, c'est un déplacement normal ; le délai est un réglage d'Administration
+    $this->travel(60)->seconds();
+    siteControl($this->batch1[0]->code, siteZone(1))->assertOk();
+    expect(controlAlerts('badge_double')->count())->toBe(1);
+    DB::table('settings')->where('key', 'controle_delai_min_points')->update(['value' => '120']);
+    $this->travel(60)->seconds();
+    siteControl($this->batch1[0]->code)->assertOk(); // troisième point (le poste lui-même), 60 s après le précédent : détecté avec le délai de 120 s
+    expect(controlAlerts('badge_double')->count())->toBe(2);
+});
+
+it('signale une rafale de refus au même point et respecte les seuils réglés', function () {
+    foreach (range(1, 4) as $i) {
+        siteControl('B-FAUX-'.$i, siteZone(1))->assertOk();
+    }
+    expect(controlAlerts('controle_rafale')->count())->toBe(0);
+    siteControl('B-FAUX-5', siteZone(1))->assertOk();
+    $alert = controlAlerts('controle_rafale')->first();
+    expect($alert->severity)->toBe('haute')->and($alert->message)->toContain('5 badges refusés en 5 minutes')->and($alert->subject_id)->toBeNull();
+    // les refus d'un autre point ne comptent pas, et un seuil plus bas se déclenche plus tôt
+    DB::table('settings')->where('key', 'controle_rafale_nombre')->update(['value' => '2']);
+    siteControl('B-FAUX-6', siteZone(2))->assertOk();
+    expect(controlAlerts('controle_rafale')->count())->toBe(1);
+    siteControl('B-FAUX-7', siteZone(2))->assertOk();
+    expect(controlAlerts('controle_rafale')->count())->toBe(2);
+    // les refus s'éteignent après la fenêtre
+    $this->travel(10)->minutes();
+    siteControl('B-FAUX-8', siteZone(3))->assertOk();
+    expect(controlAlerts('controle_rafale')->count())->toBe(2);
+});
+
+it('date l’alerte d’un contrôle fait hors ligne à l’heure déclarée par la tablette', function () {
+    siteEnter(2, $this->batch2[0]);
+    app(BadgeService::class)->annuler($this->batch2[0], siteUser('superviseur'), 'Perdu');
+    $declared = now()->subMinutes(20);
+    $poste = Device::find(DemoSeeder::id('device'));
+    app(SiteControl::class)->control($poste, $this->agent, $this->batch2[0]->code, null, $declared->toIso8601String());
+    $alert = controlAlerts('controle_refuse')->first();
+    expect($alert->message)->toContain('Contrôle fait hors ligne à '.$declared->format('H:i'));
 });

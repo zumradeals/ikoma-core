@@ -27,7 +27,7 @@ final class PostesController
         return Inertia::render('Admin/Postes', [
             'events' => DB::table('events')->orderBy('name')->get(['id', 'name']),
             'postes' => $postes,
-            'settings' => ['inactivity' => $setting('poste_inactivite_minutes'), 'skew' => $setting('poste_ecart_horloge_secondes'), 'pin' => $setting('poste_echecs_pin_max')],
+            'settings' => ['inactivity' => $setting('poste_inactivite_minutes'), 'skew' => $setting('poste_ecart_horloge_secondes'), 'pin' => $setting('poste_echecs_pin_max'), 'pointsDelay' => $setting('controle_delai_min_points'), 'burstCount' => $setting('controle_rafale_nombre'), 'burstMinutes' => $setting('controle_rafale_minutes')],
             'newCode' => session()->pull('enrol_code'),
             'conflicts' => DB::table('sync_conflicts as c')->join('devices as d', 'd.id', '=', 'c.device_id')->where('c.status', 'ouvert')->orderByDesc('c.created_at')->limit(50)->get(['c.id', 'c.kind', 'c.reason', 'c.operation_type', 'c.created_at', 'd.name as device_name']),
         ]);
@@ -60,12 +60,23 @@ final class PostesController
     public function settings(Request $r): RedirectResponse
     {
         Gate::authorize('postes.gerer');
-        $data = $r->validate(['inactivity' => 'required|integer|min:1|max:60', 'skew' => 'required|integer|min:30|max:3600', 'pin' => 'required|integer|min:3|max:30']);
+        $data = $r->validate([
+            'inactivity' => 'required|integer|min:1|max:60', 'skew' => 'required|integer|min:30|max:3600', 'pin' => 'required|integer|min:3|max:30',
+            // Alertes du contrôle d'accès (audit global B2, B3) : facultatifs pour rester compatibles avec l'ancien formulaire.
+            'pointsDelay' => 'sometimes|integer|min:1|max:3600', 'burstCount' => 'sometimes|integer|min:2|max:100', 'burstMinutes' => 'sometimes|integer|min:1|max:120',
+        ]);
         DB::transaction(function () use ($data): void {
             DB::table('settings')->where('key', 'poste_inactivite_minutes')->update(['value' => (string) $data['inactivity']]);
             DB::table('settings')->where('key', 'poste_ecart_horloge_secondes')->update(['value' => (string) $data['skew']]);
             DB::table('settings')->where('key', 'poste_echecs_pin_max')->update(['value' => (string) $data['pin']]);
-            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['inactivite_minutes' => (int) $data['inactivity'], 'ecart_horloge_s' => (int) $data['skew'], 'echecs_pin_max' => (int) $data['pin']]);
+            $control = [];
+            foreach (['pointsDelay' => 'controle_delai_min_points', 'burstCount' => 'controle_rafale_nombre', 'burstMinutes' => 'controle_rafale_minutes'] as $field => $key) {
+                if (isset($data[$field])) {
+                    DB::table('settings')->where('key', $key)->update(['value' => (string) $data[$field]]);
+                    $control[$key] = (int) $data[$field];
+                }
+            }
+            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['inactivite_minutes' => (int) $data['inactivity'], 'ecart_horloge_s' => (int) $data['skew'], 'echecs_pin_max' => (int) $data['pin']] + $control);
         });
 
         return back();

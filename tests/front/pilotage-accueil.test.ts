@@ -50,3 +50,16 @@ describe('accueil du superviseur', () => {
     for (const [key, value] of [['attendus', '200'], ['arrives', '50'], ['presents', '40'], ['refuses', '2']]) expect(w.get(`[data-testid=compteur-${key}] [data-testid=valeur]`).text()).toBe(value);
   });
 });
+
+describe('alertes du contrôle d’accès', () => {
+  it('nomme chaque nouveau type d’alerte en français et garde la gravité en mot et en symbole', async () => {
+    const { default: AlertCard } = await import('../../resources/js/components/pilotage/AlertCard.vue');
+    const row = (type: string, severity: 'critique' | 'haute' | 'normale') => ({ id: type, type, severity, message: 'Badge B-014 annulé présenté au point « Porte nord ».', created_at: '2027-01-10T10:00:00Z', acknowledged_at: null, resolved_at: null, link: null });
+    for (const [type, label] of [['controle_refuse', 'Badge refusé au contrôle'], ['zone_interdite', 'Zone non autorisée'], ['badge_double', 'Badge présenté deux fois'], ['controle_rafale', 'Refus répétés']] as const) {
+      const w = mount(AlertCard, { props: { alert: row(type, 'haute') } });
+      expect(w.text()).toContain(label); expect(w.text()).toContain('Haute'); expect(w.text()).toContain('▲');
+    }
+    const critical = mount(AlertCard, { props: { alert: row('controle_refuse', 'critique') } });
+    expect(critical.text()).toContain('Critique'); expect(critical.text()).toContain('⛔');
+  });
+});

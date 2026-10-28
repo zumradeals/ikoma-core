@@ -176,3 +176,7 @@ Migration `2026_11_06_000000_create_host_notifications` :
 Le rattachement réutilise hosts.user_id. Un compte peut être rattaché à ses fiches de plusieurs événements ; le serveur vérifie à chaque accès que la fiche hôte appartient au compte courant. L’administration peut rattacher les fiches existantes ; elle ne peut pas voler implicitement une fiche déjà rattachée à un autre compte.
 
 L’hôte peut attribuer la catégorie **Visiteur uniquement**. Une catégorie initialement fixée par l’administration peut être conservée ; un changement ne contredit pas un groupe ou un badge déjà remis. Doublons et homonymes utilisent ikoma_normalize et le nettoyage L3 ; un avertissement d’homonymie ne divulgue pas les fiches des autres hôtes.
+
+## Évolution L14a — alertes du contrôle d'accès
+
+Migration `2026_11_07_000000_create_control_alerts`. Aucune table nouvelle. `alerts_type_valid` accepte en plus `controle_refuse`, `zone_interdite`, `badge_double`, `controle_rafale` (sujet `badge` ou aucun ; message sans nom de personne). Réglages ajoutés dans `settings` : `controle_delai_min_points` (15, secondes), `controle_rafale_nombre` (5), `controle_rafale_minutes` (5). Service : `ControlAlerts`, appelé par `SiteControl::control` et `SiteControl::exit`. Détails et décisions : JOURNAL_DECISIONS.md, rubrique L14a.
