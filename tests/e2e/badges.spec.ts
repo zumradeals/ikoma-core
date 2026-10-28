@@ -19,14 +19,16 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
 
   // 1. Génération d'un lot de 20 badges « Visiteur » : 20 attendus + 10 % de marge = 22.
   const lotForm = page.getByRole('form', { name: 'Générer un lot de badges' });
+  await lotForm.getByLabel('Événement').selectOption({ label: 'Exercice fictif IKOMA — démonstration' });
   await lotForm.getByLabel('Catégorie des badges').selectOption({ label: 'Visiteur' });
   await lotForm.getByLabel('Nombre de personnes attendues').fill('20');
   await expect(lotForm).toContainText('Badges à fabriquer : 22');
   await lotForm.getByRole('button', { name: 'Générer le lot', exact: true }).click();
   const lots = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Lots et étiquettes' }) });
-  const lotLine = lots.locator('li').filter({ hasText: '22 badge(s) dont 2 de marge' }).last();
+  const lotLine = lots.locator('li').filter({ hasText: '22 badge(s) dont 2 de marge' }).filter({ hasText: 'Exercice fictif IKOMA' }).last();
   await expect(lotLine).toBeVisible();
   const lotName = (await lotLine.locator('strong').innerText()).trim();
+  const lotLabel = `Exercice fictif IKOMA — démonstration · ${lotName}`; // le même nom de lot peut exister dans un autre événement
   const range = (await lotLine.innerText()).match(/n° (\d+) à (\d+)/);
   expect(range).not.toBeNull();
   const first = Number(range![1]);
@@ -34,12 +36,12 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
 
   // 2. Réservation des 5 premiers badges du lot au poste fictif.
   const reserve = page.getByRole('form', { name: 'Réserver des badges' });
-  await reserve.getByLabel('Lot').selectOption({ label: lotName });
+  await reserve.getByLabel('Lot').selectOption({ label: lotLabel });
   await reserve.getByLabel('Du badge n°').fill(String(first)); await reserve.getByLabel('Au badge n°').fill(String(first + 4));
   await reserve.locator('select').nth(1).selectOption({ label: 'Poste fictif A' });
   await reserve.getByRole('button', { name: 'Réserver la plage', exact: true }).click();
   const filter = page.getByRole('form', { name: 'Filtrer les badges' });
-  await filter.getByLabel('Lot').selectOption({ label: lotName });
+  await filter.getByLabel('Lot').selectOption({ label: lotLabel });
   await filter.getByLabel('Réservation').selectOption('oui');
   await filter.getByRole('button', { name: 'Filtrer les badges', exact: true }).click();
   await expect(page.getByText('Poste réservé : Poste fictif A').first()).toBeVisible();
@@ -51,7 +53,7 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   const external: string[] = [];
   page.on('request', request => { const url = request.url(); if (!url.startsWith('data:') && new URL(url).origin !== origin) external.push(url); });
   await page.goto('/administration/badges');
-  await page.locator('li').filter({ hasText: lotName }).first().getByRole('link', { name: 'Imprimer les étiquettes' }).click();
+  await page.locator('li').filter({ hasText: lotName }).filter({ hasText: 'Exercice fictif IKOMA' }).first().getByRole('link', { name: 'Imprimer les étiquettes' }).click();
   await expect(page.locator('article.label')).toHaveCount(22); // 3 colonnes × 5 lignes = 15 par feuille A4 : deux feuilles
   await expect(page.locator('.sheet')).toHaveCount(2);
   await page.getByLabel('Colonnes').selectOption('4'); await page.getByLabel('Lignes').selectOption('6');
@@ -84,12 +86,4 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   expect(payloads).toHaveLength(22);
   for (const payload of payloads) expect(payload).toMatch(/^IKOMA1:[0-9a-f]{64}$/);
   expect(new Set(payloads).size).toBe(22);
-
-  // 5. Le jeton lu est reconnu par le contrôle de démonstration (badge disponible, donc « non associé »), sans identité.
-  const xsrf = decodeURIComponent((await page.context().cookies()).find(c => c.name === 'XSRF-TOKEN')!.value);
-  const response = await page.request.post('/administration/badges/controle-demo', { data: { code: payloads[0] }, headers: { 'X-XSRF-TOKEN': xsrf, Accept: 'application/json' } });
-  expect(response.ok()).toBe(true);
-  expect(await response.json()).toMatchObject({ valide: false, raison: 'non_associe', categorie: null });
-  const unknown = await page.request.post('/administration/badges/controle-demo', { data: { code: 'IKOMA1:' + '0'.repeat(64) }, headers: { 'X-XSRF-TOKEN': xsrf, Accept: 'application/json' } });
-  expect(await unknown.json()).toMatchObject({ valide: false, raison: 'inconnu' });
 });

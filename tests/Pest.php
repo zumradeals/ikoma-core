@@ -16,3 +16,5 @@ pest()->use(DatabaseTransactions::class)->in('Feature/BusinessModelTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/ListImportTest.php');
 
 pest()->use(DatabaseTransactions::class)->in('Feature/BadgeLifecycleTest.php');
+
+pest()->use(DatabaseTransactions::class)->in('Feature/PosteTest.php');

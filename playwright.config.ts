@@ -1,2 +1,2 @@
 import { defineConfig } from '@playwright/test';
-export default defineConfig({ testDir: './tests/e2e', workers: 1, use: { baseURL: process.env.BASE_URL || 'http://localhost:8080', serviceWorkers: 'allow', locale: 'fr-FR' }, projects: [{ name: 'chromium', use: { browserName: 'chromium' } }], reporter: 'list' });
+export default defineConfig({ testDir: './tests/e2e', workers: 1, use: { baseURL: process.env.BASE_URL || 'http://localhost:8080', serviceWorkers: 'allow', locale: 'fr-FR', permissions: ['camera'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } }, projects: [{ name: 'chromium', use: { browserName: 'chromium' } }], reporter: 'list' });

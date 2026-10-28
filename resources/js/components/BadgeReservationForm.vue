@@ -2,7 +2,7 @@
 import { computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import FormButton from './FormButton.vue';
-type Batch = { id: string; name: string; event_id: string; first_number: number | null; last_number: number | null };
+type Batch = { id: string; name: string; event_id: string; event_name?: string; first_number: number | null; last_number: number | null };
 const props = defineProps<{ batches: Batch[]; devices: { id: string; event_id: string; name: string; station: string | null }[]; groups: { id: string; event_id: string; name: string }[] }>();
 const form = useForm({ batch_id: props.batches[0]?.id || '', from: '' as number | '', to: '' as number | '', target_type: 'poste', target_id: '' });
 const batch = computed(() => props.batches.find(b => b.id === form.batch_id));
@@ -12,7 +12,7 @@ function submit() { form.post('/administration/badges/reservations', { onSuccess
 </script>
 <template>
   <form aria-label="Réserver des badges" class="space-y-5" @submit.prevent="submit">
-    <label class="block">Lot<select v-model="form.batch_id" class="field" required><option v-for="item in batches" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+    <label class="block">Lot<select v-model="form.batch_id" class="field" required><option v-for="item in batches" :key="item.id" :value="item.id">{{ item.event_name ? `${item.event_name} · ${item.name}` : item.name }}</option></select></label>
     <p v-if="batch && batch.first_number !== null">Numéros de ce lot : du {{ batch.first_number }} au {{ batch.last_number }}.</p>
     <label class="block">Du badge n°<input v-model.number="form.from" type="number" min="1" class="field" required></label>
     <label class="block">Au badge n°<input v-model.number="form.to" type="number" min="1" class="field" required></label>

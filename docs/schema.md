@@ -86,3 +86,19 @@ Invariants : index unique partiel `badge_assignments_one_active_visitor` (un seu
 Réglages ajoutés dans `settings` : `badge_marge_pourcent` (10), `badge_reutilisable` (non). Lot : `quantity` = fabriqués, `margin` = nombre de badges de marge. Les lots hérités du seed ont `category_id` nul.
 
 Services : `BadgeLots` (génération, réservation), `BadgeService` (associer, restituer, annuler, controler), `QrSvg`, `CategorySymbol`. Détails et décisions : JOURNAL_DECISIONS.md, rubrique L4.
+
+
+## Évolution L5 — poste d'accueil en ligne
+
+Migration `2026_11_01_000000_create_reception_desk`.
+
+- **sync_operations** (nouvelle) : `id` UUID = identifiant d'opération créé par la tablette (en-tête `X-Operation-Id`), `device_id` (poste), `user_id`, `type` (identite, valider, refuser, badge, entree, non_liste), `payload_hash` (SHA-256 du type et de la charge), `status_code`, `result` (jsonb, réponse rejouée telle quelle), `received_at`, `processed_at`. Insertion `ON CONFLICT DO NOTHING` : rejouer un identifiant avec la même charge renvoie le résultat enregistré sans écriture ; une autre charge ou un autre compte donne 409. Un refus métier est enregistré aussi (ses écritures sont annulées par un point de sauvegarde). Les noms de personnes n'y sont pas copiés, hormis dans le message de refus « badge déjà associé à … », conservé comme réponse rejouable (purge au lot L11).
+- **visitors.host_validation** : `en_attente` / `accepte` / `refuse` (CHECK), nul pour un visiteur listé. Visiteur non listé : `source = non listé`, `status = attendu`, catégorie choisie à la création (« Visiteur » par défaut), validité de l'instant de création à la fin de l'événement. L'accès limité à la zone d'accueil avec accompagnement est **déduit** de `source = non listé` (aucune colonne).
+- **zones.est_accueil** : booléen, case dans l'écran Zones ; ce sont les zones affichées à un non listé.
+- **access_events.details** (jsonb) : `validation` → `{hors_periode, avis}` ; `entree` → `{duree_ms}`. Types utilisés : `validation`, `entree`.
+- Photos : `photos.file_reference` pointe un fichier `photos/{uuid}.enc` du disque privé `local` (serve désactivé), contenu chiffré par `Crypt` (clé APP_KEY). Aucune route ni permission de consultation.
+- Statuts visiteur utilisés : `attendu` → `present` (entrée) ou `refuse`. `present` ne devient pas `sorti` avant le lot L7.
+
+Routes JSON (rôle `agent_accueil` seulement, session + CSRF + permission) : `GET /poste`, `GET /poste/api/postes|contexte|recherche|visiteurs/{id}`, `POST /poste/api/identite|valider|refuser|badge|entree|non-listes`. Hors `postes`, chaque requête porte `X-Poste-Id` ; l'événement est toujours celui du poste.
+
+Services : `Poste\Desk` (règles du parcours), `Poste\Operations` (idempotence), `VisitorSearch` (recherche par mot). La décision de l'hôte sur un non listé est la méthode `Desk::decideHost` (écran de l'hôte au lot L10).

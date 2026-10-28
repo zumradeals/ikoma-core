@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AccountsController;
-use App\Http\Controllers\BadgeControlDemoController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgeReservationsController;
@@ -10,8 +9,12 @@ use App\Http\Controllers\BadgeSettingsController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ListImportsController;
+use App\Http\Controllers\PosteApiController;
+use App\Http\Controllers\PosteController;
 use App\Http\Controllers\ZonesController;
+use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\RequireTwoFactor;
+use App\Http\Middleware\ResolvePoste;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -35,8 +38,22 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/badges/reservations', [BadgeReservationsController::class, 'store'])->middleware('can:badges.gerer');
         Route::put('/administration/badges/reglages', [BadgeSettingsController::class, 'update'])->middleware('can:badges.gerer');
         Route::get('/administration/badges/etiquettes', BadgeLabelsController::class)->middleware('can:badges.gerer');
-        // Démonstration L4 : à supprimer en L5, quand les routes d'accueil appelleront BadgeService.
-        Route::post('/administration/badges/controle-demo', BadgeControlDemoController::class)->middleware('can:badges.gerer');
+
+        Route::middleware(EnsureAgentAccueil::class)->group(function (): void {
+            Route::get('/poste', PosteController::class)->middleware('can:visiteurs.rechercher');
+            Route::get('/poste/api/postes', [PosteApiController::class, 'postes'])->middleware('can:visiteurs.rechercher');
+            Route::middleware(ResolvePoste::class)->group(function (): void {
+                Route::get('/poste/api/contexte', [PosteApiController::class, 'contexte'])->middleware('can:visiteurs.rechercher');
+                Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware('can:visiteurs.rechercher');
+                Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');
+                Route::post('/poste/api/identite', [PosteApiController::class, 'identite'])->middleware('can:visiteurs.verifier');
+                Route::post('/poste/api/valider', [PosteApiController::class, 'valider'])->middleware('can:visiteurs.valider');
+                Route::post('/poste/api/refuser', [PosteApiController::class, 'refuser'])->middleware('can:visiteurs.refuser');
+                Route::post('/poste/api/badge', [PosteApiController::class, 'badge'])->middleware('can:badges.associer');
+                Route::post('/poste/api/entree', [PosteApiController::class, 'entree'])->middleware('can:visiteurs.valider');
+                Route::post('/poste/api/non-listes', [PosteApiController::class, 'nonListe'])->middleware('can:visiteurs.enregistrer_non_liste');
+            });
+        });
 
         Route::get('/espace', fn () => Inertia::render('Space'))->name('space');
         Route::get('/administration/comptes', [AccountsController::class, 'index'])->middleware('can:comptes.gerer');
