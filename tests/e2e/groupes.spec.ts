@@ -228,9 +228,9 @@ test('administration : règle de contrôle des stagiaires et groupes', async ({ 
   await page.goto('/administration/groupes');
   await expect(page.getByRole('heading', { name: 'Administration · Groupes' })).toBeVisible();
   await expect(page.getByTestId('mode-encadreur')).toBeChecked(); await expect(page.getByText(fx.cars['1'].name)).toBeVisible(); await shot(page, 'admin-groupes');
-  await page.getByTestId('mode-identite').check(); await button(page, 'Enregistrer la règle').click();
+  await page.getByTestId('mode-identite').check(); await Promise.all([page.waitForResponse(r => r.url().includes('/administration/groupes/reglage')), button(page, 'Enregistrer la règle').click()]);
   await page.goto('/administration/groupes'); await expect(page.getByTestId('mode-identite')).toBeChecked();
-  await page.getByTestId('mode-encadreur').check(); await button(page, 'Enregistrer la règle').click();
+  await page.getByTestId('mode-encadreur').check(); await Promise.all([page.waitForResponse(r => r.url().includes('/administration/groupes/reglage')), button(page, 'Enregistrer la règle').click()]);
   await page.goto('/administration/groupes'); await expect(page.getByTestId('mode-encadreur')).toBeChecked();
   await admin.close();
 });
