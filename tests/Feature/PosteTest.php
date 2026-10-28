@@ -24,14 +24,18 @@ function deskUser(string $role): User
     return $user;
 }
 
+/** JPEG minimal (16 × 16) intégré : l'image PHP « gd » n'existe pas dans le conteneur ; seules les dimensions de l'en-tête SOF changent. */
 function deskJpeg(int $w = 320, int $h = 240): string
 {
-    $image = imagecreatetruecolor($w, $h);
-    imagefilledrectangle($image, 0, 0, $w, $h, imagecolorallocate($image, 30, 90, 160));
-    ob_start();
-    imagejpeg($image, null, 80);
+    $bytes = base64_decode('/9j/4AAQSkZJRgABAQEAYABgAAD//gA7Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcgSlBFRyB2ODApLCBxdWFsaXR5ID0gNTAK/9sAQwAQCwwODAoQDg0OEhEQExgoGhgWFhgxIyUdKDozPTw5Mzg3QEhcTkBEV0U3OFBtUVdfYmdoZz5NcXlwZHhcZWdj/9sAQwEREhIYFRgvGhovY0I4QmNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2Nj/8AAEQgAEAAQAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/aAAwDAQACEQMRAD8Ax6KKK9U84//Z');
+    $sof = strpos($bytes, "\xFF\xC0");
 
-    return (string) ob_get_clean();
+    return substr($bytes, 0, $sof + 5).pack('nn', $h, $w).substr($bytes, $sof + 9);
+}
+
+function deskPng(): string
+{
+    return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADElEQVQImWNgYGAAAAAEAAGjChXjAAAAAElFTkSuQmCC');
 }
 
 /** En-têtes d'une écriture du poste : poste choisi et identifiant d'opération neuf (ou imposé pour tester le rejeu). */
@@ -301,13 +305,7 @@ it('chiffre la photo au repos, ne l’expose par aucune adresse et refuse les fi
     }
     expect(config('filesystems.disks.local.serve'))->toBeFalse()->and(DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'visiteur.identite_verifiee')->value('details'))->not->toContain($photo->file_reference);
     // type, dimensions et poids
-    foreach ([['p.png', (function () {
-        $i = imagecreatetruecolor(50, 50);
-        ob_start();
-        imagepng($i);
-
-        return ob_get_clean();
-    })()], ['grand.jpg', deskJpeg(1200, 900)], ['texte.jpg', 'pas une image']] as [$name, $bytes]) {
+    foreach ([['p.png', deskPng()], ['grand.jpg', deskJpeg(1200, 900)], ['texte.jpg', 'pas une image']] as [$name, $bytes]) {
         $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(4), 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent($name, $bytes)], deskHeaders())->assertStatus(422)->assertJson(['code' => 'photo_invalide']);
     }
     expect(DB::table('photos')->where('visitor_id', deskVisitor(4))->count())->toBe(0);
