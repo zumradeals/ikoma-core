@@ -108,7 +108,7 @@ Deux tablettes hors ligne pourraient attribuer le même badge. Parade : **chaque
 | `badges` | Badges physiques | code lisible, QR (jeton unique), statut, lot, poste réservé |
 | `badge_batches` | Lots imprimés | quantité, marge, date |
 | `badge_assignments` | Historique des associations | badge, visiteur, agent, appareil, date, annulée |
-| `identity_checks` | Contrôle d'identité | visiteur, agent, date (case cochée) |
+| `identity_checks` | Contrôle d'identité | visiteur, agent, date (case cochée), type et numéro de pièce (numéro chiffré) |
 | `photos` | Photos prises à l'accueil | visiteur, fichier chiffré, date |
 | `access_events` | Entrées / sorties / contrôles | visiteur, badge, type, point de contrôle, date |
 | `refusals` | Refus d'accès | visiteur, motif, agent, décision du superviseur |

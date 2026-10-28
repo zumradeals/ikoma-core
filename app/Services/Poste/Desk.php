@@ -26,6 +26,9 @@ final class Desk
 {
     public const PHOTO_MAX_BYTES = 1_000_000;
 
+    /** Types de pièce acceptés (libellés dans resources/js/labels.ts). */
+    public const DOCUMENT_TYPES = ['cni', 'passeport', 'permis', 'carte_militaire', 'carte_professionnelle', 'autre'];
+
     public const PHOTO_MAX_SIDE = 640;
 
     public function __construct(private readonly Audit $audit, private readonly BadgeService $badges, private readonly VisitorSearch $search) {}
@@ -76,11 +79,15 @@ final class Desk
      *
      * @return array<string, mixed>
      */
-    public function saveIdentity(Device $poste, User $agent, string $visitorId, bool $identityChecked, string $jpeg): array
+    public function saveIdentity(Device $poste, User $agent, string $visitorId, bool $identityChecked, string $jpeg, ?string $documentType = null, ?string $documentNumber = null): array
     {
         $visitor = $this->openVisitor($poste, $visitorId);
         if (! $identityChecked) {
             throw new DeskRefused('identite_non_cochee', 'Cochez « pièce d’identité contrôlée » après avoir vérifié la pièce.');
+        }
+        $number = strtoupper(preg_replace('/[\s.]+/', '', (string) $documentNumber) ?? '');
+        if (! in_array($documentType, self::DOCUMENT_TYPES, true) || preg_match('/^[A-Z0-9\/-]{4,30}$/', $number) !== 1) {
+            throw new DeskRefused('piece_requise', 'Indiquez le type et le numéro de la pièce d’identité (4 à 30 lettres ou chiffres).');
         }
         $info = strlen($jpeg) <= self::PHOTO_MAX_BYTES ? @getimagesizefromstring($jpeg) : false;
         if ($info === false || $info[2] !== IMAGETYPE_JPEG || $info[0] > self::PHOTO_MAX_SIDE || $info[1] > self::PHOTO_MAX_SIDE || $info[0] < 1) {
@@ -90,10 +97,10 @@ final class Desk
         $photo = (string) Str::uuid();
         $path = "photos/{$photo}.enc";
         $now = now();
-        DB::table('identity_checks')->insert(['id' => $check, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'checked_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('identity_checks')->insert(['id' => $check, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'checked_at' => $now, 'document_type' => $documentType, 'document_number' => Crypt::encryptString($number), 'created_at' => $now, 'updated_at' => $now]);
         DB::table('photos')->insert(['id' => $photo, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'file_reference' => $path, 'taken_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
         Storage::disk('local')->put($path, Crypt::encryptString($jpeg)); // jamais en clair sur le disque, jamais servi par une adresse
-        $this->audit->append('visiteur.identite_verifiee', $agent->id, ['visitor_id' => $visitor->id, 'identity_check_id' => $check, 'photo_id' => $photo, 'device_id' => $poste->id]);
+        $this->audit->append('visiteur.identite_verifiee', $agent->id, ['visitor_id' => $visitor->id, 'identity_check_id' => $check, 'photo_id' => $photo, 'device_id' => $poste->id, 'document_type' => $documentType]);
 
         return ['identity_done' => true, 'photo_done' => true];
     }

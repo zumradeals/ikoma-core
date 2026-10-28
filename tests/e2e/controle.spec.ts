@@ -42,7 +42,7 @@ async function admit(page: Page, name: string, badge: string): Promise<void> {
   await page.getByLabel(/Nom du visiteur/).fill(name);
   await button(page, new RegExp(name)).first().click();
   await button(page, 'C’est bien cette personne').click();
-  await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
+  await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456'); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
   await button(page, /Valider/).click();
   await page.getByLabel(/QR illisible/).fill(badge); await button(page, 'Associer ce badge').click();
   await button(page, /Autoriser l’accès/).click();

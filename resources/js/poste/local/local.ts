@@ -1,4 +1,4 @@
-import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
+import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
 import type { GroupPosteRepository } from '../repository';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
 import { sha256Hex } from './crypto';
@@ -120,7 +120,7 @@ export class LocalPosteRepository implements GroupPosteRepository {
     return result;
   }
 
-  async saveIdentity(operationId: string, visitorId: string, photo: Blob): Promise<void> { await this.enqueue(operationId, 'identite', { visitor_id: visitorId, identity_checked: true }, photo); }
+  async saveIdentity(operationId: string, visitorId: string, photo: Blob, doc: IdentityDocument): Promise<void> { await this.enqueue(operationId, 'identite', { visitor_id: visitorId, identity_checked: true, document_type: doc.type, document_number: doc.number }, photo); }
   async validate(operationId: string, visitorId: string, avis?: Avis): Promise<void> { await this.enqueue(operationId, 'valider', { visitor_id: visitorId, avis: avis ?? null }); }
   async refuse(operationId: string, visitorId: string, motif: string): Promise<void> { await this.enqueue(operationId, 'refuser', { visitor_id: visitorId, motif }); }
   async assignBadge(operationId: string, visitorId: string, code: string): Promise<{ badge_code: string }> {

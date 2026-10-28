@@ -42,11 +42,11 @@ final class PosteApiController
 
     public function identite(Request $r): JsonResponse
     {
-        $data = $r->validate(['visitor_id' => 'required|uuid', 'identity_checked' => 'required|boolean', 'photo' => 'required|file|max:1024']);
+        $data = $r->validate(['visitor_id' => 'required|uuid', 'identity_checked' => 'required|boolean', 'photo' => 'required|file|max:1024', 'document_type' => 'required|string|max:20', 'document_number' => 'required|string|max:40']);
         $bytes = (string) $r->file('photo')->get();
         $poste = $this->poste($r);
 
-        return $this->operations->run($r, 'identite', $data['visitor_id'].'|'.(int) $r->boolean('identity_checked').'|'.hash('sha256', $bytes), fn () => $this->desk->saveIdentity($poste, $r->user(), $data['visitor_id'], $r->boolean('identity_checked'), $bytes));
+        return $this->operations->run($r, 'identite', $data['visitor_id'].'|'.(int) $r->boolean('identity_checked').'|'.hash('sha256', $bytes.'|'.$data['document_type'].'|'.$data['document_number']), fn () => $this->desk->saveIdentity($poste, $r->user(), $data['visitor_id'], $r->boolean('identity_checked'), $bytes, $data['document_type'], $data['document_number']));
     }
 
     public function valider(Request $r): JsonResponse

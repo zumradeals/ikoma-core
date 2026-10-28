@@ -1,4 +1,4 @@
-import { ApiError, type Avis, type Fiche, type SearchResult } from '../types';
+import { ApiError, documentLabels, type Avis, type Fiche, type SearchResult } from '../types';
 import type { LocalList, SnapVisitor } from './list';
 import { applyGroupOp, type GroupDelta } from './group';
 import { searchIndex } from './search';
@@ -58,6 +58,9 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
   switch (op.type) {
     case 'identite': {
       const v = open(list, p.visitor_id);
+      if (!(p.document_type as string in documentLabels) || !/^[A-Z0-9/-]{4,30}$/.test(String(p.document_number ?? '').toUpperCase().replace(/[\s.]+/g, ''))) {
+        throw refuse('piece_requise', 'Indiquez le type et le numéro de la pièce d’identité (4 à 30 lettres ou chiffres).');
+      }
       v.identity_done = true; v.photo_done = true; list.touch();
       return {};
     }

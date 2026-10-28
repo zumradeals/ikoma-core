@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { initial, reduce, stepNumber, validateBlockedReason, type Ev } from '../../poste/machine';
 import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../poste/repository';
-import { ApiError, type Avis, type DeskContext, type DeskSummary, type Fiche, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
+import { ApiError, type Avis, type DeskContext, type DeskSummary, type Fiche, type IdentityDocument, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
 import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.vue'; import PosteSelect from './PosteSelect.vue'; import StepSearch from './StepSearch.vue'; import StepFiche from './StepFiche.vue';
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
 import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
@@ -61,10 +61,10 @@ function selectVisitor(id: string, homonymCount: number) {
 }
 const onSelect = (result: SearchResult) => selectVisitor(result.id, result.homonyms);
 const onConfirm = () => send({ type: 'CONFIRM_FICHE' });
-function onIdentity(photo: Blob) {
+function onIdentity(photo: Blob, doc: IdentityDocument) {
   return run(async () => {
     const id = ctx.value.visitorId as string; const key = `identite:${id}`;
-    await repo.saveIdentity(ops.get(key), id, photo); ops.done(key);
+    await repo.saveIdentity(ops.get(key), id, photo, doc); ops.done(key);
     await refreshFiche(id); send({ type: 'IDENTITY_SAVED' });
   });
 }

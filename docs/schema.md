@@ -189,3 +189,5 @@ Migration `2026_11_08_000000_add_offline_and_threshold_settings`. Aucune table n
 
 Migration `2026_11_09_000000_add_alert_escalation` : `alerts.escalated_at` (timestamptz, nul tant que l'alerte n'a pas été escaladée) et le réglage `alerte_escalade_minutes` (5). Tâche planifiée `alertes:escalader` (30 s). Journal : `alerte.escaladee`. Décisions : JOURNAL_DECISIONS.md, rubrique L14c.
 
+
+- A1 : `identity_checks.document_type` (cni, passeport, permis, carte_militaire, carte_professionnelle, autre) et `document_number` (chiffré) ; les deux renseignés ensemble ou aucun (anciens contrôles et flux groupe).

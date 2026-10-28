@@ -130,7 +130,7 @@ describe('application du poste', () => {
     expect(wrapper.text()).toContain('Étape 3 sur 7');
     const save = () => wrapper.findAll('button').find(b => b.text().includes('Enregistrer et passer'))!;
     expect(save().attributes('disabled')).toBeDefined();
-    await wrapper.get('input[type="checkbox"]').setValue(true); await wrapper.findAll('button').find(b => b.text().includes('Prendre la photo'))!.trigger('click'); await flushPromises();
+    await wrapper.get('input[type="checkbox"]').setValue(true); await wrapper.get('[data-testid=piece-type]').setValue('cni'); await wrapper.get('[data-testid=piece-numero]').setValue('CI0123456'); await wrapper.findAll('button').find(b => b.text().includes('Prendre la photo'))!.trigger('click'); await flushPromises();
     expect(save().attributes('disabled')).toBeUndefined(); await save().trigger('click'); await flushPromises();
     expect(wrapper.text()).toContain('Étape 4 sur 7'); expect(repo.calls).toEqual(['identite']);
     await wrapper.findAll('button').find(b => b.text().includes('Valider'))!.trigger('click'); await flushPromises();

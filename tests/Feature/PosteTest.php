@@ -55,7 +55,7 @@ function deskVisitor(int $i): string
 
 function deskIdentity(string $visitor, ?string $operation = null)
 {
-    return test()->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent('photo.jpg', deskJpeg())], deskHeaders($operation));
+    return test()->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo' => UploadedFile::fake()->createWithContent('photo.jpg', deskJpeg())], deskHeaders($operation));
 }
 
 function deskLot(int $expected = 6, int $category = 1): Badge
@@ -153,7 +153,7 @@ it('interdit la validation sans pièce d’identité cochée et sans photo, côt
     $this->postJson('/poste/api/valider', ['visitor_id' => $visitor], deskHeaders())->assertStatus(422)->assertJson(['code' => 'identite_requise']);
     DB::table('identity_checks')->insert(['id' => (string) Str::uuid(), 'visitor_id' => $visitor, 'actor_id' => $this->agent->id, 'checked_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     $this->postJson('/poste/api/valider', ['visitor_id' => $visitor], deskHeaders())->assertStatus(422)->assertJson(['code' => 'identite_requise']);
-    $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(4), 'identity_checked' => false, 'photo' => UploadedFile::fake()->createWithContent('p.jpg', deskJpeg())], deskHeaders())->assertStatus(422)->assertJson(['code' => 'identite_non_cochee']);
+    $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(4), 'identity_checked' => false, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo' => UploadedFile::fake()->createWithContent('p.jpg', deskJpeg())], deskHeaders())->assertStatus(422)->assertJson(['code' => 'identite_non_cochee']);
     $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(4), 'identity_checked' => true], deskHeaders())->assertStatus(422);
     expect(DB::table('access_events')->where('type', 'validation')->count())->toBe(0)->and(DB::table('photos')->count())->toBe(0);
     deskIdentity($visitor)->assertOk()->assertJson(['identity_done' => true, 'photo_done' => true]);
@@ -291,7 +291,7 @@ it('traite une opération rejouée sans aucun effet double et refuse un identifi
     $op = (string) Str::uuid();
     $file = UploadedFile::fake()->createWithContent('p.jpg', deskJpeg());
     for ($i = 0; $i < 3; $i++) {
-        $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(7), 'identity_checked' => true, 'photo' => $file], deskHeaders($op))->assertOk();
+        $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(7), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo' => $file], deskHeaders($op))->assertOk();
     }
     expect(DB::table('photos')->where('visitor_id', deskVisitor(7))->count())->toBe(1)->and(DB::table('identity_checks')->where('visitor_id', deskVisitor(7))->count())->toBe(1);
 });
@@ -300,7 +300,7 @@ it('chiffre la photo au repos, ne l’expose par aucune adresse et refuse les fi
     Storage::fake('local');
     $jpeg = deskJpeg(640, 480);
     $visitor = deskVisitor(1);
-    $this->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent('p.jpg', $jpeg)], deskHeaders())->assertOk();
+    $this->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo' => UploadedFile::fake()->createWithContent('p.jpg', $jpeg)], deskHeaders())->assertOk();
     $photo = DB::table('photos')->where('visitor_id', $visitor)->first();
     $stored = Storage::disk('local')->get($photo->file_reference);
     expect($photo->file_reference)->toStartWith('photos/')->and(str_starts_with($stored, "\xFF\xD8"))->toBeFalse()->and($stored)->not->toContain('JFIF')->and(Crypt::decryptString($stored))->toBe($jpeg);
@@ -310,7 +310,7 @@ it('chiffre la photo au repos, ne l’expose par aucune adresse et refuse les fi
     expect(config('filesystems.disks.local.serve'))->toBeFalse()->and(DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'visiteur.identite_verifiee')->value('details'))->not->toContain($photo->file_reference);
     // type, dimensions et poids
     foreach ([['p.png', deskPng()], ['grand.jpg', deskJpeg(1200, 900)], ['texte.jpg', 'pas une image']] as [$name, $bytes]) {
-        $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(4), 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent($name, $bytes)], deskHeaders())->assertStatus(422)->assertJson(['code' => 'photo_invalide']);
+        $this->post('/poste/api/identite', ['visitor_id' => deskVisitor(4), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo' => UploadedFile::fake()->createWithContent($name, $bytes)], deskHeaders())->assertStatus(422)->assertJson(['code' => 'photo_invalide']);
     }
     expect(DB::table('photos')->where('visitor_id', deskVisitor(4))->count())->toBe(0);
 });
@@ -338,4 +338,18 @@ it('n’écrit aucun nom de personne ni motif dans le journal', function () {
             expect(is_scalar($value) || $value === null)->toBeTrue();
         }
     }
+});
+
+it('exige le type et le numéro de la pièce d’identité, et ne conserve le numéro que chiffré', function () {
+    $visitor = deskVisitor(4);
+    $send = fn (array $doc) => $this->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent('p.jpg', deskJpeg()), ...$doc], deskHeaders());
+    $send([])->assertStatus(422); // ni type ni numéro
+    $send(['document_type' => 'cni', 'document_number' => 'AB'])->assertStatus(422)->assertJson(['code' => 'piece_requise']);
+    $send(['document_type' => 'inconnu', 'document_number' => 'CI0123456'])->assertStatus(422)->assertJson(['code' => 'piece_requise']);
+    expect(DB::table('identity_checks')->where('visitor_id', $visitor)->count())->toBe(0);
+    $send(['document_type' => 'passeport', 'document_number' => ' ci 01.23456 '])->assertOk()->assertJson(['identity_done' => true]);
+    $row = DB::table('identity_checks')->where('visitor_id', $visitor)->first();
+    expect($row->document_type)->toBe('passeport')->and($row->document_number)->not->toContain('CI0123456')->and(Crypt::decryptString($row->document_number))->toBe('CI0123456');
+    $log = DB::table('audit_logs')->where('action', 'visiteur.identite_verifiee')->get()->map(fn ($l) => json_encode($l))->implode('');
+    expect($log)->toContain('passeport')->not->toContain('CI0123456');
 });

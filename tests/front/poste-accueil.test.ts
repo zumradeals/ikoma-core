@@ -1,3 +1,4 @@
+const DOC = { type: 'cni', number: 'CI0123456' };
 import 'fake-indexeddb/auto';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
@@ -46,8 +47,8 @@ describe('chiffres du poste calculés sur la tablette', () => {
     expect(empty).toMatchObject({ accueillis: 0, refuses: 0, badges: { restants: 3, total: 3 }, pending: [], recent: [], asOf: null });
     expect(empty.waiting).toEqual([{ id: 'v3', name: 'Diallo Issa' }]); // le refusé par l'hôte n'attend plus
 
-    await repo.saveIdentity('o1', 'v1', new Blob(['photo'])); await repo.validate('o2', 'v1'); await repo.assignBadge('o3', 'v1', 'B-001'); await repo.enter('o4', 'v1', 1000);
-    await repo.saveIdentity('o5', 'v2', new Blob(['photo'])); await repo.refuse('o6', 'v2', 'Pièce illisible');
+    await repo.saveIdentity('o1', 'v1', new Blob(['photo']), DOC); await repo.validate('o2', 'v1'); await repo.assignBadge('o3', 'v1', 'B-001'); await repo.enter('o4', 'v1', 1000);
+    await repo.saveIdentity('o5', 'v2', new Blob(['photo']), DOC); await repo.refuse('o6', 'v2', 'Pièce illisible');
     const s = await repo.deskSummary();
     expect(s.accueillis).toBe(1); expect(s.refuses).toBe(1);
     expect(s.badges).toEqual({ restants: 2, total: 3 }); // B-900 n'est pas à ce poste, B-777 est réservé à un car

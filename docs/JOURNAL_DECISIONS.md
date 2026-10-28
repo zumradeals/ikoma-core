@@ -291,3 +291,11 @@ Décision du dirigeant : l'application revient à l'état décrit dans le docume
 - **En réserve** : les fonctions retirées restent décrites dans docs/AUDIT_GLOBAL.md et dans l'historique git (commits L15a, L15b, L16, L17, L14d, annulés par des « revert »). Elles ne reviennent que sur demande explicite du client.
 - **Base de données** : les migrations de ces fonctions sont supprimées du dépôt. Une base de démonstration déjà migrée avec elles doit être reconstruite (`make migrate-fresh-seed`) ; elle ne contient que des données fictives.
 - **Décision confirmée** : seule la pièce d'identité (A1) est approuvée parmi les points de l'audit ; les autres sont suspendus.
+
+## L17 — pièce d'identité : type et numéro (audit global A1), 28 octobre 2026
+
+Seul point de l'audit approuvé par le dirigeant. Migration `2026_11_10_000000_add_identity_document`.
+
+- **À l'accueil** : l'agent choisit le type de pièce (carte nationale, passeport, permis, carte militaire, carte professionnelle, autre) et saisit le numéro (4 à 30 lettres, chiffres, tirets ou barres obliques ; espaces et points ignorés, mis en majuscules). Les deux sont obligatoires pour enregistrer le contrôle d'identité, en ligne comme hors ligne.
+- **Chiffrement** : le numéro est chiffré par l'application (même clé que les photos) avant d'être écrit dans `identity_checks.document_number`. Le journal d'audit ne contient que le **type** de pièce, jamais le numéro. Rien n'affiche le numéro dans l'interface pour l'instant : il sert de preuve a posteriori (déchiffrable par l'application sur demande d'un lot ultérieur).
+- **Pas fait** : rapprochement automatique avec la fiche ou avec une liste de personnes recherchées ; le flux « groupe » (appel nominal d'un car) ne demande pas de pièce. Durée de conservation : à fixer au lot L11 (purge).
