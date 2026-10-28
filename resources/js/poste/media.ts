@@ -1,4 +1,5 @@
 import { BrowserQRCodeReader } from '@zxing/browser';
+import jsQR from 'jsqr';
 /** Caméra de la tablette : photo réduite (640 px maximum, JPEG) et lecture de QR (BarcodeDetector sinon @zxing/browser, sans aucun appel réseau). zxing est importé avec la page, pas à la demande : un chargement différé pouvait rester en attente pendant l'activation du service worker et le QR n'était jamais lu. */
 
 export const PHOTO_MAX_SIDE = 640;
@@ -61,7 +62,8 @@ export async function startScan(video: HTMLVideoElement, onCode: (text: string) 
     if (stopped || !context || video.readyState < 2 || !video.videoWidth) return;
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
     context.drawImage(video, 0, 0);
-    try { emit(reader.decodeFromCanvas(canvas).getText()); } catch { /* aucun QR lisible dans cette image */ }
+    try { emit(reader.decodeFromCanvas(canvas).getText()); return; } catch { /* zxing ne lit pas tous les QR valides (environ 1 sur 6 des badges d'essai) : on essaie jsQR */ }
+    try { const image = context.getImageData(0, 0, canvas.width, canvas.height); const found = jsQR(image.data, image.width, image.height); if (found) emit(found.data); } catch { /* aucun QR lisible dans cette image */ }
   }, 150);
   return { stop() { stopped = true; window.clearInterval(timer); closeCamera(video, stream); } };
 }
