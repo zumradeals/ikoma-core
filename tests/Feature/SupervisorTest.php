@@ -277,13 +277,17 @@ it('répond en moins de 500 ms avec 1 000 présents, par pages de 50', function 
     $this->get('/pilotage/presents')->assertOk(); // chauffe
     // Meilleur de trois mesures : un serveur d'intégration partagé peut avoir un coup de ralentissement isolé, pas trois de suite.
     $elapsed = INF;
+    $timings = [];
     for ($try = 0; $try < 3; $try++) {
         $started = microtime(true);
         $this->get('/pilotage/presents?page=7')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->where('total', 1000)->has('rows', 50)->where('page', 7)->where('perPage', 50));
         $this->get('/pilotage')->assertOk();
+        $timings[] = round((microtime(true) - $started) * 1000);
         $elapsed = min($elapsed, (microtime(true) - $started) * 1000);
     }
-    expect($elapsed)->toBeLessThan(500);
+    // En cas de dépassement, le message donne les trois mesures (ms) et le plan d'exécution de la requête des présents.
+    $plan = $elapsed < 500 ? '' : implode("\n", array_map(fn ($r) => (string) current((array) $r), DB::select('EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF) SELECT count(*) FROM (SELECT DISTINCT ON (e.visitor_id) e.visitor_id, e.type FROM access_events e WHERE e.event_id = ? AND e.type IN (\'entree\', \'sortie\') AND e.visitor_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM access_events x WHERE x.corrige_id = e.id) ORDER BY e.visitor_id, e.occurred_at DESC, e.created_at DESC, e.id DESC) l', [$this->event])));
+    expect($elapsed < 500)->toBeTrue('mesures '.json_encode($timings)." ms\n".$plan);
     expect(app(Presence::class)->count($this->event))->toBe(1000);
 });
 
