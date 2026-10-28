@@ -192,7 +192,7 @@ function statusOf(m: GroupMemberView): string {
             <p class="rounded-2xl bg-white p-6 text-center text-[clamp(2rem,9vw,3.5rem)] font-extrabold leading-tight" data-testid="personne-courante">{{ current.name }}</p>
             <p v-if="current.organisation" class="text-center text-xl">{{ current.organisation }}</p>
 
-            <div v-show="current.checked" class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[35vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
+            <div class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[35vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
             <template v-if="!current.checked">
               <template v-if="mode === 'identite'">
                 <label class="flex min-h-16 items-center gap-4 rounded-xl border-2 border-ikoma-blue bg-white px-4 text-xl font-semibold"><input v-model="idChecked" type="checkbox" class="size-8" data-testid="piece-controlee"> Pièce d’identité contrôlée</label>
