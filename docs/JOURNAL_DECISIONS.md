@@ -321,3 +321,14 @@ Pour que les contrôles les plus contraignants ne bloquent pas la démonstration
 - **Conséquence sur les tablettes** : un agent doit saisir son code à six chiffres en plus du mot de passe pour enrôler une tablette ou rouvrir une session expirée. Le PIN de la tablette, lui, ne change pas.
 - **Constat qui a motivé le changement de règle** : `APP_ENV` n'est pas défini en local ni sans configuration, donc Laravel le prend pour « production » ; et le serveur de démonstration fixe `APP_ENV=production` avec des données fictives. Le profil ne peut donc pas se déduire de l'environnement.
 - Les essais automatiques (Pest) couvrent les deux profils ; les parcours Playwright et la CI restent en profil `standard`. **À faire au lot L12** : l'installation de production pose `renforce`.
+
+## L15b — double validation des actions critiques (audit global D2), 28 octobre 2026
+
+Migration `2026_11_12_000000_create_approvals`, service `Approvals`, écran **Administration > Validations** (permission `approbations.decider`, administrateur seul).
+
+- **Principe** : dans le profil `renforce` et dès qu'il y a **au moins deux administrateurs actifs**, une action critique n'est pas exécutée : elle devient une demande que **un autre administrateur** valide ou refuse. L'auteur ne peut pas valider sa propre demande : contrôlé par le service **et** par une contrainte SQL (`decided_by <> requested_by`). Une demande est valable **24 heures**, puis expire.
+- **Actions couvertes** : création d'un compte **administrateur ou superviseur** ; changement de rôle **vers ou depuis** un rôle privilégié ; **réactivation** d'un compte privilégié ; **retour au profil « standard »**. La **désactivation** d'un compte privilégié reste directe (mesure d'urgence, pas une élévation de droits). Un changement entre rôles de terrain reste direct.
+- **Aucun secret en clair** : un mot de passe de compte n'est conservé dans la demande que sous forme d'**empreinte** ; il n'apparaît ni dans le résumé affiché ni dans le journal. Journal : `approbation.demandee`, `approbation.approuvee`, `approbation.refusee`, puis l'action exécutée porte `demande_par` et `double_validation`.
+- **Amorçage** : avec **un seul** administrateur actif, la double validation ne peut pas s'appliquer ; la création directe reste possible (c'est ainsi qu'on crée le deuxième administrateur) et le tableau de l'administrateur signale « Un seul administrateur actif ». Dès le deuxième, la règle s'applique.
+- **Pas encore branché** (leurs fonctions sont sur la branche L11 de ChatGPT Work, non fusionnée) : export du journal, purge de fin d'événement, réinitialisation du 2FA. Le service `Approvals` est fait pour qu'on y ajoute ces actions : une entrée dans `execute()` et un appel `request()`.
+- **Message de statut** : le serveur envoie un message (`flash.status`) affiché par la mise en page de base, pour dire « Demande envoyée : un second administrateur doit la valider ».

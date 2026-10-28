@@ -3,7 +3,10 @@ import { Link, useForm } from '@inertiajs/vue3';
 import BaseLayout from '../../layouts/BaseLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
 const props = defineProps<{ profile: 'standard' | 'renforce'; production: boolean }>();
 const form = useForm({ profile: props.profile });
-const enforced = ['Authentification à deux facteurs (code à six chiffres) pour tous les rôles : agents, hôtes et encadreurs comme administrateur et superviseur.'];
+const enforced = [
+  'Authentification à deux facteurs (code à six chiffres) pour tous les rôles : agents, hôtes et encadreurs comme administrateur et superviseur.',
+  'Double validation : la création d’un compte administrateur ou superviseur, un changement de rôle privilégié, la réactivation d’un compte privilégié et le retour au profil standard exigent la validation d’un second administrateur (menu « Validations »).',
+];
 </script>
 <template>
 <BaseLayout>

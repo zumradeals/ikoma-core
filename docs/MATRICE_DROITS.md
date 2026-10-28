@@ -29,6 +29,7 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | presences.consulter | — | Oui | — | — | — |
 | roles.attribuer | Oui | — | — | — | — |
 | securite.gerer | Oui | — | — | — | — |
+| approbations.decider | Oui | — | — | — | — |
 | visiteurs.enregistrer_mobile | — | — | Oui | — | — |
 | visiteurs.enregistrer_non_liste | — | — | Oui | — | — |
 | visiteurs.rechercher | — | — | Oui | — | — |
@@ -44,4 +45,4 @@ Les permissions des futurs modules sont enregistrées mais aucune route ni table
 
 Validation du dirigeant : la permission `categories.gerer` est attribuée uniquement à l’administrateur, conformément à la section 10 du document de fonctionnement (« gestion des badges, zones et catégories »). La portée des listes de l’hôte et du groupe de l’encadreur devra être limitée aux objets concernés dans leurs futurs modules.
 
-Lot L15a (décision du dirigeant, 28 octobre 2026) : `securite.gerer` est ajoutée, réservée à l'administrateur (choix du profil de sécurité). Dans le profil renforcé, le 2FA devient obligatoire pour tous les rôles.
+Lot L15a (décision du dirigeant, 28 octobre 2026) : `securite.gerer` est ajoutée, réservée à l'administrateur (choix du profil de sécurité). Dans le profil renforcé, le 2FA devient obligatoire pour tous les rôles. Lot L15b : `approbations.decider` (valider ou refuser la demande d'un autre administrateur), réservée à l'administrateur.

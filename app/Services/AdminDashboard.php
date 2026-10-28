@@ -152,7 +152,17 @@ final class AdminDashboard
      */
     private function profileWatch(): array
     {
-        return SecurityProfile::strict() ? [] : [['severity' => 'haute', 'title' => 'Profil de sécurité « standard »', 'text' => 'Ce profil convient à une démonstration avec des données fictives. Passez au profil renforcé avant toute donnée réelle.', 'href' => '/administration/profil-securite']];
+        $approvals = app(Approvals::class);
+        $rows = [];
+        $pending = $approvals->pendingCount();
+        if ($pending > 0) {
+            $rows[] = ['severity' => 'haute', 'title' => $pending.' demande'.($pending > 1 ? 's' : '').' de validation en attente', 'text' => 'Une demande d’action critique attend la validation d’un second administrateur.', 'href' => '/administration/approbations'];
+        }
+        if (SecurityProfile::strict() && $approvals->soleAdministrator()) {
+            $rows[] = ['severity' => 'haute', 'title' => 'Un seul administrateur actif', 'text' => 'La double validation ne peut pas s’appliquer : créez un second administrateur.', 'href' => '/administration/comptes'];
+        }
+
+        return SecurityProfile::strict() ? $rows : [...$rows, ['severity' => 'haute', 'title' => 'Profil de sécurité « standard »', 'text' => 'Ce profil convient à une démonstration avec des données fictives. Passez au profil renforcé avant toute donnée réelle.', 'href' => '/administration/profil-securite']];
     }
 
     private function since(string $at): string

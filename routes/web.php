@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\ApprovalsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgeReservationsController;
@@ -109,6 +110,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/postes/{device}/code', [PostesController::class, 'code'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
 
+        Route::get('/administration/approbations', [ApprovalsController::class, 'index'])->middleware('can:approbations.decider');
+        Route::post('/administration/approbations/{approval}/approuver', [ApprovalsController::class, 'approve'])->whereUuid('approval')->middleware('can:approbations.decider');
+        Route::post('/administration/approbations/{approval}/refuser', [ApprovalsController::class, 'refuse'])->whereUuid('approval')->middleware('can:approbations.decider');
         Route::get('/administration/profil-securite', [SecurityProfileController::class, 'show'])->middleware('can:securite.gerer');
         Route::put('/administration/profil-securite', [SecurityProfileController::class, 'update'])->middleware('can:securite.gerer');
 

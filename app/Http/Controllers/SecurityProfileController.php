@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Approvals;
 use App\Services\Audit;
 use App\Services\SecurityProfile;
 use Illuminate\Http\RedirectResponse;
@@ -27,6 +28,12 @@ final class SecurityProfileController
         Gate::authorize('securite.gerer');
         $data = $r->validate(['profile' => ['required', Rule::in([SecurityProfile::STANDARD, SecurityProfile::STRICT])]]);
         $before = SecurityProfile::current();
+        $approvals = app(Approvals::class);
+        if ($before === SecurityProfile::STRICT && $data['profile'] === SecurityProfile::STANDARD && $approvals->required()) {
+            $approvals->request('securite.profil_standard', [], 'Revenir au profil de sécurité « standard » (non adapté aux données réelles).', $r->user());
+
+            return back()->with('status', 'Demande envoyée : un second administrateur doit valider le retour au profil standard.');
+        }
         DB::transaction(function () use ($data, $before, $audit, $r): void {
             DB::table('settings')->where('key', 'profil_securite')->update(['value' => $data['profile']]);
             if ($before !== $data['profile']) {
