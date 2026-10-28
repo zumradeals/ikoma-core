@@ -37,8 +37,18 @@ export class LocalPosteRepository implements GroupPosteRepository {
 
   /** Nouvelle copie du serveur : on y rejoue les opérations pas encore envoyées pour ne rien faire disparaître à l'écran. */
   async replaceSnapshot(snapshot: Snapshot): Promise<void> {
-    this.list = new LocalList(snapshot);
-    await this.replayPending();
+    await this.exclusive(async () => {
+      this.list = new LocalList(snapshot);
+      await this.replayPending();
+    });
+  }
+
+  /** Une écriture (règle appliquée à la copie puis enregistrement dans la file) et un remplacement de la copie ne se chevauchent jamais : sinon l'écriture pouvait disparaître de l'écran jusqu'à la synchronisation suivante. */
+  private tail: Promise<unknown> = Promise.resolve();
+  private exclusive<T>(job: () => Promise<T>): Promise<T> {
+    const run = this.tail.then(job, job);
+    this.tail = run.catch(() => undefined);
+    return run;
   }
 
   private async replayPending(): Promise<void> {
@@ -61,7 +71,11 @@ export class LocalPosteRepository implements GroupPosteRepository {
   async visitor(id: string): Promise<Fiche> { return ficheOf(this.list, id, this.now()); }
   async pendingCount(): Promise<number> { return this.store.count('pending'); }
 
-  private async enqueue(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<ApplyResult> {
+  private enqueue(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<ApplyResult> {
+    return this.exclusive(() => this.enqueueNow(operationId, type, payload, photo));
+  }
+
+  private async enqueueNow(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<ApplyResult> {
     const existing = await this.store.getOp(operationId);
     if (existing && type.startsWith('groupe_')) return applyGroupOp(this.list, type, existing.op.payload); // toutes les opérations de groupe sont sans effet quand elles sont rejouées
     if (existing) { // même opération rejouée (coupure, double clic) : rien de plus n'est enregistré
