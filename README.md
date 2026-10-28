@@ -83,3 +83,9 @@ Connectez-vous avec un compte administrateur, puis **Mon espace → Importer une
 Lisez le rapport : les doublons et erreurs sont exclus ; les homonymes sont signalés et restent importables. Corrigez puis rechargez si nécessaire. **Continuer vers la confirmation**, puis **Importer les lignes valides** enregistre en une seule opération. Aucun visiteur n’est créé avant ce dernier bouton. Le fichier privé disparaît après confirmation ou abandon ; les aperçus abandonnés expirent après une heure et sont purgés automatiquement par le service scheduler, démarré avec `make up`.
 
 Pour la recette fictive, utilisez tests/fixtures/liste-fictive-1000.csv : 985 importables, 15 bloquées, 8 avertissements. Les tests existants (`make test`, `make test-front`, `make e2e`, `make lint`) incluent L3 et vérifient aussi les seuils de temps. Le conteneur reste en PHP 8.5 ; OpenSpout exige PHP 8.4 minimum pour une installation hors Docker.
+
+## Espace de l’hôte (L10)
+
+L’administrateur rattache le compte de rôle Hôte à ses fiches dans **Administration → Comptes**. L’hôte ouvre ensuite **Mes notifications** pour répondre aux demandes et voir les arrivées, ou **Mes invités** pour tenir sa liste. Sans fiche rattachée, l’application explique de contacter l’administrateur.
+
+L’hôte ajoute des invités de catégorie Visiteur. Les doublons sont bloqués et les homonymes signalés. Après une entrée, la fiche est verrouillée. Un visiteur non listé accepté reste limité à l’accueil, avec accompagnement. Sans réponse pendant deux minutes, le superviseur est alerté ; ce délai se règle dans l’administration des comptes. Les notifications exigent le réseau et l’écran ouvert ; aucun e-mail ni SMS n’est envoyé.

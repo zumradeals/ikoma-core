@@ -163,3 +163,16 @@ Côté appareil du superviseur (IndexedDB `ikoma-pilotage`, même coffre que le 
 - **Copie de la tablette** (`ListSnapshot`) : `visitors[].group_id`, `badges[].group_id` (badge réservé à un groupe), `groups[]`, `members[]` (booléens d'avancement, aucun horodatage nominatif) et `settings.controle_stagiaires`. Le hachage de version couvre groupes, membres, réservations de badges et règle de contrôle.
 - **Journal** : `groupe.cree`, `groupe.ouvert`, `groupe.badge_remis`, `groupe.absent`, `groupe.embarque`, `groupe.arrive`, `groupe.confirme_par_encadreur`, ainsi que `groupe.encadreur_designe`, `groupe.stagiaire_rattache`, `groupe.stagiaire_retire`, `groupe.reglage_modifie`. Identifiants et nombres uniquement, jamais de nom.
 - **Opérations de synchronisation** : `groupe_controle`, `groupe_badge`, `groupe_depart`, `groupe_arrivee`, `groupe_arrivee_fin` (permissions `groupes.appel_nominal`, `groupes.remettre_badges`, `badges.controler`), rejouables sans effet, mises en quarantaine comme au lot L6.
+
+## Évolution L10 — Espace hôte
+
+Migration `2026_11_06_000000_create_host_notifications` :
+
+- notifications : UUID id, recipient_id (users), event_id, visitor_id, requester_id facultatif (agent), device_id facultatif, type (`arrivee`, `non_liste`, `hors_periode`), message court générique, dedupe_key unique, read_at, decision (`autorise`/`refuse`, nullable), reason facultatif, decided_at, escalated_at, horodatages. Les clés étrangères sont restrictives. Le nom de l’invité et celui de l’agent ne sont pas recopiés dans le message : ils sont joints au moment de la lecture autorisée.
+- visitors.withdrawn_at : retrait logique avant toute entrée ; les historiques restent référencés. La recherche et la copie tablette excluent ces fiches ; l’entrée et l’association/contrôle d’un badge les refusent. Aucun droit de suppression sur access_events, identity_checks ou audit_logs n’est ajouté.
+- events.list_revision : compteur technique inclus dans la version calculée L6, incrémenté dans la transaction d’un ajout, d’une modification, d’un retrait ou d’une réponse hôte. Il distingue deux changements dans la même seconde. updated_at de visitors gagne la précision microseconde pour le contrôle de concurrence des fiches.
+- settings.hote_delai_reponse_minutes : 2 initialement, modifiable de 1 à 120 dans Administration > Comptes.
+
+Le rattachement réutilise hosts.user_id. Un compte peut être rattaché à ses fiches de plusieurs événements ; le serveur vérifie à chaque accès que la fiche hôte appartient au compte courant. L’administration peut rattacher les fiches existantes ; elle ne peut pas voler implicitement une fiche déjà rattachée à un autre compte.
+
+L’hôte peut attribuer la catégorie **Visiteur uniquement**. Une catégorie initialement fixée par l’administration peut être conservée ; un changement ne contredit pas un groupe ou un badge déjà remis. Doublons et homonymes utilisent ikoma_normalize et le nettoyage L3 ; un avertissement d’homonymie ne divulgue pas les fiches des autres hôtes.
