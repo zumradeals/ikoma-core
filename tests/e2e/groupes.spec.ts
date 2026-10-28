@@ -52,7 +52,7 @@ test.beforeAll(async ({ browser }, info) => {
 });
 test.afterAll(async () => { await tablet.close(); await phone.close(); });
 
-const setQr = (page: Page, code: string | null, car?: Car) => page.evaluate(svg => (window as unknown as { __setQr: (s: string | null) => Promise<void> }).__setQr(svg), code && car ? car.qr[code] : null);
+const setQr = (page: Page, code: string | null, car?: Car) => page.evaluate(svg => Promise.race([(window as unknown as { __setQr: (s: string | null) => Promise<void> }).__setQr(svg), new Promise<void>((_, reject) => setTimeout(() => reject(new Error('setQr bloqué plus de 10 s')), 10_000))]), code && car ? car.qr[code] : null);
 
 /** Ouvre l'écran des groupes de la tablette (enrôlement la première fois, PIN ensuite). */
 async function openCars(page: Page): Promise<void> {
@@ -85,6 +85,7 @@ test('car de 50 stagiaires : appel, correspondance et remise du badge en moins d
   test.setTimeout(360_000);
   const car = fx.cars['1'];
   const page = await tablet.newPage();
+  page.on('pageerror', e => console.log('PAGEERROR', e.message)); page.on('console', m => { if (['error', 'warning'].includes(m.type())) console.log('CONSOLE', m.type(), m.text().slice(0, 200)); });
   await openCars(page); await shot(page, 'groupe-choix');
   await chooseCar(page, car);
   await progress(page, 0, 50); await shot(page, 'groupe-appel');
@@ -96,7 +97,7 @@ test('car de 50 stagiaires : appel, correspondance et remise du badge en moins d
     await setQr(page, car.badges[i], car);
     await progress(page, i + 1, 50);
     await setQr(page, null);
-    console.log('PERSONNE', i + 1, Date.now() - started, 'ms cumulées');
+    console.log('PERSONNE', i + 1, Date.now() - started, 'ms cumulées, en attente', await pendingOps(page).innerText());
     if (i === 24) await shot(page, 'groupe-mi-parcours');
   }
   const average = (Date.now() - started) / 50 / 1000;
