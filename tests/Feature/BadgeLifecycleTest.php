@@ -536,7 +536,9 @@ it('imprime 400 étiquettes A4 sans aucune ressource externe ni jeton en clair',
     preg_match('/<style nonce="([^"]+)"/', $html, $found);
     expect($found)->toHaveCount(2)->and($response->headers->get('Content-Security-Policy'))->toContain("style-src 'self' 'nonce-{$found[1]}'");
     expect(substr_count($html, '<article class="label"'))->toBe(400)->and(substr_count($html, '<section class="sheet"'))->toBe(10);
-    expect($html)->not->toMatch('/(src|href|action)="https?:/i')->and($html)->not->toMatch('/url\(\s*[\'"]?https?:/i')->and($html)->not->toContain('<link')->and($html)->not->toContain('<script')->and($html)->not->toContain('@import');
+    expect($html)->not->toMatch('/(src|href|action)="https?:/i')->and($html)->not->toMatch('/url\(\s*[\'"]?https?:/i')->and($html)->not->toContain('<link')->and($html)->not->toContain('onclick')->and($html)->not->toContain('@import');
+    // Un seul script, en ligne, autorisé par le même nonce que le style : le bouton « Imprimer » (aucun gestionnaire en ligne).
+    expect(substr_count($html, '<script'))->toBe(1)->and($html)->toContain('<script nonce="'.$found[1].'"')->and($response->headers->get('Content-Security-Policy'))->toContain("script-src 'self' 'nonce-{$found[1]}'");
     expect($html)->toContain('@media print')->and($html)->toContain('size: A4')->and($html)->toContain('Visiteur')->and($html)->toContain('B-401')->and($html)->toContain('B-800');
     $tokens = DB::table('badges')->where('badge_batch_id', $lot->badge_batch_id)->pluck('qr_token');
     foreach ($tokens->take(25) as $token) {

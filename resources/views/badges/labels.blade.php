@@ -40,7 +40,7 @@ body { margin: 0; background: #e2e8f0; color: #000; font-family: system-ui, -app
   <label>Colonnes<select name="cols">@foreach (range(1, 4) as $n)<option value="{{ $n }}" @selected($cols === $n)>{{ $n }}</option>@endforeach</select></label>
   <label>Lignes<select name="rows">@foreach (range(1, 10) as $n)<option value="{{ $n }}" @selected($rows === $n)>{{ $n }}</option>@endforeach</select></label>
   <button type="submit">Mettre à jour la page</button>
-  <button type="button" onclick="window.print()">Imprimer ({{ $count }} étiquette(s))</button>
+  <button type="button" id="imprimer">Imprimer ({{ $count }} étiquette(s))</button>
   <a href="/administration/badges">Retour aux badges</a>
 </form>
 @if ($tooMany)
@@ -63,5 +63,6 @@ body { margin: 0; background: #e2e8f0; color: #000; font-family: system-ui, -app
   </div>
 </section>
 @endforeach
+<script nonce="{{ $nonce }}">document.getElementById('imprimer').addEventListener('click', function () { window.print(); });</script>
 </body>
 </html>
