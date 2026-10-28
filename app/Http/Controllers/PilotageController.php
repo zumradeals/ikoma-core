@@ -48,6 +48,7 @@ final class PilotageController
             ...$this->shared($event),
             'counters' => fn () => $event ? $this->pilotage->counters($event->id) : null,
             'alerts' => fn () => $event ? $this->pilotage->alerts($event->id, 'a_traiter', 5) : [],
+            'overview' => fn () => $event ? $this->pilotage->overview($event->id) : null,
         ]);
     }
 

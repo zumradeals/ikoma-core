@@ -9,6 +9,9 @@ final class Pilotage
 {
     public const PER_PAGE = 50;
 
+    /** Une tablette enrôlée sans synchronisation depuis ce délai est signalée au superviseur. */
+    public const SILENT_AFTER_MINUTES = 60;
+
     public function __construct(private readonly Presence $presence) {}
 
     /** Événement affiché : celui demandé, sinon celui qui est en cours, sinon le plus récent. */
@@ -40,6 +43,32 @@ final class Pilotage
         );
 
         return ['attendus' => (int) $row->attendus, 'arrives' => (int) $row->arrives, 'presents' => $this->presence->count($eventId), 'refuses' => (int) $row->refuses, 'as_of' => now()->utc()->format('Y-m-d\TH:i:s.u\Z')];
+    }
+
+    /**
+     * Vue d'ensemble du terrain pour l'écran d'accueil du superviseur : alertes par gravité, cas à décider, cars et tablettes sans nouvelles.
+     * Nombres seulement : aucun nom de personne.
+     *
+     * @return array{critiques:int,hautes:int,litiges:int,cars:array{total:int,partis:int,arrives:int,ecarts:int},postes_silencieux:int}
+     */
+    public function overview(string $eventId): array
+    {
+        $alerts = DB::selectOne("SELECT count(*) FILTER (WHERE severity = 'critique') AS critiques, count(*) FILTER (WHERE severity = 'haute') AS hautes
+            FROM alerts WHERE event_id = ? AND acknowledged_at IS NULL AND resolved_at IS NULL", [$eventId]);
+        $litiges = (int) DB::selectOne('SELECT count(*) AS n FROM refusals f JOIN visitors v ON v.id = f.visitor_id WHERE v.event_id = ? AND f.decision IS NULL', [$eventId])->n;
+        $groups = $this->groups($eventId);
+        $silent = (int) DB::table('devices')->where('event_id', $eventId)->whereNotNull('token_hash')->whereNull('revoked_at')
+            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(self::SILENT_AFTER_MINUTES)))->count();
+
+        return [
+            'critiques' => (int) $alerts->critiques, 'hautes' => (int) $alerts->hautes, 'litiges' => $litiges,
+            'cars' => [
+                'total' => count($groups), 'partis' => count(array_filter($groups, fn ($g) => (bool) $g['parti'])),
+                'arrives' => count(array_filter($groups, fn ($g) => (int) $g['total'] > 0 && (int) $g['arrives'] >= (int) $g['total'])),
+                'ecarts' => count(array_filter($groups, fn ($g) => (int) $g['ecarts'] > 0)),
+            ],
+            'postes_silencieux' => $silent,
+        ];
     }
 
     /** @return list<array<string, mixed>> */

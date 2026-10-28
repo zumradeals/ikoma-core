@@ -80,6 +80,8 @@ test('un compteur et une alerte créés par un autre poste apparaissent en moins
   await expect(counter(sup, 'refuses')).toHaveText(String(before.refuses + 1), { timeout: 5000 });
   await expect(sup.getByTestId('alerte-refus').first()).toBeVisible({ timeout: 5000 });
   await expect(sup.getByTestId('alerte-refus').first()).toContainText('Haute'); await shot(sup, 'l8-tableau-alerte');
+  await expect(sup.getByTestId('situation')).not.toHaveAttribute('data-level', 'calme'); await expect(sup.getByTestId('situation-titre')).toContainText(/alerte/);
+  await expect(sup.getByTestId('terrain-litiges')).toHaveAttribute('data-warn', 'true');
   await noOverflow(sup);
   await agent.close();
 });

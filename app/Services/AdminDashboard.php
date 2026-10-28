@@ -14,8 +14,6 @@ final class AdminDashboard
     /** Rôles qui doivent avoir au moins un compte actif pour que l'événement puisse se dérouler. */
     private const ROLES = ['agent_accueil' => 'agent d’accueil', 'superviseur' => 'superviseur', 'hote' => 'hôte', 'encadreur' => 'encadreur'];
 
-    private const SILENT_AFTER_MINUTES = 60;
-
     private const CODE_EXPIRES_WITHIN_MINUTES = 15;
 
     public function __construct(private readonly Pilotage $pilotage) {}
@@ -116,7 +114,7 @@ final class AdminDashboard
     {
         $rows = [];
         $silent = DB::table('devices')->where('event_id', $eventId)->whereNotNull('token_hash')->whereNull('revoked_at')
-            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(self::SILENT_AFTER_MINUTES)))
+            ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(Pilotage::SILENT_AFTER_MINUTES)))
             ->orderBy('name')->get(['name', 'station', 'last_synced_at']);
         foreach ($silent as $d) {
             $label = $d->station ?? $d->name;
