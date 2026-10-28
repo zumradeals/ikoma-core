@@ -241,3 +241,20 @@ Refonte de l'écran de recherche du poste d'accueil, d'après la maquette valid�
 ## Audit global d'aptitude militaire, 28 octobre 2026
 
 À la demande du dirigeant (le client final est l'armée de Côte d'Ivoire), audit global rédigé dans docs/AUDIT_GLOBAL.md : verdict, écarts classés P0/P1/P2, feuille de route proposée (lots L14 à L19 entre L12 et L13), et onze décisions à obtenir. **Projet de travail : aucune décision n'est prise** tant que le dirigeant ne l'a pas validée. Le dirigeant a approuvé le 28 octobre 2026 les propositions du lot « réglages » (délai hors réseau, seuil de badges bas, seuil de tablette silencieuse rendus réglables dans Administration) ; leurs valeurs de départ restent à confirmer.
+
+## L14a — alertes du contrôle d'accès (audit global B2 et B3), 28 octobre 2026
+
+Priorité n°1 de docs/AUDIT_GLOBAL.md, lancée sur « go » du dirigeant. Un badge refusé ou copié ne reste plus seulement dans le journal : le superviseur est prévenu.
+
+- **Quand une alerte est créée** (`app/Services/ControlAlerts.php`, appelé par `SiteControl`) :
+  - **Badge refusé à un contrôle ou à une sortie** : critique pour un badge **annulé** (perdu ou volé qu'on essaie encore) ; haute pour restitué, non associé, invité retiré, autre événement, et QR **scanné** inconnu ; normale pour hors période et code **tapé** inconnu (souvent une faute de frappe).
+  - **Zone interdite** : badge valide présenté à un point dont la zone n'est pas dans sa catégorie (haute).
+  - **Double présentation** : le même badge validé (contrôle valide, entrée ou sortie) à deux points **différents** en moins de N secondes (haute, « copie possible »). Un second passage au même point ne compte pas.
+  - **Rafale** : au moins N refus ou zones interdites au même point en M minutes (haute).
+- **Contrôle fait hors ligne** : l'alerte est créée au rejeu par la synchronisation, avec l'heure déclarée par la tablette (jamais dans le futur) et la mention « Contrôle fait hors ligne à HH:MM ».
+- **Sans nom de personne** : code du badge, nom du point de contrôle et nombres seulement (même règle que les autres alertes).
+- **Dédoublonnage** : une même cause au même point dans la même tranche de cinq minutes ne crée qu'une alerte ; la gravité fait partie de la clé (un QR inconnu ne peut pas être masqué par un code tapé).
+- **Réglages d'Administration > Postes** (jamais en constante) : `controle_delai_min_points` (**15 s**), `controle_rafale_nombre` (**5**), `controle_rafale_minutes` (**5**). **Valeurs de départ proposées, à confirmer avec le client** : 15 s suppose deux points distants d'au moins quelques mètres ; un site où l'accueil touche la première porte peut demander moins. Chaque modification est journalisée (`poste.reglage_modifie`).
+- **Migration** `2026_11_07_000000_create_control_alerts` : quatre types d'alerte ajoutés au CHECK `alerts_type_valid` (`controle_refuse`, `zone_interdite`, `badge_double`, `controle_rafale`) et les trois réglages.
+- **Pas fait dans ce lot** (reste dans L14) : alertes de dépassement et de non-restitution (B4), comptage par zone (B5), gel d'urgence d'un poste, d'une zone ou d'un car (C5). Alerte sonore et escalade : lot L16 (C1).
+- **Limite connue** : la détection de double présentation compare les événements **déjà reçus par le serveur**. Deux contrôles faits hors ligne sur deux tablettes ne sont comparés qu'au moment où les deux sont synchronisés ; l'alerte arrive donc en retard, pas jamais.

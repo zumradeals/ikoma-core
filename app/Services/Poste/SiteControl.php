@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Audit;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
+use App\Services\ControlAlerts;
 use App\Services\Presence;
 use App\Services\QrSvg;
 use Illuminate\Support\Collection;
@@ -20,7 +21,7 @@ use Illuminate\Support\Str;
  */
 final class SiteControl
 {
-    public function __construct(private readonly BadgeService $badges, private readonly Audit $audit, private readonly Presence $presence) {}
+    public function __construct(private readonly BadgeService $badges, private readonly Audit $audit, private readonly Presence $presence, private readonly ControlAlerts $controlAlerts) {}
 
     /**
      * @param  array{type:string,id:string}|null  $point
@@ -53,6 +54,15 @@ final class SiteControl
         DB::table('access_events')->insert(['id' => $eventId, 'event_id' => $poste->event_id, 'visitor_id' => $valid ? $verdict->person['id'] : null, 'badge_id' => $badge?->id, 'actor_id' => $agent->id, 'type' => 'controle', 'checkpoint' => $checkpoint['name'], 'occurred_at' => $now, 'details' => json_encode(array_filter(['verdict' => $valid ? 'valide' : 'refuse', 'raison' => $reason, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'zone_ok' => $zoneOk, 'poste_id' => $poste->id, 'heure_declaree' => $declaredAt, 'differe' => $declaredAt !== null ? true : null, 'verdict_tablette' => $localValid === null ? null : ($localValid ? 'valide' : 'refuse')], fn ($v) => $v !== null), JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
         if (! $valid || $zoneOk === false) {
             $this->audit->append('controle.refuse', $agent->id, ['access_event_id' => $eventId, 'event_id' => $poste->event_id, 'device_id' => $poste->id, 'badge_id' => $badge?->id, 'raison' => $valid ? 'zone_non_autorisee' : $reason, 'point_id' => $checkpoint['id']]);
+            // Le superviseur est prévenu tout de suite (audit global B2) : un badge annulé qui se présente n'est plus seulement dans le journal.
+            if (! $valid) {
+                $this->controlAlerts->refused($poste->event_id, $badge?->id, $badge?->code, (string) $reason, preg_match('/^(IKOMA1:)?[0-9a-f]{64}$/i', trim($code)) === 1, $checkpoint, $declaredAt);
+            } elseif ($badge !== null) {
+                $this->controlAlerts->zoneDenied($poste->event_id, $badge->id, $badge->code, $checkpoint, $declaredAt);
+            }
+        }
+        if ($valid && $badge !== null) {
+            $this->controlAlerts->doublePresentation($poste->event_id, $badge->id, $badge->code, $eventId, $checkpoint, $declaredAt);
         }
 
         return [
@@ -87,6 +97,8 @@ final class SiteControl
             return $this->refused($poste, $agent, $badge && $badge->event_id === $poste->event_id ? $badge->id : null, 'inconnu', $badge === null ? 'Badge inconnu : vérifiez le code ou scannez à nouveau.' : 'Badge d’un autre événement.');
         }
         if ($badge->status === 'Annulé') {
+            $this->controlAlerts->refused($poste->event_id, $badge->id, $badge->code, 'annule', false, $checkpoint, $declaredAt, 'sortie');
+
             return $this->refused($poste, $agent, $badge->id, 'annule', 'Badge annulé : la sortie n’est pas enregistrée. Prévenez le superviseur.');
         }
         $active = DB::table('badge_assignments')->where('badge_id', $badge->id)->whereNull('returned_at')->whereNull('cancelled_at')->value('visitor_id');

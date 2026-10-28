@@ -319,6 +319,13 @@ it('gère les postes depuis l’administration : création, code affiché une fo
     $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12])->assertRedirect();
     expect(DB::table('settings')->whereIn('key', ['poste_inactivite_minutes', 'poste_ecart_horloge_secondes', 'poste_echecs_pin_max'])->orderBy('key')->pluck('value', 'key')->all())->toEqual(['poste_echecs_pin_max' => '12', 'poste_ecart_horloge_secondes' => '600', 'poste_inactivite_minutes' => '10']);
     $this->put('/administration/postes/reglages', ['inactivity' => 0, 'skew' => 600, 'pin' => 12])->assertSessionHasErrors('inactivity');
+    // seuils des alertes du contrôle (audit global B2, B3) : réglables, bornés, journalisés
+    $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, 'pointsDelay' => 45, 'burstCount' => 7, 'burstMinutes' => 3])->assertRedirect();
+    expect(DB::table('settings')->whereIn('key', ['controle_delai_min_points', 'controle_rafale_nombre', 'controle_rafale_minutes'])->orderBy('key')->pluck('value', 'key')->all())->toEqual(['controle_delai_min_points' => '45', 'controle_rafale_minutes' => '3', 'controle_rafale_nombre' => '7']);
+    expect(json_decode((string) syncAudit()->where('action', 'poste.reglage_modifie')->orderByDesc('id')->value('details'), true))->toMatchArray(['controle_delai_min_points' => 45, 'controle_rafale_nombre' => 7, 'controle_rafale_minutes' => 3]);
+    foreach (['pointsDelay' => 0, 'burstCount' => 1, 'burstMinutes' => 500] as $field => $bad) {
+        $this->put('/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12, $field => $bad])->assertSessionHasErrors($field);
+    }
     $this->post('/administration/postes', ['event_id' => (string) Str::uuid(), 'name' => 'x'])->assertSessionHasErrors('event_id');
     foreach (['poste.cree', 'poste.code_emis', 'poste.revoque', 'poste.reglage_modifie'] as $action) {
         expect(syncAudit()->where('action', $action)->exists())->toBeTrue($action);
