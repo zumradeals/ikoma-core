@@ -10,6 +10,7 @@ use App\Services\Audit;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
 use App\Services\HostNotifications;
+use App\Services\PrivatePhoto;
 use App\Services\QrSvg;
 use App\Services\VisitorSearch;
 use Illuminate\Support\Carbon;
@@ -93,6 +94,7 @@ final class Desk
         if ($info === false || $info[2] !== IMAGETYPE_JPEG || $info[0] > self::PHOTO_MAX_SIDE || $info[1] > self::PHOTO_MAX_SIDE || $info[0] < 1) {
             throw new DeskRefused('photo_invalide', 'La photo n’est pas acceptée : reprenez-la (JPEG, 640 pixels au plus).');
         }
+        $jpeg = app(PrivatePhoto::class)->clean($jpeg);
         $check = (string) Str::uuid();
         $photo = (string) Str::uuid();
         $path = "photos/{$photo}.enc";

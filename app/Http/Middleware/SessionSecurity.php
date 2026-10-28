@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AccessAudit;
 use App\Services\Audit;
 use Closure;
 use Illuminate\Http\Request;
@@ -31,9 +32,7 @@ class SessionSecurity
             abort(403, 'La double authentification est obligatoire pour ce rôle.');
         }
         $response = $next($request);
-        if (in_array($response->getStatusCode(), [401, 403, 429], true)) {
-            app(Audit::class)->append('acces.refuse', $request->user()?->id, ['route' => $request->path(), 'statut' => $response->getStatusCode()]);
-        }
+        app(AccessAudit::class)->record($request, $response);
         if ($request->path() !== '/' && ! str_starts_with($request->path(), 'build/')) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }

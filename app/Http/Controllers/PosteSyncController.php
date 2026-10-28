@@ -35,7 +35,12 @@ final class PosteSyncController
     {
         $data = $r->validate(['sent_at' => 'nullable|date', 'operations' => 'required|array|min:1|max:'.SyncProcessor::MAX_OPERATIONS, 'operations.*' => 'array']);
 
-        return response()->json($processor->process($this->poste($r), $r->user(), $data['operations'], $data['sent_at'] ?? null));
+        $result = $processor->process($this->poste($r), $r->user(), $data['operations'], $data['sent_at'] ?? null);
+        if ($result['revoked'] ?? false) {
+            return response()->json(['code' => 'appareil_revoque', 'message' => 'Cette tablette a été révoquée : contactez l’administrateur.'], 401);
+        }
+
+        return response()->json($result);
     }
 
     public function efface(Request $r, Audit $audit): JsonResponse

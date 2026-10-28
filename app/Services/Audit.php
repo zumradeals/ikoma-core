@@ -12,7 +12,7 @@ final class Audit
         DB::transaction(function () use ($action, $actor, $details): void {
             DB::statement('SELECT pg_advisory_xact_lock(731901)');
             $id = (int) DB::selectOne("SELECT nextval(pg_get_serial_sequence('audit_logs','id')) AS id")->id;
-            $previous = DB::table('audit_logs')->orderByDesc('id')->value('hash') ?? str_repeat('0', 64);
+            $previous = DB::table('audit_logs')->orderByDesc('id')->value('hash') ?? app(AuditSeal::class)->root()['hash'];
             $at = now()->utc()->format('Y-m-d\TH:i:s.u\Z');
             $data = json_encode($details, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $hash = $this->digest($id, $previous, $actor, $action, $at, $data);
