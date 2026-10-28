@@ -6,7 +6,7 @@ export type AlertRow = { id: string; type: string; severity: 'critique' | 'haute
 defineProps<{ alert: AlertRow }>();
 const severity = { critique: ['⛔', 'Critique', 'border-red-700 bg-red-50'], haute: ['▲', 'Haute', 'border-orange-600 bg-orange-50'], normale: ['●', 'Normale', 'border-slate-400 bg-white'] } as const;
 const types: Record<string, string> = { refus: 'Accès refusé', non_liste_attente: 'Non listé en attente', badge_annule: 'Badge annulé', conflit_sync: 'Conflit de synchronisation', hors_periode: 'Hors période', car_arrive: 'Car arrivé', groupe_incomplet: 'Groupe incomplet', groupe_ecart: 'Écart de groupe' };
-function acknowledge(id: string) { router.post(`/pilotage/alertes/${id}/prendre-en-compte`, {}, { preserveScroll: true, async: true }); }
+function acknowledge(id: string) { router.post(`/pilotage/alertes/${id}/prendre-en-compte`, {}, { preserveScroll: true }); }
 </script>
 <template>
   <li class="rounded-2xl border-2 p-4" :class="severity[alert.severity][2]" :data-testid="'alerte-' + alert.type" :data-severity="alert.severity">
