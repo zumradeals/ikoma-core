@@ -1,8 +1,9 @@
 import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
-import type { SitePosteRepository } from '../repository';
-import { applyOp, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
+import type { GroupPosteRepository } from '../repository';
+import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
 import { sha256Hex } from './crypto';
 import { getMeta } from './db';
+import { applyGroupOp, groupSummaries, groupView, type ArrivalResult, type GroupSummary, type GroupView } from './group';
 import { LocalList, type Snapshot } from './list';
 import { checkpointsOf, controlLocal, exitLocal, resolveBadge } from './site';
 import type { PosteStore } from './store';
@@ -15,7 +16,7 @@ type Profile = { id: string; name: string };
  * Implémentation locale du dépôt de données du poste : tout est lu dans la copie chiffrée de la tablette et toute écriture
  * est d'abord enregistrée dans la file (IndexedDB) avant d'être envoyée, réseau ou non.
  */
-export class LocalPosteRepository implements SitePosteRepository {
+export class LocalPosteRepository implements GroupPosteRepository {
   list: LocalList;
   constructor(snapshot: Snapshot, private readonly vault: PosteVault, private readonly store: PosteStore, private readonly profile: Profile, private readonly onQueued: () => void, private clockOffset = 0, private readonly sync: SyncManager | null = null) {
     this.list = new LocalList(snapshot);
@@ -60,8 +61,9 @@ export class LocalPosteRepository implements SitePosteRepository {
   async visitor(id: string): Promise<Fiche> { return ficheOf(this.list, id, this.now()); }
   async pendingCount(): Promise<number> { return this.store.count('pending'); }
 
-  private async enqueue(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<{ badge_code?: string; zones?: string[]; visitor_id?: string }> {
+  private async enqueue(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<ApplyResult> {
     const existing = await this.store.getOp(operationId);
+    if (existing && type.startsWith('groupe_')) return applyGroupOp(this.list, type, existing.op.payload); // toutes les opérations de groupe sont sans effet quand elles sont rejouées
     if (existing) { // même opération rejouée (coupure, double clic) : rien de plus n'est enregistré
       const v = this.list.visitors.get(String(existing.op.payload.visitor_id));
       return { badge_code: String(existing.op.payload.code ?? v?.badge_code ?? ''), zones: v ? this.list.zonesFor(v) : [], visitor_id: String(existing.op.payload.visitor_id ?? '') };
@@ -94,6 +96,28 @@ export class LocalPosteRepository implements SitePosteRepository {
   }
 
   async checkpoints(): Promise<Checkpoint[]> { return checkpointsOf(this.list); }
+
+  async groups(): Promise<GroupSummary[]> { return groupSummaries(this.list); }
+  async groupView(groupId: string): Promise<GroupView> { return groupView(this.list, groupId); }
+  async groupCheck(operationId: string, groupId: string, visitorId: string, identityChecked: boolean): Promise<void> { await this.enqueue(operationId, 'groupe_controle', { group_id: groupId, visitor_id: visitorId, identity_checked: identityChecked }); }
+  async groupDeliver(operationId: string, groupId: string, visitorId: string, code: string): Promise<{ badge_code: string }> {
+    const printed = await resolveBadge(this.list, code);
+    if (!printed) throw new ApiError('badge_inconnu', 'Badge inconnu : vérifiez le code imprimé ou prenez un autre badge.', 'Saisissez le code imprimé ou prenez un autre badge.', 422);
+    return { badge_code: (await this.enqueue(operationId, 'groupe_badge', { group_id: groupId, visitor_id: visitorId, code: printed })).badge_code as string };
+  }
+  async groupDepart(operationId: string, groupId: string): Promise<{ boarded: number; absent: number }> {
+    const r = await this.enqueue(operationId, 'groupe_depart', { group_id: groupId });
+    return { boarded: r.boarded ?? 0, absent: r.absent ?? 0 };
+  }
+  async arrive(operationId: string, code: string): Promise<ArrivalResult> {
+    const printed = await resolveBadge(this.list, code);
+    if (!printed) throw new ApiError('badge_inconnu', 'Badge inconnu : vérifiez le code ou scannez à nouveau.', null, 422);
+    return (await this.enqueue(operationId, 'groupe_arrivee', { code: printed })).arrival as ArrivalResult;
+  }
+  async arriveFinish(operationId: string, groupId: string): Promise<{ arrived: number; missing: number }> {
+    const r = await this.enqueue(operationId, 'groupe_arrivee_fin', { group_id: groupId });
+    return { arrived: r.arrived ?? 0, missing: r.missing ?? 0 };
+  }
 
   private get online(): boolean { return typeof navigator === 'undefined' || navigator.onLine; }
   private async knownAt(): Promise<string | null> { return (await getMeta(this.vault.db, 'lastSyncAt')) ?? null; }

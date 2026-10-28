@@ -161,7 +161,10 @@ final class Pilotage
                 (SELECT count(*) FROM visitors v WHERE v.group_id = g.id AND EXISTS (SELECT 1 FROM badge_assignments a WHERE a.visitor_id = v.id AND a.returned_at IS NULL AND a.cancelled_at IS NULL)) AS badges_remis,
                 (SELECT count(*) FROM group_members m WHERE m.group_id = g.id AND m.boarded_at IS NOT NULL) AS embarques,
                 (SELECT count(*) FROM group_members m WHERE m.group_id = g.id AND m.arrived_at IS NOT NULL) AS arrives,
-                (SELECT count(*) FROM visitors v WHERE v.group_id = g.id AND NOT EXISTS (SELECT 1 FROM group_members m WHERE m.visitor_id = v.id AND m.arrived_at IS NOT NULL)) AS absents
+                (SELECT count(*) FROM visitors v WHERE v.group_id = g.id AND NOT EXISTS (SELECT 1 FROM group_members m WHERE m.visitor_id = v.id AND m.arrived_at IS NOT NULL)) AS absents,
+                (SELECT count(*) FROM group_members m WHERE m.group_id = g.id AND m.absent_at IS NOT NULL) AS absents_depart,
+                (SELECT count(*) FROM alerts al WHERE al.subject_type = \'groupe\' AND al.subject_id = g.id AND al.type IN (\'groupe_ecart\',\'groupe_incomplet\') AND al.resolved_at IS NULL) AS ecarts,
+                (g.departed_at IS NOT NULL) AS parti
              FROM groups g WHERE g.event_id = ? ORDER BY g.name',
             [$eventId],
         ));

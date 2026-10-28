@@ -53,6 +53,9 @@ final class BadgeService
             if ($badge->reserved_device_id !== null && $badge->reserved_device_id !== $deviceId) {
                 throw new BadgeRefused('autre_poste', 'Badge réservé à un autre poste : il ne peut être associé que depuis ce poste.');
             }
+            if ($badge->reserved_group_id !== null && $visitor->group_id !== $badge->reserved_group_id) {
+                throw new BadgeRefused('autre_groupe', 'Badge réservé à un groupe : il ne peut être associé qu’à un stagiaire de ce groupe.');
+            }
             if ($deviceId !== null && ! DB::table('devices')->where('id', $deviceId)->where('event_id', $badge->event_id)->exists()) {
                 throw new BadgeRefused('poste_inconnu', 'Poste inconnu pour cet événement.');
             }

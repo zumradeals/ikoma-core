@@ -28,11 +28,11 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,woff2}'], navigateFallback: undefined,
         // Page publique provisoire et coquille publique du poste (/poste/shell : aucune session, aucun nom, aucune donnée).
-        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }, { url: '/controle/shell', revision: sourceHash() }, { url: '/pilotage/evacuation/shell', revision: sourceHash() }],
+        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }, { url: '/controle/shell', revision: sourceHash() }, { url: '/groupe/shell', revision: sourceHash() }, { url: '/pilotage/evacuation/shell', revision: sourceHash() }],
         navigateFallbackDenylist: [/^\/build/],
-        // /poste, /controle et /pilotage/evacuation passent toujours par le serveur (session, droits) ; sans réseau, on rend la coquille publique précachée. Jamais de contenu authentifié en cache.
+        // /poste, /controle, /groupe et /pilotage/evacuation passent toujours par le serveur (session, droits) ; sans réseau, on rend la coquille publique précachée. Jamais de contenu authentifié en cache.
         runtimeCaching: [{
-          urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && ['/poste', '/controle', '/pilotage/evacuation'].includes(url.pathname),
+          urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && ['/poste', '/controle', '/groupe', '/pilotage/evacuation'].includes(url.pathname),
           handler: 'NetworkOnly',
           options: { plugins: [{ handlerDidError: async ({ request }: { request: Request }) => caches.match(new URL(request.url).pathname + '/shell', { ignoreSearch: true }) }] },
         }],

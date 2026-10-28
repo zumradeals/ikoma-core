@@ -6,6 +6,7 @@ use App\Models\Device;
 use App\Models\User;
 use App\Services\Alerts;
 use App\Services\Audit;
+use App\Services\Groups;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,9 +20,9 @@ final class SyncProcessor
 {
     public const MAX_OPERATIONS = 50;
 
-    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler'];
+    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler'];
 
-    public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site) {}
+    public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups) {}
 
     /**
      * @param  list<array<string, mixed>>  $operations
@@ -182,6 +183,26 @@ final class SyncProcessor
                 }
 
                 return $verdict;
+            case 'groupe_controle':
+                [$group, $visitor] = $need('group_id', 'visitor_id');
+
+                return $this->groups->check($agent, (string) $group, (string) $visitor, (bool) ($p['identity_checked'] ?? false));
+            case 'groupe_badge':
+                [$group, $visitor, $code] = $need('group_id', 'visitor_id', 'code');
+
+                return $this->groups->deliver($device, $agent, (string) $group, (string) $visitor, (string) $code);
+            case 'groupe_depart':
+                [$group] = $need('group_id');
+
+                return $this->groups->depart($agent, (string) $group);
+            case 'groupe_arrivee':
+                [$code] = $need('code');
+
+                return $this->groups->arrive($device, $agent, (string) $code, $clientTime);
+            case 'groupe_arrivee_fin':
+                [$group] = $need('group_id');
+
+                return $this->groups->finishArrival($agent, (string) $group);
             case 'sortie':
                 [$code] = $need('code');
 

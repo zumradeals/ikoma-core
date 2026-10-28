@@ -1,3 +1,4 @@
+import type { ArrivalResult, GroupSummary, GroupView } from './local/group';
 import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
@@ -30,6 +31,20 @@ export interface SitePosteRepository extends PosteRepository {
   exit(operationId: string, code: string, point: PointRef | null): Promise<ExitResult>;
   /** Nombre de personnes présentes selon le serveur, ou null sans réseau. */
   presentCount(): Promise<number | null>;
+}
+
+/**
+ * Groupes de stagiaires (lot L9) : appel nominal, contrôle, remise des badges du lot du groupe, embarquement et arrivée du car.
+ * Tout passe par la file locale du lot L6 : la même action rejouée ne change rien, avec ou sans réseau.
+ */
+export interface GroupPosteRepository extends SitePosteRepository {
+  groups(): Promise<GroupSummary[]>;
+  groupView(groupId: string): Promise<GroupView>;
+  groupCheck(operationId: string, groupId: string, visitorId: string, identityChecked: boolean): Promise<void>;
+  groupDeliver(operationId: string, groupId: string, visitorId: string, code: string): Promise<{ badge_code: string }>;
+  groupDepart(operationId: string, groupId: string): Promise<{ boarded: number; absent: number }>;
+  arrive(operationId: string, code: string): Promise<ArrivalResult>;
+  arriveFinish(operationId: string, groupId: string): Promise<{ arrived: number; missing: number }>;
 }
 
 export function cookie(name: string): string {
