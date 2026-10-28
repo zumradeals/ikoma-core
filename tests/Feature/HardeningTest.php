@@ -12,7 +12,9 @@ use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
@@ -36,7 +38,7 @@ it('protège les pages et les erreurs, réserve la caméra aux applications de t
         $response = $this->get($path);
         $policy = $response->headers->get('Content-Security-Policy');
         expect($policy)->toContain("script-src 'self'")->toContain("frame-ancestors 'none'")->toContain("object-src 'none'")->not->toContain('unsafe-eval');
-        $response->assertHeader('X-Content-Type-Options', 'nosniff')->assertHeader('Referrer-Policy', 'no-referrer')->assertHeader('X-Frame-Options', 'DENY');
+        $response->assertHeader('X-Content-Type-Options', 'nosniff')->assertHeader('Referrer-Policy', 'same-origin')->assertHeader('X-Frame-Options', 'DENY');
         expect($response->headers->get('Permissions-Policy'))->toContain('camera='.(in_array($path, ['/poste/shell', '/controle/shell', '/groupe/shell']) ? '(self)' : '()'));
     }
     $this->get('https://localhost/')->assertHeader('Strict-Transport-Security', 'max-age=31536000');
@@ -230,4 +232,12 @@ it('limite la synchronisation et la recherche sans exécuter une requête au-del
             $this->getJson('/poste/api/recherche?q=Fictif', ['X-Device-Token' => $token])->assertStatus(429);
         }
     }
+});
+
+it('ne divulgue ni message libre ni trace dans les erreurs HTTP et techniques', function () {
+    Log::spy();
+    Route::get('/erreur-fictive-l11', fn () => throw new RuntimeException('Identité fictive à ne jamais journaliser'));
+    $response = $this->getJson('/erreur-fictive-l11')->assertStatus(500);
+    expect($response->getContent())->not->toContain('Identité fictive')->not->toContain('trace')->not->toContain('RuntimeException');
+    Log::shouldHaveReceived('error')->once()->withArgs(fn ($message, $context) => $message === 'Erreur applicative' && ! str_contains(json_encode($context), 'Identité fictive') && isset($context['reference']));
 });

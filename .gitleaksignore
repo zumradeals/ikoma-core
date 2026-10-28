@@ -1,0 +1,2 @@
+# Jeton déterministe fictif DESK_TOKEN, introduit dans les seuls tests PHP (voir REVUE_SECURITE.md).
+1bda050f1df0313c2f47d6ea614ebd223fcbfc42:tests/Feature/PosteTest.php:generic-api-key:19

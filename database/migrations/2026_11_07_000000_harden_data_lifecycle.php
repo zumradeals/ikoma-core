@@ -26,7 +26,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('settings')->where('key', 'audit_checkpoint')->delete();
+        if (DB::table('settings')->where('key', 'audit_checkpoint')->exists()) {
+            throw new RuntimeException('Reprise contrôlée requise après purge du journal : ne pas supprimer le point signé.');
+        }
         Schema::table('settings', fn (Blueprint $t) => $t->string('value')->change());
         Schema::table('devices', fn (Blueprint $t) => $t->dropColumn('sync_seq'));
         Schema::table('events', fn (Blueprint $t) => $t->dropColumn(['anonymized_at', 'retention_summary']));

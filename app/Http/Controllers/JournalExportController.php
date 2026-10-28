@@ -16,7 +16,7 @@ final class JournalExportController
     {
         Gate::authorize('journal.exporter');
         $data = $r->validate(['debut' => 'required|date_format:Y-m-d', 'fin' => 'required|date_format:Y-m-d|after_or_equal:debut']);
-        abort_if(Carbon::parse($data['debut'])->diffInDays(Carbon::parse($data['fin'])) > 366, 422, 'Choisissez une période de 366 jours au plus.');
+        abort_if(Carbon::parse($data['debut'])->diffInDays(Carbon::parse($data['fin'])) > 365, 422, 'Choisissez une période de 366 jours au plus.');
         $maximum = min(50000, max(1, (int) DB::table('settings')->where('key', 'journal_export_max_lignes')->value('value')));
         // Capturer une limite haute avant de journaliser l'export ; la lecture suivante ne change pas son contenu.
         $last = (int) DB::table('audit_logs')->max('id');

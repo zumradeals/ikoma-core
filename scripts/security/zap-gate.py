@@ -37,6 +37,9 @@ def approved(alert):
 
 
 report = json.loads(Path(sys.argv[1]).read_text())
+if not report.get('site'):
+    print('Rapport ZAP sans site analysé : refusé.')
+    sys.exit(2)
 blocked, exceptions = [], []
 for site in report.get('site', []):
     for alert in site.get('alerts', []):
