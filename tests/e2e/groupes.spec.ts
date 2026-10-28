@@ -41,7 +41,12 @@ test.beforeAll(async ({ browser }, info) => {
       await image.decode();
       bitmap = await createImageBitmap(image, { resizeWidth: 480, resizeHeight: 480 });
     };
-    setInterval(() => { context.fillStyle = '#fff'; context.fillRect(0, 0, 480, 480); if (bitmap) context.drawImage(bitmap, 0, 0); context.fillStyle = tick++ % 2 ? '#fcfcfc' : '#fefefe'; context.fillRect(0, 0, 3, 3); }, 100);
+    // Léger tremblement de la main : un QR que le lecteur ne sait pas décoder sur une image fixe l'est sur une image voisine (comme devant une vraie caméra).
+    setInterval(() => {
+      context.fillStyle = '#fff'; context.fillRect(0, 0, 480, 480);
+      if (bitmap) { const k = 0.94 + Math.random() * 0.1; const size = 480 * k; context.drawImage(bitmap, (480 - size) / 2 + (Math.random() - 0.5) * 12, (480 - size) / 2 + (Math.random() - 0.5) * 12, size, size); }
+      context.fillStyle = tick++ % 2 ? '#fcfcfc' : '#fefefe'; context.fillRect(0, 0, 3, 3);
+    }, 100);
     navigator.mediaDevices.getUserMedia = async constraints => {
       const video = constraints?.video as MediaTrackConstraints | boolean | undefined;
       if (typeof video !== 'object' || video.facingMode !== 'environment') return original(constraints);
