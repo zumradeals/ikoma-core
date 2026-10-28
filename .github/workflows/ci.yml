@@ -101,3 +101,36 @@ jobs:
         run: docker compose logs --tail=60
       - if: always()
         run: make down
+
+  # Production (lot L12) : installation complète depuis zéro avec le seul script install.sh, puis recette automatique
+  # (assistant d'initialisation à usage unique, vérifications de sécurité, refus des données de démonstration,
+  # sauvegarde chiffrée puis restauration avec audit:verify et effectifs identiques, retour arrière).
+  production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clé de sauvegarde de test (la clé privée n'est jamais donnée au serveur de recette)
+        run: |
+          export GNUPGHOME="$(mktemp -d)"
+          gpg --batch --passphrase '' --quick-generate-key 'Sauvegarde fictive <sauvegarde@exemple.test>' rsa3072 encrypt never
+          gpg --armor --export > "$RUNNER_TEMP/cle-publique.asc"
+          gpg --batch --pinentry-mode loopback --passphrase '' --armor --export-secret-keys > "$RUNNER_TEMP/cle-privee.asc"
+      - name: Installation de production depuis zéro (install.sh seul)
+        run: bash deploy/prod/install.sh --domaine localhost --tls autosigne --cle-sauvegarde "$RUNNER_TEMP/cle-publique.asc" --ports 8080:8443 --sans-planification
+      - name: Recette de production
+        run: bash deploy/prod/ci-recette.sh "$RUNNER_TEMP/cle-privee.asc"
+      - name: Installer les outils d’analyse vérifiés
+        if: ${{ !cancelled() }}
+        run: sh scripts/security/install-tools.sh
+      - name: "Analyse des images de production (information, tous les niveaux élevés et critiques, avec ou sans correctif publié)"
+        if: ${{ !cancelled() }}
+        run: |
+          version="$(grep '^IKOMA_VERSION=' prod-data/env | cut -d= -f2)"
+          for image in "ikoma-php:$version" "ikoma-nginx:$version"; do
+            /tmp/ikoma-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --format table "$image" || true
+          done
+      - if: failure()
+        run: docker compose --project-directory "$PWD" --env-file prod-data/env -f docker-compose.prod.yml logs --tail=80
+      - if: always()
+        run: docker compose --project-directory "$PWD" --env-file prod-data/env -f docker-compose.prod.yml down -v || true

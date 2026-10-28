@@ -1,0 +1,15 @@
+.git
+.github
+.env
+.env.*
+.secrets
+node_modules
+vendor
+storage/logs
+storage/framework
+test-results
+playwright-report
+docs
+tests
+public/build
+prod-data

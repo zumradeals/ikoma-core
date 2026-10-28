@@ -36,3 +36,5 @@ Thumbs.db
 /.secrets/
 
 __pycache__/
+
+/prod-data/
