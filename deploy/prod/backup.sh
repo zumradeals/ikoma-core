@@ -12,7 +12,8 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 WORK="$(mktemp -d)"
 FILES=()
 
-record() { dc exec -T php php artisan sauvegarde:enregistrer "$1" >/dev/null 2>&1 || echo "Avertissement : résultat « $1 » non enregistré dans l'application." >&2; }
+# « docker compose exec » ne passe pas par le point d'entrée du conteneur (qui charge les secrets) : on l'appelle explicitement.
+record() { dc exec -T php ikoma-entrypoint php artisan sauvegarde:enregistrer "$1" >/dev/null 2>&1 || echo "Avertissement : résultat « $1 » non enregistré dans l'application." >&2; }
 cleanup() { rm -rf "$WORK"; }
 on_error() { echo "ÉCHEC de la sauvegarde ($STAMP)." >&2; record echec; cleanup; exit 1; }
 trap on_error ERR

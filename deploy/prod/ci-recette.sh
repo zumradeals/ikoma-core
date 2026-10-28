@@ -32,8 +32,10 @@ CODE="$("${CURL[@]}" -b "$JAR" -c "$JAR" -o /dev/null -w '%{http_code}' -X POST 
 bash "$ROOT/deploy/prod/smoke.sh" --apres-installation
 
 say "Les données de démonstration sont refusées en production"
-if dc exec -T php php artisan db:seed --force >/dev/null 2>&1; then fail "le seeder de démonstration s'est exécuté en production."; fi
-echo "  ✓ refusé"
+SEED_OUTPUT="$(dc exec -T php ikoma-entrypoint php artisan db:seed --force 2>&1)" && fail "le seeder de démonstration s'est exécuté en production."
+# Il doit être refusé pour la bonne raison (le garde de production), pas parce que l'application ne démarre pas.
+[[ "$SEED_OUTPUT" == *'jamais créées en production'* ]] || fail "refus pour une autre raison que le garde de production : $SEED_OUTPUT"
+echo "  ✓ refusé par le garde de production"
 
 say "Sauvegarde chiffrée"
 bash "$ROOT/deploy/prod/backup.sh"
