@@ -1,5 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { freshOtp } from './otp';
 
 type Fixtures = { email: string; password: string; names: Record<string, string>; enrolCode2: string; poste2: string; controlNames: string[]; controlBadges: string[]; controlQrSvg: string; admin: { email: string; password: string; secret: string } };
@@ -91,7 +91,11 @@ test('contrôle d’un badge valide : QR lu par la caméra en moins de 5 s, verd
       const context = canvas.getContext('2d')!;
       const image = new Image(); image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480"'));
       await image.decode();
-      setInterval(() => { context.fillStyle = '#fff'; context.fillRect(0, 0, 480, 480); context.drawImage(image, 0, 0, 480, 480); }, 100);
+      // L'image SVG est rastérisée une fois pour toutes : redessiner le SVG à chaque image donnait parfois un QR à moitié tracé dans le flux simulé.
+      const bitmap = await createImageBitmap(image, { resizeWidth: 480, resizeHeight: 480 });
+      let tick = 0;
+      // Un pixel presque invisible change à chaque image : sans cela le flux simulé peut rester figé sur une image mal assemblée (QR déformé) et ne plus jamais se renouveler.
+      setInterval(() => { context.fillStyle = '#fff'; context.fillRect(0, 0, 480, 480); context.drawImage(bitmap, 0, 0); context.fillStyle = tick++ % 2 ? '#fcfcfc' : '#fefefe'; context.fillRect(0, 0, 3, 3); }, 100);
       return canvas.captureStream(10);
     };
   }, fx.controlQrSvg);
@@ -99,7 +103,7 @@ test('contrôle d’un badge valide : QR lu par la caméra en moins de 5 s, verd
   await expect(page.getByTestId('choix-point')).toBeVisible(); await shot(page, 'l7-choix-point');
   const started = Date.now();
   await button(page, /Salle principale/).first().click(); // la caméra s'ouvre ici
-  await expect(page.getByTestId('resultat')).toBeVisible({ timeout: 20_000 }).catch(async e => { { const info = await page.locator('video').evaluate(v => ({ ...(v as HTMLVideoElement).dataset, rs: (v as HTMLVideoElement).readyState, w: (v as HTMLVideoElement).videoWidth })) as Record<string, string>; if (info.dbgImg) writeFileSync('/tmp/dbg-frame.png', Buffer.from(info.dbgImg.split(',')[1], 'base64')); delete info.dbgImg; console.log('DBG', JSON.stringify(info)); } throw e; });
+  await expect(page.getByTestId('resultat')).toBeVisible({ timeout: 20_000 });
   const elapsed = Date.now() - started;
   expect(elapsed, `${elapsed} ms entre l'ouverture de la caméra et le verdict`).toBeLessThan(5000);
   await expect(page.getByTestId('resultat')).toHaveAttribute('data-verdict', 'valide');

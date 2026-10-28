@@ -19,8 +19,8 @@ const spaces = [
     <a href="#contenu" class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-3">Aller au contenu</a>
     <header class="border-b-4 border-ikoma-orange bg-ikoma-navy text-white">
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <p class="flex items-center gap-3 text-xl font-bold"><span aria-hidden="true" class="grid h-10 w-10 place-items-center rounded-lg bg-white text-ikoma-navy">▣</span><span>IKOMA <span class="font-normal">Accueil</span></span></p>
-        <a href="/login" class="inline-flex min-h-14 items-center rounded-xl bg-white px-5 font-semibold text-ikoma-navy">Se connecter</a>
+        <p class="flex items-center gap-3 text-xl font-bold"><span aria-hidden="true" class="grid h-10 w-10 place-items-center rounded-lg bg-white text-ikoma-navy">▣</span><span class="whitespace-nowrap">IKOMA <span class="font-normal">Accueil</span></span></p>
+        <a href="/login" class="inline-flex min-h-14 items-center whitespace-nowrap rounded-xl bg-white px-4 font-semibold text-ikoma-navy">Se connecter</a>
       </div>
     </header>
 

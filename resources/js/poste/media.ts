@@ -57,14 +57,10 @@ export async function startScan(video: HTMLVideoElement, onCode: (text: string) 
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { willReadFrequently: true });
   const timer = window.setInterval(() => {
-    video.dataset.dbgTicks = String(Number(video.dataset.dbgTicks ?? 0) + 1); video.dataset.dbgState = `${video.readyState}/${video.videoWidth}/${video.paused}`;
     if (stopped || !context || video.readyState < 2 || !video.videoWidth) return;
-    video.dataset.dbgDecodes = String(Number(video.dataset.dbgDecodes ?? 0) + 1);
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
     context.drawImage(video, 0, 0);
-    try { const px = context.getImageData(0, 0, canvas.width, canvas.height).data; let sum = 0; for (let i = 0; i < px.length; i += 400) sum += px[i]; video.dataset.dbgLum = String(Math.round(sum / (px.length / 400))); } catch { /* debug */ }
-    if (video.dataset.dbgTicks === '60') video.dataset.dbgImg = canvas.toDataURL('image/png');
-    try { emit(reader.decodeFromCanvas(canvas).getText()); } catch (e) { video.dataset.dbgErr = (e as Error).name; /* aucun QR lisible dans cette image */ }
+    try { emit(reader.decodeFromCanvas(canvas).getText()); } catch { /* aucun QR lisible dans cette image */ }
   }, 150);
   return { stop() { stopped = true; window.clearInterval(timer); closeCamera(video, stream); } };
 }
