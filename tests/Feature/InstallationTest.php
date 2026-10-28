@@ -4,6 +4,7 @@ use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\PermissionRegistrar;
 
 function installationPayload(array $over = []): array
 {
@@ -17,8 +18,12 @@ beforeEach(function () {
     $this->tokenFile = tempnam(sys_get_temp_dir(), 'ikoma-install-');
     file_put_contents($this->tokenFile, $this->installToken."\n");
     // Une base de test sans administrateur ni installation terminée : on isole l'état dans la transaction du test.
+    // Base neuve de production : ni compte, ni rôle (ils sont créés par l'assistant).
     DB::table('model_has_roles')->delete();
+    DB::table('role_has_permissions')->delete();
+    DB::table('roles')->delete();
     DB::table('users')->delete();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
     DB::table('settings')->where('key', 'installation_terminee')->update(['value' => '0']);
     $this->audit = (int) DB::table('audit_logs')->max('id');
 });

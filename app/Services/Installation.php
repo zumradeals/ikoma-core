@@ -28,10 +28,19 @@ final class Installation
         return is_string($path) && $path !== '' && is_file($path) && is_readable($path) ? $path : null;
     }
 
+    /**
+     * Un administrateur existe-t-il ? Requête directe : sur une base neuve, les rôles n'existent pas encore (ils sont créés par l'assistant),
+     * et User::role() lèverait « le rôle n'existe pas ».
+     */
+    public function administratorExists(): bool
+    {
+        return DB::table('model_has_roles as m')->join('roles as r', 'r.id', '=', 'm.role_id')->where('r.name', 'administrateur')->exists();
+    }
+
     /** Vrai si l'assistant peut être utilisé maintenant. */
     public function available(): bool
     {
-        return $this->tokenFile() !== null && ! $this->finished() && ! User::role('administrateur')->exists();
+        return $this->tokenFile() !== null && ! $this->finished() && ! $this->administratorExists();
     }
 
     public function tokenMatches(string $given): bool
@@ -83,7 +92,7 @@ final class Installation
         return DB::transaction(function () use ($data): User {
             // Deux requêtes simultanées : une seule peut passer.
             DB::table('settings')->where('key', 'installation_terminee')->lockForUpdate()->first();
-            if ($this->finished() || User::role('administrateur')->exists()) {
+            if ($this->finished() || $this->administratorExists()) {
                 throw new \RuntimeException('L’installation est déjà terminée.');
             }
             (new RoleSeeder)->run();
