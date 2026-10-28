@@ -17,6 +17,7 @@ const items = [
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
   { key: 'postes', label: 'Tablettes', icon: 'tablet', href: '/administration/postes', permission: 'postes.gerer' },
   { key: 'comptes', label: 'Comptes', icon: 'users', href: '/administration/comptes', permission: 'comptes.gerer' },
+  { key: 'profil', label: 'Profil de sécurité', icon: 'shield', href: '/administration/profil-securite', permission: 'securite.gerer' },
   { key: 'journal', label: 'Journal', icon: 'book', href: '/administration/journal', permission: 'journal.consulter' },
 ];
 function change(e: Event) { router.get(window.location.pathname, { event: (e.target as HTMLSelectElement).value }); }

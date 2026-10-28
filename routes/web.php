@@ -18,6 +18,7 @@ use App\Http\Controllers\PilotageController;
 use App\Http\Controllers\PosteApiController;
 use App\Http\Controllers\PosteController;
 use App\Http\Controllers\PostesController;
+use App\Http\Controllers\SecurityProfileController;
 use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\ZonesController;
@@ -107,6 +108,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/postes/reglages', [PostesController::class, 'settings'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/code', [PostesController::class, 'code'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
+
+        Route::get('/administration/profil-securite', [SecurityProfileController::class, 'show'])->middleware('can:securite.gerer');
+        Route::put('/administration/profil-securite', [SecurityProfileController::class, 'update'])->middleware('can:securite.gerer');
 
         Route::get('/espace', fn () => Inertia::render('Space'))->name('space');
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
