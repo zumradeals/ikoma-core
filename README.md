@@ -63,7 +63,7 @@ Ouvrir « Se connecter ». Les administrateurs et superviseurs doivent configure
 
 Vérifier le journal : `docker compose exec php php artisan audit:verify`. Le chaînage signale une ligne modifiée ; il ne constitue pas une protection contre un administrateur PostgreSQL qui réécrirait toute la chaîne. La lecture du journal est aussi accessible au superviseur, sans droit de gestion des comptes. L’export est réservé à un futur lot.
 
-Le correctif PWA calcule une empreinte des sources à chaque build. Le test e2e modifie puis reconstruit réellement la page provisoire, attend l’activation du nouveau service worker et vérifie sa réouverture hors ligne. Aucun écran authentifié n’est mis en cache.
+Le correctif PWA calcule une empreinte des sources à chaque build. Le test e2e modifie puis reconstruit réellement la page d’accueil publique, attend l’activation du nouveau service worker et vérifie sa réouverture hors ligne. Aucun écran authentifié n’est mis en cache : seules les coquilles publiques sans donnée (`/`, `/poste/shell`, `/controle/shell`, `/pilotage/evacuation/shell`) et les fichiers compilés le sont.
 
 ## Lot L2 : modèle et démonstration
 

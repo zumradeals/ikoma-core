@@ -22,7 +22,7 @@ export function ficheOf(list: LocalList, id: string, now: number): Fiche {
   return {
     id: v.id, full_name: v.full_name, organisation: v.organisation, host: v.host_id ? list.hostNames.get(v.host_id) ?? null : null, category, zones: list.zonesFor(v),
     accueil_limite: v.source === 'non listé', source: v.source, status: v.status, host_validation: v.host_validation, valid_from: v.valid_from, valid_until: v.valid_until,
-    hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code,
+    hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, a_rebadger: v.a_rebadger ?? false,
   };
 }
 

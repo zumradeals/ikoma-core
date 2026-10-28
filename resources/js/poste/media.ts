@@ -1,4 +1,5 @@
-/** Caméra de la tablette : photo réduite (640 px maximum, JPEG) et lecture de QR (BarcodeDetector sinon @zxing/browser, sans aucun appel réseau). */
+import { BrowserQRCodeReader } from '@zxing/browser';
+/** Caméra de la tablette : photo réduite (640 px maximum, JPEG) et lecture de QR (BarcodeDetector sinon @zxing/browser, sans aucun appel réseau). zxing est importé avec la page, pas à la demande : un chargement différé pouvait rester en attente pendant l'activation du service worker et le QR n'était jamais lu. */
 
 export const PHOTO_MAX_SIDE = 640;
 
@@ -52,7 +53,6 @@ export async function startScan(video: HTMLVideoElement, onCode: (text: string) 
   }
   // Lecture image par image : on ne confie pas le flux à la boucle interne de zxing (decodeFromStream), qui attend un événement « loadedmetadata »
   // déjà passé quand la caméra est ouverte avant et pouvait ne jamais lire le QR (blocage intermittent constaté en recette).
-  const { BrowserQRCodeReader } = await import('@zxing/browser');
   const reader = new BrowserQRCodeReader();
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { willReadFrequently: true });

@@ -19,6 +19,8 @@ const reason = computed(() => (props.homonyms > 1 && !secondCriterion.value ? 'P
         <div><dt class="font-semibold">Personne reçue</dt><dd>{{ fiche.host || 'Non indiquée' }}</dd></div>
         <div class="sm:col-span-2"><dt class="font-semibold">{{ fiche.accueil_limite ? 'Zone autorisée (accès limité, avec accompagnement)' : 'Zones autorisées' }}</dt><dd>{{ fiche.zones.length ? fiche.zones.join(' · ') : 'Aucune zone enregistrée' }}</dd></div>
       </dl>
+      <p v-if="fiche.access_note" class="mt-4 rounded-xl border-2 border-green-700 bg-green-50 p-3 font-bold text-green-900" data-testid="mention-autorisation"><span aria-hidden="true">✓</span> Accès autorisé par le superviseur : {{ fiche.access_note }}</p>
+      <p v-if="fiche.a_rebadger" class="mt-4 rounded-xl border-2 border-orange-600 bg-orange-50 p-3 font-bold text-orange-900" data-testid="a-rebadger"><span aria-hidden="true">▲</span> À rebadger : le badge précédent a été annulé, associez un nouveau badge.</p>
       <p v-if="fiche.hors_periode" class="mt-4 rounded-xl border-2 border-red-700 bg-red-50 p-3 font-bold text-red-900"><span aria-hidden="true">⚠</span> Hors de sa période de validité : l’avis de l’hôte ou du superviseur sera demandé à la décision.</p>
     </div>
     <div v-if="homonyms > 1" class="rounded-xl border-2 border-red-700 bg-red-50 p-4">

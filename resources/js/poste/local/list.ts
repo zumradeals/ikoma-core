@@ -3,7 +3,7 @@ import { normalize, trigrams, type Indexed } from './search';
 
 export type SnapVisitor = {
   id: string; full_name: string; organisation: string | null; host_id: string | null; category_id: string; valid_from: string; valid_until: string; source: string; status: string;
-  host_validation: 'en_attente' | 'accepte' | 'refuse' | null; rev: string | null; identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
+  host_validation: 'en_attente' | 'accepte' | 'refuse' | null; access_note?: string | null; a_rebadger?: boolean; rev: string | null; identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
 };
 export type SnapBadge = { code: string; token_hash: string; category_id: string | null; status: string; mine: boolean };
 export type Snapshot = {

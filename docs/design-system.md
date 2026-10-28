@@ -19,7 +19,7 @@ Police système, disponible sans réseau. Trois tailles : body (18 px), heading 
 - CategoryLabel : symbole obligatoire + libellé, tons standard et VIP ; aucune catégorie métier créée.
 - StatusBanner : message annoncé par role=status, accompagné du symbole information.
 
-La page provisoire n'affiche aucune action métier. Le cache PWA ne concerne que cette page publique et les ressources compilées. Ne pas étendre ce cache à des réponses authentifiées ; sa stratégie devra être révisée avant L1.
+La page d'accueil publique (`/`) ne contient aucune donnée ni aucune action métier : elle présente l'application et renvoie vers la connexion et les espaces par rôle (chaque lien exige une session). Le cache PWA ne concerne que cette page publique, les coquilles publiques du poste, du contrôle et de l'évacuation, et les ressources compilées. Ne jamais l'étendre à des réponses authentifiées.
 
 ## Formulaires L1
 
