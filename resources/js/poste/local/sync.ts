@@ -18,6 +18,7 @@ type Result = { id: string; status: 'applique' | 'conflit'; code?: string; messa
 export class SyncManager {
   state: SyncState = { online: true, syncing: false, pending: 0, conflicts: 0, lastSyncAt: null, lastError: null, needsLogin: false, revoked: false, stale: false, clockWarning: false };
   private running: Promise<void> | null = null;
+  private again = false;
   private failures = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -40,9 +41,15 @@ export class SyncManager {
   }
   stop(): void { clearTimeout(this.timer); }
 
+  /** Un seul envoi à la fois ; une demande reçue pendant un envoi en provoque un second juste après (une opération arrivée en fin de course n'attend pas). */
   sync(): Promise<void> {
-    if (!this.running) this.running = this.run().finally(() => { this.running = null; });
+    if (this.running) { this.again = true; return this.running; }
+    this.running = this.loop().finally(() => { this.running = null; });
     return this.running;
+  }
+
+  private async loop(): Promise<void> {
+    do { this.again = false; await this.run(); } while (this.again && !this.state.revoked);
   }
 
   private async call<T>(method: 'GET' | 'POST', url: string, body?: object): Promise<T> {

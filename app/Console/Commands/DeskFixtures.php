@@ -3,9 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Models\Badge;
+use App\Models\Device;
 use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\BadgeService;
+use App\Services\Poste\Devices;
 use App\Services\QrSvg;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Command;
@@ -44,13 +46,20 @@ class DeskFixtures extends Command
         }
         $host = (string) Str::uuid();
         DB::table('hosts')->insert(['id' => $host, 'event_id' => $event, 'name' => "Hôte fictif {$s}", 'created_at' => $now, 'updated_at' => $now]);
-        DB::table('devices')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'name' => "Tablette recette {$s}", 'station' => "Poste recette {$s}", 'created_at' => $now, 'updated_at' => $now]);
+        $device = (string) Str::uuid();
+        DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => "Tablette recette {$s}", 'station' => "Poste recette {$s}", 'created_at' => $now, 'updated_at' => $now]);
         $visitor = function (string $name, string $category, ?string $from = null, ?string $until = null) use ($event, $host, $categories, $now): string {
             $id = (string) Str::uuid();
             DB::table('visitors')->insert(['id' => $id, 'event_id' => $event, 'full_name' => $name, 'organisation' => 'Organisation fictive de recette', 'host_id' => $host, 'category_id' => $categories[$category], 'valid_from' => $from ?? $now->copy()->subHour(), 'valid_until' => $until ?? $now->copy()->addDay(), 'source' => 'listé', 'status' => 'attendu', 'created_at' => $now, 'updated_at' => $now]);
 
             return $id;
         };
+        // Trente visiteurs de plus pour le parcours hors ligne en rafale.
+        $bulk = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $bulk[] = sprintf('Rafale Fictif %02d %s', $i, $s);
+            $visitor(end($bulk), 'Visiteur');
+        }
         $names = ['listed' => "Aminata Dembélé {$s}", 'vip' => "Soro Prestige {$s}", 'refused' => "Yéo Refus {$s}", 'outside' => "Traoré Horsperiode {$s}", 'taken' => "Koffi Occupant {$s}", 'second' => "Bamba Second {$s}", 'badged' => "Diallo Déjàbadgé {$s}", 'scan' => "Ouattara Scanner {$s}", 'mobile' => "Konaté Mobile {$s}"];
         $ids = [
             'listed' => $visitor($names['listed'], 'Visiteur'), 'vip' => $visitor($names['vip'], 'VIP'), 'refused' => $visitor($names['refused'], 'Visiteur'),
@@ -60,15 +69,27 @@ class DeskFixtures extends Command
         $secret = (new Google2FA)->generateSecretKey();
         $agent = User::create(['name' => "Agent fictif {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $password]);
         $agent->assignRole('agent_accueil');
-        $admin = User::create(['name' => "Administrateur fictif {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24), 'two_factor_secret' => encrypt($secret), 'two_factor_recovery_codes' => encrypt(json_encode([])), 'two_factor_confirmed_at' => $now]);
+        $admin = User::create(['name' => "Administrateur fictif {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $adminPassword = Str::password(24).'aA1!', 'two_factor_secret' => encrypt($secret), 'two_factor_recovery_codes' => encrypt(json_encode([])), 'two_factor_confirmed_at' => $now]);
         $admin->assignRole('administrateur');
         $lots = app(BadgeLots::class);
-        $visitorBadges = Badge::where('badge_batch_id', $lots->generate($event, $categories['Visiteur'], 12, $admin)->id)->orderBy('code')->get();
-        $vipBadges = Badge::where('badge_batch_id', $lots->generate($event, $categories['VIP'], 3, $admin)->id)->orderBy('code')->get();
+        $deviceModel = Device::findOrFail($device);
+        $visitorBatch = $lots->generate($event, $categories['Visiteur'], 50, $admin);
+        $vipBatch = $lots->generate($event, $categories['VIP'], 3, $admin);
+        // La tablette ne reçoit que les badges qui lui sont réservés : tout le stock de la recette lui est réservé.
+        foreach ([$visitorBatch, $vipBatch] as $batch) {
+            $numbers = Badge::where('badge_batch_id', $batch->id)->pluck('code')->map(fn (string $code) => (int) substr($code, 2));
+            $lots->reserve($batch->id, $numbers->min(), $numbers->max(), $deviceModel, $admin);
+        }
+        $visitorBadges = Badge::where('badge_batch_id', $visitorBatch->id)->orderBy('code')->get();
+        $vipBadges = Badge::where('badge_batch_id', $vipBatch->id)->orderBy('code')->get();
         // Deux badges déjà remis : l'un à « Koffi Occupant » (refus « déjà associé »), l'autre à « Diallo Déjàbadgé » (visiteur déjà badgé).
-        app(BadgeService::class)->associer($visitorBadges[0], $ids['taken'], $agent);
-        app(BadgeService::class)->associer($visitorBadges[1], $ids['badged'], $agent);
+        app(BadgeService::class)->associer($visitorBadges[0], $ids['taken'], $agent, $deviceModel);
+        app(BadgeService::class)->associer($visitorBadges[1], $ids['badged'], $agent, $deviceModel);
+        // Code d'enrôlement de la tablette de recette : en recette seulement, sa validité est prolongée pour couvrir tout le parcours.
+        $enrolCode = app(Devices::class)->issueCode($deviceModel, $admin);
+        DB::table('devices')->where('id', $device)->update(['enrollment_expires_at' => now()->addHours(6)]);
         $this->line(json_encode([
+            'enrolCode' => $enrolCode, 'admin' => ['email' => $admin->email, 'password' => $adminPassword, 'secret' => $secret], 'bulk' => $bulk, 'bulkPrefix' => 'Rafale Fictif',
             'email' => $agent->email, 'password' => $password, 'suffix' => $s, 'poste' => "Poste recette {$s}", 'names' => $names, 'ids' => $ids,
             'takenBadge' => $visitorBadges[0]->code, 'vipBadges' => $vipBadges->pluck('code'), 'freeBadges' => $visitorBadges->skip(3)->pluck('code')->values(),
             'qrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $visitorBadges[2]->id)->value('qr_token')), 'QR du badge '.$visitorBadges[2]->code), 'qrBadge' => $visitorBadges[2]->code,

@@ -114,3 +114,19 @@ Toute opération hors ligne est marquée « faite hors ligne » avec l'heure de 
 9. Bouton « Effacer cette tablette » réservé au superviseur. Recommandation : oui.
 10. Distinction poste logique / appareil physique pour la tablette de secours (section 3, point 6). Recommandation : à trancher avec le prompt L6.
 11. Obligations du client sur les tablettes (verrouillage système, chiffrement du stockage, mode dédié, effacement à distance) à inscrire dans le cahier d'exploitation. Recommandation : oui.
+
+## 12. Mise en œuvre au lot L6 : écarts et limites (28 octobre 2026)
+
+Les onze décisions de la section 11 ont été validées avec les recommandations de l'architecte ; le lot L6 les applique. Ce qui diffère du texte ci-dessus ou n'est pas couvert :
+
+1. **Poste logique et appareil physique (décision 10)** : un poste est une tablette enrôlée ; une tablette de secours reçoit son propre code d'enrôlement et ses propres badges réservés. Réenrôler un poste (nouveau code) invalide l'ancien jeton : l'ancienne tablette est refusée puis effacée à sa prochaine synchronisation.
+2. **Un seul agent par tablette** : le compte de l'agent qui enrôle la tablette est conservé (scellé) et signe les opérations. Changer d'agent demande d'effacer la tablette puis de l'enrôler à nouveau. Plusieurs agents sur une même tablette (chacun son PIN) ne sont pas prévus à ce lot.
+3. **Bouton « Effacer cette tablette » (décision 9)** : visible pour tout agent connecté au poste, pas seulement pour le superviseur, car aucun droit hors ligne ne permet de savoir qui est superviseur. Il demande une confirmation. À valider ou à restreindre.
+4. **Effacement après échecs de PIN** : la tablette est effacée, mais ne peut pas le déclarer au serveur (son jeton est détruit avec le reste) ; l'administrateur le constate à l'absence de synchronisation. L'effacement manuel, la révocation et la fin d'événement sont journalisés (`poste.efface`).
+5. **Effacement de fin d'événement** : 24 h après la fin, **seulement si la file est vide** ; sinon la tablette garde la file pour pouvoir l'envoyer. L'export chiffré avant effacement n'est pas réalisé (question ouverte).
+6. **Détection de tablette clonée** (section 9) : non réalisée à ce lot. Le jeton est lié au secret d'appareil mais le serveur ne compare pas encore les séquences de deux appareils.
+7. **Visiteur non listé hors ligne** : la fiche rapide est créée localement et envoyée ; l'accord de l'hôte est reçu avec la liste suivante (l'écran de l'hôte arrive au lot L10). Tant que l'accord manque, ni validation ni entrée.
+8. **Fiche modifiée entre-temps** : une opération est refusée si la fiche a été modifiée par un autre poste depuis la copie de la tablette, sauf si c'est la tablette elle-même qui l'a modifiée plus tôt.
+9. **Verrouillage en plein parcours** : à l'inactivité, le verrou fait perdre l'écran en cours (l'étape revient à la recherche) ; les opérations déjà faites restent dans la file.
+10. **Photos en quarantaine** : si une opération d'identité est refusée, sa photo n'est pas conservée.
+11. **Obligations du client (décision 11)** : verrouillage système de la tablette, chiffrement du stockage de l'appareil, mode dédié (kiosque) et effacement à distance par sa gestion d'appareils restent à inscrire dans le cahier d'exploitation (lot L12).

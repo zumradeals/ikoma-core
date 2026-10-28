@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createDeviceKey, createVault, fromB64, openJson, openVault, PBKDF2_ITERATIONS, randomBytes, sealJson, toB64 } from '../../resources/js/poste/local/crypto';
 import { PosteDb } from '../../resources/js/poste/local/db';
 import { PosteVault, PinError, pinProblem } from '../../resources/js/poste/local/vault';
@@ -12,6 +12,8 @@ import { PosteRuntime } from '../../resources/js/poste/local/runtime';
 import { ApiError } from '../../resources/js/poste/types';
 
 const ITER = 1000; // le coût réel (600 000) est vérifié séparément : ici seulement la logique
+type Op = { id: string; seq: number; payload: Record<string, string> };
+type Call = { url: string; body: { operations: Op[] } };
 let n = 0;
 const dbName = () => `test-${++n}-${Math.random()}`;
 const SECRET = toB64(randomBytes(32));
@@ -142,7 +144,7 @@ describe('recherche locale', () => {
 
 describe('file hors ligne, règles locales et envoi', () => {
   async function setup(visitors: SnapVisitor[] = [visitor('v1', 'Koné Mariam'), visitor('v2', 'Yao Brou')], reply?: (url: string, init: RequestInit) => Response | Promise<Response>) {
-    const calls: { url: string; body: any }[] = [];
+    const calls: Call[] = [];
     const clock = { t: now0 };
     const vault = new PosteVault(new PosteDb(dbName()), { iterations: ITER });
     await vault.enrol({ token: 'b'.repeat(64), secret: SECRET, pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
@@ -156,14 +158,14 @@ describe('file hors ligne, règles locales et envoi', () => {
       const body = init?.body ? JSON.parse(String(init.body)) : null;
       calls.push({ url: String(url), body });
       if (reply) return reply(String(url), init ?? {});
-      if (String(url).endsWith('/sync')) return new Response(JSON.stringify({ results: body.operations.map((o: any) => ({ id: o.id, status: 'applique' })), summary: {}, clock_skew_seconds: 2 }), { status: 200 });
+      if (String(url).endsWith('/sync')) return new Response(JSON.stringify({ results: body.operations.map((o: Op) => ({ id: o.id, status: 'applique' })), summary: {}, clock_skew_seconds: 2 }), { status: 200 });
       if (String(url).endsWith('/liste/version')) return new Response(JSON.stringify({ version: 'v2', server_time: new Date(now0).toISOString() }), { status: 200 });
       return new Response(JSON.stringify({ ...snap, version: 'v2' }), { status: 200 });
     }) as unknown as typeof fetch;
     const sync = new SyncManager(vault, store, { onState: () => undefined, onSnapshot: async s => { snaps.push(s); await repo.replaceSnapshot(s); }, onRevoked: async () => { revoked(); await vault.wipe(); }, now: () => clock.t, fetcher });
     return { vault, store, repo, sync, calls, queued, revoked, snaps, clock };
   }
-  const ops = (calls: { url: string; body: any }[]) => calls.filter(c => c.url.endsWith('/sync')).flatMap(c => c.body.operations);
+  const ops = (calls: Call[]) => calls.filter(c => c.url.endsWith('/sync')).flatMap(c => c.body.operations);
 
   it('enregistre chaque étape dans la file avant tout envoi, et applique les règles du poste', async () => {
     const { repo, store, calls } = await setup();
@@ -200,7 +202,7 @@ describe('file hors ligne, règles locales et envoi', () => {
     const sent = ops(calls);
     expect(sent).toHaveLength(60);
     expect(calls.filter(c => c.url.endsWith('/sync')).map(c => c.body.operations.length)).toEqual([50, 10]);
-    expect(sent.map((o: any) => o.seq)).toEqual([...sent.map((o: any) => o.seq)].sort((a, b) => a - b));
+    expect(sent.map((o: Op) => o.seq)).toEqual([...sent.map((o: Op) => o.seq)].sort((a, b) => a - b));
     expect(await store.count('pending')).toBe(0);
     expect(snaps).toHaveLength(1);
     expect(await store.count('done')).toBe(0);
@@ -219,7 +221,7 @@ describe('file hors ligne, règles locales et envoi', () => {
   it('garde les conflits visibles, sans les écraser, et continue les autres opérations', async () => {
     const { repo, sync, store } = await setup(undefined, (url, init) => {
       const body = JSON.parse(String(init.body ?? '{}'));
-      if (url.endsWith('/sync')) return new Response(JSON.stringify({ results: body.operations.map((o: any, i: number) => (i === 0 ? { id: o.id, status: 'conflit', code: 'deja_present', message: 'Ce visiteur est déjà entré.' } : { id: o.id, status: 'applique' })), clock_skew_seconds: 0 }), { status: 200 });
+      if (url.endsWith('/sync')) return new Response(JSON.stringify({ results: body.operations.map((o: Op, i: number) => (i === 0 ? { id: o.id, status: 'conflit', code: 'deja_present', message: 'Ce visiteur est déjà entré.' } : { id: o.id, status: 'applique' })), clock_skew_seconds: 0 }), { status: 200 });
       return new Response(JSON.stringify(url.endsWith('/version') ? { version: 'v1', server_time: new Date(now0).toISOString() } : {}), { status: 200 });
     });
     await repo.refuse('c1', 'v1', 'motif'); await repo.refuse('c2', 'v2', 'motif');
@@ -235,7 +237,7 @@ describe('file hors ligne, règles locales et envoi', () => {
       if (mode === 'reseau') throw new TypeError('network');
       if (mode === 'session') return new Response('{}', { status: 401 });
       const body = JSON.parse(String(init.body ?? '{}'));
-      if (url.endsWith('/sync')) return new Response(JSON.stringify({ results: body.operations.map((o: any) => ({ id: o.id, status: 'applique' })), clock_skew_seconds: 0 }), { status: 200 });
+      if (url.endsWith('/sync')) return new Response(JSON.stringify({ results: body.operations.map((o: Op) => ({ id: o.id, status: 'applique' })), clock_skew_seconds: 0 }), { status: 200 });
       return new Response(JSON.stringify(url.endsWith('/version') ? { version: 'v1', server_time: new Date(now0).toISOString() } : snapshot([visitor('v1', 'Koné Mariam')])), { status: 200 });
     });
     await repo.refuse('r1', 'v1', 'motif');

@@ -1,31 +1,54 @@
-import { test, expect, type Browser, type Page } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { createHmac } from 'node:crypto';
 
-type Fixtures = { email: string; password: string; poste: string; names: Record<string, string>; takenBadge: string; vipBadges: string[]; freeBadges: string[]; qrSvg: string; qrBadge: string };
+type Fixtures = { email: string; password: string; poste: string; names: Record<string, string>; takenBadge: string; vipBadges: string[]; freeBadges: string[]; qrSvg: string; qrBadge: string; enrolCode: string; bulk: string[]; bulkPrefix: string; admin: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
-const shots = process.env.L5_CAPTURES === '1';
-let storage = '';
+const shots = process.env.L5_CAPTURES === '1' || process.env.L6_CAPTURES === '1';
+const PIN = '482915';
+function otp(secret: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = ''; for (const c of secret) bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
+  const bytes = []; for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const hash = createHmac('sha1', Buffer.from(bytes)).update(counter).digest(); const offset = hash[19] & 15;
+  return ((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');
+}
+
+// Une seule tablette (un seul contexte de navigateur) pour tout le fichier : elle est enrôlée une fois, puis verrouillée/déverrouillée par PIN comme sur le terrain.
+let tablet: BrowserContext;
 
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }, info) => {
-  const context = await browser.newContext({ baseURL: info.project.use.baseURL });
-  const page = await context.newPage();
+  tablet = await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 1280, height: 800 }, permissions: ['camera'] });
+  const page = await tablet.newPage();
   await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(fx.email); await page.getByLabel('Mot de passe', { exact: true }).fill(fx.password); await page.getByRole('button', { name: 'Se connecter' }).click();
   await expect(page).toHaveURL(/\/espace/);
-  storage = await context.storageState().then(state => JSON.stringify(state));
-  await context.close();
+  await page.close();
 });
+test.afterAll(async () => { await tablet.close(); });
 
-async function desk(browser: Browser, baseURL: string | undefined, viewport = { width: 1280, height: 800 }): Promise<Page> {
-  const context = await browser.newContext({ baseURL, viewport, permissions: ['camera'], storageState: JSON.parse(storage) });
-  const page = await context.newPage();
+/** Enrôle la tablette si elle ne l'est pas encore, ou la déverrouille avec son PIN. */
+async function openDesk(page: Page): Promise<void> {
+  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou'); const step = page.getByText('Étape 1 sur 7');
+  await enrol.or(lock).or(step).first().waitFor();
+  if (await enrol.isVisible()) {
+    await page.getByTestId('code-enrolement').fill(fx.enrolCode); await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN);
+    await page.getByTestId('enroler').click();
+  } else if (await lock.isVisible()) {
+    await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click();
+  }
+  await expect(step).toBeVisible();
+}
+
+async function desk(viewport = { width: 1280, height: 800 }): Promise<Page> {
+  const page = await tablet.newPage();
+  await page.setViewportSize(viewport);
   await page.goto('/poste');
-  await page.getByRole('button', { name: new RegExp(fx.poste) }).click();
-  await expect(page.getByText('Étape 1 sur 7')).toBeVisible();
+  await openDesk(page);
   return page;
 }
-const shot = async (page: Page, name: string) => { if (shots) await page.screenshot({ path: `docs/captures/L5/${name}.png`, fullPage: true }); };
+const shot = async (page: Page, name: string) => { if (shots) await page.screenshot({ path: `docs/captures/${process.env.L6_CAPTURES === '1' ? 'L6' : 'L5'}/${name}.png`, fullPage: true }); };
 const search = (page: Page, text: string) => page.getByLabel(/Nom du visiteur/).fill(text);
 const pick = (page: Page, name: string) => page.getByRole('button', { name: new RegExp(name) }).first();
 const button = (page: Page, name: string | RegExp) => page.getByRole('button', { name });
@@ -44,8 +67,8 @@ async function manualBadge(page: Page, code: string) {
   await page.getByLabel(/QR illisible/).fill(code); await button(page, 'Associer ce badge').click();
 }
 
-test('un visiteur listé est traité en moins de 60 secondes, de la recherche à l’entrée', async ({ browser, baseURL }) => {
-  const page = await desk(browser, baseURL);
+test('un visiteur listé est traité en moins de 60 secondes, de la recherche à l’entrée', async () => {
+  const page = await desk();
   const started = Date.now();
   await shot(page, 'tablette-1-recherche');
   await search(page, 'dembele'); // sans accent : la recherche le tolère
@@ -72,12 +95,12 @@ test('un visiteur listé est traité en moins de 60 secondes, de la recherche à
   expect(wall).toBeLessThan(60); expect(shown).toBeLessThan(60); expect(Math.abs(shown - wall)).toBeLessThanOrEqual(3);
   await expect(page.getByText('Objectif de 60 secondes tenu')).toBeVisible();
   await button(page, 'Visiteur suivant').click(); await expect(page.getByText('Étape 1 sur 7')).toBeVisible();
-  await expect(page.getByText('Opérations en attente : 0')).toBeVisible(); await expect(page.getByText('En ligne')).toBeVisible();
-  await page.context().close();
+  await expect(page.getByTestId('en-attente')).toHaveText('0', { timeout: 30_000 }); await expect(page.getByText('En ligne')).toBeVisible();
+  await page.close();
 });
 
-test('un VIP ressort en premier avec une alerte de couleur et passe par le même parcours', async ({ browser, baseURL }) => {
-  const page = await desk(browser, baseURL);
+test('un VIP ressort en premier avec une alerte de couleur et passe par le même parcours', async () => {
+  const page = await desk();
   await search(page, fx.names.vip.split(' ').pop()!);
   await expect(page.getByText('Personnalité VIP : circuit prioritaire, sans file d’attente')).toBeVisible();
   await pick(page, fx.names.vip).click();
@@ -90,11 +113,11 @@ test('un VIP ressort en premier avec une alerte de couleur et passe par le même
   await manualBadge(page, fx.vipBadges[0]);
   await expect(page.getByRole('heading', { name: `Remettez le badge ${fx.vipBadges[0]}` })).toBeVisible();
   await button(page, /Autoriser l’accès/).click(); await expect(page.getByRole('heading', { name: /Entrée enregistrée/ })).toBeVisible();
-  await page.context().close();
+  await page.close();
 });
 
-test('un refus exige un motif, n’associe aucun badge et bloque la suite', async ({ browser, baseURL }) => {
-  const page = await desk(browser, baseURL);
+test('un refus exige un motif, n’associe aucun badge et bloque la suite', async () => {
+  const page = await desk();
   await toDecision(page, 'refus', fx.names.refused);
   await button(page, /Refuser/).click();
   await expect(button(page, /Confirmer le refus/)).toBeDisabled(); await shot(page, 'tablette-4-refus-motif');
@@ -105,11 +128,11 @@ test('un refus exige un motif, n’associe aucun badge et bloque la suite', asyn
   await search(page, 'refus'); await pick(page, fx.names.refused).click(); await button(page, 'C’est bien cette personne').click();
   await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
   await expect(page.getByTestId('erreur')).toContainText('L’accès a été refusé à ce visiteur');
-  await page.context().close();
+  await page.close();
 });
 
-test('un visiteur hors période n’est validé qu’avec l’avis de l’hôte ou du superviseur', async ({ browser, baseURL }) => {
-  const page = await desk(browser, baseURL);
+test('un visiteur hors période n’est validé qu’avec l’avis de l’hôte ou du superviseur', async () => {
+  const page = await desk();
   await search(page, 'horsperiode'); await pick(page, fx.names.outside).click();
   await expect(page.getByText('Hors de sa période de validité')).toBeVisible(); await shot(page, 'tablette-2-hors-periode');
   await button(page, 'C’est bien cette personne').click();
@@ -120,22 +143,22 @@ test('un visiteur hors période n’est validé qu’avec l’avis de l’hôte 
   await manualBadge(page, fx.freeBadges[1]);
   await expect(page.getByRole('heading', { name: `Remettez le badge ${fx.freeBadges[1]}` })).toBeVisible();
   await button(page, /Autoriser l’accès/).click(); await expect(page.getByRole('heading', { name: /Entrée enregistrée/ })).toBeVisible();
-  await page.context().close();
+  await page.close();
 });
 
-test('un badge déjà associé est refusé en nommant la personne et en proposant un autre badge', async ({ browser, baseURL }) => {
-  const page = await desk(browser, baseURL);
+test('un badge déjà associé est refusé en nommant la personne et en proposant un autre badge', async () => {
+  const page = await desk();
   await toDecision(page, 'second', fx.names.second);
   await button(page, /Valider/).click();
   await manualBadge(page, fx.takenBadge);
   await expect(page.getByTestId('erreur')).toContainText(`Badge déjà associé à ${fx.names.taken}`); await expect(page.getByTestId('erreur')).toContainText('Prenez un autre badge.'); await shot(page, 'tablette-5-badge-deja-associe');
   await manualBadge(page, fx.freeBadges[2]);
   await expect(page.getByRole('heading', { name: `Remettez le badge ${fx.freeBadges[2]}` })).toBeVisible();
-  await page.context().close();
+  await page.close();
 });
 
-test('le QR du badge est lu par la caméra (flux simulé), sans appel réseau externe', async ({ browser, baseURL }) => {
-  const page = await desk(browser, baseURL);
+test('le QR du badge est lu par la caméra (flux simulé), sans appel réseau externe', async ({ baseURL }) => {
+  const page = await tablet.newPage();
   const external: string[] = [];
   const origin = new URL(baseURL!).origin;
   page.on('request', request => { const url = request.url(); if (!url.startsWith('data:') && !url.startsWith('blob:') && new URL(url).origin !== origin) external.push(url); });
@@ -153,16 +176,16 @@ test('le QR du badge est lu par la caméra (flux simulé), sans appel réseau ex
       return canvas.captureStream(10);
     };
   }, fx.qrSvg);
-  await page.reload(); await expect(page.getByText('Étape 1 sur 7')).toBeVisible(); // le poste choisi est mémorisé par la tablette
+  await page.goto('/poste'); await openDesk(page);
   await toDecision(page, 'scanner', fx.names.scan);
   await button(page, /Valider/).click();
   await expect(page.getByRole('heading', { name: `Remettez le badge ${fx.qrBadge}` })).toBeVisible({ timeout: 20000 });
   expect(external).toEqual([]);
-  await page.context().close();
+  await page.close();
 });
 
-test('un visiteur non listé reste bloqué tant que l’hôte n’a pas accepté', async ({ browser, baseURL }) => {
-  const page = await desk(browser, baseURL);
+test('un visiteur non listé reste bloqué tant que l’hôte n’a pas accepté', async () => {
+  const page = await desk();
   await button(page, /Visiteur non listé/).click();
   const form = page.getByRole('form', { name: 'Fiche rapide' });
   await expect(form.getByRole('button', { name: /Créer la fiche/ })).toBeDisabled(); await shot(page, 'tablette-non-liste');
@@ -172,12 +195,12 @@ test('un visiteur non listé reste bloqué tant que l’hôte n’a pas accepté
   await expect(page.getByRole('heading', { name: 'En attente de l’accord de l’hôte' })).toBeVisible(); await shot(page, 'tablette-non-liste-attente');
   await expect(button(page, /Valider/)).toHaveCount(0);
   await button(page, 'Vérifier la réponse de l’hôte').click(); await expect(page.getByRole('heading', { name: 'En attente de l’accord de l’hôte' })).toBeVisible();
-  await page.context().close();
+  await page.close();
 });
 
-test('captures mobile du parcours', async ({ browser, baseURL }) => {
+test('captures mobile du parcours', async () => {
   test.skip(!shots, 'captures uniquement avec L5_CAPTURES=1');
-  const page = await desk(browser, baseURL, { width: 390, height: 844 });
+  const page = await desk({ width: 390, height: 844 });
   await shot(page, 'mobile-1-recherche');
   await search(page, 'konate'); await shot(page, 'mobile-1-resultats'); await pick(page, fx.names.mobile).click(); await shot(page, 'mobile-2-fiche');
   await button(page, 'C’est bien cette personne').click(); await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await shot(page, 'mobile-3-identite');
@@ -185,5 +208,109 @@ test('captures mobile du parcours', async ({ browser, baseURL }) => {
   await button(page, /Valider/).click(); await shot(page, 'mobile-5-badge');
   await manualBadge(page, fx.freeBadges[3]); await shot(page, 'mobile-6-remise');
   await button(page, /Autoriser l’accès/).click(); await shot(page, 'mobile-7-entree');
-  await page.context().close();
+  await page.close();
+});
+
+test('la tablette se verrouille, refuse un mauvais PIN et se rouvre avec le bon', async () => {
+  const page = await desk();
+  await shot(page, 'l6-tablette-statut');
+  await button(page, 'Verrouiller').click();
+  await expect(page.getByRole('heading', { name: 'Tablette verrouillée' })).toBeVisible(); await expect(page.getByText('Étape 1 sur 7')).toHaveCount(0); await shot(page, 'l6-verrou');
+  await page.getByTestId('pin-deverrouillage').fill('999111'); await page.getByTestId('deverrouiller').click();
+  await expect(page.getByTestId('erreur-gate')).toContainText('PIN incorrect'); await shot(page, 'l6-pin-incorrect');
+  await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click();
+  await expect(page.getByText('Étape 1 sur 7')).toBeVisible();
+  await page.close();
+});
+
+async function adminCounters(admin: Page): Promise<{ received: number; applied: number; conflicts: number }> {
+  await admin.goto('/administration/postes');
+  await expect(admin.getByRole('heading', { name: 'Administration · Postes' })).toBeVisible({ timeout: 20_000 });
+  const text = await admin.locator(`xpath=//h2[contains(., "${fx.poste}")]/following-sibling::p[@data-testid="compteurs"]`).innerText({ timeout: 10_000 });
+  const [received, applied, conflicts] = text.match(/\d+/g)!.map(Number);
+  return { received, applied, conflicts };
+}
+
+test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis envoi complet sans perte ni doublon', async ({ browser, baseURL }) => {
+  test.setTimeout(600_000);
+  const online = await desk();
+  // La coquille du poste doit être en cache avant la coupure.
+  await online.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) await new Promise<void>(resolve => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true }));
+  });
+  await expect(online.getByTestId('en-attente')).toHaveText('0');
+  const adminContext = await browser.newContext({ baseURL });
+  const admin = await adminContext.newPage();
+  await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
+  await admin.getByLabel('Code à six chiffres').fill(otp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await expect(admin).toHaveURL(/\/espace/);
+  const before = await adminCounters(admin);
+
+  await tablet.setOffline(true);
+  await online.close();
+  const page = await tablet.newPage();
+  await page.goto('/poste'); // servi par le service worker : aucune réponse du serveur
+  await openDesk(page);
+  await expect(page.getByText('Hors ligne')).toBeVisible(); await shot(page, 'l6-hors-ligne');
+  const started = Date.now();
+  for (let i = 0; i < 30; i++) {
+    const name = fx.bulk[i];
+    await search(page, name); await pick(page, name).click();
+    await button(page, 'C’est bien cette personne').click();
+    await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
+    await button(page, /Valider/).click();
+    await manualBadge(page, fx.freeBadges[10 + i]);
+    await button(page, /Autoriser l’accès/).click();
+    await expect(page.getByRole('heading', { name: /Entrée enregistrée/ })).toBeVisible();
+    await button(page, 'Visiteur suivant').click();
+  }
+  console.log(`30 visiteurs hors ligne en ${Math.round((Date.now() - started) / 1000)} s`);
+  await expect(page.getByTestId('en-attente')).toHaveText('120'); await shot(page, 'l6-file-en-attente');
+
+  // Rien d'identifiable n'est lisible dans IndexedDB.
+  const dump = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { const request = indexedDB.open('ikoma-poste'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    const out: string[] = [];
+    for (const name of Array.from(db.objectStoreNames)) {
+      const rows = await new Promise<unknown[]>(resolve => { const query = db.transaction(name).objectStore(name).getAll(); query.onsuccess = () => resolve(query.result); });
+      out.push(JSON.stringify(rows, (_key, value) => (value instanceof Uint8Array ? Array.from(value).map(c => String.fromCharCode(c)).join('') : typeof CryptoKey !== 'undefined' && value instanceof CryptoKey ? 'cle' : value)));
+    }
+    db.close();
+    return out.join('\n');
+  });
+  expect(dump.length).toBeGreaterThan(10_000);
+  for (const secret of [fx.bulk[0], fx.bulk[29], fx.names.listed, 'Organisation fictive de recette', fx.freeBadges[10], fx.enrolCode.replaceAll('-', ''), fx.email]) expect(dump, secret).not.toContain(secret);
+
+  // Retour du réseau : la première réponse du serveur est perdue (le lot est appliqué mais la tablette ne le sait pas) ; le renvoi ne doit rien doubler.
+  await tablet.setOffline(false);
+  let lost = false;
+  await page.route('**/poste/api/sync', async route => {
+    if (!lost) { lost = true; await route.fetch(); await route.abort('connectionreset'); } else await route.continue();
+  });
+  await button(page, 'Synchroniser maintenant').click();
+  await expect(page.getByTestId('en-attente')).toHaveText('0', { timeout: 120_000 });
+  await expect(page.getByTestId('derniere-sync')).not.toHaveText('jamais'); await shot(page, 'l6-synchronise');
+  expect(lost).toBe(true);
+  const after = await adminCounters(admin);
+  expect(after.received - before.received).toBe(120); expect(after.applied - before.applied).toBe(120); expect(after.conflicts - before.conflicts).toBe(0);
+  await shot(admin, 'l6-admin-postes');
+  await adminContext.close();
+  await page.close();
+});
+
+test('« Effacer cette tablette » supprime toutes les données locales et redemande un enrôlement', async () => {
+  const page = await desk();
+  await button(page, 'Effacer cette tablette').click(); await shot(page, 'l6-effacer-confirmation');
+  await page.getByTestId('effacer-oui').click();
+  await expect(page.getByTestId('ecran-enrolement')).toBeVisible(); await expect(page.getByTestId('message-efface')).toBeVisible(); await shot(page, 'l6-efface');
+  const rows = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { const request = indexedDB.open('ikoma-poste'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    let total = 0;
+    for (const name of Array.from(db.objectStoreNames)) total += await new Promise<number>(resolve => { const query = db.transaction(name).objectStore(name).count(); query.onsuccess = () => resolve(query.result); });
+    db.close();
+    return total;
+  });
+  expect(rows).toBe(0);
+  await page.close();
 });

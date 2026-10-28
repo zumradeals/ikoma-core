@@ -85,7 +85,13 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): { badge_code
       const badge = list.badges.get(code);
       if (!badge) throw refuse('badge_inconnu', 'Badge inconnu : vérifiez le code imprimé ou prenez un autre badge.', 'Saisissez le code imprimé ou prenez un autre badge.');
       if (v.badge_code === badge.code) return { badge_code: badge.code };
-      if (badge.status !== 'Disponible') throw refuse(badge.status === 'Associé' ? 'deja_associe' : 'indisponible', `Ce badge est ${badge.status === 'Associé' ? 'déjà associé à un autre visiteur' : 'indisponible'}.`, 'Prenez un autre badge.');
+      if (badge.status !== 'Disponible') {
+        if (badge.status === 'Associé') {
+          const holder = Array.from(list.visitors.values()).find(x => x.badge_code === badge.code)?.full_name;
+          throw refuse('deja_associe', `Badge déjà associé${holder ? ` à ${holder}` : ''}. Prenez un autre badge.`, 'Prenez un autre badge.');
+        }
+        throw refuse(badge.status === 'Annulé' ? 'annule' : 'indisponible', badge.status === 'Annulé' ? 'Badge annulé : il ne peut plus être utilisé.' : 'Badge restitué ou clos : il ne peut plus être associé.', 'Prenez un autre badge.');
+      }
       if (!badge.category_id) throw refuse('sans_categorie', 'Badge sans catégorie (lot hérité) : il ne peut pas être associé. Prenez un autre badge.', 'Prenez un badge d’un lot par catégorie.');
       if (badge.category_id !== v.category_id) throw refuse('categorie', `Badge de catégorie ${list.categories.get(badge.category_id)?.name ?? ''}, visiteur de catégorie ${list.categories.get(v.category_id)?.name ?? ''}`, `Prenez un badge de catégorie ${list.categories.get(v.category_id)?.name ?? ''}.`);
       if (v.badge_code) throw refuse('visiteur_deja_badge', `Ce visiteur a déjà le badge ${v.badge_code}.`, 'Ce visiteur a déjà son badge : passez à la remise.');

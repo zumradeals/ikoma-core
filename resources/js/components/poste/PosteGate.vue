@@ -23,7 +23,7 @@ let idleMs = 300_000;
 const runtime = props.runtime ?? new PosteRuntime();
 runtime.handlers = {
   onState: (s: SyncState) => { sync.value = s; if (phase.value === 'ouvert') void loadConflicts(); },
-  onWiped: (r: WipeReason) => { wiped.value = r; phase.value = 'vide'; clearTimeout(idleTimer); },
+  onWiped: (r: WipeReason) => { wiped.value = r; message.value = null; phase.value = 'vide'; clearTimeout(idleTimer); },
 };
 
 const waiting = computed(() => (lockedUntil.value > now.value ? Math.ceil((lockedUntil.value - now.value) / 1000) : 0));

@@ -19,11 +19,9 @@ export class PosteStore {
       const id = `list:v:${i}`;
       rows.push({ id, data: await sealJson(this.key, visitors.slice(i * CHUNK, (i + 1) * CHUNK), id) });
     }
-    await this.db.transaction('rw', [this.db.chunks, this.db.meta], async () => {
-      const stale = (await this.db.chunks.toCollection().primaryKeys()).filter(k => k.startsWith('list:'));
-      await this.db.chunks.bulkDelete(stale);
-      await this.db.chunks.bulkPut(rows);
-      await setMeta(this.db, 'listVersion', snapshot.version);
+    const stale = (await this.db.chunks.toCollection().primaryKeys()).filter(k => k.startsWith('list:'));
+    await this.db.transaction('rw', [this.db.chunks, this.db.meta], () => {
+      void this.db.chunks.bulkDelete(stale); void this.db.chunks.bulkPut(rows); void setMeta(this.db, 'listVersion', snapshot.version);
     });
   }
 
@@ -50,9 +48,9 @@ export class PosteStore {
     // Le chiffrement (WebCrypto) se fait avant d'ouvrir la transaction : IndexedDB referme une transaction qui attend autre chose que ses propres requêtes.
     const sealedPhoto = photo ? await sealBytes(this.key, new Uint8Array(await photo.arrayBuffer()), `photo:${op.id}`) : null;
     const data = await sealJson(this.key, op, `op:${op.id}`);
-    await this.db.transaction('rw', [this.db.ops, this.db.photos], async () => {
-      if (sealedPhoto) await this.db.photos.put({ id: op.id, data: sealedPhoto });
-      await this.db.ops.put({ id: op.id, seq: op.seq, type: op.type, status: 'pending', data });
+    await this.db.transaction('rw', [this.db.ops, this.db.photos], () => {
+      if (sealedPhoto) void this.db.photos.put({ id: op.id, data: sealedPhoto });
+      void this.db.ops.put({ id: op.id, seq: op.seq, type: op.type, status: 'pending', data });
     });
   }
 
@@ -75,9 +73,9 @@ export class PosteStore {
 
   async setStatus(op: LocalOp, status: 'done' | 'conflict'): Promise<void> {
     const data = await sealJson(this.key, op, `op:${op.id}`);
-    await this.db.transaction('rw', [this.db.ops, this.db.photos], async () => {
-      await this.db.ops.put({ id: op.id, seq: op.seq, type: op.type, status, data });
-      await this.db.photos.delete(op.id); // la photo est partie avec l'opération (ou mise en quarantaine côté serveur)
+    await this.db.transaction('rw', [this.db.ops, this.db.photos], () => {
+      void this.db.ops.put({ id: op.id, seq: op.seq, type: op.type, status, data });
+      void this.db.photos.delete(op.id); // la photo est partie avec l'opération (ou mise en quarantaine côté serveur)
     });
   }
 

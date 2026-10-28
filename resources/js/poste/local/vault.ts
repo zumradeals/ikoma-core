@@ -98,8 +98,9 @@ export class PosteVault {
   /** Efface tout ce que la tablette conserve (liste, file, photos, clés, compteurs). */
   async wipe(): Promise<void> {
     this.dek = null;
-    await this.db.transaction('rw', [this.db.meta, this.db.chunks, this.db.ops, this.db.photos], async () => {
-      await Promise.all([this.db.meta.clear(), this.db.chunks.clear(), this.db.ops.clear(), this.db.photos.clear()]);
+    // Fonction de transaction non asynchrone : Dexie attend lui-même la fin des requêtes (pas de validation anticipée).
+    await this.db.transaction('rw', [this.db.meta, this.db.chunks, this.db.ops, this.db.photos], () => {
+      void this.db.meta.clear(); void this.db.chunks.clear(); void this.db.ops.clear(); void this.db.photos.clear();
     });
   }
 
