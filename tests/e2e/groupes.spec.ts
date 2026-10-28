@@ -135,7 +135,7 @@ test('car avec absents : confirmation de l’encadreur en direct, absents signal
   const page = await tablet.newPage();
   await openCars(page); await chooseCar(page, car);
   await expect(page.getByTestId('attente-encadreur')).toBeVisible(); await expect(button(page, 'Valider la correspondance')).toBeDisabled(); await shot(page, 'groupe-attente-encadreur');
-  for (let i = 0; i < 4; i++) await enc.getByTestId('confirmer').first().click();
+  for (let i = 0; i < 4; i++) { await enc.getByTestId('confirmer').first().click(); await expect(enc.getByTestId('confirmer')).toHaveCount(5 - i); }
   await expect(enc.getByTestId('confirmer')).toHaveCount(2); await shot(enc, 'encadreur-mon-groupe');
   for (let i = 0; i < 4; i++) {
     await expect(page.getByTestId('personne-courante')).toHaveText(car.members[i]);

@@ -4,7 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.vue'; import BaseCard from '../com
 type Member = { visitor_id: string; full_name: string; organisation: string | null; called_at: string | null; checked_at: string | null; confirmed_at: string | null; absent_at: string | null; boarded_at: string | null; arrived_at: string | null; badge_code: string | null };
 const props = defineProps<{ groups: { id: string; name: string; bus_number: string | null }[]; state: { group: { id: string; name: string; bus_number: string | null; departed_at: string | null }; members: Member[]; progress: { total: number; badged: number; boarded: number; arrived: number; absent: number; complete: boolean } } | null }>();
 const departed = computed(() => props.state?.group.departed_at != null);
-function confirm(id: string) { router.post(`/mon-groupe/${id}/confirmer`, {}, { preserveScroll: true }); }
+function confirm(id: string) { router.post(`/mon-groupe/${id}/confirmer`, {}, { preserveScroll: true, async: true }); }
 function label(m: Member): string { return m.absent_at ? 'Absent' : m.arrived_at ? 'Arrivé' : m.boarded_at ? 'Embarqué' : m.badge_code ? 'Badge remis' : m.confirmed_at ? 'Confirmé' : 'À confirmer'; }
 </script>
 <template>
