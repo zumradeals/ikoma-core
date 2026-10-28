@@ -14,6 +14,7 @@ return new class extends Migration
             $t->foreign(['category_id', 'event_id'])->references(['id', 'event_id'])->on('categories')->restrictOnDelete();
         });
         Schema::table('badges', function (Blueprint $t) {
+            $t->text('cancellation_reason')->nullable();
             $t->uuid('category_id')->nullable();
             $t->uuid('reserved_group_id')->nullable();
             $t->foreign(['category_id', 'event_id'])->references(['id', 'event_id'])->on('categories')->restrictOnDelete();
@@ -36,7 +37,7 @@ return new class extends Migration
 CREATE OR REPLACE FUNCTION public.ikoma_badge_status_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF NEW.status IS DISTINCT FROM OLD.status AND NOT (
-        (OLD.status = 'Disponible' AND NEW.status = 'Associé')
+        (OLD.status = 'Disponible' AND NEW.status IN ('Associé', 'Annulé'))
         OR (OLD.status = 'Associé' AND NEW.status IN ('Restitué', 'Annulé'))
         OR (OLD.status = 'Restitué' AND NEW.status IN ('Disponible', 'Clos'))
     ) THEN
@@ -67,7 +68,7 @@ SQL);
             $t->unique('code');
             $t->dropForeign(['reserved_group_id', 'event_id']);
             $t->dropForeign(['category_id', 'event_id']);
-            $t->dropColumn(['reserved_group_id', 'category_id']);
+            $t->dropColumn(['reserved_group_id', 'category_id', 'cancellation_reason']);
         });
         Schema::table('badge_batches', function (Blueprint $t) {
             $t->dropForeign(['category_id', 'event_id']);

@@ -89,7 +89,7 @@ final class BadgeService
         });
     }
 
-    /** Annulation définitive (perdu, volé, défectueux) par un superviseur. Le motif est obligatoire. */
+    /** Annulation définitive (perdu, volé, défectueux), d'un badge associé ou encore disponible, par un superviseur. Le motif est obligatoire. */
     public function annuler(Badge|string $badge, User $superviseur, string $motif): Badge
     {
         $this->require($superviseur, 'badges.annuler');
@@ -102,12 +102,14 @@ final class BadgeService
         return DB::transaction(function () use ($badgeId, $superviseur, $motif): Badge {
             $badge = $this->lockBadge($badgeId);
             $assignment = $this->activeAssignment($badge);
-            if ($badge->status !== BadgeStatus::Assigned || $assignment === null) {
-                throw new BadgeRefused('non_associe', 'Seul un badge associé peut être annulé.');
+            if ($badge->status === BadgeStatus::Assigned && $assignment !== null) {
+                $assignment->update(['cancelled_at' => now(), 'cancellation_reason' => $motif]);
+            } elseif ($badge->status !== BadgeStatus::Available) {
+                throw new BadgeRefused('non_annulable', 'Seul un badge disponible ou associé peut être annulé.');
             }
-            $assignment->update(['cancelled_at' => now(), 'cancellation_reason' => $motif]);
+            $badge->cancellation_reason = $motif;
             $this->setStatus($badge, BadgeStatus::Cancelled);
-            $this->audit->append('badge.annule', $superviseur->id, ['badge_id' => $badge->id, 'visitor_id' => $assignment->visitor_id, 'assignment_id' => $assignment->id, 'event_id' => $badge->event_id]);
+            $this->audit->append('badge.annule', $superviseur->id, ['badge_id' => $badge->id, 'visitor_id' => $assignment?->visitor_id, 'assignment_id' => $assignment?->id, 'event_id' => $badge->event_id]);
 
             return $badge;
         });

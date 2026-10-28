@@ -79,9 +79,9 @@ Le journal conserve uniquement les identifiants et nombres pour liste.import_ape
 
 ## Évolution L4 — vie d’un badge
 
-Migration `2026_10_31_000000_create_badge_lifecycle`. Ajouts : `badge_batches.category_id`, `badges.category_id`, `badges.reserved_group_id` (CHECK : jamais poste et groupe à la fois), `badge_assignments.cancellation_reason`, `access_events.corrige_id` (référence vers l’événement corrigé : une correction est un nouvel événement). Clés étrangères composites (id, event_id) comme en L2. Unicité du code : `(event_id, code)` au lieu de globale ; jeton QR toujours unique globalement.
+Migration `2026_10_31_000000_create_badge_lifecycle`. Ajouts : `badge_batches.category_id`, `badges.category_id`, `badges.reserved_group_id` (CHECK : jamais poste et groupe à la fois), `badges.cancellation_reason`, `badge_assignments.cancellation_reason`, `access_events.corrige_id` (référence vers l’événement corrigé : une correction est un nouvel événement). Clés étrangères composites (id, event_id) comme en L2. Unicité du code : `(event_id, code)` au lieu de globale ; jeton QR toujours unique globalement.
 
-Invariants : index unique partiel `badge_assignments_one_active_visitor` (un seul badge actif par visiteur) en plus de `badge_assignments_one_active` ; déclencheur `badges_status_guard` (transitions Disponible→Associé, Associé→Restitué, Associé→Annulé, Restitué→Disponible, Restitué→Clos ; Annulé et Clos définitifs). `access_events` et `identity_checks` : le compte applicatif n’a plus UPDATE, DELETE ni TRUNCATE.
+Invariants : index unique partiel `badge_assignments_one_active_visitor` (un seul badge actif par visiteur) en plus de `badge_assignments_one_active` ; déclencheur `badges_status_guard` (transitions Disponible→Associé, Associé→Restitué, Disponible→Annulé, Associé→Annulé, Restitué→Disponible, Restitué→Clos ; Annulé et Clos définitifs). `access_events` et `identity_checks` : le compte applicatif n’a plus UPDATE, DELETE ni TRUNCATE.
 
 Réglages ajoutés dans `settings` : `badge_marge_pourcent` (10), `badge_reutilisable` (non). Lot : `quantity` = fabriqués, `margin` = nombre de badges de marge. Les lots hérités du seed ont `category_id` nul.
 

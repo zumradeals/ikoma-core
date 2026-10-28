@@ -226,12 +226,25 @@ it('annule définitivement avec un motif obligatoire, réservé au superviseur',
     $this->service->annuler($lot, $this->supervisor, 'Badge perdu');
     $assignment = DB::table('badge_assignments')->where('badge_id', $lot->id)->first();
     expect($lot->fresh()->status)->toBe(BadgeStatus::Cancelled)->and($assignment->cancelled_at)->not->toBeNull()->and($assignment->cancellation_reason)->toBe('Badge perdu');
-    expect(refusalOf(fn () => $this->service->annuler($lot, $this->supervisor, 'Encore'))?->reason)->toBe('non_associe');
+    expect($lot->fresh()->cancellation_reason)->toBe('Badge perdu');
+    expect(refusalOf(fn () => $this->service->annuler($lot, $this->supervisor, 'Encore'))?->reason)->toBe('non_annulable');
     expect(refusalOf(fn () => $this->service->restituer($lot, $this->agent))?->reason)->toBe('non_associe');
     // la personne peut recevoir un autre badge
     $other = Badge::where('badge_batch_id', $lot->badge_batch_id)->orderBy('code')->skip(1)->firstOrFail();
     $this->service->associer($other, demoVisitor(1), $this->agent);
     expect($other->fresh()->status)->toBe(BadgeStatus::Assigned);
+});
+
+it('annule un badge disponible abîmé avant toute association, sans historique d’association', function () {
+    $lot = demoLot(4);
+    $this->service->annuler($lot, $this->supervisor, 'Badge abîmé');
+    expect($lot->fresh()->status)->toBe(BadgeStatus::Cancelled)->and($lot->fresh()->cancellation_reason)->toBe('Badge abîmé');
+    expect(DB::table('badge_assignments')->where('badge_id', $lot->id)->count())->toBe(0);
+    expect(refusalOf(fn () => $this->service->associer($lot, demoVisitor(1), $this->agent))?->reason)->toBe('annule');
+    expect($this->service->controler($lot->code, $lot->event_id)->reason)->toBe('annule');
+    $log = json_decode(auditRows()->where('action', 'badge.annule')->value('details'), true);
+    expect($log['badge_id'])->toBe($lot->id)->and($log['visitor_id'])->toBeNull()->and($log['assignment_id'])->toBeNull();
+    expect(refusalOf(fn () => $this->service->annuler($lot, $this->agent, 'x'))?->reason)->toBe('non_autorise');
 });
 
 it('refuse toute opération sans la permission correspondante', function () {
@@ -293,7 +306,7 @@ it('exige l’événement quand le même code existe dans deux événements', fu
 });
 
 it('refuse en base les transitions interdites de statut et laisse les définitifs intacts', function () {
-    $allowed = [['Disponible', 'Associé'], ['Associé', 'Restitué'], ['Associé', 'Annulé'], ['Restitué', 'Disponible'], ['Restitué', 'Clos']];
+    $allowed = [['Disponible', 'Associé'], ['Disponible', 'Annulé'], ['Associé', 'Restitué'], ['Associé', 'Annulé'], ['Restitué', 'Disponible'], ['Restitué', 'Clos']];
     $all = array_column(BadgeStatus::cases(), 'value');
     $lot = demoLot(2);
     $make = function (string $status) use ($lot) {
