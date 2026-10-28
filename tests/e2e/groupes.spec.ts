@@ -96,6 +96,7 @@ test('car de 50 stagiaires : appel, correspondance et remise du badge en moins d
     await setQr(page, car.badges[i], car);
     await progress(page, i + 1, 50);
     await setQr(page, null);
+    console.log('PERSONNE', i + 1, Date.now() - started, 'ms cumulées');
     if (i === 24) await shot(page, 'groupe-mi-parcours');
   }
   const average = (Date.now() - started) / 50 / 1000;
