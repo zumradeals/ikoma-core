@@ -339,3 +339,33 @@ it('n’écrit aucun nom de personne ni motif dans le journal', function () {
         }
     }
 });
+
+it('laisse l’accueil inchangé par défaut : aucune pièce d’identité n’est demandée ni conservée', function () {
+    $visitor = deskVisitor(4);
+    expect(DB::table('settings')->where('key', 'identite_piece_active')->value('value'))->toBe('0');
+    $this->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo' => UploadedFile::fake()->createWithContent('p.jpg', deskJpeg()), 'document_photo' => UploadedFile::fake()->createWithContent('d.jpg', deskJpeg())], deskHeaders())->assertOk()->assertJson(['identity_done' => true]);
+    $row = DB::table('identity_checks')->where('visitor_id', $visitor)->first();
+    expect($row->document_type)->toBeNull()->and($row->document_number)->toBeNull()->and($row->document_file)->toBeNull();
+});
+
+it('exige le type et la photo de la pièce quand l’administrateur active l’option, le numéro restant facultatif et chiffré', function () {
+    DB::table('settings')->where('key', 'identite_piece_active')->update(['value' => '1']);
+    $visitor = deskVisitor(4);
+    $send = fn (array $doc) => $this->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent('p.jpg', deskJpeg()), ...$doc], deskHeaders());
+    $send([])->assertStatus(422)->assertJson(['code' => 'piece_requise']);
+    $send(['document_type' => 'cni'])->assertStatus(422)->assertJson(['code' => 'piece_requise']); // pas de photo de la pièce
+    $send(['document_type' => 'inconnu', 'document_photo' => UploadedFile::fake()->createWithContent('d.jpg', deskJpeg())])->assertStatus(422)->assertJson(['code' => 'piece_requise']);
+    $send(['document_type' => 'cni', 'document_number' => 'AB', 'document_photo' => UploadedFile::fake()->createWithContent('d.jpg', deskJpeg())])->assertStatus(422)->assertJson(['code' => 'piece_numero_invalide']);
+    expect(DB::table('identity_checks')->where('visitor_id', $visitor)->count())->toBe(0);
+    $send(['document_type' => 'passeport', 'document_number' => ' ci 01.23456 ', 'document_photo' => UploadedFile::fake()->createWithContent('d.jpg', deskJpeg())])->assertOk()->assertJson(['identity_done' => true]);
+    $row = DB::table('identity_checks')->where('visitor_id', $visitor)->first();
+    expect($row->document_type)->toBe('passeport')->and($row->document_number)->not->toContain('CI0123456')->and(Crypt::decryptString($row->document_number))->toBe('CI0123456');
+    $file = Storage::disk('local')->get($row->document_file);
+    expect($file)->not->toContain("\xff\xd8")->and(Crypt::decryptString($file))->not->toBe('');
+    $log = DB::table('audit_logs')->where('action', 'visiteur.identite_verifiee')->get()->map(fn ($l) => json_encode($l))->implode('');
+    expect($log)->toContain('passeport')->not->toContain('CI0123456');
+    // sans numéro : accepté
+    $other = deskVisitor(5);
+    $this->post('/poste/api/identite', ['visitor_id' => $other, 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent('p.jpg', deskJpeg()), 'document_type' => 'permis', 'document_photo' => UploadedFile::fake()->createWithContent('d.jpg', deskJpeg())], deskHeaders())->assertOk();
+    expect(DB::table('identity_checks')->where('visitor_id', $other)->value('document_number'))->toBeNull();
+});

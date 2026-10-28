@@ -135,3 +135,9 @@ Les onze décisions de la section 11 ont été validées avec les recommandation
 
 - Le contrôle sur site et la sortie fonctionnent hors ligne sur la copie chiffrée ; la copie contient désormais le hachage du jeton de **tous** les badges de l'événement (jamais un jeton en clair). Les agents qui contrôlent sur smartphone enrôlent leur appareil comme un poste.
 - Détection de tablette clonée (point 6) : confirmée par le dirigeant pour le lot L11. Export chiffré avant effacement de fin d'événement (point 5) : confirmé pour le lot L12.
+
+## Complément L11 — séquences incompatibles
+
+La décision de détection de tablette clonée (report L7) est implémentée : un lot de synchronisation verrouille le poste, les nouvelles séquences font progresser devices.sync_seq. Le renvoi du même UUID et de la même charge reste sans effet supplémentaire ; un nouvel UUID à une séquence déjà dépassée provoque révocation du poste, conflit `appareil_clone`, alerte critique et entrée `poste.clone_suspect`. Le poste est effacé au prochain échange, selon le mécanisme de révocation L6. Un nouvel enrôlement remet la séquence haute à zéro avec un nouveau jeton.
+
+Limite : cette mesure détecte des séquences incompatibles, pas un clonage matériel prouvé ni un clone coordonné qui poursuit la séquence sans collision. Ne pas la présenter comme une preuve de non-clonage. Les autres limites L6 restent applicables, notamment l’absence de révocation instantanée sans réseau et l’export chiffré avant effacement, reporté L12. La CSP, les politiques de caméra et les coquilles sans données sont vérifiées par la recette L11 ; voir REVUE_SECURITE.md.

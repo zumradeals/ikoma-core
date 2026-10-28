@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
+import jsQR from 'jsqr';
 function otp(secret: string): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = ''; for (const c of secret) bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
   const bytes = []; for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
@@ -69,20 +70,24 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   await page.emulateMedia({ media: 'screen' });
   expect(external).toEqual([]);
 
-  // 4. Décodage automatique (jsQR dans le navigateur) du QR rendu par le navigateur : « IKOMA1: » + jeton de 64 caractères hexadécimaux.
-  await page.addScriptTag({ path: 'node_modules/jsqr/dist/jsQR.js' });
-  const payloads = await page.evaluate(async () => {
-    const decode = (window as unknown as { jsQR: (d: Uint8ClampedArray, w: number, h: number) => { data: string } | null }).jsQR;
-    const results: (string | null)[] = [];
-    for (const svg of Array.from(document.querySelectorAll('article.label .qr svg'))) {
+  // 4. Décodage automatique (jsQR, côté test) du QR rendu par le navigateur : « IKOMA1: » + jeton de 64 caractères hexadécimaux.
+  // La page garde sa politique de sécurité stricte : aucun script n'y est injecté, seuls les pixels en sortent.
+  const total = await page.locator('article.label .qr svg').count();
+  const payloads: (string | null)[] = [];
+  for (let index = 0; index < total; index++) {
+    const encoded = await page.evaluate(async (position) => {
+      const svg = document.querySelectorAll('article.label .qr svg')[position];
       const markup = new XMLSerializer().serializeToString(svg).replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"');
       const image = new Image(); image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup); await image.decode();
       const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 400;
       const context = canvas.getContext('2d')!; context.fillStyle = '#fff'; context.fillRect(0, 0, 400, 400); context.drawImage(image, 0, 0, 400, 400);
-      results.push(decode(context.getImageData(0, 0, 400, 400).data, 400, 400)?.data ?? null);
-    }
-    return results;
-  });
+      const pixels = context.getImageData(0, 0, 400, 400).data;
+      let binary = '';
+      for (let from = 0; from < pixels.length; from += 8192) binary += String.fromCharCode(...pixels.subarray(from, from + 8192));
+      return btoa(binary);
+    }, index);
+    payloads.push(jsQR(new Uint8ClampedArray(Buffer.from(encoded, 'base64')), 400, 400)?.data ?? null);
+  }
   expect(payloads).toHaveLength(22);
   for (const payload of payloads) expect(payload).toMatch(/^IKOMA1:[0-9a-f]{64}$/);
   expect(new Set(payloads).size).toBe(22);

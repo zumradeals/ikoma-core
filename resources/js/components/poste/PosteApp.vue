@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { initial, reduce, stepNumber, validateBlockedReason, type Ev } from '../../poste/machine';
 import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../poste/repository';
-import { ApiError, type Avis, type DeskContext, type DeskSummary, type Fiche, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
+import { ApiError, type Avis, type DeskContext, type DeskSummary, type Fiche, type IdentityDocument, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
 import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.vue'; import PosteSelect from './PosteSelect.vue'; import StepSearch from './StepSearch.vue'; import StepFiche from './StepFiche.vue';
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
 import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
@@ -61,10 +61,10 @@ function selectVisitor(id: string, homonymCount: number) {
 }
 const onSelect = (result: SearchResult) => selectVisitor(result.id, result.homonyms);
 const onConfirm = () => send({ type: 'CONFIRM_FICHE' });
-function onIdentity(photo: Blob) {
+function onIdentity(photo: Blob, doc: IdentityDocument | undefined) {
   return run(async () => {
     const id = ctx.value.visitorId as string; const key = `identite:${id}`;
-    await repo.saveIdentity(ops.get(key), id, photo); ops.done(key);
+    await repo.saveIdentity(ops.get(key), id, photo, doc); ops.done(key);
     await refreshFiche(id); send({ type: 'IDENTITY_SAVED' });
   });
 }
@@ -155,7 +155,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
         <UnlistedForm v-else-if="ctx.step === 'non_liste'" :context="context" :busy="busy" @submit="onCreateUnlisted" @back="onBack" />
         <StepFiche v-else-if="ctx.step === 'fiche' && fiche" :key="fiche.id" :fiche="fiche" :homonyms="homonyms" @confirm="onConfirm" @back="onBack" />
         <StepWaitHost v-else-if="ctx.step === 'attente_hote' && fiche" :fiche="fiche" :refused="ctx.hostRefused" :busy="busy" @refresh="onHostRefresh" @next="onNext" />
-        <StepIdentity v-else-if="ctx.step === 'identite' && fiche" :name="fiche.full_name" :busy="busy" @done="onIdentity" @back="onBack" />
+        <StepIdentity v-else-if="ctx.step === 'identite' && fiche" :name="fiche.full_name" :busy="busy" :document-required="fiche.identity_document === true" @done="onIdentity" @back="onBack" />
         <StepDecision v-else-if="ctx.step === 'decision' && fiche" :name="fiche.full_name" :hors-periode="fiche.hors_periode" :blocked-reason="blockedReason" :busy="busy" :host-advice="fiche.host_advice?.state" :can-request="!!repo.requestHostAdvice" @request-advice="onRequestAdvice" @refresh-advice="onAdviceRefresh" @validate="onValidate" @refuse="onRefuse" @back="onBack" />
         <StepBadge v-else-if="ctx.step === 'badge' && fiche" :name="fiche.full_name" :busy="busy" @submit="onBadge" />
         <StepHandover v-else-if="ctx.step === 'remise' && fiche" :fiche="fiche" :badge-code="ctx.badgeCode ?? ''" :busy="busy" @enter="onEnter" />

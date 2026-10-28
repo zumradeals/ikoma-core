@@ -11,6 +11,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\Console\Output\OutputInterface;
 
 final class HostFixtures extends Command
 {
@@ -58,7 +59,7 @@ final class HostFixtures extends Command
         app(BadgeLots::class)->reserve($batch->id, $numbers->min(), $numbers->max(), $poste, $admin);
         $code = app(Devices::class)->issueCode($poste, $admin);
         DB::table('devices')->where('id', $poste->id)->update(['enrollment_expires_at' => now()->addHours(6)]);
-        $this->line(json_encode(['host' => $users['hote'], 'agent' => $users['agent_accueil'], 'event' => $event, 'poste' => 'Poste hôte '.$suffix, 'hostName' => 'Hôte fictif '.$suffix, 'hostId' => $host, 'category' => $category, 'listedName' => $name, 'unlistedName' => 'Non listé fictif L10 '.$suffix, 'addedName' => 'Invité ajouté fictif '.$suffix, 'enrolCode' => $code, 'badges' => $badges->pluck('code')->all()], JSON_THROW_ON_ERROR));
+        $this->output->writeln(json_encode(['host' => $users['hote'], 'agent' => $users['agent_accueil'], 'event' => $event, 'poste' => 'Poste hôte '.$suffix, 'hostName' => 'Hôte fictif '.$suffix, 'hostId' => $host, 'category' => $category, 'listedName' => $name, 'unlistedName' => 'Non listé fictif L10 '.$suffix, 'addedName' => 'Invité ajouté fictif '.$suffix, 'enrolCode' => $code, 'badges' => $badges->pluck('code')->all()], JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }

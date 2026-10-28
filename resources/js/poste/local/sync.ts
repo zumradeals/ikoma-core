@@ -125,7 +125,7 @@ export class SyncManager {
 
   private async wire(op: LocalOp) {
     const payload = { ...op.payload };
-    if (op.type === 'identite') payload.photo_b64 = await this.store.photoBase64(op.id);
+    if (op.type === 'identite') { payload.photo_b64 = await this.store.photoBase64(op.id); if (payload.document_photo === true) payload.document_photo_b64 = await this.store.photoBase64(`doc:${op.id}`); }
     return { id: op.id, seq: op.seq, type: op.type, agent_id: op.agent_id, client_time: op.client_time, visitor_rev: op.visitor_rev, payload };
   }
 }

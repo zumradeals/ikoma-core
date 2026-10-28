@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AdminDashboardController;
-use App\Http\Controllers\ApprovalsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgeReservationsController;
@@ -13,7 +12,7 @@ use App\Http\Controllers\ControleController;
 use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\HostController;
 use App\Http\Controllers\JournalController;
-use App\Http\Controllers\ListApprovalsController;
+use App\Http\Controllers\JournalExportController;
 use App\Http\Controllers\ListImportsController;
 use App\Http\Controllers\MonGroupeController;
 use App\Http\Controllers\PilotageController;
@@ -22,7 +21,8 @@ use App\Http\Controllers\PosteController;
 use App\Http\Controllers\PostesController;
 use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
-use App\Http\Controllers\SecurityProfileController;
+use App\Http\Controllers\RetentionController;
+use App\Http\Controllers\TwoFactorRecoveryController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\RequireTwoFactor;
@@ -87,13 +87,13 @@ Route::middleware(['auth'])->group(function (): void {
             Route::middleware(ResolvePoste::class)->group(function (): void {
                 Route::get('/poste/api/liste', [PosteSyncController::class, 'liste'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/liste/version', [PosteSyncController::class, 'version'])->middleware('can:visiteurs.rechercher');
-                Route::post('/poste/api/sync', [PosteSyncController::class, 'sync'])->middleware('can:visiteurs.rechercher');
+                Route::post('/poste/api/sync', [PosteSyncController::class, 'sync'])->middleware(['can:visiteurs.rechercher', 'throttle:sync']);
                 Route::post('/poste/api/efface', [PosteSyncController::class, 'efface'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/contexte', [PosteApiController::class, 'contexte'])->middleware('can:visiteurs.rechercher');
                 Route::post('/poste/api/controle', [PosteApiController::class, 'controle'])->middleware('can:badges.controler');
                 Route::post('/poste/api/sortie', [PosteApiController::class, 'sortie'])->middleware('can:badges.controler');
                 Route::get('/poste/api/presents', [PosteApiController::class, 'presents'])->middleware('can:badges.controler');
-                Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware('can:visiteurs.rechercher');
+                Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware(['can:visiteurs.rechercher', 'throttle:recherche']);
                 Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');
                 Route::post('/poste/api/identite', [PosteApiController::class, 'identite'])->middleware('can:visiteurs.verifier');
                 Route::post('/poste/api/avis-hote', [PosteApiController::class, 'avisHote'])->middleware('can:visiteurs.valider');
@@ -111,21 +111,18 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/postes/{device}/code', [PostesController::class, 'code'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
 
-        Route::get('/autorite/listes', [ListApprovalsController::class, 'index'])->middleware('can:listes.approuver');
-        Route::post('/autorite/listes/{batch}/{decision}', [ListApprovalsController::class, 'decide'])->where('decision', 'approuver|refuser')->middleware('can:listes.approuver');
-        Route::get('/administration/approbations', [ApprovalsController::class, 'index'])->middleware('can:approbations.decider');
-        Route::post('/administration/approbations/{approval}/approuver', [ApprovalsController::class, 'approve'])->whereUuid('approval')->middleware('can:approbations.decider');
-        Route::post('/administration/approbations/{approval}/refuser', [ApprovalsController::class, 'refuse'])->whereUuid('approval')->middleware('can:approbations.decider');
-        Route::get('/administration/profil-securite', [SecurityProfileController::class, 'show'])->middleware('can:securite.gerer');
-        Route::put('/administration/profil-securite', [SecurityProfileController::class, 'update'])->middleware('can:securite.gerer');
-
         Route::get('/espace', fn () => Inertia::render('Space'))->name('space');
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
+        Route::post('/administration/comptes/{user}/2fa/preparer', [TwoFactorRecoveryController::class, 'prepare'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);
+        Route::post('/administration/comptes/{user}/2fa/confirmer', [TwoFactorRecoveryController::class, 'confirm'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::get('/administration/comptes', [AccountsController::class, 'index'])->middleware('can:comptes.gerer');
         Route::post('/administration/comptes', [AccountsController::class, 'store'])->middleware(['can:comptes.gerer', 'can:roles.attribuer']);
         Route::put('/administration/comptes/inactivite', [AccountsController::class, 'inactivity'])->middleware('can:comptes.gerer');
         Route::put('/administration/comptes/{user}', [AccountsController::class, 'update'])->middleware(['can:comptes.gerer', 'can:roles.attribuer']);
         Route::put('/administration/comptes/{user}/mot-de-passe', [AccountsController::class, 'password'])->middleware('can:comptes.gerer');
+        Route::get('/administration/conservation', [RetentionController::class, 'index'])->middleware('can:comptes.gerer');
+        Route::put('/administration/conservation', [RetentionController::class, 'update'])->middleware('can:comptes.gerer');
+        Route::get('/administration/journal/exporter', JournalExportController::class)->middleware(['can:journal.exporter', 'throttle:exports']);
         Route::get('/administration/journal', JournalController::class)->middleware('can:journal.consulter');
         Route::get('/administration/groupes', [GroupesController::class, 'index'])->middleware('can:groupes.gerer');
         Route::post('/administration/groupes', [GroupesController::class, 'store'])->middleware('can:groupes.gerer');

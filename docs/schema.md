@@ -189,13 +189,15 @@ Migration `2026_11_08_000000_add_offline_and_threshold_settings`. Aucune table n
 
 Migration `2026_11_09_000000_add_alert_escalation` : `alerts.escalated_at` (timestamptz, nul tant que l'alerte n'a pas été escaladée) et le réglage `alerte_escalade_minutes` (5). Tâche planifiée `alertes:escalader` (30 s). Journal : `alerte.escaladee`. Décisions : JOURNAL_DECISIONS.md, rubrique L14c.
 
-## Évolution L14d — code de contrainte
 
-Migration `2026_11_10_000000_add_duress_alert` : `alerts_type_valid` accepte `contrainte` et `alerts_subject_valid` accepte le sujet `poste`. Nouvelle opération de synchronisation `contrainte` (droit `visiteurs.rechercher`, rôle agent d'accueil). Journal : `poste.contrainte`. Côté tablette : `VaultRecord.duress` (second enveloppement du coffre). Décisions : JOURNAL_DECISIONS.md, rubrique L14d.
+- A1 (option) : `identity_checks.document_type` (cni, passeport, permis, carte_militaire, carte_professionnelle, autre), `document_number` (chiffré, facultatif), `document_file` (image chiffrée) ; réglage `identite_piece_active` (désactivé par défaut).
+## Évolution L11 — durcissement et conservation
 
-## Évolution L15a et L15b — profil de sécurité et double validation
+Migration additive `2026_11_07_000000_harden_data_lifecycle` : aucune nouvelle table.
 
-Migrations `2026_11_11_000000_add_security_profile` (réglage `profil_securite`, `standard` au départ) et `2026_11_12_000000_create_approvals`. **approvals** (nouvelle) : `action`, `payload` (jsonb, sans secret en clair), `summary`, `requested_by`, `expires_at`, `decided_by`, `decided_at`, `decision` (`approuve` / `refuse`), `executed_at`. Contraintes : décision, auteur et date vont ensemble ; `decided_by <> requested_by` ; une demande n'est exécutée que si elle est approuvée. Permissions ajoutées : `securite.gerer`, `approbations.decider` (administrateur). Journal : `securite.profil_modifie`, `approbation.demandee`, `approbation.approuvee`, `approbation.refusee`. Décisions : JOURNAL_DECISIONS.md, rubriques L15a et L15b.
+- devices.sync_seq : dernière séquence nouvelle acceptée ou mise en conflit, initialisée au maximum historique, remise à zéro à l’enrôlement. Sous verrou d’appareil : un renvoi du même UUID reste idempotent ; un nouvel UUID à une séquence déjà dépassée déclenche révocation, conflit `appareil_clone`, alerte critique et audit. Cela détecte des séquences incompatibles, pas un clone capable de poursuivre une séquence commune sans collision.
+- events.anonymized_at, retention_summary (jsonb) : date de réduction des identités et bilan chiffré des visiteurs/statuts/mouvements avant suppression privilégiée des mouvements échus. UUID, contraintes et statistiques sont conservés ; voir les limites d’anonymisation dans CONSERVATION_DONNEES.md.
+- index sync_operations(device_id, seq). Les privilèges de l’application sur les trois tables append-only restent inchangés.
+- settings.value passe de varchar(255) à text pour les reçus signés (rétrocompatible pour les réglages existants). Réglages : conservation_{visiteurs,evenements,photos,synchronisations,alertes,notifications,audit}_jours (30/90/7/30/30/7/365 proposés), conservation_validee=0, journal_export_max_lignes=10000. Après une purge du journal seulement : audit_checkpoint contient le point de reprise signé, vérifiable par une clé publique indépendante ; aucune clé privée dans la base.
 
-
-- L16 : `visitors.approval_status` (`approuve` par défaut | `a_approuver` | `refuse`), `approved_by`, `approved_at` ; contrainte CHECK sur le statut ; index sur (event_id, approval_status).
+Les échecs de connexion ajoutent IP et empreinte SHA-256 du jeton d’appareil reçu, à défaut du User-Agent. Ce dernier est un indicateur technique non unique, pas une authentification d’appareil. Les jetons, identifiants saisis et mots de passe ne sont pas copiés au journal. Un refus d’accès est enregistré une seule fois par requête, avec le gabarit de route et le statut.

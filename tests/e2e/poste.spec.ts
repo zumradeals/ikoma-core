@@ -297,6 +297,7 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
 });
 
 test('la révocation par l’administrateur efface la tablette à sa prochaine synchronisation', async ({ browser, baseURL }) => {
+  test.setTimeout(90_000); // le serveur refuse un code à six chiffres déjà utilisé : l'attente de la période suivante peut durer 30 s
   const page = await desk();
   await expect(page.getByRole('button', { name: 'Effacer cette tablette' })).toHaveCount(0); // l'effacement n'est pas à la portée de l'agent
   const adminContext = await browser.newContext({ baseURL });

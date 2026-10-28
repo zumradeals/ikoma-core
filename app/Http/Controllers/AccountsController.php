@@ -3,14 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\Approvals;
 use App\Services\Audit;
 use App\Services\HostNotifications;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +21,7 @@ class AccountsController
     {
         Gate::authorize('comptes.gerer');
 
-        return Inertia::render('Admin/Accounts', ['users' => User::with('roles')->orderBy('name')->get()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'active' => $u->active, 'role' => $u->getRoleNames()->first()]), 'hosts' => DB::table('hosts as h')->join('events as e', 'e.id', '=', 'h.event_id')->orderBy('e.name')->get(['h.id', 'h.name', 'h.user_id', 'e.name as event_name']), 'hostTimeout' => (int) (DB::table('settings')->where('key', 'hote_delai_reponse_minutes')->value('value') ?? 2), 'roles' => array_keys(config('roles')), 'idle' => (int) DB::table('settings')->where('key', 'session_idle_minutes')->value('value')]);
+        return Inertia::render('Admin/Accounts', ['twoFactorReset' => session('twoFactorReset'), 'users' => User::with('roles')->orderBy('name')->get()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'active' => $u->active, 'role' => $u->getRoleNames()->first()]), 'hosts' => DB::table('hosts as h')->join('events as e', 'e.id', '=', 'h.event_id')->orderBy('e.name')->get(['h.id', 'h.name', 'h.user_id', 'e.name as event_name']), 'hostTimeout' => (int) (DB::table('settings')->where('key', 'hote_delai_reponse_minutes')->value('value') ?? 2), 'roles' => array_keys(config('roles')), 'idle' => (int) DB::table('settings')->where('key', 'session_idle_minutes')->value('value')]);
     }
 
     public function store(Request $r): RedirectResponse
@@ -31,14 +29,8 @@ class AccountsController
         Gate::authorize('comptes.gerer');
         Gate::authorize('roles.attribuer');
         $data = $r->validate(['name' => 'required|string|max:120', 'email' => 'required|email|max:180|unique:users', 'password' => ['required', Password::min(12)->mixedCase()->numbers()->symbols()], 'role' => ['required', Rule::in(array_keys(config('roles')))]]);
-        $approvals = app(Approvals::class);
-        if (Approvals::privileged($data['role']) && $approvals->required()) {
-            // Profil renforcé : un compte privilégié n'est créé qu'après la validation d'un second administrateur. Le mot de passe n'est conservé qu'en empreinte.
-            $approvals->request('compte.creer', ['name' => $data['name'], 'email' => strtolower($data['email']), 'password_hash' => Hash::make($data['password']), 'role' => $data['role']], 'Créer le compte « '.$data['name'].' » avec le rôle '.$data['role'].'.', $r->user());
-
-            return back()->with('status', 'Demande envoyée : un second administrateur doit la valider (menu « Validations »).');
-        }
         DB::transaction(function () use ($data): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
             $u = User::create(['name' => $data['name'], 'email' => strtolower($data['email']), 'password' => $data['password']]);
             $u->assignRole($data['role']);
             app(Audit::class)->append('compte.cree', auth()->id(), ['id' => $u->id, 'role' => $data['role']]);
@@ -53,23 +45,17 @@ class AccountsController
         Gate::authorize('roles.attribuer');
         $data = $r->validate(['active' => 'required|boolean', 'role' => ['required', Rule::in(array_keys(config('roles')))]]);
         abort_if($user->id === $r->user()->id && (! $data['active'] || $data['role'] !== 'administrateur'), 422, 'Vous ne pouvez pas retirer votre propre accès administrateur.');
-        $approvals = app(Approvals::class);
-        $current = $user->getRoleNames()->first();
-        $touchesPrivilege = $current !== $data['role'] && (Approvals::privileged($current) || Approvals::privileged($data['role']));
-        $reactivatesPrivileged = ! $user->active && $data['active'] && Approvals::privileged($data['role']);
-        if (($touchesPrivilege || $reactivatesPrivileged) && $approvals->required()) {
-            $approvals->request('compte.modifier', ['user_id' => $user->id, 'role' => $data['role'], 'active' => (bool) $data['active']], 'Modifier le compte « '.$user->name.' » : rôle '.$data['role'].', '.($data['active'] ? 'actif' : 'désactivé').'.', $r->user());
-
-            return back()->with('status', 'Demande envoyée : un second administrateur doit la valider (menu « Validations »).');
-        }
         DB::transaction(function () use ($user, $data): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
+            $user = User::query()->lockForUpdate()->findOrFail($user->id);
             if ($user->active !== $data['active']) {
-                $user->update(['active' => $data['active']]);
+                $user->update(['active' => $data['active'], 'remember_token' => null]);
                 app(Audit::class)->append($data['active'] ? 'compte.active' : 'compte.desactive', auth()->id(), ['id' => $user->id]);
             }
             $old = $user->getRoleNames()->first();
             if ($old !== $data['role']) {
                 $user->syncRoles([$data['role']]);
+                $user->update(['remember_token' => null]);
                 app(Audit::class)->append('role.change', auth()->id(), ['id' => $user->id, 'avant' => $old, 'apres' => $data['role']]);
             }
             DB::table('sessions')->where('user_id', $user->id)->delete();
@@ -128,6 +114,8 @@ class AccountsController
         Gate::authorize('comptes.gerer');
         $data = $r->validate(['password' => ['required', Password::min(12)->mixedCase()->numbers()->symbols()]]);
         DB::transaction(function () use ($data, $user): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
+            $user = User::query()->lockForUpdate()->findOrFail($user->id);
             $user->update(['password' => $data['password'], 'remember_token' => null]);
             DB::table('sessions')->where('user_id', $user->id)->delete();
             app(Audit::class)->append('mot_de_passe.reinitialise', auth()->id(), ['id' => $user->id]);

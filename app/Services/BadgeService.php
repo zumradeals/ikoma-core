@@ -49,9 +49,6 @@ final class BadgeService
             if ($visitor->status === 'refuse') {
                 throw new BadgeRefused('visiteur_refuse', 'Accès refusé à ce visiteur : aucun badge ne peut lui être associé.');
             }
-            if (($visitor->approval_status ?? 'approuve') !== 'approuve') { // audit global A3 : approbation de l'officier de sécurité (profil renforcé)
-                throw new BadgeRefused('non_approuve', 'Cet invité attend l’approbation de l’officier de sécurité : aucun badge ne peut lui être associé.');
-            }
             $held = DB::table('badge_assignments as a')->join('badges as b', 'b.id', '=', 'a.badge_id')->where('a.visitor_id', $visitor->id)->whereNull('a.returned_at')->whereNull('a.cancelled_at')->value('b.code');
             if ($held !== null) {
                 throw new BadgeRefused('visiteur_deja_badge', "Ce visiteur a déjà le badge {$held}.");

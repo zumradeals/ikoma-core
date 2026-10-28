@@ -46,23 +46,16 @@ async function unseal(key: CryptoKey, blob: Uint8Array, aad: string): Promise<Ui
   return new Uint8Array(await subtle().decrypt({ name: 'AES-GCM', iv: blob.slice(0, 12) as BufferSource, additionalData: encoder.encode(aad) }, key, blob.slice(12) as BufferSource));
 }
 
-/** `duress` : le même coffre, enveloppé une seconde fois par le code de contrainte (audit global C2). */
-export type VaultRecord = { salt: string; iterations: number; wrapped: string; duress?: { salt: string; wrapped: string } };
+export type VaultRecord = { salt: string; iterations: number; wrapped: string };
 
 /** Crée le coffre : DEK aléatoire, enveloppée par la clé PIN puis par la clé d'appareil. */
-export async function createVault(pin: string, serverSecret: Uint8Array, deviceKey: CryptoKey, iterations = PBKDF2_ITERATIONS, duressPin?: string): Promise<{ record: VaultRecord; dek: CryptoKey }> {
+export async function createVault(pin: string, serverSecret: Uint8Array, deviceKey: CryptoKey, iterations = PBKDF2_ITERATIONS): Promise<{ record: VaultRecord; dek: CryptoKey }> {
   const salt = randomBytes(16);
   const raw = randomBytes(32);
   const kek = await deriveKek(pin, salt, serverSecret, iterations);
   const inner = await seal(kek, raw, 'ikoma-dek');
   const wrapped = await seal(deviceKey, inner, 'ikoma-dek-device');
-  const record: VaultRecord = { salt: toB64(salt), iterations, wrapped: toB64(wrapped) };
-  if (duressPin) {
-    const duressSalt = randomBytes(16);
-    const duressInner = await seal(await deriveKek(duressPin, duressSalt, serverSecret, iterations), raw, 'ikoma-dek-duress');
-    record.duress = { salt: toB64(duressSalt), wrapped: toB64(await seal(deviceKey, duressInner, 'ikoma-dek-device')) };
-  }
-  return { record, dek: await importDek(raw) };
+  return { record: { salt: toB64(salt), iterations, wrapped: toB64(wrapped) }, dek: await importDek(raw) };
 }
 
 /** Ouvre le coffre. Un mauvais PIN, un autre secret ou une autre tablette font échouer le déchiffrement. */
@@ -70,24 +63,6 @@ export async function openVault(pin: string, record: VaultRecord, serverSecret: 
   const kek = await deriveKek(pin, fromB64(record.salt), serverSecret, record.iterations);
   const inner = await unseal(deviceKey, fromB64(record.wrapped), 'ikoma-dek-device');
   return importDek(await unseal(kek, inner, 'ikoma-dek'));
-}
-
-/**
- * Ouvre le coffre avec le PIN ou avec le code de contrainte. Les deux essais sont toujours faits, même quand il n'existe pas de code de contrainte :
- * la durée ne dit pas lequel des deux codes a été saisi.
- */
-export async function openVaultMode(pin: string, record: VaultRecord, serverSecret: Uint8Array, deviceKey: CryptoKey): Promise<{ dek: CryptoKey; duress: boolean }> {
-  const attempt = async (salt: string, wrapped: string, aad: string): Promise<CryptoKey | null> => {
-    try {
-      const kek = await deriveKek(pin, fromB64(salt), serverSecret, record.iterations);
-      return await importDek(await unseal(kek, await unseal(deviceKey, fromB64(wrapped), 'ikoma-dek-device'), aad));
-    } catch { return null; }
-  };
-  const main = await attempt(record.salt, record.wrapped, 'ikoma-dek');
-  const duress = record.duress ? await attempt(record.duress.salt, record.duress.wrapped, 'ikoma-dek-duress') : await attempt(record.salt, record.wrapped, 'ikoma-dek-duress');
-  if (main) return { dek: main, duress: false };
-  if (duress && record.duress) return { dek: duress, duress: true };
-  throw new Error('pin_incorrect');
 }
 
 function importDek(raw: Uint8Array): Promise<CryptoKey> {

@@ -6,7 +6,6 @@ use App\Models\Device;
 use App\Models\User;
 use App\Services\Alerts;
 use App\Services\Audit;
-use App\Services\ControlAlerts;
 use App\Services\Groups;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,15 +20,30 @@ final class SyncProcessor
 {
     public const MAX_OPERATIONS = 50;
 
-    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler', 'contrainte' => 'visiteurs.rechercher'];
+    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler'];
 
-    public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups, private readonly ControlAlerts $controlAlerts) {}
+    public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups) {}
 
     /**
      * @param  list<array<string, mixed>>  $operations
-     * @return array{results:list<array<string,mixed>>,summary:array<string,int>}
+     * @return array{revoked:true}|array{results:list<array<string,mixed>>,summary:array<string,int>,clock_skew_seconds:?int}
      */
     public function process(Device $device, User $session, array $operations, ?string $sentAt): array
+    {
+        return DB::transaction(function () use ($device, $session, $operations, $sentAt): array {
+            $locked = Device::query()->lockForUpdate()->findOrFail($device->id);
+            if ($locked->revoked_at !== null) {
+                return ['revoked' => true];
+            }
+
+            return $this->batch($locked, $session, $operations, $sentAt);
+        });
+    }
+
+    /** @param list<array<string, mixed>> $operations
+     * @return array{revoked:true}|array{results:list<array<string,mixed>>,summary:array<string,int>,clock_skew_seconds:?int}
+     */
+    private function batch(Device $device, User $session, array $operations, ?string $sentAt): array
     {
         usort($operations, fn ($a, $b) => ((int) ($a['seq'] ?? 0)) <=> ((int) ($b['seq'] ?? 0)));
         $results = [];
@@ -37,6 +51,9 @@ final class SyncProcessor
         $conflicts = 0;
         foreach ($operations as $operation) {
             $result = $this->one($device, $operation);
+            if (($result['code'] ?? null) === 'appareil_revoque') {
+                return ['revoked' => true];
+            }
             $results[] = $result;
             $result['status'] === 'applique' ? $applied++ : $conflicts++;
         }
@@ -89,6 +106,22 @@ final class SyncProcessor
             $now = now();
             $clientTime = $this->time($op['client_time'] ?? null);
             $visitorId = isset($payload['visitor_id']) && Str::isUuid((string) $payload['visitor_id']) ? (string) $payload['visitor_id'] : null;
+            $sequence = filter_var($op['seq'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($sequence === false) {
+                return ['id' => $id, 'status' => 'conflit', 'code' => 'operation_invalide', 'message' => 'Séquence invalide.'];
+            }
+            if (! DB::table('sync_operations')->where('id', $id)->exists()) {
+                if ($sequence <= (int) DB::table('devices')->where('id', $device->id)->value('sync_seq')) {
+                    DB::table('devices')->where('id', $device->id)->update(['revoked_at' => now(), 'updated_at' => now()]);
+                    $conflict = (string) Str::uuid();
+                    DB::table('sync_conflicts')->insert(['id' => $conflict, 'event_id' => $device->event_id, 'device_id' => $device->id, 'kind' => 'conflit', 'reason' => 'appareil_clone', 'details' => json_encode(['seq' => $sequence]), 'created_at' => now(), 'updated_at' => now()]);
+                    app(Alerts::class)->raise($device->event_id, 'conflit_sync', 'critique', 'conflit', $conflict, 'Séquences incompatibles : appareil révoqué, vérification nécessaire.', 'clone:'.$device->id.':'.$device->enrolled_at);
+                    $this->audit->append('poste.clone_suspect', null, ['device_id' => $device->id, 'seq' => $sequence]);
+
+                    return ['id' => $id, 'code' => 'appareil_revoque'];
+                }
+                DB::table('devices')->where('id', $device->id)->update(['sync_seq' => $sequence]);
+            }
             $inserted = DB::table('sync_operations')->insertOrIgnore(['id' => $id, 'device_id' => $device->id, 'user_id' => $op['agent_id'], 'type' => $type, 'payload_hash' => $hash, 'seq' => (int) ($op['seq'] ?? 0), 'client_time' => $clientTime, 'visitor_id' => $visitorId, 'received_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
             if ($inserted === 0) {
                 $row = DB::table('sync_operations')->where('id', $id)->first();
@@ -158,7 +191,7 @@ final class SyncProcessor
                 [$visitor, $photo] = $need('visitor_id', 'photo_b64');
                 $bytes = base64_decode((string) $photo, true);
 
-                return $this->desk->saveIdentity($device, $agent, (string) $visitor, (bool) ($p['identity_checked'] ?? true), $bytes === false ? '' : $bytes);
+                return $this->desk->saveIdentity($device, $agent, (string) $visitor, (bool) ($p['identity_checked'] ?? true), $bytes === false ? '' : $bytes, isset($p['document_type']) ? (string) $p['document_type'] : null, isset($p['document_number']) ? (string) $p['document_number'] : null, isset($p['document_photo_b64']) && $p['document_photo_b64'] !== '' ? (base64_decode((string) $p['document_photo_b64'], true) ?: null) : null);
             case 'valider':
                 [$visitor] = $need('visitor_id');
 
@@ -204,10 +237,6 @@ final class SyncProcessor
                 [$group] = $need('group_id');
 
                 return $this->groups->finishArrival($agent, (string) $group);
-            case 'contrainte':
-                $this->controlAlerts->duress($device, $agent, $clientTime);
-
-                return ['ok' => true];
             case 'sortie':
                 [$code] = $need('code');
 

@@ -3,14 +3,14 @@ import { normalize, trigrams, type Indexed } from './search';
 
 export type SnapVisitor = {
   id: string; full_name: string; organisation: string | null; host_id: string | null; category_id: string; valid_from: string; valid_until: string; source: string; status: string;
-  host_validation: 'en_attente' | 'accepte' | 'refuse' | null; access_note?: string | null; group_id?: string | null; a_rebadger?: boolean; approval?: 'approuve' | 'a_approuver' | 'refuse'; rev: string | null; identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
+  host_validation: 'en_attente' | 'accepte' | 'refuse' | null; access_note?: string | null; group_id?: string | null; a_rebadger?: boolean; rev: string | null; identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
 };
 export type SnapBadge = { code: string; token_hash: string; category_id: string | null; status: string; mine: boolean; group_id?: string | null };
 export type SnapGroup = { id: string; name: string; bus_number: string | null; opened: boolean; departed: boolean; arrival_closed: boolean };
 export type SnapMember = { group_id: string; visitor_id: string; checked: boolean; confirmed: boolean; absent: boolean; boarded: boolean; arrived: boolean };
 export type Snapshot = {
   version: string; server_time: string; poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string; starts_at: string; ends_at: string };
-  settings: { inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; controle_stagiaires?: 'identite' | 'encadreur';
+  settings: { identity_document?: boolean; inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; controle_stagiaires?: 'identite' | 'encadreur';
     offline_call_minutes?: number; offline_max_hours?: number; low_badges_percent?: number; low_badges_min?: number };
   categories: Category[]; zones: { id: string; name: string; est_accueil: boolean }[]; category_zone: { category_id: string; zone_id: string }[];
   hosts: { id: string; name: string; service: string | null }[]; postes: { id: string; name: string }[]; visitors: SnapVisitor[]; badges: SnapBadge[]; groups?: SnapGroup[]; members?: SnapMember[];

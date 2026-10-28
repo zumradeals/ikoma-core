@@ -42,11 +42,12 @@ final class PosteApiController
 
     public function identite(Request $r): JsonResponse
     {
-        $data = $r->validate(['visitor_id' => 'required|uuid', 'identity_checked' => 'required|boolean', 'photo' => 'required|file|max:1024']);
+        $data = $r->validate(['visitor_id' => 'required|uuid', 'identity_checked' => 'required|boolean', 'photo' => 'required|file|max:1024', 'document_type' => 'nullable|string|max:20', 'document_number' => 'nullable|string|max:40', 'document_photo' => 'nullable|file|max:2048']);
         $bytes = (string) $r->file('photo')->get();
+        $docBytes = $r->hasFile('document_photo') ? (string) $r->file('document_photo')->get() : null;
         $poste = $this->poste($r);
 
-        return $this->operations->run($r, 'identite', $data['visitor_id'].'|'.(int) $r->boolean('identity_checked').'|'.hash('sha256', $bytes), fn () => $this->desk->saveIdentity($poste, $r->user(), $data['visitor_id'], $r->boolean('identity_checked'), $bytes));
+        return $this->operations->run($r, 'identite', $data['visitor_id'].'|'.(int) $r->boolean('identity_checked').'|'.hash('sha256', $bytes.'|'.($data['document_type'] ?? '').'|'.($data['document_number'] ?? '').'|'.($docBytes !== null ? hash('sha256', $docBytes) : '')), fn () => $this->desk->saveIdentity($poste, $r->user(), $data['visitor_id'], $r->boolean('identity_checked'), $bytes, $data['document_type'] ?? null, $data['document_number'] ?? null, $docBytes));
     }
 
     public function valider(Request $r): JsonResponse

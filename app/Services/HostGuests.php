@@ -92,10 +92,9 @@ final class HostGuests
             $at = now()->format('Y-m-d H:i:s.uP');
             $visitorId = $id ?? (string) Str::uuid();
             if (! $v) {
-                DB::table('visitors')->insert(['id' => $visitorId, 'event_id' => $host->event_id, 'host_id' => $host->id, ...$values, 'source' => 'listé', 'status' => 'attendu', 'approval_status' => VisitorApprovals::initialStatus(), 'created_at' => $at, 'updated_at' => $at]);
+                DB::table('visitors')->insert(['id' => $visitorId, 'event_id' => $host->event_id, 'host_id' => $host->id, ...$values, 'source' => 'listé', 'status' => 'attendu', 'created_at' => $at, 'updated_at' => $at]);
             } elseif ($fields) {
-                // Une fiche modifiée par l'hôte doit être approuvée de nouveau (profil renforcé) : l'officier ne valide que ce qu'il a vu.
-                DB::table('visitors')->where('id', $id)->update([...$values, 'updated_at' => $at, ...(SecurityProfile::strict() ? ['approval_status' => VisitorApprovals::PENDING, 'approved_by' => null, 'approved_at' => null] : [])]);
+                DB::table('visitors')->where('id', $id)->update([...$values, 'updated_at' => $at]);
             }
             if (! $v || $fields) {
                 DB::table('events')->where('id', $host->event_id)->increment('list_revision');

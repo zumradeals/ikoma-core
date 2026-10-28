@@ -159,8 +159,8 @@ it('envoie la copie de travail sans jeton QR en clair, avec tous les badges de l
     $number = (int) substr($this->badges[0]->code, 2);
     app(BadgeLots::class)->reserve($this->badges[0]->badge_batch_id, $number, $number + 2, Device::findOrFail($this->deviceA), syncUser('administrateur'));
     $liste = $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->json();
-    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
-    expect(array_keys($liste['visitors'][0]))->toBe(['id', 'full_name', 'organisation', 'host_id', 'category_id', 'valid_from', 'valid_until', 'source', 'status', 'host_validation', 'access_note', 'approval', 'group_id', 'a_rebadger', 'rev', 'identity_done', 'photo_done', 'validated', 'badge_code']);
+    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'identity_document' => false, 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
+    expect(array_keys($liste['visitors'][0]))->toBe(['id', 'full_name', 'organisation', 'host_id', 'category_id', 'valid_from', 'valid_until', 'source', 'status', 'host_validation', 'access_note', 'group_id', 'a_rebadger', 'rev', 'identity_done', 'photo_done', 'validated', 'badge_code']);
     $codes = array_column($liste['badges'], 'code');
     expect($codes)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->toContain($this->badges[3]->code);
     $mine = collect($liste['badges'])->where('mine', true)->pluck('code');

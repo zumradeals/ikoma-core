@@ -16,7 +16,7 @@ const phase = ref<'chargement' | 'vide' | 'verrouille' | 'ouvert'>('chargement')
 const sync = ref<SyncState | null>(null);
 const wiped = ref<WipeReason | null>(null);
 const message = ref<string | null>(null);
-const code = ref(''); const pin = ref(''); const pin2 = ref(''); const duressPin = ref(''); const busy = ref(false);
+const code = ref(''); const pin = ref(''); const pin2 = ref(''); const busy = ref(false);
 const lockedUntil = ref(0); const now = ref(Date.now()); const remaining = ref<number | null>(null);
 const conflicts = shallowRef<LocalOp[]>([]);
 const openKey = ref(0);
@@ -36,7 +36,7 @@ const wipeText: Record<WipeReason, string> = {
   fin_evenement: 'L’événement est terminé depuis plus de 24 heures : les données de cette tablette ont été effacées.',
   manuel: 'Les données de cette tablette ont été effacées.',
 };
-const conflictLabel: Record<string, string> = { identite: 'Pièce d’identité et photo', valider: 'Validation', refuser: 'Refus', badge: 'Badge', entree: 'Entrée', non_liste: 'Visiteur non listé', groupe_controle: 'Contrôle de correspondance (groupe)', groupe_badge: 'Badge remis à un stagiaire', groupe_depart: 'Fermeture du car', groupe_arrivee: 'Arrivée du car', groupe_arrivee_fin: 'Fin du contrôle d’arrivée', contrainte: 'Alerte silencieuse' };
+const conflictLabel: Record<string, string> = { identite: 'Pièce d’identité et photo', valider: 'Validation', refuser: 'Refus', badge: 'Badge', entree: 'Entrée', non_liste: 'Visiteur non listé', groupe_controle: 'Contrôle de correspondance (groupe)', groupe_badge: 'Badge remis à un stagiaire', groupe_depart: 'Fermeture du car', groupe_arrivee: 'Arrivée du car', groupe_arrivee_fin: 'Fin du contrôle d’arrivée' };
 
 async function loadConflicts() { conflicts.value = runtime.vault.unlocked ? await runtime.conflicts() : []; }
 function visitorName(op: LocalOp): string {
@@ -66,11 +66,10 @@ function explain(e: unknown): string {
 async function enrol() {
   message.value = null;
   if (!props.agent) return;
-  const duressProblem = duressPin.value ? (duressPin.value === pin.value ? 'Le code de contrainte doit être différent du PIN.' : pinProblem(duressPin.value)) : null;
-  const problem = pin.value !== pin2.value ? 'Les deux PIN ne sont pas identiques.' : pinProblem(pin.value) ?? (duressProblem ? `Code de contrainte : ${duressProblem}` : null);
+  const problem = pin.value !== pin2.value ? 'Les deux PIN ne sont pas identiques.' : pinProblem(pin.value);
   if (problem) { message.value = problem; return; }
   busy.value = true;
-  try { await runtime.enrol(code.value, pin.value, props.agent, duressPin.value || undefined); pin.value = ''; pin2.value = ''; duressPin.value = ''; code.value = ''; await afterOpen(); }
+  try { await runtime.enrol(code.value, pin.value, props.agent); pin.value = ''; pin2.value = ''; code.value = ''; await afterOpen(); }
   catch (e) { message.value = explain(e); }
   finally { busy.value = false; }
 }
@@ -122,8 +121,6 @@ onBeforeUnmount(() => {
         <label class="block text-lg font-semibold">Code d’enrôlement<input v-model="code" class="field !text-2xl" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" data-testid="code-enrolement" required></label>
         <label class="block text-lg font-semibold">Choisissez un PIN (6 chiffres)<input v-model="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" class="field !text-2xl" data-testid="pin" required></label>
         <label class="block text-lg font-semibold">Confirmez le PIN<input v-model="pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" class="field !text-2xl" data-testid="pin-confirmation" required></label>
-        <label class="block text-lg font-semibold">Code de contrainte (facultatif, recommandé)<input v-model="duressPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" class="field !text-2xl" data-testid="pin-contrainte" aria-describedby="aide-contrainte"></label>
-        <p id="aide-contrainte" class="text-base">Un second code de 6 chiffres, différent du PIN. Si vous êtes menacé, saisissez-le à la place du PIN : la tablette s’ouvre normalement, mais le superviseur est prévenu en silence. Ne le dites à personne.</p>
         <p v-if="message" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="erreur-gate"><span aria-hidden="true">⚠</span> {{ message }}</p>
         <button type="submit" class="btn-main" :disabled="busy" data-testid="enroler">{{ busy ? 'Copie de la liste en cours…' : 'Enrôler cette tablette' }}</button>
       </form>

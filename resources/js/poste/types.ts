@@ -2,11 +2,15 @@ export type Category = { id: string; name: string; color: string; priority_circu
 export type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string };
 export type DeskContext = { poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string }; hosts: { id: string; name: string; service: string | null }[]; categories: Category[] };
 export type SearchResult = { id: string; full_name: string; organisation: string | null; host: string | null; homonyms: number; category: Category };
+export type IdentityDocument = { type: string; number?: string; photo: Blob };
+export const documentLabels: Record<string, string> = { cni: 'Carte nationale d’identité', passeport: 'Passeport', permis: 'Permis de conduire', carte_militaire: 'Carte militaire', carte_professionnelle: 'Carte professionnelle', autre: 'Autre pièce' };
+
 export type Fiche = {
+  identity_document?: boolean;
   id: string; full_name: string; organisation: string | null; host: string | null; category: Category; zones: string[]; accueil_limite: boolean; source: string; status: string;
   host_advice?: {state:string|null};
   host_validation: 'en_attente' | 'accepte' | 'refuse' | null; valid_from: string; valid_until: string; hors_periode: boolean;
-  identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null; access_note?: string | null; a_rebadger?: boolean; approval?: 'approuve' | 'a_approuver' | 'refuse';
+  identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null; access_note?: string | null; a_rebadger?: boolean;
 };
 export type Checkpoint = { type: 'zone' | 'poste'; id: string; name: string };
 export type PointRef = { type: 'zone' | 'poste'; id: string };
