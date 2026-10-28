@@ -72,6 +72,7 @@ export class PosteStore {
     const rows = await this.db.ops.toArray();
     const counts: Record<string, number> = {}; const pending: Record<string, number> = {};
     for (const r of rows) {
+      if (r.type === 'contrainte') continue; // le code de contrainte ne doit apparaître nulle part sur l'écran de l'agent
       if (r.status !== 'conflict') counts[r.type] = (counts[r.type] ?? 0) + 1;
       if (r.status === 'pending') pending[r.type] = (pending[r.type] ?? 0) + 1;
     }

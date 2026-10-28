@@ -27,7 +27,7 @@ export class LocalEvacuation {
     await this.vault.enrol({ token: 'pilotage', secret: toB64(randomBytes(32)), pin, agent, poste: { id: 'pilotage', name: 'Pilotage' }, eventEndsAt: endsAt, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
   }
 
-  unlock(pin: string): Promise<void> { return this.vault.unlock(pin); }
+  async unlock(pin: string): Promise<void> { await this.vault.unlock(pin); }
   lock(): void { this.vault.lock(); }
   wipe(): Promise<void> { return this.vault.wipe(); }
 

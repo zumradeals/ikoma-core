@@ -3,7 +3,7 @@ import type { LocalList, SnapVisitor } from './list';
 import { applyGroupOp, type GroupDelta } from './group';
 import { searchIndex } from './search';
 
-export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie' | 'groupe_controle' | 'groupe_badge' | 'groupe_depart' | 'groupe_arrivee' | 'groupe_arrivee_fin';
+export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie' | 'groupe_controle' | 'groupe_badge' | 'groupe_depart' | 'groupe_arrivee' | 'groupe_arrivee_fin' | 'contrainte';
 export type LocalOp = {
   id: string; seq: number; type: OpType; agent_id: string; client_time: string; visitor_rev: string | null; payload: Record<string, unknown>; photoId?: string;
   result?: { code: string; message: string } | null;
@@ -56,6 +56,8 @@ export type ApplyResult = { badge_code?: string; zones?: string[]; visitor_id?: 
 export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult {
   const p = op.payload;
   switch (op.type) {
+    case 'contrainte':
+      return {}; // alerte silencieuse : rien ne change dans la copie de la liste
     case 'identite': {
       const v = open(list, p.visitor_id);
       v.identity_done = true; v.photo_done = true; list.touch();

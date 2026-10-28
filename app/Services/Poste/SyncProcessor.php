@@ -6,6 +6,7 @@ use App\Models\Device;
 use App\Models\User;
 use App\Services\Alerts;
 use App\Services\Audit;
+use App\Services\ControlAlerts;
 use App\Services\Groups;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,9 +21,9 @@ final class SyncProcessor
 {
     public const MAX_OPERATIONS = 50;
 
-    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler'];
+    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler', 'contrainte' => 'visiteurs.rechercher'];
 
-    public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups) {}
+    public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups, private readonly ControlAlerts $controlAlerts) {}
 
     /**
      * @param  list<array<string, mixed>>  $operations
@@ -203,6 +204,10 @@ final class SyncProcessor
                 [$group] = $need('group_id');
 
                 return $this->groups->finishArrival($agent, (string) $group);
+            case 'contrainte':
+                $this->controlAlerts->duress($device, $agent, $clientTime);
+
+                return ['ok' => true];
             case 'sortie':
                 [$code] = $need('code');
 
