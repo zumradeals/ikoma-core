@@ -20,3 +20,4 @@ pest()->use(DatabaseTransactions::class)->in('Feature/BadgeLifecycleTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/PosteTest.php');
 
 pest()->use(DatabaseTransactions::class)->in('Feature/SyncTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/SiteControlTest.php');

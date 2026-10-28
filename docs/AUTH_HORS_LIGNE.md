@@ -130,3 +130,8 @@ Les onze décisions de la section 11 ont été validées avec les recommandation
 9. **Verrouillage en plein parcours** : à l'inactivité, le verrou fait perdre l'écran en cours (l'étape revient à la recherche) ; les opérations déjà faites restent dans la file.
 10. **Photos en quarantaine** : si une opération d'identité est refusée, sa photo n'est pas conservée.
 11. **Obligations du client (décision 11)** : verrouillage système de la tablette, chiffrement du stockage de l'appareil, mode dédié (kiosque) et effacement à distance par sa gestion d'appareils restent à inscrire dans le cahier d'exploitation (lot L12).
+
+### Complément du lot L7
+
+- Le contrôle sur site et la sortie fonctionnent hors ligne sur la copie chiffrée ; la copie contient désormais le hachage du jeton de **tous** les badges de l'événement (jamais un jeton en clair). Les agents qui contrôlent sur smartphone enrôlent leur appareil comme un poste.
+- Détection de tablette clonée (point 6) : confirmée par le dirigeant pour le lot L11. Export chiffré avant effacement de fin d'événement (point 5) : confirmé pour le lot L12.

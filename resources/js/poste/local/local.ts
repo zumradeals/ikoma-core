@@ -1,10 +1,12 @@
-import { ApiError, type Avis, type DeskContext, type Fiche, type Poste, type SearchResult, type UnlistedInput } from '../types';
-import type { PosteRepository } from '../repository';
+import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
+import type { SitePosteRepository } from '../repository';
 import { applyOp, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
 import { sha256Hex } from './crypto';
 import { getMeta } from './db';
 import { LocalList, type Snapshot } from './list';
+import { checkpointsOf, controlLocal, exitLocal, resolveBadge } from './site';
 import type { PosteStore } from './store';
+import type { SyncManager } from './sync';
 import type { PosteVault } from './vault';
 
 type Profile = { id: string; name: string };
@@ -13,17 +15,17 @@ type Profile = { id: string; name: string };
  * Implémentation locale du dépôt de données du poste : tout est lu dans la copie chiffrée de la tablette et toute écriture
  * est d'abord enregistrée dans la file (IndexedDB) avant d'être envoyée, réseau ou non.
  */
-export class LocalPosteRepository implements PosteRepository {
+export class LocalPosteRepository implements SitePosteRepository {
   list: LocalList;
-  constructor(snapshot: Snapshot, private readonly vault: PosteVault, private readonly store: PosteStore, private readonly profile: Profile, private readonly onQueued: () => void, private clockOffset = 0) {
+  constructor(snapshot: Snapshot, private readonly vault: PosteVault, private readonly store: PosteStore, private readonly profile: Profile, private readonly onQueued: () => void, private clockOffset = 0, private readonly sync: SyncManager | null = null) {
     this.list = new LocalList(snapshot);
   }
 
-  static async open(vault: PosteVault, store: PosteStore, onQueued: () => void): Promise<LocalPosteRepository | null> {
+  static async open(vault: PosteVault, store: PosteStore, onQueued: () => void, sync: SyncManager | null = null): Promise<LocalPosteRepository | null> {
     const snapshot = await store.loadSnapshot();
     const profile = await vault.getSecret<Profile>('profile');
     if (!snapshot || !profile) return null;
-    const repo = new LocalPosteRepository(snapshot, vault, store, profile, onQueued, (await getMeta(vault.db, 'clockOffsetMs')) ?? 0);
+    const repo = new LocalPosteRepository(snapshot, vault, store, profile, onQueued, (await getMeta(vault.db, 'clockOffsetMs')) ?? 0, sync);
     await repo.replayPending();
     return repo;
   }
@@ -89,5 +91,52 @@ export class LocalPosteRepository implements PosteRepository {
     const id = existing ? String(existing.op.payload.visitor_id) : crypto.randomUUID();
     await this.enqueue(operationId, 'non_liste', { visitor_id: id, ...input });
     return { visitor_id: id };
+  }
+
+  async checkpoints(): Promise<Checkpoint[]> { return checkpointsOf(this.list); }
+
+  private get online(): boolean { return typeof navigator === 'undefined' || navigator.onLine; }
+  private async knownAt(): Promise<string | null> { return (await getMeta(this.vault.db, 'lastSyncAt')) ?? null; }
+
+  /** Envoie d'abord ce qui attend dans la file (le serveur doit connaître l'entrée avant le contrôle ou la sortie), sans bloquer plus de 2,5 s. */
+  private async flushQueue(): Promise<void> {
+    if (!this.sync || (await this.store.count('pending')) === 0) return;
+    await Promise.race([this.sync.sync(), new Promise<void>(resolve => setTimeout(resolve, 2500))]);
+  }
+
+  /** Réponse du serveur, ou null si le réseau manque (la tablette répond alors seule). Un refus du serveur, lui, est une réponse. */
+  private async remote<T>(path: string, body: object, operationId: string): Promise<T | null> {
+    if (!this.sync || !this.online) return null;
+    try {
+      await this.flushQueue();
+      return await this.sync.request<T>('POST', path, body, operationId, 4000);
+    } catch (e) {
+      if (e instanceof ApiError && (e.code === 'reseau' || e.code === 'session_expiree')) return null;
+      throw e;
+    }
+  }
+
+  async control(operationId: string, code: string, point: PointRef | null): Promise<ControlResult> {
+    const server = await this.remote<ControlResult>('/poste/api/controle', { code, point }, operationId);
+    if (server) return { ...server, source: 'serveur' };
+    const printed = await resolveBadge(this.list, code);
+    const result = controlLocal(this.list, printed, point, this.now(), await this.knownAt());
+    // Seul le code imprimé part dans la file : le contenu du QR n'est conservé nulle part sur la tablette.
+    await this.enqueue(operationId, 'controle', { code: printed ?? 'INCONNU', point, local_valid: result.valid });
+    return result;
+  }
+
+  async exit(operationId: string, code: string, point: PointRef | null): Promise<ExitResult> {
+    const server = await this.remote<ExitResult>('/poste/api/sortie', { code, point }, operationId);
+    if (server) return { ...server, source: 'serveur' };
+    const printed = await resolveBadge(this.list, code);
+    const result = exitLocal(this.list, printed, point, await this.knownAt());
+    if (result.ok) await this.enqueue(operationId, 'sortie', { code: printed, point });
+    return result;
+  }
+
+  async presentCount(): Promise<number | null> {
+    if (!this.sync || !this.online) return null;
+    try { return (await this.sync.request<{ count: number }>('GET', '/poste/api/presents', undefined, undefined, 3000)).count; } catch { return null; }
   }
 }

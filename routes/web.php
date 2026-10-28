@@ -7,12 +7,14 @@ use App\Http\Controllers\BadgeReservationsController;
 use App\Http\Controllers\BadgesController;
 use App\Http\Controllers\BadgeSettingsController;
 use App\Http\Controllers\CategoriesController;
+use App\Http\Controllers\ControleController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ListImportsController;
 use App\Http\Controllers\PosteApiController;
 use App\Http\Controllers\PosteController;
 use App\Http\Controllers\PostesController;
 use App\Http\Controllers\PosteSyncController;
+use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\RequireTwoFactor;
@@ -23,9 +25,11 @@ use Inertia\Inertia;
 Route::get('/', fn () => Inertia::render('Home'))->name('home');
 // Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
 Route::get('/poste/shell', fn () => Inertia::render('Poste'));
+Route::get('/controle/shell', fn () => Inertia::render('Controle'));
 Route::middleware(['auth'])->group(function (): void {
     Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => (bool) auth()->user()->two_factor_confirmed_at]))->middleware('password.confirm')->name('security');
     Route::middleware(RequireTwoFactor::class)->group(function (): void {
+        Route::get('/api/presences', PresencesController::class)->middleware('can:presences.consulter');
         Route::get('/administration/imports', [ListImportsController::class, 'index'])->middleware('can:listes.importer');
         Route::get('/administration/imports/modele', [ListImportsController::class, 'template'])->middleware('can:listes.importer');
         Route::post('/administration/imports/apercu', [ListImportsController::class, 'preview'])->middleware('can:listes.importer');
@@ -45,6 +49,7 @@ Route::middleware(['auth'])->group(function (): void {
 
         Route::middleware(EnsureAgentAccueil::class)->group(function (): void {
             Route::get('/poste', PosteController::class)->middleware('can:visiteurs.rechercher');
+            Route::get('/controle', ControleController::class)->middleware('can:badges.controler');
             Route::get('/poste/api/postes', [PosteApiController::class, 'postes'])->middleware('can:visiteurs.rechercher');
             Route::post('/poste/api/enroler', [PosteSyncController::class, 'enroler'])->middleware('can:visiteurs.rechercher');
             Route::middleware(ResolvePoste::class)->group(function (): void {
@@ -53,6 +58,9 @@ Route::middleware(['auth'])->group(function (): void {
                 Route::post('/poste/api/sync', [PosteSyncController::class, 'sync'])->middleware('can:visiteurs.rechercher');
                 Route::post('/poste/api/efface', [PosteSyncController::class, 'efface'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/contexte', [PosteApiController::class, 'contexte'])->middleware('can:visiteurs.rechercher');
+                Route::post('/poste/api/controle', [PosteApiController::class, 'controle'])->middleware('can:badges.controler');
+                Route::post('/poste/api/sortie', [PosteApiController::class, 'sortie'])->middleware('can:badges.controler');
+                Route::get('/poste/api/presents', [PosteApiController::class, 'presents'])->middleware('can:badges.controler');
                 Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');
                 Route::post('/poste/api/identite', [PosteApiController::class, 'identite'])->middleware('can:visiteurs.verifier');

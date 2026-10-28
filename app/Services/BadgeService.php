@@ -118,9 +118,9 @@ final class BadgeService
 
     /**
      * Contrôle d’un badge à partir du code lisible ou du jeton (avec ou sans le préfixe du QR). Ne modifie ni le badge ni son historique ;
-     * un refus est seulement journalisé. Un code lisible n’est unique que dans son événement : il faut alors fournir l’événement.
+     * un refus est seulement journalisé. Un code lisible n’est unique que dans son événement : il faut alors fournir l’événement. `$journaliser = false` laisse l’appelant (contrôle sur site, L7) écrire sa propre entrée de journal.
      */
-    public function controler(string $codeOrToken, ?string $eventId = null, ?User $actor = null): BadgeVerdict
+    public function controler(string $codeOrToken, ?string $eventId = null, ?User $actor = null, bool $journaliser = true): BadgeVerdict
     {
         $input = trim($codeOrToken);
         if (str_starts_with($input, QrSvg::PREFIX)) {
@@ -140,22 +140,22 @@ final class BadgeService
         }
         $rows = $query->limit(2)->get();
         if ($rows->count() !== 1) {
-            return $this->refuse($rows->isEmpty() ? 'inconnu' : 'evenement_requis', $rows->isEmpty() ? 'Badge inconnu.' : 'Plusieurs événements portent ce code : précisez l’événement.', null, null, $actor);
+            return $this->refuse($rows->isEmpty() ? 'inconnu' : 'evenement_requis', $rows->isEmpty() ? 'Badge inconnu.' : 'Plusieurs événements portent ce code : précisez l’événement.', null, null, $actor, $journaliser);
         }
         $row = $rows->first();
         $status = BadgeStatus::from($row->status);
         if ($status === BadgeStatus::Cancelled) {
-            return $this->refuse('annule', 'Badge annulé : accès refusé.', $row->id, $row->event_id, $actor);
+            return $this->refuse('annule', 'Badge annulé : accès refusé.', $row->id, $row->event_id, $actor, $journaliser);
         }
         if ($status === BadgeStatus::Returned || $status === BadgeStatus::Closed) {
-            return $this->refuse('restitue', 'Badge restitué : il n’est plus valable.', $row->id, $row->event_id, $actor);
+            return $this->refuse('restitue', 'Badge restitué : il n’est plus valable.', $row->id, $row->event_id, $actor, $journaliser);
         }
         if ($status === BadgeStatus::Available || $row->visitor_id === null) {
-            return $this->refuse('non_associe', 'Badge non associé à une personne.', $row->id, $row->event_id, $actor);
+            return $this->refuse('non_associe', 'Badge non associé à une personne.', $row->id, $row->event_id, $actor, $journaliser);
         }
         $now = now();
         if ($now->lt(new \DateTimeImmutable($row->valid_from)) || $now->gt(new \DateTimeImmutable($row->valid_until))) {
-            return $this->refuse('hors_periode', 'Badge hors de sa période de validité.', $row->id, $row->event_id, $actor);
+            return $this->refuse('hors_periode', 'Badge hors de sa période de validité.', $row->id, $row->event_id, $actor, $journaliser);
         }
         $categoryId = $row->visitor_category_id;
         $category = DB::table('categories')->where('id', $categoryId)->first(['id', 'name', 'color']);
@@ -164,9 +164,11 @@ final class BadgeService
         return new BadgeVerdict(true, null, 'Badge valide.', $row->id, ['id' => $row->visitor_id, 'name' => $row->full_name], $category ? ['id' => $category->id, 'name' => $category->name, 'color' => $category->color] : null, $row->organisation, $zones);
     }
 
-    private function refuse(string $reason, string $message, ?string $badgeId, ?string $eventId, ?User $actor): BadgeVerdict
+    private function refuse(string $reason, string $message, ?string $badgeId, ?string $eventId, ?User $actor, bool $journaliser = true): BadgeVerdict
     {
-        $this->audit->append('badge.controle_refuse', $actor?->id, ['badge_id' => $badgeId, 'event_id' => $eventId, 'raison' => $reason]);
+        if ($journaliser) {
+            $this->audit->append('badge.controle_refuse', $actor?->id, ['badge_id' => $badgeId, 'event_id' => $eventId, 'raison' => $reason]);
+        }
 
         return new BadgeVerdict(false, $reason, $message, $badgeId);
     }

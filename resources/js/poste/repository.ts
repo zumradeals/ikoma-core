@@ -1,4 +1,4 @@
-import { ApiError, type Avis, type DeskContext, type Fiche, type Poste, type SearchResult, type UnlistedInput } from './types';
+import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
  * Tous les accès aux données du poste passent par cette interface (plan, section 4.1). Le lot L5 n'a qu'une implémentation (appels JSON) ;
@@ -18,6 +18,18 @@ export interface PosteRepository {
   createUnlisted(operationId: string, input: UnlistedInput): Promise<{ visitor_id: string }>;
   /** Nombre d'opérations en attente d'envoi : toujours 0 tant que le mode hors ligne n'existe pas (lot L6). */
   pendingCount(): Promise<number>;
+}
+
+/**
+ * Contrôle sur site et sortie (lot L7). En ligne, le serveur répond (BadgeService::controler) ; sans réseau, la tablette répond
+ * d'après sa copie locale et met l'opération dans la file du lot L6. Chaque appel reçoit un identifiant d'opération.
+ */
+export interface SitePosteRepository extends PosteRepository {
+  checkpoints(): Promise<Checkpoint[]>;
+  control(operationId: string, code: string, point: PointRef | null): Promise<ControlResult>;
+  exit(operationId: string, code: string, point: PointRef | null): Promise<ExitResult>;
+  /** Nombre de personnes présentes selon le serveur, ou null sans réseau. */
+  presentCount(): Promise<number | null>;
 }
 
 export function cookie(name: string): string {

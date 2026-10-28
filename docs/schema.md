@@ -117,3 +117,22 @@ Routes (agent connecté + jeton d'appareil `X-Device-Token`, sauf `enroler`) : `
 Services : `Poste\Devices` (création, code, enrôlement, révocation), `Poste\ListSnapshot` (copie de travail et numéro de version), `Poste\SyncProcessor` (rejeu, conflits, écart d'horloge). Journal : `poste.cree`, `poste.code_emis`, `poste.enrole`, `poste.enrolement_refuse`, `poste.revoque`, `poste.efface`, `poste.reglage_modifie`, `sync.recue`, `sync.conflit`.
 
 Côté tablette (IndexedDB `ikoma-poste`, Dexie) : `meta` (clés d'appareil non exportables, enregistrement du coffre, compteurs en clair : version de liste, dernière synchronisation), `chunks` (liste de travail, secrets, compteur d'échecs : blocs scellés), `ops` (file : identifiant, séquence, type et état en clair ; contenu scellé), `photos` (scellées, supprimées à l'envoi).
+
+## Évolution L7 — contrôle sur site, sortie, présents
+
+Migration `2026_11_03_000000_create_site_control`.
+
+- **access_events** : `visitor_id` devient facultatif (un contrôle refusé sur un badge inconnu ou non associé n'a pas de visiteur ; CHECK : seul le type `controle` peut être sans visiteur). Types admis (CHECK) : `validation`, `entree` (L5), `controle`, `sortie`, `correction` (L7). Le compte applicatif n'a toujours que INSERT et SELECT sur cette table (aucun UPDATE, aucun DELETE, aucun verrou `FOR UPDATE`).
+  - `controle` : `checkpoint` = nom du point (zone ou poste), `details` = `verdict` (`valide`/`refuse`), `raison`, `point_type`, `point_id`, `zone_ok`, `poste_id` et, pour un contrôle fait hors ligne, `heure_declaree`, `differe`, `verdict_tablette`. Aucun nom de personne.
+  - `sortie` : `details` = point, poste, `heure_declaree` éventuelle.
+  - `correction` : `corrige_id` pointe l'événement d'entrée ou de sortie corrigé (jamais modifié) ; `details` = motif et type corrigé. Un événement ne peut être corrigé qu'une fois (index unique partiel sur `corrige_id`).
+  - Index partiel `access_events_presence` (événement, visiteur, heure) sur les entrées et sorties pour le compteur.
+- **Compteur de présents** : jamais stocké. Une personne est présente si son dernier événement non corrigé parmi `entree` et `sortie` est une entrée (service `Presence`). `visitors.status` (`present` / `sorti`) reste tenu à jour pour la lecture des fiches.
+- **Statuts de badge à la sortie** : `Associé` → `Restitué` → `Disponible` (réglage `badge_reutilisable` = oui) ou `Clos` (non), par `BadgeService::restituer` (L4).
+- **Copie de la tablette** (`GET /poste/api/liste`) : tous les badges de l'événement (code, hachage du jeton, catégorie, statut, `mine` = réservé à ce poste) et la liste des postes de l'événement. Le numéro de version tient compte du statut de chaque badge (une annulation change la version) et ignore les événements `controle` (un contrôle ne force pas une nouvelle copie).
+
+Routes : page `GET /controle` (rôle `agent_accueil`, permission `badges.controler`), coquille publique `GET /controle/shell` ; JSON (jeton d'appareil + session) `POST /poste/api/controle`, `POST /poste/api/sortie` (idempotents, `X-Operation-Id`), `GET /poste/api/presents` ; superviseur : `GET /api/presences?event_id=` (permission `presences.consulter`).
+
+Services : `Poste\SiteControl` (contrôle, sortie), `Presence` (compteur, correction), `BadgeService::controler` (paramètre `$journaliser`). Opérations de la file hors ligne : `controle` et `sortie` (permission `badges.controler`). Journal : `controle.refuse`, `sortie.enregistree`, `sortie.refusee`, `presence.corrigee` (identifiants et nombres seulement).
+
+Conflits à la synchronisation (`sync_conflicts`) : `sortie_sans_entree`, `deja_sorti`, `annule`, `non_associe`, `restitue`, `visiteur_refuse` (sortie), et `annule_entre_temps` (contrôle jugé valide hors ligne, refusé par le serveur au rejeu).

@@ -52,12 +52,16 @@ export class SyncManager {
     do { this.again = false; await this.run(); } while (this.again && !this.state.revoked);
   }
 
-  private async call<T>(method: 'GET' | 'POST', url: string, body?: object): Promise<T> {
+  /** Appel authentifié par le jeton d'appareil (aussi utilisé par le contrôle en ligne). */
+  request<T>(method: 'GET' | 'POST', url: string, body?: object, operationId?: string, timeoutMs?: number): Promise<T> { return this.call<T>(method, url, body, operationId, timeoutMs); }
+
+  private async call<T>(method: 'GET' | 'POST', url: string, body?: object, operationId?: string, timeoutMs?: number): Promise<T> {
     const token = await this.vault.getSecret<string>('deviceToken');
     const headers: Record<string, string> = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN'), 'X-Device-Token': token ?? '' };
     if (body) headers['Content-Type'] = 'application/json';
+    if (operationId) headers['X-Operation-Id'] = operationId;
     let response: Response;
-    try { response = await (this.hooks.fetcher ?? fetch)(url, { method, headers, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin', redirect: 'manual' }); }
+    try { response = await (this.hooks.fetcher ?? fetch)(url, { method, headers, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin', redirect: 'manual', signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined }); }
     catch { throw new ApiError('reseau', 'Pas de connexion au serveur.'); }
     if (response.type === 'opaqueredirect' || response.status === 419 || (response.status === 401 && !(await this.revokedBody(response)))) throw new ApiError('session_expiree', 'Session expirée.', null, 401);
     const data = await response.json().catch(() => null) as (T & { code?: string; message?: string }) | null;

@@ -14,16 +14,17 @@ final class ListSnapshot
         $e = $poste->event_id;
         $row = DB::selectOne("SELECT concat_ws('|',
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM visitors WHERE event_id = ?),
-            (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM badges WHERE event_id = ?),
+            (SELECT count(*) || ':' || coalesce(md5(string_agg(code || status, ',' ORDER BY code)), '') FROM badges WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM badge_assignments WHERE event_id = ?),
             (SELECT count(*) FROM identity_checks i JOIN visitors v ON v.id = i.visitor_id WHERE v.event_id = ?),
             (SELECT count(*) FROM photos p JOIN visitors v ON v.id = p.visitor_id WHERE v.event_id = ?),
-            (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM access_events WHERE event_id = ?),
+            (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM access_events WHERE event_id = ? AND type <> 'controle'),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM categories WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM zones WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM hosts WHERE event_id = ?),
             (SELECT count(*) FROM category_zone WHERE event_id = ?),
-            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
+            (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM devices WHERE event_id = ?),
+            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
 
         return sha1((string) $row->v);
     }
@@ -52,8 +53,10 @@ final class ListSnapshot
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
             'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
-            // Les jetons QR ne quittent jamais le serveur en clair : la tablette compare le hachage du jeton scanné.
-            'badges' => DB::table('badges')->where('reserved_device_id', $poste->id)->orderBy('code')->get(['code', 'qr_token', 'category_id', 'status'])->map(fn ($b) => ['code' => $b->code, 'token_hash' => hash('sha256', $b->qr_token), 'category_id' => $b->category_id, 'status' => $b->status])->all(),
+            'postes' => DB::table('devices')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'station'])->map(fn ($d) => ['id' => $d->id, 'name' => $d->station ?? $d->name])->all(),
+            // Les jetons QR ne quittent jamais le serveur en clair : la tablette compare le hachage du jeton scanné. Tous les badges de l'événement
+            // sont copiés pour le contrôle hors ligne ; `mine` indique ceux que ce poste peut associer (réservés à lui).
+            'badges' => DB::table('badges')->where('event_id', $e)->orderBy('code')->get(['code', 'qr_token', 'category_id', 'status', 'reserved_device_id'])->map(fn ($b) => ['code' => $b->code, 'token_hash' => hash('sha256', $b->qr_token), 'category_id' => $b->category_id, 'status' => $b->status, 'mine' => $b->reserved_device_id === $poste->id])->all(),
         ];
     }
 }

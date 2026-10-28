@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Device;
 use App\Services\Poste\Desk;
 use App\Services\Poste\Operations;
+use App\Services\Poste\SiteControl;
+use App\Services\Presence;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 /** Routes JSON du poste d'accueil. Les permissions sont portées par les routes ; chaque écriture est idempotente (X-Operation-Id). */
 final class PosteApiController
 {
-    public function __construct(private readonly Desk $desk, private readonly Operations $operations) {}
+    public function __construct(private readonly Desk $desk, private readonly Operations $operations, private readonly SiteControl $site, private readonly Presence $presence) {}
 
     public function postes(): JsonResponse
     {
@@ -83,6 +85,29 @@ final class PosteApiController
         $poste = $this->poste($r);
 
         return $this->operations->run($r, 'non_liste', implode('|', [$data['name'], $data['organisation'] ?? '', $data['host_id'], $data['category_id']]), fn () => $this->desk->createUnlisted($poste, $r->user(), $data['name'], $data['organisation'] ?? null, $data['host_id'], $data['category_id']));
+    }
+
+    public function controle(Request $r): JsonResponse
+    {
+        $data = $r->validate(['code' => 'required|string|max:100', 'point' => 'nullable|array', 'point.type' => 'required_with:point|in:zone,poste', 'point.id' => 'required_with:point|uuid']);
+        $poste = $this->poste($r);
+
+        return $this->operations->run($r, 'controle', hash('sha256', $data['code']).'|'.json_encode($data['point'] ?? null), fn () => $this->site->control($poste, $r->user(), $data['code'], $data['point'] ?? null));
+    }
+
+    public function sortie(Request $r): JsonResponse
+    {
+        $data = $r->validate(['code' => 'required|string|max:100', 'point' => 'nullable|array', 'point.type' => 'required_with:point|in:zone,poste', 'point.id' => 'required_with:point|uuid']);
+        $poste = $this->poste($r);
+
+        return $this->operations->run($r, 'sortie', hash('sha256', $data['code']).'|'.json_encode($data['point'] ?? null), fn () => $this->site->exit($poste, $r->user(), $data['code'], $data['point'] ?? null));
+    }
+
+    public function presents(Request $r): JsonResponse
+    {
+        $event = $this->poste($r)->event_id;
+
+        return response()->json(['count' => $this->presence->count($event), 'as_of' => now()->utc()->format('Y-m-d\TH:i:s.u\Z')]);
     }
 
     private function poste(Request $r): Device
