@@ -4,7 +4,7 @@ import type { Fiche } from '../../poste/types';
 const props = defineProps<{ fiche: Fiche; refused: boolean; busy: boolean }>();
 const emit = defineEmits<{ refresh: []; next: [] }>();
 let timer: number | undefined;
-onMounted(() => { timer = window.setInterval(() => { if (!props.refused) emit('refresh'); }, 5000); });
+onMounted(() => { timer = window.setInterval(() => { if (!props.refused) emit('refresh'); }, 2500); });
 onBeforeUnmount(() => window.clearInterval(timer));
 </script>
 <template>

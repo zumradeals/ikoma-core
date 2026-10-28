@@ -57,6 +57,19 @@ export class LocalPosteRepository implements GroupPosteRepository {
     }
   }
 
+  async refreshHost(visitorId:string):Promise<Fiche>{
+    if(this.sync && this.online){
+      await this.sync.sync();
+      // La copie chiffrée reste la source de travail ; l’avis est une information en ligne de la fiche courante.
+      const fresh=await this.sync.request<Fiche>('GET','/poste/api/visiteurs/'+encodeURIComponent(visitorId),undefined,undefined,3000);
+      return {...ficheOf(this.list,visitorId,this.now()),host_validation:fresh.host_validation,host_advice:fresh.host_advice};
+    }
+    return this.visitor(visitorId);
+  }
+  async requestHostAdvice(visitorId:string):Promise<void>{
+    if(!this.sync || !this.online)throw new ApiError('reseau','Reconnectez-vous pour demander l’avis de l’hôte.');
+    await this.sync.sync();await this.sync.request('POST','/poste/api/avis-hote',{visitor_id:visitorId},undefined,3000);
+  }
   async listPostes(): Promise<Poste[]> {
     const s = this.list.snapshot;
     return [{ id: s.poste.id, name: s.poste.name, station: s.poste.station, event_id: s.poste.event_id, event_name: s.event.name }];

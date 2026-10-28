@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Services\Audit;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
@@ -24,5 +25,9 @@ class DatabaseSeeder extends Seeder
             $this->command?->warn($email.' — mot de passe affiché une seule fois : '.$password);
         }
         $this->call(DemoSeeder::class);
+        $hostAccount = User::where('email', 'hote@exemple.test')->first();
+        if ($hostAccount) {
+            DB::table('hosts')->where('id', DemoSeeder::id('host0'))->whereNull('user_id')->update(['user_id' => $hostAccount->id]);
+        }
     }
 }

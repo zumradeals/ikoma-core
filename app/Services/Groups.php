@@ -98,7 +98,7 @@ final class Groups
         $members = DB::select(
             'SELECT m.visitor_id, v.full_name, v.organisation, m.called_at, m.checked_at, m.check_mode, m.confirmed_at, m.absent_at, m.boarded_at, m.arrived_at,
                 (SELECT b.code FROM badge_assignments a JOIN badges b ON b.id = a.badge_id WHERE a.visitor_id = v.id AND a.returned_at IS NULL AND a.cancelled_at IS NULL LIMIT 1) AS badge_code
-             FROM group_members m JOIN visitors v ON v.id = m.visitor_id WHERE m.group_id = ? ORDER BY v.full_name, v.id',
+             FROM group_members m JOIN visitors v ON v.id = m.visitor_id WHERE m.group_id = ? AND v.withdrawn_at IS NULL ORDER BY v.full_name, v.id',
             [$groupId],
         );
         $total = count($members);
@@ -277,6 +277,10 @@ final class Groups
             if ($member->arrived_at !== null) {
                 return ['arrived' => true, 'already' => true, 'badge_code' => $badge->code, 'group_id' => $member->group_id, 'ecart' => null];
             }
+            $guest = DB::table('visitors')->where('id', $visitorId)->lockForUpdate()->first();
+            if ($guest->withdrawn_at !== null) {
+                throw new DeskRefused('invite_retire', 'Cet invité a été retiré de la liste.');
+            }
             $now = now();
             $ecart = null;
             if ($member->boarded_at === null) {
@@ -286,6 +290,7 @@ final class Groups
             DB::table('group_members')->where('id', $member->id)->update(['arrived_at' => $now, 'updated_at' => $now]);
             DB::table('visitors')->where('id', $visitorId)->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'attendu'))->update(['status' => 'present', 'updated_at' => $now]);
             DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $device->event_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'actor_id' => $agent->id, 'type' => 'entree', 'checkpoint' => $device->station ?? $device->name, 'occurred_at' => $now, 'details' => json_encode(array_filter(['arrivee_groupe' => true, 'group_id' => $member->group_id, 'heure_declaree' => $declaredAt, 'ecart' => $ecart])), 'created_at' => $now, 'updated_at' => $now]);
+            app(HostNotifications::class)->send($visitorId, 'arrivee', $agent, $device);
             $this->audit->append('groupe.arrive', $agent->id, ['group_id' => $member->group_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'device_id' => $device->id, 'ecart' => $ecart]);
 
             return ['arrived' => true, 'already' => false, 'badge_code' => $badge->code, 'group_id' => $member->group_id, 'ecart' => $ecart];

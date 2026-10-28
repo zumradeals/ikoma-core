@@ -94,11 +94,16 @@ function onCreateUnlisted(input: UnlistedInput) {
 async function onHostRefresh() {
   const id = ctx.value.visitorId; if (!id) return;
   try {
-    const f = await refreshFiche(id);
+    const f = repo.refreshHost ? await repo.refreshHost(id) : await refreshFiche(id); fiche.value=f;
     if (f.host_validation === 'accepte') send({ type: 'HOST_DECISION', accepted: true });
     if (f.host_validation === 'refuse') send({ type: 'HOST_DECISION', accepted: false });
   } catch (e) { if (e instanceof ApiError) error.value = e; }
 }
+async function onRequestAdvice(){
+  const id=ctx.value.visitorId;if(!id || !repo.requestHostAdvice)return;
+  await run(async()=>{await repo.requestHostAdvice!(id);fiche.value=repo.refreshHost?await repo.refreshHost(id):await repo.visitor(id);});
+}
+async function onAdviceRefresh(){const id=ctx.value.visitorId;if(!id)return;await run(async()=>{fiche.value=repo.refreshHost?await repo.refreshHost(id):await repo.visitor(id);});}
 function onNext() { ctx.value = reduce(ctx.value, { type: 'NEXT' }); if (ctx.value.step === 'recherche') { fiche.value = null; error.value = null; homonyms.value = 1; } }
 function onBack() { error.value = null; send({ type: 'BACK' }); }
 
@@ -134,7 +139,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
         <StepFiche v-else-if="ctx.step === 'fiche' && fiche" :key="fiche.id" :fiche="fiche" :homonyms="homonyms" @confirm="onConfirm" @back="onBack" />
         <StepWaitHost v-else-if="ctx.step === 'attente_hote' && fiche" :fiche="fiche" :refused="ctx.hostRefused" :busy="busy" @refresh="onHostRefresh" @next="onNext" />
         <StepIdentity v-else-if="ctx.step === 'identite' && fiche" :name="fiche.full_name" :busy="busy" @done="onIdentity" @back="onBack" />
-        <StepDecision v-else-if="ctx.step === 'decision' && fiche" :name="fiche.full_name" :hors-periode="fiche.hors_periode" :blocked-reason="blockedReason" :busy="busy" @validate="onValidate" @refuse="onRefuse" @back="onBack" />
+        <StepDecision v-else-if="ctx.step === 'decision' && fiche" :name="fiche.full_name" :hors-periode="fiche.hors_periode" :blocked-reason="blockedReason" :busy="busy" :host-advice="fiche.host_advice?.state" :can-request="!!repo.requestHostAdvice" @request-advice="onRequestAdvice" @refresh-advice="onAdviceRefresh" @validate="onValidate" @refuse="onRefuse" @back="onBack" />
         <StepBadge v-else-if="ctx.step === 'badge' && fiche" :name="fiche.full_name" :busy="busy" @submit="onBadge" />
         <StepHandover v-else-if="ctx.step === 'remise' && fiche" :fiche="fiche" :badge-code="ctx.badgeCode ?? ''" :busy="busy" @enter="onEnter" />
         <StepDone v-else-if="ctx.step === 'entree' && fiche" :name="fiche.full_name" :badge-code="ctx.badgeCode ?? ''" :zones="entryZones" :duration-ms="ctx.durationMs ?? 0" @next="onNext" />

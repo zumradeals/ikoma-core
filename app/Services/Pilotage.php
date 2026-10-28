@@ -33,7 +33,7 @@ final class Pilotage
     {
         $row = DB::selectOne(
             "SELECT
-                (SELECT count(*) FROM visitors WHERE event_id = ? AND coalesce(status, 'attendu') <> 'refuse') AS attendus,
+                (SELECT count(*) FROM visitors WHERE event_id = ? AND withdrawn_at IS NULL AND coalesce(status, 'attendu') <> 'refuse') AS attendus,
                 (SELECT count(DISTINCT e.visitor_id) FROM access_events e WHERE e.event_id = ? AND e.type = 'entree' AND NOT EXISTS (SELECT 1 FROM access_events c WHERE c.corrige_id = e.id)) AS arrives,
                 (SELECT count(*) FROM visitors WHERE event_id = ? AND status = 'refuse') AS refuses",
             [$eventId, $eventId, $eventId],
