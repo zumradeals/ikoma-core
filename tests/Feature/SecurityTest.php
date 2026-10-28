@@ -87,14 +87,15 @@ it('crée, attribue, désactive et réinitialise sans journaliser de secret', fu
     $admin = account('administrateur');
     $admin->update(['two_factor_confirmed_at' => now()]);
     $email = Str::uuid().'@exemple.test';
-    $password = Str::password(24);
+    // Str::password(24) peut ne contenir ni chiffre ni symbole (environ 7 % des tirages) : on garantit les quatre classes exigées par la règle.
+    $password = Str::password(24).'aA1!';
     $this->actingAs($admin)->post('/administration/comptes', ['name' => 'Nouveau compte fictif', 'email' => $email, 'password' => $password, 'role' => 'agent_accueil'])->assertRedirect();
     $user = User::where('email', $email)->firstOrFail();
     expect(Hash::check($password, $user->password))->toBeTrue();
     $this->put('/administration/comptes/'.$user->id, ['active' => false, 'role' => 'hote'])->assertRedirect();
     expect($user->fresh()->active)->toBeFalse();
     expect($user->fresh()->hasRole('hote'))->toBeTrue();
-    $this->put('/administration/comptes/'.$user->id.'/mot-de-passe', ['password' => Str::password(24)])->assertRedirect();
+    $this->put('/administration/comptes/'.$user->id.'/mot-de-passe', ['password' => Str::password(24).'aA1!'])->assertRedirect();
     foreach (['compte.cree', 'compte.desactive', 'role.change', 'mot_de_passe.reinitialise'] as $action) {
         expect(DB::table('audit_logs')->where('actor_id', $admin->id)->where('action', $action)->exists())->toBeTrue();
     }
