@@ -1,0 +1,5 @@
+<script setup lang="ts">
+import { useForm } from '@inertiajs/vue3';
+const props=defineProps<{ user:{id:string;name:string};hosts:{id:string;name:string;event_name:string;user_id:string|null}[] }>();const form=useForm({host_ids:props.hosts.filter(h=>h.user_id===props.user.id).map(h=>h.id)});
+</script>
+<template><form class="space-y-4" :aria-label="'Rattacher les fiches de '+user.name" @submit.prevent="form.put('/administration/comptes/'+user.id+'/hotes')"><fieldset><legend class="font-bold">Fiches hôte de {{ user.name }}</legend><p>Choisissez ses fiches par événement. Sans fiche, son espace reste vide.</p><label v-for="host in hosts" :key="host.id" class="flex min-h-14 items-center gap-3"><input v-model="form.host_ids" type="checkbox" :value="host.id" class="h-6 w-6" :disabled="!!host.user_id && host.user_id!==user.id" />{{ host.event_name }} · {{ host.name }}<span v-if="host.user_id && host.user_id!==user.id">(autre compte)</span></label></fieldset><button class="btn-main" :disabled="form.processing">Enregistrer le rattachement</button><p v-for="(error,key) in form.errors" :key="key" role="alert">{{ error }}</p></form></template>

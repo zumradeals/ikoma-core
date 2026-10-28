@@ -7,6 +7,8 @@ import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskCont
  * créé par la tablette : le rejouer ne crée rien de plus côté serveur.
  */
 export interface PosteRepository {
+  refreshHost?(visitorId: string): Promise<Fiche>;
+  requestHostAdvice?(visitorId: string): Promise<void>;
   listPostes(): Promise<Poste[]>;
   context(): Promise<DeskContext>;
   search(query: string): Promise<SearchResult[]>;
@@ -78,6 +80,8 @@ export class HttpPosteRepository implements PosteRepository {
     return data as T;
   }
 
+  refreshHost(visitorId:string):Promise<Fiche>{return this.visitor(visitorId);}
+  async requestHostAdvice(visitorId:string):Promise<void>{await this.call('POST','/poste/api/avis-hote',{visitor_id:visitorId});}
   async listPostes(): Promise<Poste[]> { return (await this.call<{ postes: Poste[] }>('GET', '/poste/api/postes')).postes; }
   context(): Promise<DeskContext> { return this.call<DeskContext>('GET', '/poste/api/contexte'); }
   async search(query: string): Promise<SearchResult[]> { return (await this.call<{ results: SearchResult[] }>('GET', '/poste/api/recherche?q=' + encodeURIComponent(query))).results; }

@@ -9,6 +9,7 @@ use App\Services\Alerts;
 use App\Services\Audit;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
+use App\Services\HostNotifications;
 use App\Services\QrSvg;
 use App\Services\VisitorSearch;
 use Illuminate\Support\Carbon;
@@ -65,6 +66,7 @@ final class Desk
             'valid_from' => Carbon::parse($visitor->valid_from)->toIso8601String(), 'valid_until' => Carbon::parse($visitor->valid_until)->toIso8601String(), 'hors_periode' => $this->outsidePeriod($visitor),
             'identity_done' => DB::table('identity_checks')->where('visitor_id', $visitor->id)->exists(), 'photo_done' => DB::table('photos')->where('visitor_id', $visitor->id)->exists(),
             'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge, 'access_note' => $visitor->access_note,
+            'host_advice' => app(HostNotifications::class)->advice($visitor->id),
             'a_rebadger' => $badge === null && DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNotNull('cancelled_at')->exists() && ! in_array($visitor->status, ['sorti', 'refuse'], true),
         ];
     }
@@ -107,6 +109,13 @@ final class Desk
             throw new DeskRefused('identite_requise', 'La pièce d’identité et la photo sont obligatoires avant de valider.');
         }
         $outside = $this->outsidePeriod($visitor);
+        $hostAdvice = app(HostNotifications::class)->advice($visitor->id)['state'];
+        if ($outside && $hostAdvice === 'refuse' && $avis !== 'superviseur') {
+            throw new DeskRefused('avis_hote_refuse', 'L’hôte n’autorise pas cette visite hors période. Appelez le superviseur.');
+        }
+        if ($outside && $hostAdvice === 'autorise') {
+            $avis ??= 'hote';
+        }
         if ($outside && ! in_array($avis, ['hote', 'superviseur'], true)) {
             throw new DeskRefused('hors_periode', "Visiteur hors période : avis de l'hôte ou du superviseur requis", 422, 'Demandez l’avis de l’hôte ou du superviseur, puis indiquez-le.');
         }
@@ -194,6 +203,7 @@ final class Desk
         if ($visitor->status !== 'present') {
             $this->insertEvent($poste, $agent, $visitor, 'entree', $badgeId, ['duree_ms' => max(0, min($durationMs, 86_400_000)), ...($declaredAt !== null ? ['heure_declaree' => $declaredAt] : [])]);
             DB::table('visitors')->where('id', $visitor->id)->update(['status' => 'present', 'updated_at' => now()]);
+            app(HostNotifications::class)->send($visitor->id, 'arrivee', $agent, $poste);
             $this->audit->append('visiteur.entree', $agent->id, ['visitor_id' => $visitor->id, 'badge_id' => $badgeId, 'device_id' => $poste->id, 'duree_ms' => max(0, min($durationMs, 86_400_000))]);
         }
 
@@ -218,6 +228,7 @@ final class Desk
             throw new DeskRefused('fiche_existante', 'Cette fiche existe déjà.', 409);
         }
         DB::table('visitors')->insert(['id' => $id, 'event_id' => $poste->event_id, 'full_name' => mb_substr($name, 0, 160), 'organisation' => $organisation !== null && trim($organisation) !== '' ? mb_substr(trim($organisation), 0, 160) : null, 'host_id' => $hostId, 'category_id' => $categoryId, 'valid_from' => min($now, new \DateTimeImmutable($event->starts_at)), 'valid_until' => $event->ends_at, 'source' => 'non listé', 'status' => 'attendu', 'host_validation' => 'en_attente', 'created_at' => $now, 'updated_at' => $now]);
+        app(HostNotifications::class)->send($id, 'non_liste', $agent, $poste);
         $this->audit->append('visiteur.non_liste_cree', $agent->id, ['visitor_id' => $id, 'event_id' => $poste->event_id, 'host_id' => $hostId, 'device_id' => $poste->id]);
         app(Alerts::class)->raise($poste->event_id, 'non_liste_attente', 'normale', 'visiteur', $id, 'Visiteur non listé en attente de l’accord de l’hôte.', 'non_liste:'.$id);
 
@@ -255,7 +266,7 @@ final class Desk
 
     private function visitor(Device $poste, string $id, bool $lock = false): Visitor
     {
-        $query = Visitor::query()->where('event_id', $poste->event_id);
+        $query = Visitor::query()->where('event_id', $poste->event_id)->whereNull('withdrawn_at');
         if ($lock) {
             $query->lockForUpdate();
         }
@@ -267,6 +278,9 @@ final class Desk
     private function openVisitor(Device $poste, string $id, bool $lock = false, bool $allowPresent = false): Visitor
     {
         $visitor = $this->visitor($poste, $id, $lock);
+        if ($visitor->withdrawn_at !== null) {
+            throw new DeskRefused('invite_retire', 'Cet invité a été retiré de la liste.');
+        }
         if ($visitor->status === 'refuse') {
             throw new DeskRefused('visiteur_refuse', 'L’accès a été refusé à ce visiteur.');
         }

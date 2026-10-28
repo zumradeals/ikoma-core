@@ -9,6 +9,7 @@ use App\Http\Controllers\BadgeSettingsController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
 use App\Http\Controllers\GroupesController;
+use App\Http\Controllers\HostController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ListImportsController;
 use App\Http\Controllers\MonGroupeController;
@@ -34,6 +35,16 @@ Route::get('/pilotage/evacuation/shell', fn () => Inertia::render('Pilotage/Evac
 Route::middleware(['auth'])->group(function (): void {
     Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => (bool) auth()->user()->two_factor_confirmed_at]))->middleware('password.confirm')->name('security');
     Route::middleware(RequireTwoFactor::class)->group(function (): void {
+        Route::get('/hote/invites', [HostController::class, 'index'])->middleware('can:listes.mettre_a_jour');
+        Route::post('/hote/invites', [HostController::class, 'store'])->middleware('can:listes.mettre_a_jour');
+        Route::get('/hote/invites/{visitor}', [HostController::class, 'show'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
+        Route::put('/hote/invites/{visitor}', [HostController::class, 'update'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
+        Route::delete('/hote/invites/{visitor}', [HostController::class, 'destroy'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
+        Route::get('/hote/notifications', [HostController::class, 'notifications'])->middleware('can:arrivees.recevoir_notification');
+        Route::post('/hote/notifications/{notification}/lue', [HostController::class, 'read'])->whereUuid('notification')->middleware('can:arrivees.recevoir_notification');
+        Route::post('/hote/notifications/{notification}/decision', [HostController::class, 'decide'])->whereUuid('notification')->middleware('can:visiteurs.valider_non_liste');
+        Route::put('/administration/comptes/delai-hote', [AccountsController::class, 'hostTimeout'])->middleware('can:comptes.gerer');
+        Route::put('/administration/comptes/{user}/hotes', [AccountsController::class, 'hosts'])->whereUuid('user')->middleware('can:comptes.gerer');
         Route::get('/api/presences', PresencesController::class)->middleware('can:presences.consulter');
         Route::get('/pilotage', [PilotageController::class, 'index'])->middleware('can:pilotage.consulter');
         Route::get('/pilotage/alertes', [PilotageController::class, 'alertes'])->middleware('can:alertes.consulter');
@@ -81,6 +92,7 @@ Route::middleware(['auth'])->group(function (): void {
                 Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');
                 Route::post('/poste/api/identite', [PosteApiController::class, 'identite'])->middleware('can:visiteurs.verifier');
+                Route::post('/poste/api/avis-hote', [PosteApiController::class, 'avisHote'])->middleware('can:visiteurs.valider');
                 Route::post('/poste/api/valider', [PosteApiController::class, 'valider'])->middleware('can:visiteurs.valider');
                 Route::post('/poste/api/refuser', [PosteApiController::class, 'refuser'])->middleware('can:visiteurs.refuser');
                 Route::post('/poste/api/badge', [PosteApiController::class, 'badge'])->middleware('can:badges.associer');

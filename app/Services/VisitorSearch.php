@@ -63,9 +63,9 @@ final class VisitorSearch
             array_push($scoreBindings, $token.'%', '% '.$token.'%', '%'.$token.'%', $token);
         }
         $sql = 'SELECT v.id, v.full_name, v.organisation, h.name AS host_name, c.id AS category_id, c.name AS category_name, c.color, c.priority_circuit, '
-            ."(SELECT count(*) FROM visitors o WHERE o.event_id = v.event_id AND public.ikoma_normalize(o.full_name) = $name) AS homonyms "
+            ."(SELECT count(*) FROM visitors o WHERE o.event_id = v.event_id AND o.withdrawn_at IS NULL AND public.ikoma_normalize(o.full_name) = $name) AS homonyms "
             .'FROM visitors v JOIN categories c ON c.id = v.category_id LEFT JOIN hosts h ON h.id = v.host_id '
-            .'WHERE v.event_id = ? AND '.implode(' AND ', $where)
+            .'WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND '.implode(' AND ', $where)
             .' ORDER BY round((('.implode(' + ', $score).') / ?)::numeric, 1) DESC, c.priority_circuit DESC, ('.implode(' + ', $score).') DESC, v.full_name, v.id LIMIT 10';
         // Le seuil ne vaut que pour cette transaction ; paramètres toujours liés.
         $rows = DB::transaction(function () use ($sql, $eventId, $bindings, $scoreBindings, $tokens) {

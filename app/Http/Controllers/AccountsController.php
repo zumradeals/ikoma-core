@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\HostNotifications;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,7 +21,7 @@ class AccountsController
     {
         Gate::authorize('comptes.gerer');
 
-        return Inertia::render('Admin/Accounts', ['users' => User::with('roles')->orderBy('name')->get()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'active' => $u->active, 'role' => $u->getRoleNames()->first()]), 'roles' => array_keys(config('roles')), 'idle' => (int) DB::table('settings')->where('key', 'session_idle_minutes')->value('value')]);
+        return Inertia::render('Admin/Accounts', ['users' => User::with('roles')->orderBy('name')->get()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'active' => $u->active, 'role' => $u->getRoleNames()->first()]), 'hosts' => DB::table('hosts as h')->join('events as e', 'e.id', '=', 'h.event_id')->orderBy('e.name')->get(['h.id', 'h.name', 'h.user_id', 'e.name as event_name']), 'hostTimeout' => (int) (DB::table('settings')->where('key', 'hote_delai_reponse_minutes')->value('value') ?? 2), 'roles' => array_keys(config('roles')), 'idle' => (int) DB::table('settings')->where('key', 'session_idle_minutes')->value('value')]);
     }
 
     public function store(Request $r): RedirectResponse
@@ -65,6 +67,39 @@ class AccountsController
         DB::transaction(function () use ($data): void {
             DB::table('settings')->where('key', 'session_idle_minutes')->update(['value' => (string) $data['minutes']]);
             app(Audit::class)->append('session.duree_modifiee', auth()->id(), ['minutes' => $data['minutes']]);
+        });
+
+        return back();
+    }
+
+    public function hosts(Request $r, User $user): RedirectResponse
+    {
+        Gate::authorize('comptes.gerer');
+        abort_unless($user->hasRole('hote'), 422, 'Ce compte doit avoir le rôle Hôte.');
+        $data = $r->validate(['host_ids' => 'present|array', 'host_ids.*' => 'required|uuid|distinct|exists:hosts,id']);
+        DB::transaction(function () use ($data, $user) {
+            DB::table('hosts')->orderBy('id')->lockForUpdate()->get(['id']);
+            if (DB::table('hosts')->whereIn('id', $data['host_ids'])->whereNotNull('user_id')->where('user_id', '<>', $user->id)->exists()) {
+                throw ValidationException::withMessages(['host_ids' => 'Une fiche est déjà rattachée à un autre compte. Détachez-la d’abord.']);
+            }
+            DB::table('hosts')->where('user_id', $user->id)->update(['user_id' => null, 'updated_at' => now()]);
+            DB::table('hosts')->whereIn('id', $data['host_ids'])->update(['user_id' => $user->id, 'updated_at' => now()]);
+            foreach ($data['host_ids'] as $hostId) {
+                app(HostNotifications::class)->pendingFor($hostId);
+            }
+            app(Audit::class)->append('hote.rattache', auth()->id(), ['user_id' => $user->id, 'host_ids' => $data['host_ids']]);
+        });
+
+        return back();
+    }
+
+    public function hostTimeout(Request $r): RedirectResponse
+    {
+        Gate::authorize('comptes.gerer');
+        $data = $r->validate(['minutes' => 'required|integer|min:1|max:120']);
+        DB::transaction(function () use ($data) {
+            DB::table('settings')->where('key', 'hote_delai_reponse_minutes')->update(['value' => (string) $data['minutes']]);
+            app(Audit::class)->append('hote.delai_modifie', auth()->id(), ['minutes' => $data['minutes']]);
         });
 
         return back();

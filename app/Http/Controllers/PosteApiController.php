@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
+use App\Services\HostNotifications;
 use App\Services\Poste\Desk;
 use App\Services\Poste\Operations;
 use App\Services\Poste\SiteControl;
@@ -10,6 +11,7 @@ use App\Services\Presence;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /** Routes JSON du poste d'accueil. Les permissions sont portées par les routes ; chaque écriture est idempotente (X-Operation-Id). */
 final class PosteApiController
@@ -53,6 +55,15 @@ final class PosteApiController
         $poste = $this->poste($r);
 
         return $this->operations->run($r, 'valider', $data['visitor_id'].'|'.($data['avis'] ?? ''), fn () => $this->desk->validate($poste, $r->user(), $data['visitor_id'], $data['avis'] ?? null));
+    }
+
+    public function avisHote(Request $r): JsonResponse
+    {
+        Gate::authorize('visiteurs.valider');
+        $data = $r->validate(['visitor_id' => 'required|uuid']);
+        app(HostNotifications::class)->requestAdvice($this->poste($r), $r->user(), $data['visitor_id']);
+
+        return response()->json(['requested' => true]);
     }
 
     public function refuser(Request $r): JsonResponse

@@ -189,3 +189,22 @@ Statut : projet de travail en attente de validation du dirigeant.
 - **Alertes et journal** : sans nom de personne (numéro de car et nombres seulement).
 - **Contrat de la copie tablette** : `tests/Feature/SyncTest.php` attend désormais `group_id` sur les visiteurs et `controle_stagiaires` dans les réglages (ajouts, aucune attente retirée).
 - **Tests de l'intégration continue (L8)** : le chronométrage du test de présence (500 ms) prend le meilleur de trois mesures ; le test de lecture QR par caméra simulée rouvre la caméra si le flux reste muet à la première ouverture.
+
+## L10 — Espace de l’hôte, 28 octobre 2026
+
+Source : prompt docs/prompts/L10.md, plan sections 3/7, fonctionnement v1.0 sections 2/7/10. Départ de main après fusion L9 (#16, 1be551b).
+
+**Décisions explicites du dirigeant du 28 octobre 2026** : l’hôte attribue uniquement la catégorie **Visiteur** ; le délai initial sans réponse avant remontée au superviseur est de **2 minutes**, réglable ensuite dans l’administration. Aucun nouveau droit de catégorie, de zone, de badge ni de compte pour l’hôte.
+
+Choix techniques :
+
+- Aucun ajout de dépendance. Notifications internes PostgreSQL, trois types, dédoublonnage ; rechargements partiels Inertia toutes les 2,5 s en premier plan. Pas d’e-mail, de SMS ou de push. L’étude sans code est dans docs/NOTIFICATIONS.md.
+- Contrôle d’objet : hosts.user_id est revérifié sur toute lecture, écriture, décision ou marquage d’une notification. Un compte sans fiche reste vide et reçoit une explication. Rattachement des fiches et réglage du délai dans l’administration des comptes, sous comptes.gerer.
+- Décisions sous verrou, une seule fois ; host_validation L5 conservé. Le non listé accepté conserve la restriction à l’accueil accompagné. Refus visible par l’agent et transmis au superviseur par son service d’alertes ; la réponse n’est pas une entrée automatique.
+- Avis hors période enregistré dans la notification, lié à l’empreinte des dates : un changement de période invalide l’ancien accord. Le circuit téléphonique d’avis hôte/superviseur existant reste disponible.
+- L’hôte ne peut plus modifier ou retirer une fiche après la moindre entrée enregistrée, même si elle est sortie depuis. Retrait logique, sans supprimer les historiques en ajout seul ; la copie tablette, la recherche et les services d’admission en tiennent compte. Un badge déjà remis n’est pas annulé par l’hôte (aucun droit d’annulation) : sa restitution relève de l’accueil ou du superviseur.
+- Révision technique sur l’événement pour détecter plusieurs modifications de la liste dans la même seconde, incluse dans la version L6 ; aucune donnée authentifiée ajoutée au cache PWA. Les réponses de l’hôte rejoignent la copie chiffrée du poste ; les demandes d’avis exigent le réseau.
+- Doublons/homonymes : même normalisation SQL et même nettoyage des valeurs que L3. L’avertissement reste générique quand il concerne l’invité d’un autre hôte ; aucun identifiant ou second critère de cet autre invité ne fuit. Le verrou d’événement est partagé avec les imports.
+- Journal : notification.creee, hote.decision_non_liste, hote.avis_hors_periode, liste.invite_ajoute/modifie/retire, hote.rattache, hote.delai_modifie ; identifiants, noms de champs ou nombres uniquement, jamais de valeur nominative ni de motif libre. Les privilèges de audit_logs, access_events et identity_checks restent inchangés.
+
+- Les demandes non listées sans compte hôte lié remontent aussi après le délai ; un rattachement ultérieur rattrape les demandes en attente. Une alerte normale L8 existante est élevée à « haute » sans duplication. Les changements de rattachement et les décisions/saisies verrouillent la fiche hôte pour éviter une course d’autorisation. Le retrait se propage aussi aux effectifs actifs des groupes, sans effacer group_members.

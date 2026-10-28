@@ -27,7 +27,8 @@ final class ListSnapshot
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM groups WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(m.updated_at)::text, '') FROM group_members m JOIN groups g ON g.id = m.group_id WHERE g.event_id = ?),
             (SELECT value FROM settings WHERE key = 'controle_stagiaires'),
-            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
+            (SELECT list_revision FROM events WHERE id = ?),
+            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
 
         return sha1((string) $row->v);
     }
@@ -50,7 +51,7 @@ final class ListSnapshot
             EXISTS (SELECT 1 FROM photos p WHERE p.visitor_id = v.id) AS photo_done,
             EXISTS (SELECT 1 FROM access_events a WHERE a.visitor_id = v.id AND a.type = 'validation') AS validated,
             (SELECT b.code FROM badge_assignments x JOIN badges b ON b.id = x.badge_id WHERE x.visitor_id = v.id AND x.returned_at IS NULL AND x.cancelled_at IS NULL LIMIT 1) AS badge_code
-            FROM visitors v WHERE v.event_id = ? ORDER BY v.full_name, v.id", [$e]);
+            FROM visitors v WHERE v.event_id = ? AND v.withdrawn_at IS NULL ORDER BY v.full_name, v.id", [$e]);
         $iso = fn (?string $value): ?string => $value === null ? null : Carbon::parse($value)->utc()->format('Y-m-d\TH:i:s.u\Z');
 
         return [
@@ -69,7 +70,7 @@ final class ListSnapshot
             // sont copiés pour le contrôle hors ligne ; `mine` indique ceux que ce poste peut associer (réservés à lui).
             'badges' => DB::table('badges')->where('event_id', $e)->orderBy('code')->get(['code', 'qr_token', 'category_id', 'status', 'reserved_device_id', 'reserved_group_id'])->map(fn ($b) => ['code' => $b->code, 'token_hash' => hash('sha256', $b->qr_token), 'category_id' => $b->category_id, 'status' => $b->status, 'mine' => $b->reserved_device_id === $poste->id, 'group_id' => $b->reserved_group_id])->all(),
             'groups' => DB::table('groups')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'bus_number', 'opened_at', 'departed_at', 'arrival_closed_at'])->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'bus_number' => $g->bus_number, 'opened' => $g->opened_at !== null, 'departed' => $g->departed_at !== null, 'arrival_closed' => $g->arrival_closed_at !== null])->all(),
-            'members' => DB::table('group_members as m')->join('groups as g', 'g.id', '=', 'm.group_id')->where('g.event_id', $e)->get(['m.group_id', 'm.visitor_id', 'm.called_at', 'm.checked_at', 'm.confirmed_at', 'm.absent_at', 'm.boarded_at', 'm.arrived_at'])->map(fn ($m) => ['group_id' => $m->group_id, 'visitor_id' => $m->visitor_id, 'checked' => $m->checked_at !== null, 'confirmed' => $m->confirmed_at !== null, 'absent' => $m->absent_at !== null, 'boarded' => $m->boarded_at !== null, 'arrived' => $m->arrived_at !== null])->all(),
+            'members' => DB::table('group_members as m')->join('groups as g', 'g.id', '=', 'm.group_id')->join('visitors as mv', 'mv.id', '=', 'm.visitor_id')->whereNull('mv.withdrawn_at')->where('g.event_id', $e)->get(['m.group_id', 'm.visitor_id', 'm.called_at', 'm.checked_at', 'm.confirmed_at', 'm.absent_at', 'm.boarded_at', 'm.arrived_at'])->map(fn ($m) => ['group_id' => $m->group_id, 'visitor_id' => $m->visitor_id, 'checked' => $m->checked_at !== null, 'confirmed' => $m->confirmed_at !== null, 'absent' => $m->absent_at !== null, 'boarded' => $m->boarded_at !== null, 'arrived' => $m->arrived_at !== null])->all(),
         ];
     }
 }

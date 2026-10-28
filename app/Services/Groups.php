@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\Poste\DeskRefused;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -83,7 +84,7 @@ final class Groups
     /** Crée les lignes de suivi manquantes (stagiaires rattachés par une importation, par exemple). */
     public function ensureMembers(string $groupId): void
     {
-        DB::statement('INSERT INTO group_members (id, group_id, visitor_id, created_at, updated_at) SELECT gen_random_uuid(), v.group_id, v.id, now(), now() FROM visitors v WHERE v.group_id = ? AND NOT EXISTS (SELECT 1 FROM group_members m WHERE m.visitor_id = v.id) ON CONFLICT DO NOTHING', [$groupId]);
+        DB::statement('INSERT INTO group_members (id, group_id, visitor_id, created_at, updated_at) SELECT gen_random_uuid(), v.group_id, v.id, now(), now() FROM visitors v WHERE v.group_id = ? AND v.withdrawn_at IS NULL AND NOT EXISTS (SELECT 1 FROM group_members m WHERE m.visitor_id = v.id) ON CONFLICT DO NOTHING', [$groupId]);
     }
 
     /**
@@ -98,7 +99,7 @@ final class Groups
         $members = DB::select(
             'SELECT m.visitor_id, v.full_name, v.organisation, m.called_at, m.checked_at, m.check_mode, m.confirmed_at, m.absent_at, m.boarded_at, m.arrived_at,
                 (SELECT b.code FROM badge_assignments a JOIN badges b ON b.id = a.badge_id WHERE a.visitor_id = v.id AND a.returned_at IS NULL AND a.cancelled_at IS NULL LIMIT 1) AS badge_code
-             FROM group_members m JOIN visitors v ON v.id = m.visitor_id WHERE m.group_id = ? ORDER BY v.full_name, v.id',
+             FROM group_members m JOIN visitors v ON v.id = m.visitor_id WHERE m.group_id = ? AND v.withdrawn_at IS NULL ORDER BY v.full_name, v.id',
             [$groupId],
         );
         $total = count($members);
@@ -112,11 +113,16 @@ final class Groups
         ];
     }
 
+    private function activeMembers(string $groupId): Builder
+    {
+        return DB::table('group_members')->where('group_id', $groupId)->whereExists(fn ($q) => $q->selectRaw('1')->from('visitors as av')->whereColumn('av.id', 'group_members.visitor_id')->whereNull('av.withdrawn_at'));
+    }
+
     private function member(string $groupId, string $visitorId): object
     {
         $this->ensureMembers($groupId);
 
-        return DB::table('group_members')->where('group_id', $groupId)->where('visitor_id', $visitorId)->lockForUpdate()->first() ?? throw new DeskRefused('pas_du_groupe', 'Cette personne ne fait pas partie de ce groupe.', 422);
+        return $this->activeMembers($groupId)->where('visitor_id', $visitorId)->lockForUpdate()->first() ?? throw new DeskRefused('pas_du_groupe', 'Cette personne ne fait pas partie de ce groupe.', 422);
     }
 
     private function open(string $groupId, User $actor): object
@@ -234,12 +240,12 @@ final class Groups
             $group = $this->open($groupId, $agent);
             $this->ensureMembers($groupId);
             if ($group->departed_at !== null) {
-                return ['boarded' => (int) DB::table('group_members')->where('group_id', $groupId)->whereNotNull('boarded_at')->count(), 'absent' => (int) DB::table('group_members')->where('group_id', $groupId)->whereNotNull('absent_at')->count()];
+                return ['boarded' => (int) $this->activeMembers($groupId)->whereNotNull('boarded_at')->count(), 'absent' => (int) $this->activeMembers($groupId)->whereNotNull('absent_at')->count()];
             }
             $now = now();
-            $boarded = DB::table('group_members')->where('group_id', $groupId)->whereExists(fn ($q) => $q->selectRaw('1')->from('badge_assignments as a')->whereColumn('a.visitor_id', 'group_members.visitor_id')->whereNull('a.returned_at')->whereNull('a.cancelled_at'))->update(['boarded_at' => $now, 'updated_at' => $now]);
-            $absentIds = DB::table('group_members')->where('group_id', $groupId)->whereNull('boarded_at')->pluck('visitor_id')->all();
-            DB::table('group_members')->where('group_id', $groupId)->whereNull('boarded_at')->update(['absent_at' => $now, 'updated_at' => $now]);
+            $boarded = $this->activeMembers($groupId)->whereExists(fn ($q) => $q->selectRaw('1')->from('badge_assignments as a')->whereColumn('a.visitor_id', 'group_members.visitor_id')->whereNull('a.returned_at')->whereNull('a.cancelled_at'))->update(['boarded_at' => $now, 'updated_at' => $now]);
+            $absentIds = $this->activeMembers($groupId)->whereNull('boarded_at')->pluck('visitor_id')->all();
+            $this->activeMembers($groupId)->whereNull('boarded_at')->update(['absent_at' => $now, 'updated_at' => $now]);
             DB::table('groups')->where('id', $groupId)->update(['departed_at' => $now, 'departed_by' => $agent->id, 'updated_at' => $now]);
             foreach ($absentIds as $visitorId) {
                 $this->audit->append('groupe.absent', $agent->id, ['group_id' => $groupId, 'visitor_id' => $visitorId]);
@@ -277,6 +283,10 @@ final class Groups
             if ($member->arrived_at !== null) {
                 return ['arrived' => true, 'already' => true, 'badge_code' => $badge->code, 'group_id' => $member->group_id, 'ecart' => null];
             }
+            $guest = DB::table('visitors')->where('id', $visitorId)->lockForUpdate()->first();
+            if ($guest->withdrawn_at !== null) {
+                throw new DeskRefused('invite_retire', 'Cet invité a été retiré de la liste.');
+            }
             $now = now();
             $ecart = null;
             if ($member->boarded_at === null) {
@@ -286,6 +296,7 @@ final class Groups
             DB::table('group_members')->where('id', $member->id)->update(['arrived_at' => $now, 'updated_at' => $now]);
             DB::table('visitors')->where('id', $visitorId)->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'attendu'))->update(['status' => 'present', 'updated_at' => $now]);
             DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $device->event_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'actor_id' => $agent->id, 'type' => 'entree', 'checkpoint' => $device->station ?? $device->name, 'occurred_at' => $now, 'details' => json_encode(array_filter(['arrivee_groupe' => true, 'group_id' => $member->group_id, 'heure_declaree' => $declaredAt, 'ecart' => $ecart])), 'created_at' => $now, 'updated_at' => $now]);
+            app(HostNotifications::class)->send($visitorId, 'arrivee', $agent, $device);
             $this->audit->append('groupe.arrive', $agent->id, ['group_id' => $member->group_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'device_id' => $device->id, 'ecart' => $ecart]);
 
             return ['arrived' => true, 'already' => false, 'badge_code' => $badge->code, 'group_id' => $member->group_id, 'ecart' => $ecart];
@@ -301,8 +312,8 @@ final class Groups
     {
         return DB::transaction(function () use ($groupId): array {
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
-            $arrived = (int) DB::table('group_members')->where('group_id', $groupId)->whereNotNull('arrived_at')->count();
-            $missing = (int) DB::table('group_members')->where('group_id', $groupId)->whereNotNull('boarded_at')->whereNull('arrived_at')->count();
+            $arrived = (int) $this->activeMembers($groupId)->whereNotNull('arrived_at')->count();
+            $missing = (int) $this->activeMembers($groupId)->whereNotNull('boarded_at')->whereNull('arrived_at')->count();
             if ($group->arrival_closed_at === null) {
                 DB::table('groups')->where('id', $groupId)->update(['arrival_closed_at' => now(), 'updated_at' => now()]);
                 $label = $group->bus_number ?? $group->name;

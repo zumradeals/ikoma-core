@@ -4,6 +4,7 @@ export type DeskContext = { poste: { id: string; name: string; station: string |
 export type SearchResult = { id: string; full_name: string; organisation: string | null; host: string | null; homonyms: number; category: Category };
 export type Fiche = {
   id: string; full_name: string; organisation: string | null; host: string | null; category: Category; zones: string[]; accueil_limite: boolean; source: string; status: string;
+  host_advice?: {state:string|null};
   host_validation: 'en_attente' | 'accepte' | 'refuse' | null; valid_from: string; valid_until: string; hors_periode: boolean;
   identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null; access_note?: string | null; a_rebadger?: boolean;
 };

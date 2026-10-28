@@ -2,6 +2,7 @@ export const roleLabels: Record<string, string> = {
   administrateur: 'Administrateur', superviseur: 'Superviseur sécurité', agent_accueil: "Agent d’accueil", hote: 'Hôte / organisateur', encadreur: 'Encadreur de groupe',
 };
 export const actionLabels: Record<string, string> = {
+  'notification.creee':'Notification créée', 'hote.decision_non_liste':'Réponse de l’hôte au non-listé', 'hote.avis_hors_periode':'Avis de l’hôte hors période', 'liste.invite_ajoute':'Invité ajouté par l’hôte', 'liste.invite_modifie':'Invité modifié par l’hôte', 'liste.invite_retire':'Invité retiré par l’hôte', 'hote.rattache':'Fiches hôte rattachées', 'hote.delai_modifie':'Délai de réponse hôte modifié',
   'liste.import_apercu': 'Liste : aperçu contrôlé', 'liste.import_confirme': 'Liste : import confirmé', 'liste.import_abandonne': 'Liste : import abandonné',
   'badge.lot_cree': 'Badges : lot créé', 'badge.reserve': 'Badges : plage réservée', 'badge.associe': 'Badge associé', 'badge.restitue': 'Badge restitué', 'badge.annule': 'Badge annulé', 'badge.controle_refuse': 'Badge : contrôle refusé', 'badge.reglage_modifie': 'Badges : réglages modifiés',
   'visiteur.identite_verifiee': 'Visiteur : identité et photo enregistrées', 'visiteur.valide': 'Visiteur validé', 'visiteur.refuse': 'Visiteur refusé', 'visiteur.entree': 'Visiteur : entrée enregistrée', 'visiteur.non_liste_cree': 'Visiteur non listé créé', 'visiteur.hote_decision': 'Décision de l’hôte sur un non listé',

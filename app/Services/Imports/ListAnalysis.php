@@ -47,7 +47,7 @@ final class ListAnalysis
         }
         $norm = $this->normalize($strings);
         $offset = 0;
-        $existing = DB::table('visitors as v')->leftJoin('hosts as h', 'h.id', '=', 'v.host_id')->where('v.event_id', $eventId)->selectRaw("v.id, v.organisation, h.name AS host, public.ikoma_normalize(v.full_name) AS name_key, public.ikoma_normalize(coalesce(v.organisation,'')) AS org_key, public.ikoma_normalize(coalesce(h.name,'')) AS host_key")->get();
+        $existing = DB::table('visitors as v')->leftJoin('hosts as h', 'h.id', '=', 'v.host_id')->where('v.event_id', $eventId)->whereNull('v.withdrawn_at')->selectRaw("v.id, v.organisation, h.name AS host, public.ikoma_normalize(v.full_name) AS name_key, public.ikoma_normalize(coalesce(v.organisation,'')) AS org_key, public.ikoma_normalize(coalesce(h.name,'')) AS host_key")->get();
         $identities = [];
         foreach ($existing as $v) {
             $identities[$v->name_key][] = ['key' => json_encode([$v->org_key, $v->host_key]), 'reference' => ['id' => $v->id, 'organisation' => $v->organisation, 'host' => $v->host, 'source' => 'déjà enregistré']];
