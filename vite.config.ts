@@ -28,13 +28,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,woff2}'], navigateFallback: undefined,
         // Page publique provisoire et coquille publique du poste (/poste/shell : aucune session, aucun nom, aucune donnée).
-        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }],
+        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }, { url: '/controle/shell', revision: sourceHash() }],
         navigateFallbackDenylist: [/^\/build/],
-        // /poste passe toujours par le serveur (session, droits) ; sans réseau, on rend la coquille publique précachée. Jamais de contenu authentifié en cache.
+        // /poste et /controle passent toujours par le serveur (session, droits) ; sans réseau, on rend la coquille publique précachée. Jamais de contenu authentifié en cache.
         runtimeCaching: [{
-          urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && url.pathname === '/poste',
+          urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && (url.pathname === '/poste' || url.pathname === '/controle'),
           handler: 'NetworkOnly',
-          options: { plugins: [{ handlerDidError: async () => caches.match('/poste/shell', { ignoreSearch: true }) }] },
+          options: { plugins: [{ handlerDidError: async ({ request }: { request: Request }) => caches.match(new URL(request.url).pathname + '/shell', { ignoreSearch: true }) }] },
         }],
       },
     }),

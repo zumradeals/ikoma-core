@@ -283,11 +283,11 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
   for (const secret of [fx.bulk[0], fx.bulk[29], fx.names.listed, 'Organisation fictive de recette', fx.freeBadges[10], fx.enrolCode.replaceAll('-', ''), fx.email]) expect(dump, secret).not.toContain(secret);
 
   // Retour du réseau : la première réponse du serveur est perdue (le lot est appliqué mais la tablette ne le sait pas) ; le renvoi ne doit rien doubler.
-  await tablet.setOffline(false);
   let lost = false;
   await page.route('**/poste/api/sync', async route => {
     if (!lost) { lost = true; await route.fetch(); await route.abort('connectionreset'); } else await route.continue();
   });
+  await tablet.setOffline(false); // l'événement « en ligne » déclenche déjà l'envoi : le piège doit être posé avant
   await button(page, 'Synchroniser maintenant').click();
   await expect(page.getByTestId('en-attente')).toHaveText('0', { timeout: 120_000 });
   await expect(page.getByTestId('derniere-sync')).not.toHaveText('jamais'); await shot(page, 'l6-synchronise');

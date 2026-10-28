@@ -71,7 +71,7 @@ export class PosteRuntime {
 
   private async open(): Promise<void> {
     this.profile = await this.vault.getSecret<{ id: string; name: string }>('profile');
-    this.repo = await LocalPosteRepository.open(this.vault, this.store, () => { void this.sync.refreshCounts(); this.sync.kick(); });
+    this.repo = await LocalPosteRepository.open(this.vault, this.store, () => { void this.sync.refreshCounts(); this.sync.kick(); }, this.sync);
     await this.sync.refreshCounts();
   }
 

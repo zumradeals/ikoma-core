@@ -50,7 +50,17 @@ export async function startScan(video: HTMLVideoElement, onCode: (text: string) 
     }, 200);
     return { stop() { stopped = true; window.clearInterval(timer); closeCamera(video, stream); } };
   }
+  // Lecture image par image : on ne confie pas le flux à la boucle interne de zxing (decodeFromStream), qui attend un événement « loadedmetadata »
+  // déjà passé quand la caméra est ouverte avant et pouvait ne jamais lire le QR (blocage intermittent constaté en recette).
   const { BrowserQRCodeReader } = await import('@zxing/browser');
-  const controls = await new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 150 }).decodeFromStream(stream, video, result => { if (result) emit(result.getText()); });
-  return { stop() { stopped = true; controls.stop(); closeCamera(video, stream); } };
+  const reader = new BrowserQRCodeReader();
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  const timer = window.setInterval(() => {
+    if (stopped || !context || video.readyState < 2 || !video.videoWidth) return;
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+    context.drawImage(video, 0, 0);
+    try { emit(reader.decodeFromCanvas(canvas).getText()); } catch { /* aucun QR lisible dans cette image */ }
+  }, 150);
+  return { stop() { stopped = true; window.clearInterval(timer); closeCamera(video, stream); } };
 }

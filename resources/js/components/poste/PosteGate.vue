@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import PosteApp from './PosteApp.vue';
+import ControleApp from './ControleApp.vue';
+import type { SitePosteRepository } from '../../poste/repository';
 import { PosteRuntime, type WipeReason } from '../../poste/local/runtime';
 import { getMeta } from '../../poste/local/db';
 import { pinProblem, PinError } from '../../poste/local/vault';
@@ -8,7 +10,7 @@ import type { LocalOp } from '../../poste/local/apply';
 import type { SyncState } from '../../poste/local/sync';
 import { ApiError } from '../../poste/types';
 
-const props = defineProps<{ agent: { id: string; name: string } | null; runtime?: PosteRuntime }>();
+const props = defineProps<{ agent: { id: string; name: string } | null; runtime?: PosteRuntime; app?: 'poste' | 'controle' }>();
 const phase = ref<'chargement' | 'vide' | 'verrouille' | 'ouvert'>('chargement');
 const sync = ref<SyncState | null>(null);
 const wiped = ref<WipeReason | null>(null);
@@ -134,7 +136,8 @@ onBeforeUnmount(() => {
   </main>
 
   <template v-else>
-    <PosteApp :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
+    <ControleApp v-if="app === 'controle' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as SitePosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
+    <PosteApp v-else :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
     <section v-if="conflicts.length" class="mx-auto max-w-4xl px-4 pb-8" aria-labelledby="conflits-titre" data-testid="conflits">
       <div class="rounded-2xl border-2 border-red-700 bg-red-50 p-5">
         <h2 id="conflits-titre" class="text-xl font-bold text-red-900"><span aria-hidden="true">⚠</span> {{ conflicts.length }} opération{{ conflicts.length > 1 ? 's' : '' }} refusée{{ conflicts.length > 1 ? 's' : '' }} par le serveur</h2>

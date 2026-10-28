@@ -12,7 +12,7 @@ vi.mock('../../resources/js/components/poste/PosteApp.vue', () => ({ default: { 
 const PIN = '482915';
 const snapshot: Snapshot = {
   version: 'v1', server_time: new Date().toISOString(), poste: { id: 'p1', name: 'Tablette A', station: 'Poste A', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: new Date(Date.now() - 3_600_000).toISOString(), ends_at: new Date(Date.now() + 86_400_000).toISOString() },
-  settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [], zones: [], category_zone: [], hosts: [], visitors: [], badges: [],
+  settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [], zones: [], category_zone: [], hosts: [], postes: [], visitors: [], badges: [],
 };
 
 async function enrolled(): Promise<PosteRuntime> {

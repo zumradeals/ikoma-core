@@ -2,7 +2,7 @@ import { ApiError, type Avis, type Fiche, type SearchResult } from '../types';
 import type { LocalList, SnapVisitor } from './list';
 import { searchIndex } from './search';
 
-export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste';
+export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie';
 export type LocalOp = {
   id: string; seq: number; type: OpType; agent_id: string; client_time: string; visitor_rev: string | null; payload: Record<string, unknown>; photoId?: string;
   result?: { code: string; message: string } | null;
@@ -85,6 +85,7 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): { badge_code
       const badge = list.badges.get(code);
       if (!badge) throw refuse('badge_inconnu', 'Badge inconnu : vérifiez le code imprimé ou prenez un autre badge.', 'Saisissez le code imprimé ou prenez un autre badge.');
       if (v.badge_code === badge.code) return { badge_code: badge.code };
+      if (!badge.mine) throw refuse('autre_poste', 'Ce badge n’est pas réservé à ce poste : il ne peut pas être associé depuis cette tablette.', 'Prenez un badge réservé à ce poste.');
       if (badge.status !== 'Disponible') {
         if (badge.status === 'Associé') {
           const holder = Array.from(list.visitors.values()).find(x => x.badge_code === badge.code)?.full_name;
@@ -103,6 +104,13 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): { badge_code
       if (!v.validated || !v.badge_code) throw refuse('badge_requis', 'Le visiteur doit être validé et avoir un badge avant d’entrer.');
       v.status = 'present'; list.touch();
       return { zones: list.zonesFor(v) };
+    }
+    case 'controle':
+      return {}; // un contrôle ne change rien à la copie locale ; l'événement est écrit par le serveur au rejeu
+    case 'sortie': {
+      const holder = Array.from(list.visitors.values()).find(x => x.badge_code === String(p.code).toUpperCase());
+      if (holder) { holder.status = 'sorti'; list.touch(); const badge = list.badges.get(String(p.code).toUpperCase()); if (badge) badge.status = 'Restitué'; }
+      return {};
     }
     case 'non_liste': {
       const id = String(p.visitor_id ?? '');

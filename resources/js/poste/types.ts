@@ -7,6 +7,14 @@ export type Fiche = {
   host_validation: 'en_attente' | 'accepte' | 'refuse' | null; valid_from: string; valid_until: string; hors_periode: boolean;
   identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
 };
+export type Checkpoint = { type: 'zone' | 'poste'; id: string; name: string };
+export type PointRef = { type: 'zone' | 'poste'; id: string };
+/** Verdict d'un contrôle : `source` dit qui l'a rendu ; `known_at` n'existe que pour une réponse de la tablette (situation connue à cette heure). */
+export type ControlResult = {
+  valid: boolean; reason: string | null; message: string; badge_code: string | null; zone_ok: boolean | null; point: string; person: { name: string } | null; organisation: string | null;
+  category: Category | null; zones: string[]; source: 'serveur' | 'local'; known_at?: string | null;
+};
+export type ExitResult = { ok: boolean; reason?: string; message?: string; badge_code: string | null; badge_status?: string; person?: { name: string }; point?: string; presents?: number | null; warning?: string | null; source: 'serveur' | 'local'; known_at?: string | null };
 export type Avis = 'hote' | 'superviseur';
 export type UnlistedInput = { name: string; organisation: string; host_id: string; category_id: string };
 

@@ -26,11 +26,11 @@ const iso = (offsetMs: number) => new Date(now0 + offsetMs).toISOString();
 function visitor(id: string, name: string, over: Partial<SnapVisitor> = {}): SnapVisitor {
   return { id, full_name: name, organisation: 'Organisation fictive', host_id: 'h1', category_id: 'c1', valid_from: iso(-3_600_000), valid_until: iso(86_400_000), source: 'listé', status: 'attendu', host_validation: null, rev: '2026-11-05T07:00:00.000000Z', identity_done: false, photo_done: false, validated: false, badge_code: null, ...over };
 }
-function snapshot(visitors: SnapVisitor[], badges = [{ code: 'B-001', token_hash: '', category_id: 'c1', status: 'Disponible' }, { code: 'B-002', token_hash: '', category_id: 'c1', status: 'Disponible' }, { code: 'B-900', token_hash: '', category_id: 'c0', status: 'Disponible' }]): Snapshot {
+function snapshot(visitors: SnapVisitor[], badges = [{ code: 'B-001', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true }, { code: 'B-002', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true }, { code: 'B-900', token_hash: '', category_id: 'c0', status: 'Disponible', mine: true }]): Snapshot {
   return {
     version: 'v1', server_time: new Date(now0).toISOString(), poste: { id: 'p1', name: 'Tablette A', station: 'Poste fictif A', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
     settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [vip, std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }, { id: 'z2', name: 'Salle', est_accueil: false }],
-    category_zone: [{ category_id: 'c1', zone_id: 'z1' }, { category_id: 'c1', zone_id: 'z2' }, { category_id: 'c0', zone_id: 'z1' }], hosts: [{ id: 'h1', name: 'Hôte fictif', service: null }], visitors, badges,
+    category_zone: [{ category_id: 'c1', zone_id: 'z1' }, { category_id: 'c1', zone_id: 'z2' }, { category_id: 'c0', zone_id: 'z1' }], hosts: [{ id: 'h1', name: 'Hôte fictif', service: null }], postes: [{ id: 'p1', name: 'Poste fictif A' }], visitors, badges,
   };
 }
 
