@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\ProgressiveLoginThrottle;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SessionSecurity;
-use App\Services\Audit;
+use App\Services\AccessAudit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,19 +21,22 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Le conteneur nginx n'écoute que sur 127.0.0.1 : seul le proxy HTTPS du serveur (Caddy) peut l'atteindre, on lui fait donc confiance pour le schéma https.
         $middleware->trustProxies(at: '*');
-        $middleware->web(append: [HandleInertiaRequests::class, SessionSecurity::class]);
+        $middleware->append(SecurityHeaders::class);
+        $middleware->web(append: [HandleInertiaRequests::class, SessionSecurity::class, ProgressiveLoginThrottle::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->respond(function (Response $response) {
-            if (in_array($response->getStatusCode(), [401, 403, 429], true) || ($response->isRedirect() && parse_url($response->headers->get('Location', ''), PHP_URL_PATH) === '/login' && request()->path() !== 'login')) {
-                app(Audit::class)->append('acces.refuse', auth()->id(), ['route' => request()->path(), 'statut' => $response->getStatusCode()]);
-            }
+            app(AccessAudit::class)->record(request(), $response);
             if (in_array($response->getStatusCode(), [403, 429], true) && ! request()->expectsJson()) {
+                $retryAfter = $response->headers->get('Retry-After');
                 $response = Inertia::render('Error', ['status' => $response->getStatusCode()])->toResponse(request())->setStatusCode($response->getStatusCode());
+                if ($retryAfter !== null) {
+                    $response->headers->set('Retry-After', $retryAfter);
+                }
             }
             $response->headers->set('Cache-Control', 'no-store, private');
 
-            return $response;
+            return SecurityHeaders::apply(request(), $response);
         });
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),

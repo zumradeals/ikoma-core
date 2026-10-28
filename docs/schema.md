@@ -176,3 +176,14 @@ Migration `2026_11_06_000000_create_host_notifications` :
 Le rattachement réutilise hosts.user_id. Un compte peut être rattaché à ses fiches de plusieurs événements ; le serveur vérifie à chaque accès que la fiche hôte appartient au compte courant. L’administration peut rattacher les fiches existantes ; elle ne peut pas voler implicitement une fiche déjà rattachée à un autre compte.
 
 L’hôte peut attribuer la catégorie **Visiteur uniquement**. Une catégorie initialement fixée par l’administration peut être conservée ; un changement ne contredit pas un groupe ou un badge déjà remis. Doublons et homonymes utilisent ikoma_normalize et le nettoyage L3 ; un avertissement d’homonymie ne divulgue pas les fiches des autres hôtes.
+
+## Évolution L11 — durcissement et conservation
+
+Migration additive `2026_11_07_000000_harden_data_lifecycle` : aucune nouvelle table.
+
+- devices.sync_seq : dernière séquence nouvelle acceptée ou mise en conflit, initialisée au maximum historique, remise à zéro à l’enrôlement. Sous verrou d’appareil : un renvoi du même UUID reste idempotent ; un nouvel UUID à une séquence déjà dépassée déclenche révocation, conflit `appareil_clone`, alerte critique et audit. Cela détecte des séquences incompatibles, pas un clone capable de poursuivre une séquence commune sans collision.
+- events.anonymized_at, retention_summary (jsonb) : date de réduction des identités et bilan chiffré des visiteurs/statuts/mouvements avant suppression privilégiée des mouvements échus. UUID, contraintes et statistiques sont conservés ; voir les limites d’anonymisation dans CONSERVATION_DONNEES.md.
+- index sync_operations(device_id, seq). Les privilèges de l’application sur les trois tables append-only restent inchangés.
+- settings : conservation_{visiteurs,evenements,photos,synchronisations,alertes,notifications,audit}_jours (30/90/7/30/30/7/365 proposés), conservation_validee=0, journal_export_max_lignes=10000. Après une purge du journal seulement : audit_checkpoint contient le point de reprise signé, vérifiable par une clé publique indépendante ; aucune clé privée dans la base.
+
+Les échecs de connexion ajoutent IP et empreinte SHA-256 du jeton d’appareil reçu, à défaut du User-Agent. Ce dernier est un indicateur technique non unique, pas une authentification d’appareil. Les jetons, identifiants saisis et mots de passe ne sont pas copiés au journal. Un refus d’accès est enregistré une seule fois par requête, avec le gabarit de route et le statut.

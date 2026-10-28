@@ -25,3 +25,5 @@ pest()->use(DatabaseTransactions::class)->in('Feature/SupervisorTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/GroupsTest.php');
 
 pest()->use(DatabaseTransactions::class)->in('Feature/HostSpaceTest.php');
+
+pest()->use(DatabaseTransactions::class)->in('Feature/HardeningTest.php');

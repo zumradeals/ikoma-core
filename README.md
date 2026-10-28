@@ -89,3 +89,9 @@ Pour la recette fictive, utilisez tests/fixtures/liste-fictive-1000.csv : 985 im
 L’administrateur rattache le compte de rôle Hôte à ses fiches dans **Administration → Comptes**. L’hôte ouvre ensuite **Mes notifications** pour répondre aux demandes et voir les arrivées, ou **Mes invités** pour tenir sa liste. Sans fiche rattachée, l’application explique de contacter l’administrateur.
 
 L’hôte ajoute des invités de catégorie Visiteur. Les doublons sont bloqués et les homonymes signalés. Après une entrée, la fiche est verrouillée. Un visiteur non listé accepté reste limité à l’accueil, avec accompagnement. Sans réponse pendant deux minutes, le superviseur est alerté ; ce délai se règle dans l’administration des comptes. Les notifications exigent le réseau et l’écran ouvert ; aucun e-mail ni SMS n’est envoyé.
+
+### Sécurité et conservation (L11)
+
+Administration > Conservation présente les délais proposés ; faites-les approuver avec le client et vérifier par un juriste avant toute donnée réelle. La purge n’est pas accessible depuis le navigateur. L’export du journal demande une période et ne contient aucun nom.
+
+En cas de perte de double facteur, un autre administrateur utilise la préparation puis la confirmation dans Comptes. La procédure du dernier administrateur et les commandes de maintenance sont décrites dans [EXPLOITATION](docs/EXPLOITATION.md). Voir aussi [la revue de sécurité](docs/REVUE_SECURITE.md) et [la politique proposée de conservation](docs/CONSERVATION_DONNEES.md).
