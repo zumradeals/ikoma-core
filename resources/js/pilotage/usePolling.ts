@@ -11,7 +11,7 @@ export function usePolling(only: string[], intervalMs = 3000) {
   function reload() {
     if (loading || document.hidden) return;
     loading = true;
-    router.reload({ only, onFinish: () => { loading = false; } });
+    router.reload({ only, async: true, onFinish: () => { loading = false; } });
   }
   function onVisibility() { if (document.hidden) stop(); else { reload(); start(); } }
   function start() { stop(); timer = window.setInterval(reload, intervalMs); }
