@@ -1,0 +1,12 @@
+# Entrée HTTPS de la démonstration. Caddy obtient et renouvelle seul le certificat Let's Encrypt.
+# Le HTTPS est obligatoire : la caméra de la tablette (photo, scan du badge) est refusée en HTTP.
+ikoma.dgafrique.com {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8080
+}

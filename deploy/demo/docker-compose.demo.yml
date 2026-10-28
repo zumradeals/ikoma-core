@@ -1,0 +1,11 @@
+# Surcharge de démonstration : redémarrage automatique des services après un redémarrage du serveur.
+# Utilisée seulement par deploy/demo/deploy.sh : docker compose -f docker-compose.yml -f deploy/demo/docker-compose.demo.yml
+services:
+  db:
+    restart: unless-stopped
+  php:
+    restart: unless-stopped
+  scheduler:
+    restart: unless-stopped
+  nginx:
+    restart: unless-stopped
