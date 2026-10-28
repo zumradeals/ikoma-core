@@ -26,7 +26,7 @@ function groupUser(string $role): User
 /** Réserve les badges B-001 à B-0NN au groupe du seed. */
 function reserveForGroup(Group $group, int $count): void
 {
-    DB::table('badges')->update(['reserved_device_id' => null, 'category_id' => DemoSeeder::id('category3')]);
+    DB::table('badges')->where('event_id', DemoSeeder::id('event'))->update(['reserved_device_id' => null, 'category_id' => DemoSeeder::id('category3')]);
     app(BadgeLots::class)->reserve(DemoSeeder::id('batch'), 1, $count, $group, test()->admin);
 }
 
