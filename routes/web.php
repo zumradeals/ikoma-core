@@ -10,7 +10,9 @@ use App\Http\Controllers\BadgeSettingsController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
 use App\Http\Controllers\GroupesController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HostController;
+use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalExportController;
 use App\Http\Controllers\ListImportsController;
@@ -30,6 +32,9 @@ use App\Http\Middleware\ResolvePoste;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+Route::get('/sante', HealthController::class)->middleware('throttle:sante');
+Route::get('/installation', [InstallationController::class, 'show'])->middleware('throttle:installation-lecture');
+Route::post('/installation', [InstallationController::class, 'store'])->middleware('throttle:installation-ecriture');
 Route::get('/', fn () => Inertia::render('Home'))->name('home');
 // Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
 Route::get('/poste/shell', fn () => Inertia::render('Poste'));

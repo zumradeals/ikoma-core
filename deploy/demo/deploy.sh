@@ -44,7 +44,8 @@ cd "$DIR"
 say "4/7 Environnement (clé, mots de passe de base de données : jamais dans Git)"
 if [ ! -f .env ]; then sh scripts/install.sh; fi
 grep -q '^APP_URL=' .env || printf 'APP_URL=https://%s\n' "$DOMAIN" >> .env
-grep -q '^APP_ENV=' .env || printf 'APP_ENV=production\nAPP_DEBUG=false\n' >> .env
+# La démonstration porte son propre environnement : « production » refuse les données de démonstration (lot L12).
+if grep -q '^APP_ENV=' .env; then sed -i 's/^APP_ENV=.*/APP_ENV=demo/' .env; else printf 'APP_ENV=demo\nAPP_DEBUG=false\n' >> .env; fi
 
 say "5/7 Construction et démarrage (plusieurs minutes la première fois)"
 # Port local de l'application (127.0.0.1 seulement) : 8080 si libre, sinon le premier port libre suivant, puis mémorisé dans .env.

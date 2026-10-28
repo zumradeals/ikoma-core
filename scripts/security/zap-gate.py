@@ -44,6 +44,9 @@ blocked, exceptions = [], []
 for site in report.get('site', []):
     for alert in site.get('alerts', []):
         result = {'regle': alert.get('alertRef'), 'alerte': alert.get('name'), 'risque': alert.get('riskcode')}
+        if not approved(alert):
+            # Diagnostic : l'instance exacte (chemin, paramètre, preuve) pour décider en connaissance de cause, jamais pour assouplir à l'aveugle.
+            result['instances'] = [{'chemin': urlparse(i.get('uri', '')).path or '/', 'parametre': i.get('param'), 'preuve': (i.get('evidence') or '')[:80]} for i in alert.get('instances', [])]
         (exceptions if approved(alert) else blocked).append(result)
 print(json.dumps({'exceptions_documentees': exceptions, 'alertes_a_examiner': blocked}, ensure_ascii=False))
 sys.exit(1 if blocked else 0)

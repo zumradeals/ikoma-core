@@ -1,0 +1,59 @@
+# Porte d'entrée unique de la production (L12). Les marqueurs @@...@@ sont remplacés par deploy/prod/install.sh.
+log_format ikoma_sans_donnees '$request_id $time_iso8601 $request_method $status';
+
+server {
+    listen 8080;
+    server_name @@DOMAIN@@;
+    server_tokens off;
+    access_log /dev/stdout ikoma_sans_donnees;
+    # Défi du certificat automatique (Let's Encrypt) : seul chemin servi en clair.
+    location /.well-known/acme-challenge/ { root /var/www/acme; try_files $uri =404; }
+    location / { return 301 https://@@DOMAIN@@$request_uri; }
+}
+
+server {
+    listen 8443 ssl;
+    http2 on;
+    server_name @@DOMAIN@@;
+    server_tokens off;
+    access_log /dev/stdout ikoma_sans_donnees;
+    # L'adresse et les paramètres d'une requête ne sont pas journalisés (ils peuvent contenir un nom) ; les erreurs vont sur la sortie d'erreur.
+    error_log /dev/stderr warn;
+
+    ssl_certificate /etc/ikoma/tls/fullchain.pem;
+    ssl_certificate_key /etc/ikoma/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    include /etc/nginx/ikoma-headers.conf;
+
+    root /var/www/html/public;
+    index index.php;
+    charset utf-8;
+    client_max_body_size 6m;
+    location /build/ {
+        include /etc/nginx/ikoma-headers.conf;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+        try_files $uri =404;
+    }
+    location = /build/sw.js {
+        include /etc/nginx/ikoma-headers.conf;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+        add_header Service-Worker-Allowed / always;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri =404;
+    }
+    location / { try_files $uri $uri/ /index.php?$query_string; }
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS on;
+        fastcgi_pass php:9000;
+    }
+    location ~ /\. { deny all; }
+}
