@@ -88,7 +88,8 @@ test('un compteur et une alerte créés par un autre poste apparaissent en moins
 
 test('alertes : voir, prendre en compte, trier par gravité', async () => {
   await sup.getByTestId('nav-alertes').click();
-  await expect(sup.getByRole('heading', { name: 'Alertes' })).toBeVisible(); await noOverflow(sup);
+  // On attend la page des alertes elle-même : le tableau de bord a aussi un titre « Alertes à traiter » et n'en montre que cinq.
+  await expect(sup).toHaveURL(/\/pilotage\/alertes(\?|$)/); await expect(sup.getByRole('heading', { name: 'Alertes', exact: true })).toBeVisible(); await expect(sup.getByTestId('liste-alertes')).toBeVisible(); await noOverflow(sup);
   const severities = await sup.locator('[data-testid^="alerte-"]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-severity')));
   const rank: Record<string, number> = { critique: 0, haute: 1, normale: 2 };
   expect(severities.map(s => rank[s!])).toEqual([...severities.map(s => rank[s!])].sort((a, b) => a - b));
