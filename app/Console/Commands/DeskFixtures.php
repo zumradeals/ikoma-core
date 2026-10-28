@@ -31,7 +31,7 @@ class DeskFixtures extends Command
             return self::FAILURE;
         }
         $this->callSilent('db:seed', ['--class' => RoleSeeder::class, '--force' => true]);
-        $s = Str::upper(Str::random(5));
+        $s = 'R'.Str::upper(Str::random(5));
         $now = now();
         $event = (string) Str::uuid();
         DB::table('events')->insert(['id' => $event, 'name' => "Recette fictive du poste d’accueil {$s}", 'starts_at' => $now->copy()->subHour(), 'ends_at' => $now->copy()->addDays(2), 'created_at' => $now, 'updated_at' => $now]);

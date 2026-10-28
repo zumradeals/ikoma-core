@@ -49,3 +49,7 @@ CI [40671812253](https://github.com/zumradeals/ikoma-core/actions/runs/406718122
 Notification d’arrivée mesurée dans le parcours à deux contextes : **799 ms après l’accusé de l’enregistrement serveur**, seuil strict de 5 000 ms. Le même parcours valide un non-listé depuis le téléphone, poursuit sa photo/validation/badge et son entrée sur la tablette, vérifie exactement « Zones : Hall accueil fictif » (pas de salle principale), ajoute un invité et vérifie le retour à la liste.
 
 Les [trois captures mobiles](captures/L10/README.md) proviennent de cette recette et ont été inspectées. Le test vérifie l’absence de défilement horizontal à 380 px. Aucun compte réel ni secret dans ces captures.
+
+## Complément après fusion
+
+La PR documentaire #18 a révélé deux fragilités de recette : mesure d’un bouton pendant un rafraîchissement Inertia, puis suffixe aléatoire numérique confondu avec le numéro d’un visiteur dans la recherche limitée à dix résultats. L’assertion conserve la taille minimale de 56 px mais attend sa mesure ; le suffixe de recette commence désormais par R pour rester distinct des numéros. Aucun parcours, contrôle ni seuil n’est retiré. Ces changements ne modifient pas les règles de recherche de l’application.
