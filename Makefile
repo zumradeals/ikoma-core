@@ -24,4 +24,4 @@ lint:
 	docker compose run --rm --no-deps front npm run lint
 	docker compose run --rm --no-deps front npm run typecheck
 migrate-fresh-seed:
-	docker compose run --rm migrator sh -c 'DB_USERNAME=ikoma DB_PASSWORD="$$(cat .secrets/db-owner)" php artisan migrate:fresh --force && php scripts/grant-db.php && php artisan db:seed --force'
+	docker compose run --rm -e APP_ENV=local migrator sh -c 'DB_USERNAME=ikoma DB_PASSWORD="$$(cat .secrets/db-owner)" php artisan migrate:fresh --force && php scripts/grant-db.php && php artisan db:seed --force'

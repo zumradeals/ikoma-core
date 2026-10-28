@@ -5,17 +5,17 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
-const INSTALL_TOKEN = 'jeton-fictif-0123456789abcdef';
-const INSTALL_PASSWORD = 'Mot-de-passe-Fictif-2027!';
-
 function installationPayload(array $over = []): array
 {
-    return ['token' => INSTALL_TOKEN, 'name' => 'Administrateur fictif', 'email' => 'admin-install@exemple.test', 'password' => INSTALL_PASSWORD, 'password_confirmation' => INSTALL_PASSWORD, 'event_name' => 'Événement fictif', 'site' => 'Site fictif', 'starts_at' => '2027-03-01 08:00', 'ends_at' => '2027-03-01 18:00', ...$over];
+    return ['token' => test()->installToken, 'name' => 'Administrateur fictif', 'email' => 'admin-install@exemple.test', 'password' => test()->installPassword, 'password_confirmation' => test()->installPassword, 'event_name' => 'Événement fictif', 'site' => 'Site fictif', 'starts_at' => '2027-03-01 08:00', 'ends_at' => '2027-03-01 18:00', ...$over];
 }
 
 beforeEach(function () {
+    // Valeurs aléatoires propres à chaque test : aucune constante qui ressemble à un secret dans le dépôt.
+    $this->installToken = bin2hex(random_bytes(16));
+    $this->installPassword = 'Mdp-'.bin2hex(random_bytes(8)).'-Aa1!';
     $this->tokenFile = tempnam(sys_get_temp_dir(), 'ikoma-install-');
-    file_put_contents($this->tokenFile, INSTALL_TOKEN."\n");
+    file_put_contents($this->tokenFile, $this->installToken."\n");
     // Une base de test sans administrateur ni installation terminée : on isole l'état dans la transaction du test.
     DB::table('model_has_roles')->delete();
     DB::table('users')->delete();
@@ -46,9 +46,9 @@ it('affiche les vérifications puis crée l’administrateur, l’événement et
     expect($event->name)->toBe('Événement fictif')->and(DB::table('zones')->where('event_id', $event->id)->where('est_accueil', true)->where('name', 'Accueil')->exists())->toBeTrue();
     expect(DB::table('settings')->where('key', 'installation_terminee')->value('value'))->toBe('1');
     $log = DB::table('audit_logs')->where('id', '>', $this->audit)->whereIn('action', ['installation.terminee', 'compte.cree'])->get()->map(fn ($l) => json_encode($l))->implode('');
-    expect($log)->toContain('installation.terminee')->not->toContain(INSTALL_PASSWORD)->not->toContain(INSTALL_TOKEN)->not->toContain('admin-install@');
+    expect($log)->toContain('installation.terminee')->not->toContain($this->installPassword)->not->toContain($this->installToken)->not->toContain('admin-install@');
     // le premier compte est forcé à configurer le 2FA : la connexion ne mène pas à l'espace sans lui
-    $this->post('/login', ['email' => 'admin-install@exemple.test', 'password' => INSTALL_PASSWORD]);
+    $this->post('/login', ['email' => 'admin-install@exemple.test', 'password' => $this->installPassword]);
     $this->get('/administration')->assertRedirect();
 });
 

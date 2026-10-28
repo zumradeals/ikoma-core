@@ -1,2 +1,4 @@
 # Jeton déterministe fictif DESK_TOKEN, introduit dans les seuls tests PHP (voir REVUE_SECURITE.md).
 1bda050f1df0313c2f47d6ea614ebd223fcbfc42:tests/Feature/PosteTest.php:generic-api-key:19
+# Constante FICTIVE du test de l'assistant d'installation (lot L12), remplacée par une valeur aléatoire générée à chaque test. Elle reste dans l'historique Git, qu'on ne réécrit pas.
+c916a533f4298ba528742aaeabbdda56afefb174:tests/Feature/InstallationTest.php:generic-api-key:8

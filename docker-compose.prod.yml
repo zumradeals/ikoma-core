@@ -44,7 +44,7 @@ services:
     secrets: [db_owner, db_app, app_key]
     networks: [interne]
     read_only: true
-    tmpfs: [/tmp, /var/www/html/bootstrap/cache]
+    tmpfs: [/tmp]
     depends_on:
       db: {condition: service_healthy}
     mem_limit: 512m
@@ -58,7 +58,7 @@ services:
     volumes: [storage:/var/www/html/storage]
     networks: [interne]
     read_only: true
-    tmpfs: [/tmp, /var/www/html/bootstrap/cache]
+    tmpfs: [/tmp]
     depends_on:
       migrator: {condition: service_completed_successfully}
     healthcheck:
@@ -79,7 +79,7 @@ services:
     volumes: [storage:/var/www/html/storage]
     networks: [interne]
     read_only: true
-    tmpfs: [/tmp, /var/www/html/bootstrap/cache]
+    tmpfs: [/tmp]
     depends_on:
       migrator: {condition: service_completed_successfully}
     mem_limit: 512m
