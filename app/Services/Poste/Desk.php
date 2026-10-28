@@ -5,6 +5,7 @@ namespace App\Services\Poste;
 use App\Models\Device;
 use App\Models\User;
 use App\Models\Visitor;
+use App\Services\Alerts;
 use App\Services\Audit;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
@@ -63,7 +64,8 @@ final class Desk
             'zones' => $zones->all(), 'accueil_limite' => $unlisted, 'source' => $visitor->source, 'status' => $visitor->status ?? 'attendu', 'host_validation' => $visitor->host_validation,
             'valid_from' => Carbon::parse($visitor->valid_from)->toIso8601String(), 'valid_until' => Carbon::parse($visitor->valid_until)->toIso8601String(), 'hors_periode' => $this->outsidePeriod($visitor),
             'identity_done' => DB::table('identity_checks')->where('visitor_id', $visitor->id)->exists(), 'photo_done' => DB::table('photos')->where('visitor_id', $visitor->id)->exists(),
-            'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge,
+            'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge, 'access_note' => $visitor->access_note,
+            'a_rebadger' => $badge === null && DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNotNull('cancelled_at')->exists() && ! in_array($visitor->status, ['sorti', 'refuse'], true),
         ];
     }
 
@@ -111,6 +113,9 @@ final class Desk
         if ($this->validation($visitor) === null) {
             $this->insertEvent($poste, $agent, $visitor, 'validation', null, ['hors_periode' => $outside, 'avis' => $outside ? $avis : null, ...($declaredAt !== null ? ['heure_declaree' => $declaredAt] : [])]);
             $this->audit->append('visiteur.valide', $agent->id, ['visitor_id' => $visitor->id, 'device_id' => $poste->id, 'hors_periode' => $outside, 'avis' => $outside ? $avis : null]);
+            if ($outside) {
+                app(Alerts::class)->raise($visitor->event_id, 'hors_periode', 'normale', 'visiteur', $visitor->id, 'Visiteur validé hors de sa période, sur avis '.($avis === 'hote' ? 'de l’hôte' : 'du superviseur').'.', 'hors_periode:'.$visitor->id);
+            }
         }
 
         return ['validated' => true, 'hors_periode' => $outside];
@@ -132,6 +137,7 @@ final class Desk
         DB::table('refusals')->insert(['id' => $id, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'reason' => mb_substr($motif, 0, 500), 'refused_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('visitors')->where('id', $visitor->id)->update(['status' => 'refuse', 'updated_at' => $now]);
         $this->audit->append('visiteur.refuse', $agent->id, ['visitor_id' => $visitor->id, 'refusal_id' => $id, 'device_id' => $poste->id]);
+        app(Alerts::class)->raise($visitor->event_id, 'refus', 'haute', 'visiteur', $visitor->id, 'Accès refusé à un visiteur : décision du superviseur attendue.', 'refus:'.$id);
 
         return ['refused' => true];
     }
@@ -213,6 +219,7 @@ final class Desk
         }
         DB::table('visitors')->insert(['id' => $id, 'event_id' => $poste->event_id, 'full_name' => mb_substr($name, 0, 160), 'organisation' => $organisation !== null && trim($organisation) !== '' ? mb_substr(trim($organisation), 0, 160) : null, 'host_id' => $hostId, 'category_id' => $categoryId, 'valid_from' => min($now, new \DateTimeImmutable($event->starts_at)), 'valid_until' => $event->ends_at, 'source' => 'non listé', 'status' => 'attendu', 'host_validation' => 'en_attente', 'created_at' => $now, 'updated_at' => $now]);
         $this->audit->append('visiteur.non_liste_cree', $agent->id, ['visitor_id' => $id, 'event_id' => $poste->event_id, 'host_id' => $hostId, 'device_id' => $poste->id]);
+        app(Alerts::class)->raise($poste->event_id, 'non_liste_attente', 'normale', 'visiteur', $id, 'Visiteur non listé en attente de l’accord de l’hôte.', 'non_liste:'.$id);
 
         return ['visitor_id' => $id];
     }
@@ -227,6 +234,7 @@ final class Desk
             }
             DB::table('visitors')->where('id', $visitor->id)->update(['host_validation' => $accepted ? 'accepte' : 'refuse', 'updated_at' => now()]);
             $this->audit->append('visiteur.hote_decision', $actor?->id, ['visitor_id' => $visitor->id, 'decision' => $accepted ? 'accepte' : 'refuse']);
+            app(Alerts::class)->resolve('visiteur', $visitor->id, 'non_liste_attente');
         });
     }
 

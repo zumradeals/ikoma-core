@@ -11,6 +11,6 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        return [...parent::share($request), 'auth' => ! in_array($request->path(), ['/', 'poste/shell', 'controle/shell'], true) && $request->user() ? ['id' => $request->user()->id, 'name' => $request->user()->name, 'permissions' => $request->user()->getAllPermissions()->pluck('name')] : null];
+        return [...parent::share($request), 'auth' => ! in_array($request->path(), ['/', 'poste/shell', 'controle/shell', 'pilotage/evacuation/shell'], true) && $request->user() ? ['id' => $request->user()->id, 'name' => $request->user()->name, 'permissions' => $request->user()->getAllPermissions()->pluck('name')] : null];
     }
 }

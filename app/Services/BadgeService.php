@@ -62,6 +62,7 @@ final class BadgeService
             }
             $assignment = BadgeAssignment::create(['event_id' => $badge->event_id, 'badge_id' => $badge->id, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'device_id' => $deviceId, 'assigned_at' => $now]);
             $this->setStatus($badge, BadgeStatus::Assigned);
+            app(Alerts::class)->resolve('visiteur', $visitor->id, 'badge_annule');
             $this->audit->append('badge.associe', $agent->id, ['badge_id' => $badge->id, 'visitor_id' => $visitor->id, 'assignment_id' => $assignment->id, 'device_id' => $deviceId, 'event_id' => $badge->event_id, ...($avis !== null ? ['avis' => $avis] : [])]);
 
             return $assignment;
@@ -111,6 +112,9 @@ final class BadgeService
             $badge->cancellation_reason = $motif;
             $this->setStatus($badge, BadgeStatus::Cancelled);
             $this->audit->append('badge.annule', $superviseur->id, ['badge_id' => $badge->id, 'visitor_id' => $assignment?->visitor_id, 'assignment_id' => $assignment?->id, 'event_id' => $badge->event_id]);
+            // Le superviseur n'associe pas de badge : il prévient l'accueil, qui verra la personne « à rebadger » sur sa fiche.
+            $holder = $assignment === null ? null : $assignment->visitor_id;
+            app(Alerts::class)->raise($badge->event_id, 'badge_annule', $holder !== null ? 'haute' : 'normale', $holder !== null ? 'visiteur' : 'badge', $holder ?? $badge->id, $holder !== null ? 'Badge annulé : la personne est à rebadger par l’accueil.' : 'Badge disponible annulé.', 'badge_annule:'.$badge->id);
 
             return $badge;
         });

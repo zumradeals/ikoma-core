@@ -10,6 +10,7 @@ use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ListImportsController;
+use App\Http\Controllers\PilotageController;
 use App\Http\Controllers\PosteApiController;
 use App\Http\Controllers\PosteController;
 use App\Http\Controllers\PostesController;
@@ -26,10 +27,22 @@ Route::get('/', fn () => Inertia::render('Home'))->name('home');
 // Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
 Route::get('/poste/shell', fn () => Inertia::render('Poste'));
 Route::get('/controle/shell', fn () => Inertia::render('Controle'));
+Route::get('/pilotage/evacuation/shell', fn () => Inertia::render('Pilotage/Evacuation'));
 Route::middleware(['auth'])->group(function (): void {
     Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => (bool) auth()->user()->two_factor_confirmed_at]))->middleware('password.confirm')->name('security');
     Route::middleware(RequireTwoFactor::class)->group(function (): void {
         Route::get('/api/presences', PresencesController::class)->middleware('can:presences.consulter');
+        Route::get('/pilotage', [PilotageController::class, 'index'])->middleware('can:pilotage.consulter');
+        Route::get('/pilotage/alertes', [PilotageController::class, 'alertes'])->middleware('can:alertes.consulter');
+        Route::post('/pilotage/alertes/{alert}/prendre-en-compte', [PilotageController::class, 'prendreEnCompte'])->whereUuid('alert')->middleware('can:alertes.consulter');
+        Route::get('/pilotage/presents', [PilotageController::class, 'presents'])->middleware('can:presences.consulter');
+        Route::get('/pilotage/visiteurs/{visitor}', [PilotageController::class, 'visiteur'])->whereUuid('visitor')->middleware('can:pilotage.consulter');
+        Route::post('/pilotage/badges/annuler', [PilotageController::class, 'annulerBadge'])->middleware('can:badges.annuler');
+        Route::get('/pilotage/litiges', [PilotageController::class, 'litiges'])->middleware('can:litiges.decider');
+        Route::post('/pilotage/litiges/{refusal}/decision', [PilotageController::class, 'decider'])->whereUuid('refusal')->middleware('can:litiges.decider');
+        Route::get('/pilotage/groupes', [PilotageController::class, 'groupes'])->middleware(['can:groupes.suivre', 'can:cars.suivre']);
+        Route::get('/pilotage/evacuation', [PilotageController::class, 'evacuation'])->middleware('can:presences.consulter');
+        Route::get('/pilotage/api/evacuation', [PilotageController::class, 'evacuationData'])->middleware('can:presences.consulter');
         Route::get('/administration/imports', [ListImportsController::class, 'index'])->middleware('can:listes.importer');
         Route::get('/administration/imports/modele', [ListImportsController::class, 'template'])->middleware('can:listes.importer');
         Route::post('/administration/imports/apercu', [ListImportsController::class, 'preview'])->middleware('can:listes.importer');

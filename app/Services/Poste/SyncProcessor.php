@@ -4,6 +4,7 @@ namespace App\Services\Poste;
 
 use App\Models\Device;
 use App\Models\User;
+use App\Services\Alerts;
 use App\Services\Audit;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,9 @@ final class SyncProcessor
         DB::transaction(function () use ($device, $session, $operations, $applied, $conflicts, $skew, $threshold): void {
             DB::table('devices')->where('id', $device->id)->update(['last_synced_at' => now(), 'updated_at' => now()]);
             if ($skew !== null && abs($skew) > $threshold) {
-                DB::table('sync_conflicts')->insert(['id' => (string) Str::uuid(), 'event_id' => $device->event_id, 'device_id' => $device->id, 'agent_id' => $session->id, 'kind' => 'horloge', 'reason' => 'horloge_suspecte', 'details' => json_encode(['ecart_secondes' => $skew, 'seuil_secondes' => $threshold]), 'created_at' => now(), 'updated_at' => now()]);
+                $conflict = (string) Str::uuid();
+                DB::table('sync_conflicts')->insert(['id' => $conflict, 'event_id' => $device->event_id, 'device_id' => $device->id, 'agent_id' => $session->id, 'kind' => 'horloge', 'reason' => 'horloge_suspecte', 'details' => json_encode(['ecart_secondes' => $skew, 'seuil_secondes' => $threshold]), 'created_at' => now(), 'updated_at' => now()]);
+                app(Alerts::class)->raise($device->event_id, 'conflit_sync', 'normale', 'conflit', $conflict, 'L’horloge d’une tablette est décalée.', 'conflit:'.$conflict);
             }
             $this->audit->append('sync.recue', $session->id, ['device_id' => $device->id, 'recues' => count($operations), 'appliquees' => $applied, 'conflits' => $conflicts, 'ecart_horloge_s' => $skew]);
         });
@@ -209,7 +212,9 @@ final class SyncProcessor
     {
         // Seul un code imprimé est conservé : le contenu d'un QR (jeton) ne doit jamais se retrouver, même en partie, dans la table des conflits.
         $badge = isset($payload['code']) && preg_match('/^B-[0-9]{1,9}$/i', (string) $payload['code']) === 1 ? strtoupper((string) $payload['code']) : null;
-        DB::table('sync_conflicts')->insert(['id' => (string) Str::uuid(), 'operation_id' => $operationId, 'event_id' => $device->event_id, 'device_id' => $device->id, 'agent_id' => $op['agent_id'], 'visitor_id' => $visitorId, 'operation_type' => $type, 'kind' => 'conflit', 'reason' => $reason, 'details' => json_encode(array_filter(['badge_code' => $badge, 'seq' => $op['seq'] ?? null]), JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now()]);
+        $conflict = (string) Str::uuid();
+        DB::table('sync_conflicts')->insert(['id' => $conflict, 'operation_id' => $operationId, 'event_id' => $device->event_id, 'device_id' => $device->id, 'agent_id' => $op['agent_id'], 'visitor_id' => $visitorId, 'operation_type' => $type, 'kind' => 'conflit', 'reason' => $reason, 'details' => json_encode(array_filter(['badge_code' => $badge, 'seq' => $op['seq'] ?? null]), JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now()]);
+        app(Alerts::class)->raise($device->event_id, 'conflit_sync', 'haute', 'conflit', $conflict, 'Une opération d’une tablette a été mise en quarantaine ('.$reason.').', 'conflit:'.$conflict);
         $this->audit->append('sync.conflit', null, ['operation_id' => $operationId, 'device_id' => $device->id, 'type' => $type, 'raison' => $reason, 'visitor_id' => $visitorId]);
     }
 
