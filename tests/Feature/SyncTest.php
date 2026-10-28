@@ -54,7 +54,7 @@ function syncVisitor(int $i): string
 function syncFlow(string $visitor, string $badgeCode, User $agent, int &$seq, ?string $avis = null): array
 {
     return [
-        syncOp('identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $agent, ++$seq),
+        syncOp('identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'photo_b64' => syncPhoto()], $agent, ++$seq),
         syncOp('valider', ['visitor_id' => $visitor, 'avis' => $avis], $agent, ++$seq),
         syncOp('badge', ['visitor_id' => $visitor, 'code' => $badgeCode], $agent, ++$seq),
         syncOp('entree', ['visitor_id' => $visitor, 'duration_ms' => 30000], $agent, ++$seq),
@@ -159,7 +159,7 @@ it('envoie la copie de travail sans jeton QR en clair, avec tous les badges de l
     $number = (int) substr($this->badges[0]->code, 2);
     app(BadgeLots::class)->reserve($this->badges[0]->badge_batch_id, $number, $number + 2, Device::findOrFail($this->deviceA), syncUser('administrateur'));
     $liste = $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->json();
-    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
+    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'identity_document' => false, 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
     expect(array_keys($liste['visitors'][0]))->toBe(['id', 'full_name', 'organisation', 'host_id', 'category_id', 'valid_from', 'valid_until', 'source', 'status', 'host_validation', 'access_note', 'group_id', 'a_rebadger', 'rev', 'identity_done', 'photo_done', 'validated', 'badge_code']);
     $codes = array_column($liste['badges'], 'code');
     expect($codes)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->toContain($this->badges[3]->code);
@@ -214,9 +214,9 @@ it('met en conflit, sans rien écraser, deux postes hors ligne qui associent le 
     $badge = $this->badges[5]; // hors lot réservé : il n'est réservé à aucun poste
     $seqA = 0;
     $seqB = 0;
-    $opsA = [syncOp('identite', ['visitor_id' => syncVisitor(1), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, ++$seqA), syncOp('valider', ['visitor_id' => syncVisitor(1)], $this->agent, ++$seqA), syncOp('badge', ['visitor_id' => syncVisitor(1), 'code' => $badge->code], $this->agent, ++$seqA), syncOp('entree', ['visitor_id' => syncVisitor(1)], $this->agent, ++$seqA)];
-    $opsB = [syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, ++$seqB), syncOp('valider', ['visitor_id' => syncVisitor(4)], $this->agent, ++$seqB), syncOp('badge', ['visitor_id' => syncVisitor(4), 'code' => $badge->code], $this->agent, ++$seqB), syncOp('entree', ['visitor_id' => syncVisitor(4)], $this->agent, ++$seqB),
-        syncOp('identite', ['visitor_id' => syncVisitor(7), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, ++$seqB)];
+    $opsA = [syncOp('identite', ['visitor_id' => syncVisitor(1), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seqA), syncOp('valider', ['visitor_id' => syncVisitor(1)], $this->agent, ++$seqA), syncOp('badge', ['visitor_id' => syncVisitor(1), 'code' => $badge->code], $this->agent, ++$seqA), syncOp('entree', ['visitor_id' => syncVisitor(1)], $this->agent, ++$seqA)];
+    $opsB = [syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seqB), syncOp('valider', ['visitor_id' => syncVisitor(4)], $this->agent, ++$seqB), syncOp('badge', ['visitor_id' => syncVisitor(4), 'code' => $badge->code], $this->agent, ++$seqB), syncOp('entree', ['visitor_id' => syncVisitor(4)], $this->agent, ++$seqB),
+        syncOp('identite', ['visitor_id' => syncVisitor(7), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seqB)];
     $this->postJson('/poste/api/sync', ['operations' => $opsA], syncHeaders(SYNC_TOKEN_A))->assertOk()->assertJsonPath('summary.conflicts', 0);
     $b = $this->postJson('/poste/api/sync', ['operations' => $opsB], syncHeaders(SYNC_TOKEN_B))->assertOk();
     expect($b->json('summary'))->toBe(['received' => 5, 'applied' => 3, 'conflicts' => 2]);
@@ -237,19 +237,19 @@ it('refuse une seconde entrée venue d’un autre poste et signale la fiche modi
     expect($this->postJson('/poste/api/sync', ['operations' => [$late]], syncHeaders(SYNC_TOKEN_B))->json('results.0.code'))->toBe('deja_present');
     expect(DB::table('access_events')->where('visitor_id', syncVisitor(1))->where('type', 'entree')->count())->toBe(1);
     // fiche modifiée depuis la copie de la tablette B (révision plus ancienne que la fiche)
-    $stale = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, 2, null, ['visitor_rev' => now()->subHour()->toIso8601String()]);
+    $stale = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, 2, null, ['visitor_rev' => now()->subHour()->toIso8601String()]);
     DB::table('visitors')->where('id', syncVisitor(4))->update(['updated_at' => now()]);
     expect($this->postJson('/poste/api/sync', ['operations' => [$stale]], syncHeaders(SYNC_TOKEN_B))->json('results.0.code'))->toBe('fiche_modifiee');
     expect(DB::table('photos')->where('visitor_id', syncVisitor(4))->count())->toBe(0);
-    $fresh = syncOp('identite', ['visitor_id' => syncVisitor(7), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, 3, null, ['visitor_rev' => now()->addMinute()->toIso8601String()]);
+    $fresh = syncOp('identite', ['visitor_id' => syncVisitor(7), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, 3, null, ['visitor_rev' => now()->addMinute()->toIso8601String()]);
     expect($this->postJson('/poste/api/sync', ['operations' => [$fresh]], syncHeaders(SYNC_TOKEN_B))->json('results.0.status'))->toBe('applique');
 });
 
 it('met en quarantaine les opérations d’un agent désactivé entre-temps, sans bloquer les autres', function () {
     $other = syncUser();
     $seq = 0;
-    $mine = syncOp('identite', ['visitor_id' => syncVisitor(1), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, ++$seq);
-    $theirs = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $other, ++$seq);
+    $mine = syncOp('identite', ['visitor_id' => syncVisitor(1), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seq);
+    $theirs = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $other, ++$seq);
     $other->update(['active' => false]);
     $wrongRole = syncOp('valider', ['visitor_id' => syncVisitor(7)], syncUser('hote'), ++$seq);
     $unknown = syncOp('valider', ['visitor_id' => syncVisitor(7)], $this->agent, ++$seq, null, ['agent_id' => (string) Str::uuid()]);
@@ -267,7 +267,7 @@ it('signale l’écart d’horloge au-delà du seuil et conserve l’heure décl
     $this->postJson('/poste/api/sync', ['sent_at' => now()->subMinutes(2)->toIso8601String(), 'operations' => $ops], syncHeaders())->assertOk()->assertJsonPath('clock_skew_seconds', 120);
     expect(DB::table('sync_conflicts')->where('kind', 'horloge')->count())->toBe(0);
     expect(Carbon::parse(json_decode(DB::table('access_events')->where('visitor_id', syncVisitor(1))->where('type', 'validation')->value('details'), true)['heure_declaree'])->equalTo(Carbon::parse($declared)))->toBeTrue();
-    $late = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, 9);
+    $late = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, 9);
     $this->postJson('/poste/api/sync', ['sent_at' => now()->subMinutes(20)->toIso8601String(), 'operations' => [$late]], syncHeaders())->assertOk()->assertJsonPath('clock_skew_seconds', 1200)->assertJsonPath('summary.applied', 1);
     $row = DB::table('sync_conflicts')->where('kind', 'horloge')->first();
     expect($row->reason)->toBe('horloge_suspecte')->and(json_decode($row->details, true))->toBe(['ecart_secondes' => 1200, 'seuil_secondes' => 300])->and($row->operation_id)->toBeNull();
@@ -279,7 +279,7 @@ it('crée hors ligne un visiteur non listé avec un identifiant de la tablette e
     $seq = 0;
     $ops = [
         syncOp('non_liste', ['visitor_id' => $new, 'name' => 'Personne fictive Imprévue', 'organisation' => 'Société fictive', 'host_id' => DemoSeeder::id('host0'), 'category_id' => DemoSeeder::id('category1')], $this->agent, ++$seq),
-        syncOp('identite', ['visitor_id' => $new, 'identity_checked' => true, 'document_type' => 'cni', 'document_number' => 'CI0123456', 'photo_b64' => syncPhoto()], $this->agent, ++$seq),
+        syncOp('identite', ['visitor_id' => $new, 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seq),
         syncOp('valider', ['visitor_id' => $new], $this->agent, ++$seq),
     ];
     $results = $this->postJson('/poste/api/sync', ['operations' => $ops], syncHeaders())->assertOk()->json('results');

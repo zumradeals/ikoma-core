@@ -27,7 +27,11 @@ final class Desk
 {
     public const PHOTO_MAX_BYTES = 1_000_000;
 
-    /** Types de pièce acceptés (libellés dans resources/js/labels.ts). */
+    public const DOCUMENT_MAX_BYTES = 1_500_000;
+
+    public const DOCUMENT_MAX_SIDE = 1280;
+
+    /** Types de pièce acceptés (libellés dans resources/js/poste/types.ts). */
     public const DOCUMENT_TYPES = ['cni', 'passeport', 'permis', 'carte_militaire', 'carte_professionnelle', 'autre'];
 
     public const PHOTO_MAX_SIDE = 640;
@@ -70,7 +74,7 @@ final class Desk
             'valid_from' => Carbon::parse($visitor->valid_from)->toIso8601String(), 'valid_until' => Carbon::parse($visitor->valid_until)->toIso8601String(), 'hors_periode' => $this->outsidePeriod($visitor),
             'identity_done' => DB::table('identity_checks')->where('visitor_id', $visitor->id)->exists(), 'photo_done' => DB::table('photos')->where('visitor_id', $visitor->id)->exists(),
             'validated' => $this->validation($visitor) !== null, 'badge_code' => $badge, 'access_note' => $visitor->access_note,
-            'host_advice' => app(HostNotifications::class)->advice($visitor->id),
+            'identity_document' => self::documentRequired(), 'host_advice' => app(HostNotifications::class)->advice($visitor->id),
             'a_rebadger' => $badge === null && DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNotNull('cancelled_at')->exists() && ! in_array($visitor->status, ['sorti', 'refuse'], true),
         ];
     }
@@ -80,15 +84,28 @@ final class Desk
      *
      * @return array<string, mixed>
      */
-    public function saveIdentity(Device $poste, User $agent, string $visitorId, bool $identityChecked, string $jpeg, ?string $documentType = null, ?string $documentNumber = null): array
+    public function saveIdentity(Device $poste, User $agent, string $visitorId, bool $identityChecked, string $jpeg, ?string $documentType = null, ?string $documentNumber = null, ?string $documentJpeg = null): array
     {
         $visitor = $this->openVisitor($poste, $visitorId);
         if (! $identityChecked) {
             throw new DeskRefused('identite_non_cochee', 'Cochez « pièce d’identité contrôlée » après avoir vérifié la pièce.');
         }
-        $number = strtoupper(preg_replace('/[\s.]+/', '', (string) $documentNumber) ?? '');
-        if (! in_array($documentType, self::DOCUMENT_TYPES, true) || preg_match('/^[A-Z0-9\/-]{4,30}$/', $number) !== 1) {
-            throw new DeskRefused('piece_requise', 'Indiquez le type et le numéro de la pièce d’identité (4 à 30 lettres ou chiffres).');
+        // Option de l'administrateur (désactivée par défaut) : type de pièce et photo de la pièce obligatoires, numéro facultatif.
+        $documentFile = null;
+        $number = null;
+        if (self::documentRequired()) {
+            $docInfo = $documentJpeg !== null && strlen($documentJpeg) <= self::DOCUMENT_MAX_BYTES ? @getimagesizefromstring($documentJpeg) : false;
+            if (! in_array($documentType, self::DOCUMENT_TYPES, true) || $docInfo === false || $docInfo[2] !== IMAGETYPE_JPEG || $docInfo[0] > self::DOCUMENT_MAX_SIDE || $docInfo[1] > self::DOCUMENT_MAX_SIDE) {
+                throw new DeskRefused('piece_requise', 'Indiquez le type de la pièce d’identité et photographiez-la (JPEG, 1 280 pixels au plus).');
+            }
+            $documentJpeg = app(PrivatePhoto::class)->clean((string) $documentJpeg);
+            $documentFile = 'identity-documents/'.Str::uuid().'.enc';
+            $number = strtoupper(preg_replace('/[\s.]+/', '', (string) $documentNumber) ?? '');
+            if ($number !== '' && preg_match('/^[A-Z0-9\/-]{4,30}$/', $number) !== 1) {
+                throw new DeskRefused('piece_numero_invalide', 'Le numéro de la pièce n’est pas valable : 4 à 30 lettres ou chiffres, ou laissez-le vide.');
+            }
+        } else {
+            $documentType = null;
         }
         $info = strlen($jpeg) <= self::PHOTO_MAX_BYTES ? @getimagesizefromstring($jpeg) : false;
         if ($info === false || $info[2] !== IMAGETYPE_JPEG || $info[0] > self::PHOTO_MAX_SIDE || $info[1] > self::PHOTO_MAX_SIDE || $info[0] < 1) {
@@ -99,12 +116,21 @@ final class Desk
         $photo = (string) Str::uuid();
         $path = "photos/{$photo}.enc";
         $now = now();
-        DB::table('identity_checks')->insert(['id' => $check, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'checked_at' => $now, 'document_type' => $documentType, 'document_number' => Crypt::encryptString($number), 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('identity_checks')->insert(['id' => $check, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'checked_at' => $now, 'document_type' => $documentType, 'document_number' => $number ? Crypt::encryptString($number) : null, 'document_file' => $documentFile, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('photos')->insert(['id' => $photo, 'visitor_id' => $visitor->id, 'actor_id' => $agent->id, 'file_reference' => $path, 'taken_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
         Storage::disk('local')->put($path, Crypt::encryptString($jpeg)); // jamais en clair sur le disque, jamais servi par une adresse
+        if ($documentFile !== null) {
+            Storage::disk('local')->put($documentFile, Crypt::encryptString((string) $documentJpeg));
+        }
         $this->audit->append('visiteur.identite_verifiee', $agent->id, ['visitor_id' => $visitor->id, 'identity_check_id' => $check, 'photo_id' => $photo, 'device_id' => $poste->id, 'document_type' => $documentType]);
 
         return ['identity_done' => true, 'photo_done' => true];
+    }
+
+    /** Option « photographier la pièce d'identité » (réglage de l'administrateur, désactivée par défaut). */
+    public static function documentRequired(): bool
+    {
+        return DB::table('settings')->where('key', 'identite_piece_active')->value('value') === '1';
     }
 
     /** @return array<string, mixed> */

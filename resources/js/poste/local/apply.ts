@@ -23,7 +23,7 @@ export function ficheOf(list: LocalList, id: string, now: number): Fiche {
   return {
     id: v.id, full_name: v.full_name, organisation: v.organisation, host: v.host_id ? list.hostNames.get(v.host_id) ?? null : null, category, zones: list.zonesFor(v),
     accueil_limite: v.source === 'non listé', source: v.source, status: v.status, host_validation: v.host_validation, valid_from: v.valid_from, valid_until: v.valid_until,
-    hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, a_rebadger: v.a_rebadger ?? false,
+    identity_document: list.snapshot.settings.identity_document === true, hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, a_rebadger: v.a_rebadger ?? false,
   };
 }
 
@@ -58,8 +58,10 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
   switch (op.type) {
     case 'identite': {
       const v = open(list, p.visitor_id);
-      if (!(p.document_type as string in documentLabels) || !/^[A-Z0-9/-]{4,30}$/.test(String(p.document_number ?? '').toUpperCase().replace(/[\s.]+/g, ''))) {
-        throw refuse('piece_requise', 'Indiquez le type et le numéro de la pièce d’identité (4 à 30 lettres ou chiffres).');
+      if (list.snapshot.settings.identity_document === true) {
+        const number = String(p.document_number ?? '').toUpperCase().replace(/[\s.]+/g, '');
+        if (!(String(p.document_type) in documentLabels) || p.document_photo !== true) throw refuse('piece_requise', 'Indiquez le type de la pièce d’identité et photographiez-la.');
+        if (number !== '' && !/^[A-Z0-9/-]{4,30}$/.test(number)) throw refuse('piece_numero_invalide', 'Le numéro de la pièce n’est pas valable : 4 à 30 lettres ou chiffres, ou laissez-le vide.');
       }
       v.identity_done = true; v.photo_done = true; list.touch();
       return {};

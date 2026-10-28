@@ -3,6 +3,8 @@ import jsQR from 'jsqr';
 /** Caméra de la tablette : photo réduite (640 px maximum, JPEG) et lecture de QR (BarcodeDetector sinon @zxing/browser, sans aucun appel réseau). zxing est importé avec la page, pas à la demande : un chargement différé pouvait rester en attente pendant l'activation du service worker et le QR n'était jamais lu. */
 
 export const PHOTO_MAX_SIDE = 640;
+/** Photo d'une pièce d'identité (option de l'administrateur) : assez grande pour lire le texte. */
+export const DOCUMENT_MAX_SIDE = 1280;
 
 export async function openCamera(video: HTMLVideoElement, facing: 'user' | 'environment'): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Caméra indisponible sur cet appareil (connexion HTTPS requise).');
@@ -19,9 +21,9 @@ export function closeCamera(video: HTMLVideoElement | null, stream: MediaStream 
 }
 
 /** Capture l'image courante de la vidéo, réduite pour que le plus grand côté ne dépasse pas 640 px. */
-export function captureJpeg(video: HTMLVideoElement, quality = 0.8): Promise<Blob> {
+export function captureJpeg(video: HTMLVideoElement, quality = 0.8, maxSide = PHOTO_MAX_SIDE): Promise<Blob> {
   const width = video.videoWidth || 640; const height = video.videoHeight || 480;
-  const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(width, height));
+  const scale = Math.min(1, maxSide / Math.max(width, height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
   const context = canvas.getContext('2d');

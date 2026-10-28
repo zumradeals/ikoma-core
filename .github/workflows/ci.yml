@@ -58,6 +58,18 @@ jobs:
             /tmp/ikoma-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "security-results/image-$service.json" "$image" || result=1
           done
           exit "$result"
+      - name: Résumé des failles trouvées par Trivy (élevées et critiques)
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          import glob, json
+          for path in sorted(glob.glob('security-results/image-*.json')):
+              data = json.load(open(path))
+              found = [(v.get('Severity'), v.get('VulnerabilityID'), v.get('PkgName'), v.get('InstalledVersion'), v.get('FixedVersion', '')) for r in data.get('Results', []) for v in (r.get('Vulnerabilities') or [])]
+              print(path, len(found), 'faille(s) élevée(s) ou critique(s)')
+              for item in found[:40]:
+                  print('  ', *item)
+          PY
       - name: OWASP ZAP baseline sur l’application de test
         if: ${{ !cancelled() }}
         run: |
@@ -76,7 +88,9 @@ jobs:
           if-no-files-found: ignore
       - name: Retirer les secrets de recette des instantanés textuels
         if: always()
-        run: python3 scripts/security/redact-test-artifacts.py
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" test-results security-results 2>/dev/null || true
+          python3 scripts/security/redact-test-artifacts.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -84,6 +98,6 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
       - if: failure()
-        run: docker compose logs
+        run: docker compose logs --tail=60
       - if: always()
         run: make down

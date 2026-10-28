@@ -51,7 +51,7 @@ async function toDecision(page: Page, word: string, name: string) {
   await search(page, word); await pick(page, name).click();
   await expect(page.getByRole('heading', { name: 'Vérifiez la fiche avec le visiteur' })).toBeVisible();
   await button(page, 'C’est bien cette personne').click();
-  await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456');
+  await page.getByLabel('Pièce d’identité contrôlée').check();
   await button(page, 'Prendre la photo').click();
   await button(page, 'Enregistrer et passer à la décision').click();
   await expect(page.getByText('Étape 4 sur 7')).toBeVisible();
@@ -71,7 +71,7 @@ test('un visiteur listé est traité en moins de 60 secondes, de la recherche à
   await button(page, 'C’est bien cette personne').click();
   await expect(page.getByText('Étape 3 sur 7')).toBeVisible();
   await expect(button(page, 'Enregistrer et passer à la décision')).toBeDisabled(); await expect(page.getByText('Cochez la pièce d’identité et prenez la photo.')).toBeVisible(); await shot(page, 'tablette-3-identite-vide');
-  await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456');
+  await page.getByLabel('Pièce d’identité contrôlée').check();
   await button(page, 'Prendre la photo').click(); await expect(page.getByAltText('Photo prise du visiteur')).toBeVisible(); await shot(page, 'tablette-3-identite');
   await button(page, 'Enregistrer et passer à la décision').click();
   await expect(page.getByRole('heading', { name: /Décision pour/ })).toBeVisible(); await shot(page, 'tablette-4-decision');
@@ -99,7 +99,7 @@ test('un VIP ressort en premier avec une alerte de couleur et passe par le même
   await pick(page, fx.names.vip).click();
   await expect(page.getByText('Personnalité VIP : circuit prioritaire, traitement discret')).toBeVisible(); await expect(page.getByText('Espace VIP')).toBeVisible();
   await button(page, 'C’est bien cette personne').click();
-  await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456'); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
+  await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
   await button(page, /Valider/).click();
   await manualBadge(page, fx.freeBadges[4]); // badge de catégorie Visiteur pour un VIP : refusé
   await expect(page.getByTestId('erreur')).toContainText('Badge de catégorie Visiteur, visiteur de catégorie VIP'); await expect(page.getByTestId('erreur')).toContainText('Prenez un badge de catégorie VIP.');
@@ -119,7 +119,7 @@ test('un refus exige un motif, n’associe aucun badge et bloque la suite', asyn
   await expect(page.getByRole('heading', { name: /Accès refusé/ })).toBeVisible(); await expect(page.getByText('Aucun badge n’est associé')).toBeVisible(); await shot(page, 'tablette-4-refuse');
   await button(page, 'Visiteur suivant').click();
   await search(page, 'refus'); await pick(page, fx.names.refused).click(); await button(page, 'C’est bien cette personne').click();
-  await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456'); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
+  await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
   await expect(page.getByTestId('erreur')).toContainText('L’accès a été refusé à ce visiteur');
   await page.close();
 });
@@ -129,7 +129,7 @@ test('un visiteur hors période n’est validé qu’avec l’avis de l’hôte 
   await search(page, 'horsperiode'); await pick(page, fx.names.outside).click();
   await expect(page.getByText('Hors de sa période de validité')).toBeVisible(); await shot(page, 'tablette-2-hors-periode');
   await button(page, 'C’est bien cette personne').click();
-  await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456'); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
+  await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
   const validate = button(page, /Valider/);
   await expect(validate).toBeDisabled(); await expect(page.getByText('Visiteur hors période : indiquez l’avis obtenu')).toBeVisible(); await shot(page, 'tablette-4-hors-periode');
   await page.getByLabel('Avis du superviseur').check(); await expect(validate).toBeEnabled(); await validate.click();
@@ -200,7 +200,7 @@ test('captures mobile du parcours', async () => {
   const page = await desk({ width: 390, height: 844 });
   await shot(page, 'mobile-1-recherche');
   await search(page, 'konate'); await shot(page, 'mobile-1-resultats'); await pick(page, fx.names.mobile).click(); await shot(page, 'mobile-2-fiche');
-  await button(page, 'C’est bien cette personne').click(); await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456'); await button(page, 'Prendre la photo').click(); await shot(page, 'mobile-3-identite');
+  await button(page, 'C’est bien cette personne').click(); await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await shot(page, 'mobile-3-identite');
   await button(page, 'Enregistrer et passer à la décision').click(); await shot(page, 'mobile-4-decision');
   await button(page, /Valider/).click(); await shot(page, 'mobile-5-badge');
   await manualBadge(page, fx.freeBadges[3]); await shot(page, 'mobile-6-remise');
@@ -255,7 +255,7 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
     const name = fx.bulk[i];
     await search(page, name); await pick(page, name).click();
     await button(page, 'C’est bien cette personne').click();
-    await page.getByLabel('Pièce d’identité contrôlée').check(); await page.getByTestId('piece-type').selectOption('cni'); await page.getByTestId('piece-numero').fill('CI0123456'); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
+    await page.getByLabel('Pièce d’identité contrôlée').check(); await button(page, 'Prendre la photo').click(); await button(page, 'Enregistrer et passer à la décision').click();
     await button(page, /Valider/).click();
     await manualBadge(page, fx.freeBadges[10 + i]);
     await button(page, /Autoriser l’accès/).click();

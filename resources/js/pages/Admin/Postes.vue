@@ -4,11 +4,11 @@ import BaseLayout from '../../layouts/BaseLayout.vue'; import BaseCard from '../
 import { displayDate } from '../../labels';
 type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
 const props = defineProps<{
-  events: { id: string; name: string }[]; postes: Poste[]; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; escalationMinutes: number };
+  events: { id: string; name: string }[]; postes: Poste[]; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; escalationMinutes: number; identityDocument: boolean };
   newCode: { device_id: string; code: string } | null; conflicts: { id: string; kind: string; reason: string; operation_type: string | null; created_at: string; device_name: string }[];
 }>();
 const create = useForm({ event_id: props.events[0]?.id || '', name: '', station: '' });
-const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, escalationMinutes: props.settings.escalationMinutes });
+const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, escalationMinutes: props.settings.escalationMinutes, identityDocument: props.settings.identityDocument });
 const states = { non_enrole: ['○', 'Non enrôlé'], enrole: ['●', 'Enrôlé'], revoque: ['⛔', 'Révoqué'] } as const;
 const reasons: Record<string, string> = { deja_associe: 'Badge déjà associé', autre_poste: 'Badge réservé à un autre poste', deja_present: 'Visiteur déjà entré', agent_desactive: 'Agent désactivé', fiche_modifiee: 'Fiche modifiée entre-temps', horloge_suspecte: 'Horloge de la tablette décalée', hote_en_attente: 'Accord de l’hôte manquant', visiteur_refuse: 'Visiteur refusé', annule: 'Badge annulé' };
 function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station || poste.name} » ? La tablette sera effacée à sa prochaine connexion.`)) router.post(`/administration/postes/${poste.id}/revoquer`); }
@@ -52,6 +52,11 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <label class="block">Délai minimal entre deux points de contrôle différents pour un même badge (secondes). En dessous, le superviseur est alerté d’une copie possible.<input v-model.number="settings.pointsDelay" type="number" min="1" max="3600" class="field" required data-testid="reglage-delai-points"></label>
 <label class="block">Nombre de badges refusés au même point qui déclenche une alerte<input v-model.number="settings.burstCount" type="number" min="2" max="100" class="field" required data-testid="reglage-rafale-nombre"></label>
 <label class="block">… pendant cette durée (minutes)<input v-model.number="settings.burstMinutes" type="number" min="1" max="120" class="field" required data-testid="reglage-rafale-minutes"></label>
+</fieldset>
+<fieldset class="space-y-3 rounded-xl border border-slate-300 p-4">
+<legend class="px-2 font-semibold">Pièce d’identité</legend>
+<label class="flex min-h-14 items-center gap-3"><input v-model="settings.identityDocument" type="checkbox" class="h-7 w-7" data-testid="reglage-piece-identite">Photographier la pièce d’identité à l’accueil (type de pièce et photo obligatoires, numéro facultatif)</label>
+<p class="text-sm text-slate-700">Désactivé : l’agent coche seulement « pièce d’identité contrôlée » et photographie le visiteur. Activé : l’image de la pièce est conservée chiffrée, comme les photos, et supprimée avec elles à l’échéance de conservation.</p>
 </fieldset>
 <fieldset class="space-y-5 rounded-xl border border-slate-300 p-4">
 <legend class="px-2 font-semibold">Hors réseau, badges et supervision</legend>

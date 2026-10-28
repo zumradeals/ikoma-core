@@ -101,11 +101,11 @@ export class LocalPosteRepository implements GroupPosteRepository {
     };
   }
 
-  private enqueue(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<ApplyResult> {
-    return this.exclusive(() => this.enqueueNow(operationId, type, payload, photo));
+  private enqueue(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob, documentPhoto?: Blob): Promise<ApplyResult> {
+    return this.exclusive(() => this.enqueueNow(operationId, type, payload, photo, documentPhoto));
   }
 
-  private async enqueueNow(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<ApplyResult> {
+  private async enqueueNow(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob, documentPhoto?: Blob): Promise<ApplyResult> {
     const existing = await this.store.getOp(operationId);
     if (existing && type.startsWith('groupe_')) return applyGroupOp(this.list, type, existing.op.payload); // toutes les opérations de groupe sont sans effet quand elles sont rejouées
     if (existing) { // même opération rejouée (coupure, double clic) : rien de plus n'est enregistré
@@ -115,12 +115,12 @@ export class LocalPosteRepository implements GroupPosteRepository {
     const visitorId = typeof payload.visitor_id === 'string' ? payload.visitor_id : null;
     const op: LocalOp = { id: operationId, seq: await this.store.nextSeq(), type, agent_id: this.profile.id, client_time: new Date(this.now()).toISOString(), visitor_rev: visitorId ? this.list.visitors.get(visitorId)?.rev ?? null : null, payload };
     const result = applyOp(this.list, op, this.now()); // refuse avant d'écrire dans la file si une règle l'interdit
-    await this.store.addOp(op, photo);
+    await this.store.addOp(op, photo, documentPhoto);
     this.onQueued();
     return result;
   }
 
-  async saveIdentity(operationId: string, visitorId: string, photo: Blob, doc: IdentityDocument): Promise<void> { await this.enqueue(operationId, 'identite', { visitor_id: visitorId, identity_checked: true, document_type: doc.type, document_number: doc.number }, photo); }
+  async saveIdentity(operationId: string, visitorId: string, photo: Blob, doc?: IdentityDocument): Promise<void> { await this.enqueue(operationId, 'identite', { visitor_id: visitorId, identity_checked: true, ...(doc ? { document_type: doc.type, document_number: doc.number ?? '', document_photo: true } : {}) }, photo, doc?.photo); }
   async validate(operationId: string, visitorId: string, avis?: Avis): Promise<void> { await this.enqueue(operationId, 'valider', { visitor_id: visitorId, avis: avis ?? null }); }
   async refuse(operationId: string, visitorId: string, motif: string): Promise<void> { await this.enqueue(operationId, 'refuser', { visitor_id: visitorId, motif }); }
   async assignBadge(operationId: string, visitorId: string, code: string): Promise<{ badge_code: string }> {

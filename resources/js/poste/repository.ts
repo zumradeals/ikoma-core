@@ -15,7 +15,7 @@ export interface PosteRepository {
   context(): Promise<DeskContext>;
   search(query: string): Promise<SearchResult[]>;
   visitor(id: string): Promise<Fiche>;
-  saveIdentity(operationId: string, visitorId: string, photo: Blob, doc: IdentityDocument): Promise<void>;
+  saveIdentity(operationId: string, visitorId: string, photo: Blob, doc?: IdentityDocument): Promise<void>;
   validate(operationId: string, visitorId: string, avis?: Avis): Promise<void>;
   refuse(operationId: string, visitorId: string, motif: string): Promise<void>;
   assignBadge(operationId: string, visitorId: string, code: string): Promise<{ badge_code: string }>;
@@ -88,9 +88,10 @@ export class HttpPosteRepository implements PosteRepository {
   context(): Promise<DeskContext> { return this.call<DeskContext>('GET', '/poste/api/contexte'); }
   async search(query: string): Promise<SearchResult[]> { return (await this.call<{ results: SearchResult[] }>('GET', '/poste/api/recherche?q=' + encodeURIComponent(query))).results; }
   visitor(id: string): Promise<Fiche> { return this.call<Fiche>('GET', '/poste/api/visiteurs/' + encodeURIComponent(id)); }
-  async saveIdentity(operationId: string, visitorId: string, photo: Blob, doc: IdentityDocument): Promise<void> {
+  async saveIdentity(operationId: string, visitorId: string, photo: Blob, doc?: IdentityDocument): Promise<void> {
     const form = new FormData();
-    form.append('visitor_id', visitorId); form.append('identity_checked', '1'); form.append('document_type', doc.type); form.append('document_number', doc.number); form.append('photo', photo, 'photo.jpg');
+    form.append('visitor_id', visitorId); form.append('identity_checked', '1');
+    if (doc) { form.append('document_type', doc.type); if (doc.number) form.append('document_number', doc.number); form.append('document_photo', doc.photo, 'piece.jpg'); } form.append('photo', photo, 'photo.jpg');
     await this.call('POST', '/poste/api/identite', form, operationId);
   }
   async validate(operationId: string, visitorId: string, avis?: Avis): Promise<void> { await this.call('POST', '/poste/api/valider', { visitor_id: visitorId, avis: avis ?? null }, operationId); }

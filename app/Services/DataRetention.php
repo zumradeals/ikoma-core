@@ -57,6 +57,16 @@ final class DataRetention
                         }
                         $counts['photos'] += DB::table('photos')->where('id', $photo->id)->delete();
                     }
+                    // Photos de pièces d'identité (option de l'administrateur) : même échéance que les photos ; le type reste, le fichier et le numéro disparaissent.
+                    foreach (DB::table('identity_checks')->whereIn('visitor_id', clone $ids)->whereNotNull('document_file')->get(['id', 'document_file']) as $check) {
+                        if (preg_match('~^identity-documents/[0-9a-f-]{36}\.enc$~', $check->document_file) !== 1) {
+                            throw new \RuntimeException('Référence de pièce non conforme : purge arrêtée.');
+                        }
+                        if (Storage::disk('local')->exists($check->document_file) && ! Storage::disk('local')->delete($check->document_file)) {
+                            throw new \RuntimeException('Suppression de pièce impossible.');
+                        }
+                        $counts['photos'] += DB::table('identity_checks')->where('id', $check->id)->update(['document_file' => null, 'document_number' => null]);
+                    }
                 }
                 if ($days['notifications'] > 0 && $elapsed >= $days['notifications']) {
                     $counts['notifications'] += DB::table('notifications')->where('event_id', $event->id)->delete();

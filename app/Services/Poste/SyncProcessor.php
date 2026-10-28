@@ -191,7 +191,7 @@ final class SyncProcessor
                 [$visitor, $photo] = $need('visitor_id', 'photo_b64');
                 $bytes = base64_decode((string) $photo, true);
 
-                return $this->desk->saveIdentity($device, $agent, (string) $visitor, (bool) ($p['identity_checked'] ?? true), $bytes === false ? '' : $bytes, isset($p['document_type']) ? (string) $p['document_type'] : null, isset($p['document_number']) ? (string) $p['document_number'] : null);
+                return $this->desk->saveIdentity($device, $agent, (string) $visitor, (bool) ($p['identity_checked'] ?? true), $bytes === false ? '' : $bytes, isset($p['document_type']) ? (string) $p['document_type'] : null, isset($p['document_number']) ? (string) $p['document_number'] : null, isset($p['document_photo_b64']) && $p['document_photo_b64'] !== '' ? (base64_decode((string) $p['document_photo_b64'], true) ?: null) : null);
             case 'valider':
                 [$visitor] = $need('visitor_id');
 

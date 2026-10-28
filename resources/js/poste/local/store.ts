@@ -44,12 +44,14 @@ export class PosteStore {
     return seq;
   }
 
-  async addOp(op: LocalOp, photo?: Blob): Promise<void> {
+  async addOp(op: LocalOp, photo?: Blob, documentPhoto?: Blob): Promise<void> {
     // Le chiffrement (WebCrypto) se fait avant d'ouvrir la transaction : IndexedDB referme une transaction qui attend autre chose que ses propres requêtes.
     const sealedPhoto = photo ? await sealBytes(this.key, new Uint8Array(await photo.arrayBuffer()), `photo:${op.id}`) : null;
+    const sealedDocument = documentPhoto ? await sealBytes(this.key, new Uint8Array(await documentPhoto.arrayBuffer()), `photo:doc:${op.id}`) : null;
     const data = await sealJson(this.key, op, `op:${op.id}`);
     await this.db.transaction('rw', [this.db.ops, this.db.photos], () => {
       if (sealedPhoto) void this.db.photos.put({ id: op.id, data: sealedPhoto });
+      if (sealedDocument) void this.db.photos.put({ id: `doc:${op.id}`, data: sealedDocument });
       void this.db.ops.put({ id: op.id, seq: op.seq, type: op.type, status: 'pending', data });
     });
   }
@@ -81,6 +83,7 @@ export class PosteStore {
 
   async count(status: 'pending' | 'done' | 'conflict'): Promise<number> { return this.db.ops.where('status').equals(status).count(); }
 
+  /** `id` seul : photo du visiteur ; `doc:<id>` : photo de la pièce d'identité. */
   async photoBase64(id: string): Promise<string> {
     const row = await this.db.photos.get(id);
     return row ? toB64(await openBytes(this.key, row.data, `photo:${id}`)) : '';
@@ -90,6 +93,7 @@ export class PosteStore {
     const data = await sealJson(this.key, op, `op:${op.id}`);
     await this.db.transaction('rw', [this.db.ops, this.db.photos], () => {
       void this.db.ops.put({ id: op.id, seq: op.seq, type: op.type, status, data });
+      void this.db.photos.delete(`doc:${op.id}`);
       void this.db.photos.delete(op.id); // la photo est partie avec l'opération (ou mise en quarantaine côté serveur)
     });
   }

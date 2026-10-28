@@ -1,4 +1,3 @@
-const DOC = { type: 'cni', number: 'CI0123456' };
 import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
 import { createDeviceKey, createVault, fromB64, openJson, openVault, PBKDF2_ITERATIONS, randomBytes, sealJson, toB64 } from '../../resources/js/poste/local/crypto';
@@ -171,7 +170,7 @@ describe('file hors ligne, règles locales et envoi', () => {
   it('enregistre chaque étape dans la file avant tout envoi, et applique les règles du poste', async () => {
     const { repo, store, calls } = await setup();
     await expect(repo.validate('o0', 'v1')).rejects.toMatchObject({ code: 'identite_requise' });
-    await repo.saveIdentity('o1', 'v1', new Blob(['photo-fictive'], { type: 'image/jpeg' }), DOC);
+    await repo.saveIdentity('o1', 'v1', new Blob(['photo-fictive'], { type: 'image/jpeg' }));
     expect((await repo.visitor('v1')).identity_done).toBe(true);
     await repo.validate('o2', 'v1');
     await expect(repo.assignBadge('o3', 'v1', 'B-404')).rejects.toMatchObject({ code: 'badge_inconnu' });
@@ -198,7 +197,7 @@ describe('file hors ligne, règles locales et envoi', () => {
     const many = Array.from({ length: 60 }, (_, i) => visitor(`m${i}`, `Visiteur fictif ${i}`));
     const { repo, sync, calls, store, snaps } = await setup(many);
     for (let i = 0; i < 60; i++) await repo.refuse(`op-${i}`, `m${i}`, 'motif fictif');
-    await repo.saveIdentity('photo-op', 'v-inexistant', new Blob(['x']), DOC).catch(() => undefined);
+    await repo.saveIdentity('photo-op', 'v-inexistant', new Blob(['x'])).catch(() => undefined);
     await sync.sync();
     const sent = ops(calls);
     expect(sent).toHaveLength(60);
@@ -211,7 +210,7 @@ describe('file hors ligne, règles locales et envoi', () => {
 
   it('joint la photo en clair seulement dans la requête, jamais dans la file', async () => {
     const { repo, sync, calls, vault } = await setup();
-    await repo.saveIdentity('i1', 'v1', new Blob([new Uint8Array([255, 216, 255, 224, 1, 2, 3])], { type: 'image/jpeg' }), DOC);
+    await repo.saveIdentity('i1', 'v1', new Blob([new Uint8Array([255, 216, 255, 224, 1, 2, 3])], { type: 'image/jpeg' }));
     const rows = JSON.stringify(await vault.db.photos.toArray().then(r => r.map(x => toB64(x.data))));
     expect(rows).not.toContain('/9j/4AEC'); // préfixe base64 de l'image en clair
     await sync.sync();
@@ -263,7 +262,7 @@ describe('file hors ligne, règles locales et envoi', () => {
 
   it('ne laisse aucune donnée personnelle ni jeton en clair dans IndexedDB', async () => {
     const { repo, vault } = await setup([visitor('v1', 'Koné Mariam', { organisation: 'Organisation Secrète fictive' })]);
-    await repo.saveIdentity('i1', 'v1', new Blob(['PHOTO-IDENTIFIABLE'], { type: 'image/jpeg' }), DOC);
+    await repo.saveIdentity('i1', 'v1', new Blob(['PHOTO-IDENTIFIABLE'], { type: 'image/jpeg' }));
     await repo.validate('i2', 'v1');
     await repo.assignBadge('i3', 'v1', 'B-001');
     const dump = async () => {

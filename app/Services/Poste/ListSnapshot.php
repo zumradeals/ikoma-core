@@ -27,7 +27,7 @@ final class ListSnapshot
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM groups WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(m.updated_at)::text, '') FROM group_members m JOIN groups g ON g.id = m.group_id WHERE g.event_id = ?),
             (SELECT value FROM settings WHERE key = 'controle_stagiaires'),
-            (SELECT md5(string_agg(key || '=' || value, ',' ORDER BY key)) FROM settings WHERE key IN ('poste_delai_appel_minutes', 'poste_hors_reseau_max_heures', 'poste_badges_bas_pourcent', 'poste_badges_bas_minimum', 'poste_inactivite_minutes', 'poste_ecart_horloge_secondes', 'poste_echecs_pin_max')),
+            (SELECT md5(string_agg(key || '=' || value, ',' ORDER BY key)) FROM settings WHERE key IN ('poste_delai_appel_minutes', 'poste_hors_reseau_max_heures', 'poste_badges_bas_pourcent', 'poste_badges_bas_minimum', 'poste_inactivite_minutes', 'poste_ecart_horloge_secondes', 'poste_echecs_pin_max', 'identite_piece_active')),
             (SELECT list_revision FROM events WHERE id = ?),
             ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
 
@@ -61,7 +61,7 @@ final class ListSnapshot
             'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $e],
             'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at']),
             'settings' => ['inactivity_minutes' => $setting('poste_inactivite_minutes', 5), 'clock_skew_seconds' => $setting('poste_ecart_horloge_secondes', 300), 'pin_max_failures' => $setting('poste_echecs_pin_max', 15), 'controle_stagiaires' => $this->groupMode(),
-                'offline_call_minutes' => $setting('poste_delai_appel_minutes', 15), 'offline_max_hours' => $setting('poste_hors_reseau_max_heures', 12), 'low_badges_percent' => $setting('poste_badges_bas_pourcent', 10), 'low_badges_min' => $setting('poste_badges_bas_minimum', 5)],
+                'identity_document' => Desk::documentRequired(), 'offline_call_minutes' => $setting('poste_delai_appel_minutes', 15), 'offline_max_hours' => $setting('poste_hors_reseau_max_heures', 12), 'low_badges_percent' => $setting('poste_badges_bas_pourcent', 10), 'low_badges_min' => $setting('poste_badges_bas_minimum', 5)],
             'categories' => DB::table('categories')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
             'zones' => DB::table('zones')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
