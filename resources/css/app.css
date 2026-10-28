@@ -20,5 +20,9 @@
 @layer components {
  .field { @apply mt-2 block min-h-14 w-full rounded-xl border border-slate-400 bg-white px-4 py-3 text-ikoma-navy; }
  .field:focus-visible { outline: 3px solid var(--color-ikoma-blue); outline-offset: 2px; }
+ .btn-ok { @apply inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-xl bg-green-700 px-6 py-4 text-xl font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-500; }
+ .btn-no { @apply inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-xl bg-red-700 px-6 py-4 text-xl font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-500; }
+ .btn-main { @apply inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-xl bg-ikoma-blue px-6 py-4 text-xl font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-500; }
+ .btn-soft { @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-ikoma-blue bg-white px-5 py-3 text-lg font-semibold text-ikoma-navy; }
  .action { @apply inline-flex min-h-14 items-center justify-center rounded-xl bg-ikoma-blue px-6 py-3 font-semibold text-white; }
 }

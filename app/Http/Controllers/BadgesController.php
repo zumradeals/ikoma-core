@@ -30,8 +30,8 @@ final class BadgesController
             $query->whereNull('b.reserved_device_id')->whereNull('b.reserved_group_id');
         }
         $number = "CASE WHEN code ~ '^B-[0-9]+\$' THEN substring(code from 3)::integer END";
-        $batches = DB::table('badge_batches as batch')->leftJoin('categories as cat', 'cat.id', '=', 'batch.category_id')
-            ->selectRaw("batch.id, batch.name, batch.event_id, batch.quantity, batch.margin, cat.name as category_name, (SELECT min($number) FROM badges WHERE badge_batch_id = batch.id) as first_number, (SELECT max($number) FROM badges WHERE badge_batch_id = batch.id) as last_number")
+        $batches = DB::table('badge_batches as batch')->leftJoin('categories as cat', 'cat.id', '=', 'batch.category_id')->join('events as ev', 'ev.id', '=', 'batch.event_id')
+            ->selectRaw("batch.id, batch.name, batch.event_id, ev.name as event_name, batch.quantity, batch.margin, cat.name as category_name, (SELECT min($number) FROM badges WHERE badge_batch_id = batch.id) as first_number, (SELECT max($number) FROM badges WHERE badge_batch_id = batch.id) as last_number")
             ->orderBy('batch.name')->get();
         $setting = fn (string $key) => DB::table('settings')->where('key', $key)->value('value');
 
