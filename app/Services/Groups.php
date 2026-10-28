@@ -134,7 +134,7 @@ final class Groups
      * Appel nominal et contrôle de correspondance. Mode « identité » : la pièce a été contrôlée (enregistrée dans identity_checks) ;
      * mode « encadreur » : seule la confirmation de l'encadreur compte (l'agent ne peut pas la remplacer).
      *
-     * @return array<string, mixed>
+     * @return array{checked: bool, mode: string}
      */
     public function check(User $agent, string $groupId, string $visitorId, bool $identityChecked = false): array
     {
@@ -146,7 +146,7 @@ final class Groups
                 throw new DeskRefused('car_ferme', 'Le car est déjà parti : plus aucun contrôle de ce groupe n’est possible.', 409);
             }
             if ($member->checked_at !== null) {
-                return ['checked' => true, 'mode' => $member->check_mode];
+                return ['checked' => true, 'mode' => (string) ($member->check_mode ?? $mode)];
             }
             if ($mode === 'identite') {
                 if (! $identityChecked) {

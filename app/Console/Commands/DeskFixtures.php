@@ -150,7 +150,7 @@ class DeskFixtures extends Command
             $batch = $lots->generate($event, $categories['Stagiaire'], $size, $admin);
             $codes = Badge::where('badge_batch_id', $batch->id)->pluck('code')->map(fn (string $code) => (int) substr($code, 2));
             $lots->reserve($batch->id, $codes->min(), $codes->max(), Group::findOrFail($group), $admin);
-            $badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->get()->take($size);
+            $badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->limit($size)->get();
             $cars[$n] = ['id' => $group, 'name' => "Groupe stagiaires {$n} {$s}", 'bus' => "Car {$n}", 'members' => $members, 'ids' => DB::table('visitors')->where('group_id', $group)->orderBy('full_name')->pluck('id')->all(), 'badges' => $badges->pluck('code')->values()->all(), 'qr' => $badges->mapWithKeys(fn ($b) => [$b->code => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $b->id)->value('qr_token')), 'QR du badge '.$b->code)])->all()];
         }
         // Car 1 : l'encadreur a déjà confirmé les 50 personnes (le parcours mesure l'appel et la remise). Car 3 : confirmé aussi, pour le scénario hors ligne.
