@@ -147,7 +147,10 @@ it('enregistre l’avis hors période et empêche le réemploi après un changem
     $poste = Device::findOrFail(DemoSeeder::id('device'));
     $n->requestAdvice($poste, $this->agent, $this->mine);
     $id = DB::table('notifications')->where('visitor_id', $this->mine)->value('id');
+    $this->travel(121)->seconds();
+    $n->escalate();
     $this->post('/hote/notifications/'.$id.'/decision', ['accepted' => true])->assertRedirect();
+    expect(DB::table('alerts')->where('dedupe_key', 'hote_delai:'.$id)->value('resolved_at'))->not->toBeNull();
     expect($n->advice($this->mine)['state'])->toBe('autorise');
     DB::table('visitors')->where('id', $this->mine)->update(['valid_until' => now()->subHours(5)]);
     expect($n->advice($this->mine)['state'])->toBeNull();

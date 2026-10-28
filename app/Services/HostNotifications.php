@@ -95,6 +95,9 @@ final class HostNotifications
             DB::table('events')->where('id', $v->event_id)->increment('list_revision');
             DB::table('notifications')->where('id', $id)->update(['decision' => $accepted ? 'autorise' : 'refuse', 'reason' => $accepted ? null : $reason, 'decided_at' => now(), 'read_at' => now(), 'updated_at' => now()]);
             app(Alerts::class)->resolve('visiteur', $v->id, 'non_liste_attente');
+            if ($n->type === 'hors_periode') {
+                DB::table('alerts')->where('dedupe_key', 'hote_delai:'.$n->id)->update(['resolved_at' => now(), 'updated_at' => now()]);
+            }
             $this->audit->append($n->type === 'non_liste' ? 'hote.decision_non_liste' : 'hote.avis_hors_periode', $actor->id, ['notification_id' => $id, 'visitor_id' => $v->id, 'event_id' => $v->event_id]);
         });
     }
@@ -144,7 +147,11 @@ final class HostNotifications
     private function raiseTimeout(string $event, string $visitor, string $type, string $key): bool
     {
         $alertType = $type === 'non_liste' ? 'non_liste_attente' : 'hors_periode';
-        $existing = DB::table('alerts')->where('subject_id', $visitor)->where('type', $alertType)->whereNull('acknowledged_at')->whereNull('resolved_at')->orderBy('id')->first(['id', 'severity']);
+        $query = DB::table('alerts')->where('subject_id', $visitor)->where('type', $alertType)->whereNull('acknowledged_at')->whereNull('resolved_at')->orderBy('id');
+        if ($type === 'hors_periode') {
+            $query->where('dedupe_key', $key);
+        }
+        $existing = $query->first(['id', 'severity']);
         if ($existing) {
             if ($existing->severity === 'haute') {
                 return false;
