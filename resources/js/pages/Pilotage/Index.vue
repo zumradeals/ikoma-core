@@ -64,7 +64,7 @@ const levelClass = { critique: 'border-red-700 bg-red-50', attention: 'border-or
           </div>
         </div>
         <div class="rounded-2xl bg-white p-4">
-          <p class="font-semibold" data-testid="avancement-arrivees">{{ counters.arrives }} arrivés sur {{ counters.attendus }} attendus ({{ arrivedPercent }} %)</p>
+          <p class="font-semibold" data-testid="avancement-arrivees">{{ counters.arrives }} arrivé{{ counters.arrives > 1 ? 's' : '' }} sur {{ counters.attendus }} attendu{{ counters.attendus > 1 ? 's' : '' }} ({{ arrivedPercent }} %)</p>
           <div class="mt-2 h-4 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Part des attendus déjà arrivés" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="arrivedPercent"><div class="h-full rounded-full bg-ikoma-orange" :style="{ width: arrivedPercent + '%' }" /></div>
         </div>
       </section>
