@@ -6,6 +6,7 @@ use App\Services\AuditChain;
 use App\Services\AuditSeal;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Console\Output\OutputInterface;
 
 final class AuditDigest extends Command
 {
@@ -22,7 +23,7 @@ final class AuditDigest extends Command
 
                 return $seal->sign(['version' => 1, 'purpose' => 'anchor', 'id' => $tail['id'], 'hash' => $tail['hash'], 'occurred_at' => $tail['occurred_at'], 'issued_at' => now()->utc()->toIso8601String()], (string) $this->option('key'));
             });
-            $this->line(json_encode($envelope, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+            $this->output->writeln(json_encode($envelope, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), OutputInterface::OUTPUT_RAW);
         } catch (\Throwable) {
             $this->error('Condensé non produit : vérifiez la chaîne et les fichiers de clés.');
 

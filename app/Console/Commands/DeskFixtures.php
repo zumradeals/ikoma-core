@@ -16,6 +16,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PragmaRX\Google2FA\Google2FA;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class DeskFixtures extends Command
 {
@@ -176,13 +177,13 @@ class DeskFixtures extends Command
         $carAgentPassword = Str::password(24);
         $carAgent = User::create(['name' => "Agent cars {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $carAgentPassword]);
         $carAgent->assignRole('agent_accueil');
-        $this->line(json_encode([
+        $this->output->writeln(json_encode([
             'cars' => $cars, 'enrolCode4' => $enrolCode4, 'posteCars' => "Poste cars {$s}", 'encadreur' => ['email' => $encadreur->email, 'password' => $encadreurPassword], 'liveEncadreur' => ['email' => $liveEncadreur->email, 'password' => $liveEncadreurPassword], 'carAgent' => ['email' => $carAgent->email, 'password' => $carAgentPassword],
             'enrolCode' => $enrolCode, 'enrolCode2' => $enrolCode2, 'enrolCode3' => $enrolCode3, 'poste3' => "Poste supervision {$s}", 'pilotageNames' => $pilotageNames, 'pilotageBadges' => $pilotageBadges->pluck('code')->values(), 'supervisor' => ['email' => $supervisor->email, 'password' => $supervisorPassword, 'secret' => $supervisorSecret], 'poste2' => "Poste contrôle {$s}", 'controlNames' => $controlNames, 'controlBadges' => $controlBadges->pluck('code')->values(), 'controlQrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $controlBadges[0]->id)->value('qr_token')), 'QR du badge '.$controlBadges[0]->code), 'zonesNames' => array_keys($zones), 'admin' => ['email' => $admin->email, 'password' => $adminPassword, 'secret' => $secret], 'bulk' => $bulk, 'bulkPrefix' => 'Rafale Fictif',
             'email' => $agent->email, 'password' => $password, 'suffix' => $s, 'poste' => "Poste recette {$s}", 'names' => $names, 'ids' => $ids,
             'takenBadge' => $visitorBadges[0]->code, 'vipBadges' => $vipBadges->pluck('code'), 'freeBadges' => $visitorBadges->skip(3)->pluck('code')->values(),
             'qrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $visitorBadges[2]->id)->value('qr_token')), 'QR du badge '.$visitorBadges[2]->code), 'qrBadge' => $visitorBadges[2]->code,
-        ], JSON_THROW_ON_ERROR));
+        ], JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }

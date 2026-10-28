@@ -7,6 +7,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use PragmaRX\Google2FA\Google2FA;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class ScreenshotAccount extends Command
 {
@@ -26,7 +27,7 @@ class ScreenshotAccount extends Command
         $secret = (new Google2FA)->generateSecretKey();
         $user = User::create(['name' => 'Administrateur fictif', 'email' => Str::uuid().'@exemple.test', 'password' => $password, 'two_factor_secret' => encrypt($secret), 'two_factor_recovery_codes' => encrypt(json_encode([])), 'two_factor_confirmed_at' => now()]);
         $user->assignRole('administrateur');
-        $this->line(json_encode(['email' => $user->email, 'password' => $password, 'secret' => $secret], JSON_THROW_ON_ERROR));
+        $this->output->writeln(json_encode(['email' => $user->email, 'password' => $password, 'secret' => $secret], JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }
