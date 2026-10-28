@@ -1,5 +1,5 @@
 import type { ArrivalResult, GroupSummary, GroupView } from './local/group';
-import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
+import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type Fiche, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
  * Tous les accès aux données du poste passent par cette interface (plan, section 4.1). Le lot L5 n'a qu'une implémentation (appels JSON) ;
@@ -8,6 +8,8 @@ import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskCont
  */
 export interface PosteRepository {
   refreshHost?(visitorId: string): Promise<Fiche>;
+  /** Chiffres du poste pour le panneau de l'accueil ; absent quand le poste travaille directement sur le serveur. */
+  deskSummary?(): Promise<DeskSummary>;
   requestHostAdvice?(visitorId: string): Promise<void>;
   listPostes(): Promise<Poste[]>;
   context(): Promise<DeskContext>;

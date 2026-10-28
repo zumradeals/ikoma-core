@@ -17,6 +17,11 @@ export type ControlResult = {
 };
 export type ExitResult = { ok: boolean; reason?: string; message?: string; badge_code: string | null; badge_status?: string; person?: { name: string }; point?: string; presents?: number | null; warning?: string | null; source: 'serveur' | 'local'; known_at?: string | null };
 export type Avis = 'hote' | 'superviseur';
+/** Chiffres du poste d'accueil, calculés sur la copie de la tablette (donc disponibles sans réseau). */
+export type DeskSummary = {
+  accueillis: number; refuses: number; badges: { restants: number; total: number }; waiting: { id: string; name: string }[];
+  pending: { type: string; count: number }[]; recent: { kind: 'badge' | 'refus'; name: string; at: string }[]; asOf: string | null;
+};
 export type UnlistedInput = { name: string; organisation: string; host_id: string; category_id: string };
 
 /** Erreur de l'API du poste : `code` est stable, `message` et `action` sont en français pour l'agent. */

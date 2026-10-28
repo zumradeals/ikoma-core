@@ -1,4 +1,4 @@
-import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
+import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
 import type { GroupPosteRepository } from '../repository';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
 import { sha256Hex } from './crypto';
@@ -83,6 +83,21 @@ export class LocalPosteRepository implements GroupPosteRepository {
   async search(query: string): Promise<SearchResult[]> { return searchOf(this.list, query); }
   async visitor(id: string): Promise<Fiche> { return ficheOf(this.list, id, this.now()); }
   async pendingCount(): Promise<number> { return this.store.count('pending'); }
+
+  /** Chiffres du panneau de l'accueil : la liste arrêtée à la dernière synchronisation, plus tout ce que cette tablette a fait depuis. */
+  async deskSummary(): Promise<DeskSummary> {
+    const { counts, pending, recent } = await this.store.deskOps(['badge', 'refuser'], 3);
+    const mine = [...this.list.badges.values()].filter(b => b.mine && !b.group_id);
+    const waiting = [...this.list.visitors.values()].filter(v => v.source === 'non listé' && v.host_validation === 'en_attente' && !['refuse', 'present', 'sorti'].includes(v.status));
+    return {
+      accueillis: counts.entree ?? 0, refuses: counts.refuser ?? 0,
+      badges: { restants: mine.filter(b => b.status === 'Disponible').length, total: mine.length },
+      waiting: waiting.map(v => ({ id: v.id, name: v.full_name })),
+      pending: Object.entries(pending).map(([type, count]) => ({ type, count })),
+      recent: recent.map(op => ({ kind: op.type === 'refuser' ? 'refus' as const : 'badge' as const, name: this.list.visitors.get(String(op.payload.visitor_id))?.full_name ?? 'Visiteur inconnu', at: op.client_time })),
+      asOf: (await getMeta(this.vault.db, 'lastSyncAt')) ?? null,
+    };
+  }
 
   private enqueue(operationId: string, type: OpType, payload: Record<string, unknown>, photo?: Blob): Promise<ApplyResult> {
     return this.exclusive(() => this.enqueueNow(operationId, type, payload, photo));

@@ -13,12 +13,14 @@ const last = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSy
       <span>Opérations en attente : <strong data-testid="en-attente">{{ pending }}</strong></span>
       <span>Poste : <strong>{{ poste ?? 'non choisi' }}</strong></span>
       <span>Agent : <strong>{{ agent }}</strong></span>
+      <span v-if="sync && !sync.stale && !sync.lastError" class="inline-flex items-center gap-1" data-testid="liste-a-jour"><span aria-hidden="true">✓</span> Liste des visiteurs à jour</span>
       <span v-if="sync">Dernière synchronisation : <strong data-testid="derniere-sync">{{ last }}</strong><template v-if="sync.syncing"> · envoi en cours…</template></span>
     </div>
     <div v-if="sync" class="mt-3 flex flex-wrap items-center gap-3">
       <button type="button" class="btn-soft !min-h-12 !py-1" :disabled="sync.syncing" data-testid="synchroniser" @click="emit('sync')">Synchroniser maintenant</button>
       <button type="button" class="btn-soft !min-h-12 !py-1" data-testid="verrouiller" @click="emit('lock')">Verrouiller</button>
     </div>
+    <p v-if="!online" role="status" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-lg text-amber-950" data-testid="bandeau-reseau"><span aria-hidden="true">⚠</span> <strong>Vous continuez à travailler.</strong> Les opérations sont enregistrées sur la tablette et partiront toutes seules au retour du réseau. Ne fermez pas l’application.</p>
     <p v-if="sync?.needsLogin" role="alert" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="reconnexion"><span aria-hidden="true">⚠</span> Votre session a expiré : <a class="underline" href="/login">reconnectez-vous</a> pour envoyer vos opérations (elles restent enregistrées sur la tablette).</p>
     <p v-if="sync?.stale" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="liste-ancienne"><span aria-hidden="true">⚠</span> La liste des visiteurs n’a pas été actualisée depuis plus d’une heure : un visiteur ajouté ou modifié depuis peut manquer.</p>
     <p v-if="sync?.clockWarning" class="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-semibold text-amber-950" data-testid="horloge"><span aria-hidden="true">⚠</span> L’heure de cette tablette est décalée : signalez-le au superviseur.</p>

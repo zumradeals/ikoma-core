@@ -227,3 +227,17 @@ Refonte de l'écran `/pilotage` à la demande du dirigeant. Aucune route, permis
 - **Nouvelle lecture** `Pilotage::overview` : nombres seulement (alertes critiques et hautes, cas à décider, cars partis/arrivés/en écart, tablettes sans nouvelles), rechargée par la même interrogation automatique de 3 s (`overview` ajouté aux propriétés partielles).
 - **Tablettes sans nouvelles** : le superviseur ne voit qu'un nombre, sans lien vers l'administration des postes (droit réservé à l'administrateur). Le seuil de 60 minutes est partagé avec le tableau de bord de l'administrateur (`Pilotage::SILENT_AFTER_MINUTES`), toujours en constante : à déplacer dans Administration si le dirigeant veut le régler.
 - Les identifiants de test des parcours existants (`compteur-*`, `valeur`, `aucune-alerte`, `alerte-*`, `mis-a-jour`) sont conservés.
+
+## Accueil de l'agent (poste d'accueil), 28 octobre 2026
+
+Refonte de l'écran de recherche du poste d'accueil, d'après la maquette validée par le dirigeant le 28 octobre 2026. Aucune route, table ni permission nouvelle ; la logique d'accueil (recherche, identité, décision, badge, entrée) est inchangée.
+
+- **Panneau « Mon poste » à droite de la recherche** (`DeskPanel.vue`) : accueillis, refusés, badges restants du poste, visiteurs non listés qui attendent leur hôte (bouton « Reprendre »), derniers passages, et, quand des opérations attendent d'être envoyées, leur détail par type avec un bouton « Envoyer maintenant ».
+- **Tout est calculé sur la tablette** (`LocalPosteRepository.deskSummary`), donc disponible sans réseau. « Accueillis » et « Refusés » comptent les opérations faites **par cette tablette** (entrées, refus enregistrés dans sa file), pas l'ensemble de l'événement : le total de l'événement reste au pilotage du superviseur. Les badges restants sont ceux réservés à ce poste, hors lots de cars. Sans réseau, le panneau indique que les chiffres viennent de la copie de la tablette et l'heure de la liste.
+- **Compter sans déchiffrer** : le type et l'état d'une opération sont en clair dans IndexedDB ; seules les trois dernières lignes de « Derniers passages » sont déchiffrées. Aucune donnée personnelle nouvelle n'est écrite en clair.
+- **Bandeau hors réseau** « Vous continuez à travailler… » et mention « Liste des visiteurs à jour » dans la barre d'état. Les textes « En ligne » / « Hors ligne », « Opérations en attente : N » et les identifiants de test existants sont conservés.
+- **À valider par le dirigeant** : l'alerte « il reste peu de badges » (moins de 10 % du lot du poste, ou 5 badges) est une proposition de ma part ; le seuil est en constante dans le composant. Le renvoi vers le superviseur après 15 minutes sans réseau, montré dans la maquette, n'est **pas** implémenté (aucune règle dans le plan).
+
+## Audit global d'aptitude militaire, 28 octobre 2026
+
+À la demande du dirigeant (le client final est l'armée de Côte d'Ivoire), audit global rédigé dans docs/AUDIT_GLOBAL.md : verdict, écarts classés P0/P1/P2, feuille de route proposée (lots L14 à L19 entre L12 et L13), et onze décisions à obtenir. **Projet de travail : aucune décision n'est prise** tant que le dirigeant ne l'a pas validée. Le dirigeant a approuvé le 28 octobre 2026 les propositions du lot « réglages » (délai hors réseau, seuil de badges bas, seuil de tablette silencieuse rendus réglables dans Administration) ; leurs valeurs de départ restent à confirmer.
