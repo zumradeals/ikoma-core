@@ -15,7 +15,7 @@ function sourceHash(): string {
       if (entry.isDirectory()) walk(file); else { hash.update(file); hash.update(readFileSync(file)); }
     }
   }
-  for (const dir of ['resources', 'routes', 'app']) walk(dir);
+  for (const dir of ['resources', 'routes', 'app', 'public/brand']) walk(dir);
   hash.update(readFileSync('package-lock.json'));
   return hash.digest('hex');
 }
@@ -24,11 +24,11 @@ export default defineConfig({
     laravel({ input: ['resources/js/app.ts'], refresh: true }), vue(), tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate', base: '/build/', scope: '/',
-      manifest: { name: 'IKOMA Accueil', short_name: 'IKOMA', lang: 'fr', start_url: '/', scope: '/', display: 'standalone', theme_color: '#0F5AA6', background_color: '#f8fafc', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }] },
+      manifest: { name: 'IKOMA ACCESS', short_name: 'IKOMA ACCESS', lang: 'fr', start_url: '/', scope: '/', display: 'standalone', theme_color: '#0B3C6B', background_color: '#f8fafc', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }] },
       workbox: {
         globPatterns: ['**/*.{js,css,woff2}'], navigateFallback: undefined,
         // Page publique provisoire et coquille publique du poste (/poste/shell : aucune session, aucun nom, aucune donnée).
-        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }, { url: '/controle/shell', revision: sourceHash() }, { url: '/groupe/shell', revision: sourceHash() }, { url: '/pilotage/evacuation/shell', revision: sourceHash() }],
+        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-icon.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-logo.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-logo-slogan.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }, { url: '/controle/shell', revision: sourceHash() }, { url: '/groupe/shell', revision: sourceHash() }, { url: '/pilotage/evacuation/shell', revision: sourceHash() }],
         navigateFallbackDenylist: [/^\/build/],
         // /poste, /controle, /groupe et /pilotage/evacuation passent toujours par le serveur (session, droits) ; sans réseau, on rend la coquille publique précachée. Jamais de contenu authentifié en cache.
         runtimeCaching: [{

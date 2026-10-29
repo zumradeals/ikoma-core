@@ -24,6 +24,10 @@ class ZapGateTest(unittest.TestCase):
     def test_cached_authenticated_page_is_never_excepted(self):
         alert = {'alertRef': '10049-3', 'riskcode': '0', 'instances': [{'uri': 'http://localhost/build/assets/app.js'}]}
         self.assertEqual(self.run_gate(alert), 0)
+        alert['instances'][0]['uri'] = 'http://localhost/icon.svg'
+        self.assertEqual(self.run_gate(alert), 0)
+        alert['instances'][0]['uri'] = 'http://localhost/brand/ikoma-access-logo.svg'
+        self.assertEqual(self.run_gate(alert), 0)
         alert['instances'][0]['uri'] = 'http://localhost/administration/comptes'
         self.assertEqual(self.run_gate(alert), 1)
 
