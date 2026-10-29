@@ -45,10 +45,17 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
     const challenge = page.getByLabel('Code à six chiffres');
     const throttled = page.getByRole('alert').filter({ hasText: /Trop de tentatives/i }).first();
     if (response.status() !== 429) {
-      await expect(challenge.or(throttled)).toBeVisible({ timeout: 15_000 });
+      try {
+        await expect(challenge.or(throttled)).toBeVisible({ timeout: 15_000 });
+      } catch {
+        // Indications techniques sans journaliser les identifiants ni les secrets TOTP.
+        const currentPath = new URL(page.url()).pathname;
+        throw new Error(`Écran 2FA absent après POST /login (HTTP ${response.status()}, page ${currentPath}). Vérifier la réponse serveur et le formulaire de connexion.`);
+      }
       if (await challenge.isVisible()) {
         await challenge.fill(await freshOtp(secret));
         await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
+        await expect(page).toHaveURL(/\/(administration|espace)$/, { timeout: 15_000 });
         return;
       }
     }
