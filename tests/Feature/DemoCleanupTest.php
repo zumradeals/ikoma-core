@@ -18,7 +18,17 @@ it('annonce le périmètre en simulation et ne supprime rien', function () {
     expect(DB::table('badges')->where('event_id', $event)->count())->toBe(400);
 });
 
-it('refuse de supprimer le seul compte administrateur fictif', function () {
+it('refuse la purge lorsqu’aucun administrateur réel confirmé ne reste disponible', function () {
+    // Ne pas supposer une base de tests vierge : d'autres suites peuvent avoir
+    // créé des comptes administrateurs lors de la première passe PHP.
+    // Les rôles sont retirés uniquement dans la transaction de CE test.
+    $seedEmails = array_map(static fn (string $role): string => $role.'@exemple.test', array_keys(config('roles')));
+    $realAdminIds = User::query()->whereNotIn('email', $seedEmails)->get()
+        ->filter(static fn (User $u): bool => $u->hasRole('administrateur'))
+        ->pluck('id')->all();
+    if ($realAdminIds !== []) {
+        DB::table('model_has_roles')->where('model_type', User::class)->whereIn('model_id', $realAdminIds)->delete();
+    }
     $this->artisan('demo:purger', ['--confirmer' => true])->assertExitCode(1);
     expect(DB::table('events')->where('id', DemoSeeder::id('event'))->exists())->toBeTrue();
     expect(User::where('email', 'administrateur@exemple.test')->exists())->toBeTrue();
