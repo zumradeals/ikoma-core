@@ -6,6 +6,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 function dashUser(string $role): User
 {
@@ -108,7 +109,7 @@ it('fournit le même contexte aux modules et garde les liens profonds accessible
 });
 
 it('préserve les refus de permission même pour un administrateur et le journal du superviseur', function () {
-    $role = \Spatie\Permission\Models\Role::findByName('administrateur');
+    $role = Role::findByName('administrateur');
     $role->revokePermissionTo('badges.gerer');
     $this->admin->unsetRelation('roles');
     $this->actingAs($this->admin)->get('/administration/badges')->assertForbidden();
