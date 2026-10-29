@@ -112,7 +112,7 @@ const time = (at: string) => new Date(at).toLocaleTimeString('fr-FR', { hour: '2
           <section aria-labelledby="titre-journal" class="admin-card">
             <div class="admin-section-heading"><h2 id="titre-journal">Dernières actions</h2><Link href="/administration/journal" class="admin-muted underline">Voir tout le journal →</Link></div>
             <ul v-if="recent.length" class="mt-4 space-y-3" data-testid="dernieres-actions">
-              <li v-for="(r, i) in recent" :key="i" class="flex items-center justify-between gap-3 text-sm"><AdminIcon name="check" :size="18" /><span class="min-w-0 grow">{{ actionLabels[r.action] ?? r.action }}</span><span class="flex-none text-slate-600">{{ time(r.occurred_at) }}</span></li>
+              <li v-for="(r, i) in recent" :key="i" class="flex items-center justify-between gap-3 text-sm"><AdminIcon name="book" :size="18" /><span class="min-w-0 grow">{{ actionLabels[r.action] ?? r.action }}</span><span class="flex-none text-slate-600">{{ time(r.occurred_at) }}</span></li>
             </ul>
             <p v-else class="mt-3 text-slate-600">Aucune action enregistrée.</p>
           </section>

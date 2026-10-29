@@ -159,3 +159,11 @@ html { scroll-padding-bottom: 6rem; }
 .admin-main > .space-y-6 { display:grid; gap:18px; margin-top:0; }
 .admin-main > .space-y-6 > * { margin-top:0; min-width:0; }
 @media (min-width:1200px) { .admin-main > .space-y-6 { grid-template-columns:repeat(2,minmax(0,1fr)); } .admin-main > .space-y-6 > :first-child { grid-column:1/-1; } }
+/* Le contenant positionné retient aussi les libellés sr-only des actions dans le défilement local. */
+.account-table-scroll { position:relative; }
+.admin-nav-link { padding-inline:16px; gap:16px; font-size:15px; }
+.admin-frame { min-height:calc(100vh - 64px); }
+.dashboard-hero { padding-block:20px; }
+.dashboard-watch { position:relative; padding-right:60px; }
+.dashboard-watch > div > a { position:absolute; right:14px; top:50%; transform:translateY(-50%); }
+.dashboard-watch > div > p:last-of-type { font-size:12px; }
