@@ -61,6 +61,7 @@ const roles = [
               <a href="mailto:ikomagroup2@gmail.com?subject=Demande%20de%20pr%C3%A9sentation%20IKOMA%20ACCESS" class="inline-flex min-h-14 items-center justify-center gap-3 rounded-lg bg-[#F75C03] px-7 font-extrabold text-white transition hover:bg-[#DE5100]">Demander une présentation <span aria-hidden="true">↗</span></a>
               <a href="#solutions" class="inline-flex min-h-14 items-center justify-center rounded-lg border border-white/70 px-7 font-bold text-white transition hover:bg-white/10">Découvrir les fonctionnalités</a>
             </div>
+            <p role="status" class="mt-6 flex items-start gap-2 text-sm text-[#DCE9F8]"><span aria-hidden="true">ⓘ</span><span>Après une première visite, cette page et vos outils d’accueil s’ouvrent même sans réseau.</span></p>
             <div class="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm text-white/80">
               <span class="flex items-center gap-2"><span class="text-[#FF9C59]" aria-hidden="true">✓</span> Accueil et badges QR</span>
               <span class="flex items-center gap-2"><span class="text-[#FF9C59]" aria-hidden="true">✓</span> Contrôle par zones</span>

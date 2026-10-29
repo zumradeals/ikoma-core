@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 test('la page d’accueil se rouvre sans réseau après une première visite', async ({ page, context }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Accueillez, contrôlez et suivez vos visiteurs en toute sécurité' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Contrôlez les accès.');
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) await new Promise<void>(resolve => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true }));
@@ -14,6 +14,6 @@ test('la page d’accueil se rouvre sans réseau après une première visite', a
   await page.close();
   const offline = await context.newPage();
   await offline.goto('/');
-  await expect(offline.getByRole('heading', { name: 'Accueillez, contrôlez et suivez vos visiteurs en toute sécurité' })).toBeVisible();
+  await expect(offline.getByRole('heading', { level: 1 })).toContainText('Contrôlez les accès.');
   await expect(offline.getByRole('status')).toContainText('même sans réseau');
 });
