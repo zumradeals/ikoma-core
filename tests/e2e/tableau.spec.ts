@@ -14,7 +14,7 @@ async function loginAdmin(page: Page): Promise<void> {
 }
 const noHorizontalScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 
-test('administration unifiée : connexion, modules réels, liens directs, historique et captures responsive', async ({ page }) => {
+test('administration unifiée : connexion, modules réels, liens directs, historique et captures responsive', async ({ page, browser }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1448, height: 1086 });
   await loginAdmin(page);
@@ -67,6 +67,15 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
     expect(await noHorizontalScroll(page)).toBe(true);
     await page.screenshot({ path: `test-results/administration/tableau-${width}.png`, fullPage: true });
   }
+  const touch = await browser.newContext({ baseURL: test.info().project.use.baseURL, storageState: await page.context().storageState(), viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true });
+  const tablet = await touch.newPage();
+  await tablet.goto('/administration/comptes');
+  for (const control of [tablet.getByRole('button', { name: 'Créer le compte', exact: true }), tablet.getByRole('button', { name: /^Modifier/ }).first(), tablet.getByLabel('Nom', { exact: true })]) {
+    expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(56);
+  }
+  expect(await noHorizontalScroll(tablet)).toBe(true);
+  await tablet.screenshot({ path: 'test-results/administration/comptes-tablette-tactile.png', fullPage: true });
+  await touch.close();
   await page.setViewportSize({ width: 1448, height: 1086 });
   await page.getByTestId('menu-securite').click();
   await expect(page.getByRole('heading', { name: 'Confirmer votre mot de passe' })).toBeVisible();

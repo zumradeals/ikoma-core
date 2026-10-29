@@ -167,3 +167,6 @@ html { scroll-padding-bottom: 6rem; }
 .dashboard-watch { position:relative; padding-right:60px; }
 .dashboard-watch > div > a { position:absolute; right:14px; top:50%; transform:translateY(-50%); }
 .dashboard-watch > div > p:last-of-type { font-size:12px; }
+@media (pointer:coarse) {
+  .admin-shell .admin-main :is(button, a.action, summary), .admin-shell .admin-main .field { min-height:56px; }
+}
