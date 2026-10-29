@@ -31,7 +31,7 @@ function change(e: Event) { router.get('/administration', { event: (e.target as 
   <div class="admin-shell" data-testid="admin-layout">
     <a href="#contenu" class="admin-skip">Aller au contenu</a>
     <header class="admin-header">
-      <div class="admin-brand"><span class="admin-logo"><img src="/brand/ikoma-access-icon.svg" alt="" width="36" height="36"></span><p><strong>IKOMA</strong> ACCESS</p></div>
+      <div class="admin-brand"><span class="admin-logo"><img :src="'/brand/ikoma-access-icon.svg'" alt="" width="36" height="36"></span><p><strong>IKOMA</strong> ACCESS</p></div>
       <div class="admin-event">
         <label v-if="eventRef && events.length > 1 && active === 'tableau'" class="admin-event-select"><span class="sr-only">Événement</span>
           <select :value="eventRef.id" data-testid="choix-evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
