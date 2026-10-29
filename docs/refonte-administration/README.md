@@ -16,7 +16,7 @@ Le tableau conserve en session son événement de référence. La barre commune 
 
 ## Références visuelles
 
-Les deux PNG joints à la mission sont le contrat visuel. Leurs empreintes et noms sont consignés dans `references.sha256`. Ils ne sont ni retouchés ni utilisés comme interface d'application.
+Les deux PNG joints à la mission sont conservés à l’identique dans [`references/tableau.png`](references/tableau.png) et [`references/comptes.png`](references/comptes.png). Ils constituent le contrat visuel. Leurs empreintes sont consignées dans `references.sha256`. Ils ne sont ni retouchés ni utilisés comme interface d'application.
 
 Comparaison attendue :
 

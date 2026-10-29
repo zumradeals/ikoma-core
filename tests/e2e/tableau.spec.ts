@@ -56,14 +56,16 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   for (const width of [820, 380]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto('/administration');
+    await expect(page.getByTestId('menu-tableau')).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
     await page.getByTestId('ouvrir-menu').click();
     await page.getByTestId('menu-comptes').click();
-    await expect(page.getByTestId('admin-layout')).toHaveCount(1);
+    await expect(page.getByTestId('menu-comptes')).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
     await page.screenshot({ path: `test-results/administration/comptes-${width}.png`, fullPage: true });
     await page.getByTestId('ouvrir-menu').click();
     await page.getByTestId('menu-tableau').click();
+    await expect(page.getByTestId('menu-tableau')).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
     await page.screenshot({ path: `test-results/administration/tableau-${width}.png`, fullPage: true });
   }
