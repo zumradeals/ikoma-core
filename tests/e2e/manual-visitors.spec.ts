@@ -20,7 +20,7 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   });
   await page.getByLabel('Importer une photo', { exact: true }).setInputFiles({ name: 'portrait-fictif.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await expect(page.getByAltText('Aperçu du portrait')).toBeVisible();
-  await page.getByLabel('Zoom du portrait').fill('1.1');
+  await page.getByLabel('Zoom du portrait').focus(); await page.getByLabel('Zoom du portrait').press('ArrowRight');
   await page.getByLabel('Autoriser l’utilisation de ce portrait', { exact: false }).check();
   await page.getByRole('button', { name: 'Enregistrer la fiche', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Fiche de la personne', exact: true })).toBeVisible();
@@ -46,12 +46,17 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   await expect(page.getByText('1 destination(s) réservée(s).', { exact: false })).toBeVisible();
   for (const design of ['visiteur', 'vip', 'prestataire']) {
     await page.locator(`input[name="design"][value="${design}"]`).check();
+    for (const orientation of ['paysage', 'portrait']) {
+    await page.getByLabel('Orientation', { exact: true }).selectOption(orientation);
     for (const photo of [false, true]) {
       await page.getByLabel('Afficher le portrait de profil autorisé, si disponible').setChecked(photo);
       await page.getByRole('button', { name: 'Actualiser l’aperçu', exact: true }).click();
       await expect(page.locator('.access-card')).toContainText(name);
       await expect(page.locator('.access-card__portrait')).toHaveCount(photo ? 1 : 0);
-      await page.locator('.access-card').screenshot({ path: `test-results/badge-nominatif-${design}-${photo ? 'photo' : 'sans-photo'}.png` });
+      const qr = await page.locator('.access-card__qr').boundingBox(); const footer = await page.locator('.access-card__footer').boundingBox();
+      expect(qr!.y + qr!.height).toBeLessThanOrEqual(footer!.y + .5);
+      await page.locator('.access-card').screenshot({ path: `test-results/badge-nominatif-${design}-${orientation}-${photo ? 'photo' : 'sans-photo'}.png` });
+    }
     }
   }
   await page.screenshot({ path: 'test-results/atelier-nominatif.png', fullPage: true });

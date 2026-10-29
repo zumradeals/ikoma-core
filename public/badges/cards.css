@@ -47,3 +47,10 @@
 .access-card--portrait.access-card--nominatif .access-card__content { gap: 1mm; }
 .access-card--portrait.access-card--nominatif .access-card__qr { width: 25mm; height: 25mm; }
 .access-card--portrait.access-card--nominatif .access-card__name { font-size: 2.5mm; }
+/* Portrait nominatif : portrait et identité sur la même rangée, QR sur la suivante. */
+.access-card--portrait.access-card--photo .access-card__content { display: grid; grid-template-columns: 12mm minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 25mm; width: 100%; gap: 1mm; justify-content: normal; }
+.access-card--portrait.access-card--photo .access-card__qr { grid-column: 1 / -1; justify-self: center; }
+.access-card--portrait.access-card--photo .access-card__details { align-items: start; text-align: left; gap: .5mm; }
+.access-card--portrait.access-card--photo .access-card__caption { display: none; }
+.access-card--portrait.access-card--photo .access-card__personal { font-size: 1.8mm; }
+.access-card .access-card__name-long { font-size: 1.8mm; }
