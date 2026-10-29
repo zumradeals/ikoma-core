@@ -34,7 +34,7 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
   const agentContext = await browser.newContext({ baseURL: info.project.use.baseURL, permissions: ['camera'], viewport: { width: 1024, height: 768 } });
   const admin = await adminContext.newPage(); const page = await agentContext.newPage();
   let original: boolean | undefined;
-  let primaryFailure = false;
+  let failure: unknown;
   async function setDocument(value: boolean) {
     await admin.goto('/administration/postes');
     const box = admin.getByTestId('reglage-piece-identite');
@@ -104,14 +104,14 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await page.getByTestId('verrouiller').click(); await expect(page.getByTestId('ecran-verrou')).toBeVisible();
     await captures(page, '11-verrouillage');
   } catch (error) {
-    primaryFailure = true;
-    throw error;
+    failure = error;
   } finally {
     try { if (original !== undefined) await setDocument(original); }
     catch (error) {
-      if (!primaryFailure) throw error;
+      if (failure === undefined) failure = error;
       console.error('Restauration du réglage impossible dans cette recette isolée ; l’échec principal est conservé.');
     }
     await agentContext.close(); await adminContext.close();
   }
+  if (failure !== undefined) throw failure;
 });

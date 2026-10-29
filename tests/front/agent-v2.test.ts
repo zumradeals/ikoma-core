@@ -30,7 +30,7 @@ describe('cadre Agent V2', () => {
     const w = mount(Layout, { props: { active: 'poste', online: false }, slots: { default: '<p>Étape en cours</p>' } }); wrappers.push(w);
     expect(w.findAll('nav a')).toHaveLength(0);
     expect(w.text()).toContain('Étape en cours');
-    expect(w.text()).toContain('Hors ligne');
+    expect(w.text()).toContain('Connexion indisponible');
   });
   it('affiche les quatre fonctions et ne prétend pas à une affectation sans information locale', async () => {
     getMeta.mockResolvedValue(undefined);
