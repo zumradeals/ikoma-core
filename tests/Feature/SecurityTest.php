@@ -63,6 +63,7 @@ it('demande le code TOTP après le mot de passe et accepte un code valide', func
     expect(DB::table('audit_logs')->where('actor_id', $user->id)->where('action', 'connexion.echec')->exists())->toBeTrue();
     $this->post('/two-factor-challenge', ['code' => $totp->getCurrentOtp($secret)])->assertRedirect('/espace');
     $this->assertAuthenticatedAs($user);
+    $this->get('/espace')->assertRedirect('/pilotage');
 });
 it('interdit de désactiver la 2FA obligatoire', function () {
     $this->actingAs(account('administrateur'))->delete('/user/two-factor-authentication')->assertForbidden();
@@ -138,4 +139,14 @@ it('refuse UPDATE DELETE TRUNCATE avec le compte applicatif et détecte une alt�
         $pdo->exec("UPDATE audit_logs SET id=$id WHERE id=($id+1000000000)");
     }
     $this->artisan('audit:verify')->assertSuccessful();
+});
+
+
+it('ne laisse jamais la redirection superviseur contourner la 2FA', function () {
+    $user = account('superviseur');
+    $this->actingAs($user)->get('/espace')->assertRedirect('/securite');
+    $this->get('/pilotage')->assertRedirect('/securite');
+    $user->update(['two_factor_confirmed_at' => now()]);
+    $this->actingAs($user)->get('/espace')->assertRedirect('/pilotage');
+    $this->get('/pilotage')->assertOk();
 });

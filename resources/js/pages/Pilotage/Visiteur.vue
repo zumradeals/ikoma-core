@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
+import { pilotageHref } from '../../pilotage/navigation';
 import PilotageLayout from '../../layouts/PilotageLayout.vue';
 import CategorySwatch from '../../components/CategorySwatch.vue';
 import CancelBadge from '../../components/pilotage/CancelBadge.vue';
@@ -16,7 +17,7 @@ function decide() { router.post(`/pilotage/litiges/${props.refusal!.id}/decision
 </script>
 <template>
   <PilotageLayout active="presents" :event="event" :events="events" :open-alerts="openAlerts" title="Fiche">
-    <Link href="/pilotage/presents" class="inline-flex min-h-14 items-center underline">← Retour à la liste</Link>
+    <Link :href="pilotageHref('/pilotage/presents', event?.id)" class="inline-flex min-h-14 items-center underline">← Retour à la liste</Link>
     <section class="space-y-2 rounded-2xl border-2 border-ikoma-navy bg-white p-4" aria-label="Visiteur">
       <p class="text-2xl font-bold" data-testid="nom">{{ visitor.full_name }}</p>
       <CategorySwatch :name="visitor.category.name" :color="visitor.category.color" :priority="visitor.category.priority_circuit" />

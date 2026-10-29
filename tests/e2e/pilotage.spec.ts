@@ -24,7 +24,7 @@ test.beforeAll(async ({ browser }, info) => {
   phone = await browser.newContext({ baseURL, viewport: { width: 380, height: 800 }, hasTouch: true, isMobile: true });
   sup = await phone.newPage();
   await loginWithSecondFactor(sup, fx.supervisor.email, fx.supervisor.password, fx.supervisor.secret);
-  await expect(sup).toHaveURL(/\/espace/);
+  await expect(sup).toHaveURL(/\/pilotage$/);
   tablet = await browser.newContext({ baseURL, viewport: { width: 1024, height: 768 }, permissions: ['camera'] });
   const agent = await tablet.newPage();
   await agent.goto('/login'); await agent.getByLabel('Adresse électronique').fill(fx.email); await agent.getByLabel('Mot de passe', { exact: true }).fill(fx.password); await agent.getByRole('button', { name: 'Se connecter' }).click();
@@ -202,6 +202,7 @@ test('la déconnexion efface la copie locale du superviseur', async () => {
   await sup.goto('/espace');
   const exists = () => sup.evaluate(async () => (await indexedDB.databases()).some(d => d.name === 'ikoma-pilotage'));
   expect(await exists()).toBe(true);
+  await sup.locator('.pilotage-account summary').click();
   await sup.getByRole('button', { name: 'Se déconnecter' }).click();
   await expect(sup).toHaveURL(/\/(login|$)/);
   await expect.poll(() => exists()).toBe(false);

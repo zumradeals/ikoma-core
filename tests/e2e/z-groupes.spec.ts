@@ -26,7 +26,7 @@ async function login(context: BrowserContext, email: string, password: string, s
   else {
     await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(email); await page.getByLabel('Mot de passe', { exact: true }).fill(password); await page.getByRole('button', { name: 'Se connecter' }).click();
   }
-  await expect(page).toHaveURL(email === fx.admin.email ? /\/administration$/ : /\/espace/);
+  await expect(page).toHaveURL(email === fx.admin.email ? /\/administration$/ : email === fx.supervisor.email ? /\/pilotage$/ : /\/espace/);
   await page.close();
 }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
+import { pilotageHref } from '../../pilotage/navigation';
 import PilotageLayout from '../../layouts/PilotageLayout.vue';
 import CategorySwatch from '../../components/CategorySwatch.vue';
 
@@ -28,9 +29,9 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: 
       </div>
     </form>
     <p role="status" data-testid="total">{{ total }} personne{{ total > 1 ? 's' : '' }} présente{{ total > 1 ? 's' : '' }}</p>
-    <ul class="space-y-3" data-testid="liste-presents">
+    <ul class="pilotage-record-grid" data-testid="liste-presents">
       <li v-for="row in rows" :key="row.id">
-        <Link :href="'/pilotage/visiteurs/' + row.id" class="block rounded-2xl border-2 border-slate-300 bg-white p-4" @click="leaving">
+        <Link :href="pilotageHref('/pilotage/visiteurs/' + row.id, event?.id)" class="block rounded-2xl border-2 border-slate-300 bg-white p-4" @click="leaving">
           <span class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xl">{{ row.full_name }}</strong><CategorySwatch :name="row.category.name" :color="row.category.color" :priority="row.category.priority_circuit" /></span>
           <span class="mt-1 block">{{ row.organisation || 'Organisation non indiquée' }}</span>
           <span class="mt-1 block text-sm">Zone : {{ row.zone }} · Groupe : {{ row.group || '—' }} · Entrée : {{ time(row.entered_at) }}</span>

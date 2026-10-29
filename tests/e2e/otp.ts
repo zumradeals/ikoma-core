@@ -71,7 +71,7 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
       if (await challenge.isVisible()) {
         await challenge.fill(await freshOtp(secret));
         await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
-        await expect(page).toHaveURL(/\/(administration|espace)$/, { timeout: 15_000 });
+        await expect(page).toHaveURL(/\/(administration|espace|pilotage)$/, { timeout: 15_000 });
         return;
       }
     }

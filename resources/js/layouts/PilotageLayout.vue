@@ -1,51 +1,70 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
+import AdminIcon from '../components/admin/AdminIcon.vue';
 import { useAlertSound } from '../pilotage/useAlertSound';
+import { wipePilotageLocal } from '../pilotage/evacuation';
+import { pilotageHref } from '../pilotage/navigation';
 
-// Les propriétés partagées par le serveur (criticalAlerts…) arrivent aussi aux pages : elles ne doivent pas se retrouver en attributs HTML.
 defineOptions({ inheritAttrs: false });
-const props = defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'litiges' | 'evacuation' | 'plus'; event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; title: string; bare?: boolean }>();
-const page = usePage<{ criticalAlerts?: number }>();
-const sound = useAlertSound(() => props.openAlerts, () => page.props.criticalAlerts ?? 0);
-const suffix = computed(() => (props.event && props.events.length > 1 ? `?event=${props.event.id}` : ''));
-const items = computed(() => [
-  { key: 'tableau', label: 'Tableau', icon: '▦', href: '/pilotage' }, { key: 'alertes', label: 'Alertes', icon: '▲', href: '/pilotage/alertes' }, { key: 'presents', label: 'Présents', icon: '●', href: '/pilotage/presents' },
-  { key: 'litiges', label: 'Litiges', icon: '⚖', href: '/pilotage/litiges' }, { key: 'evacuation', label: 'Évacuation', icon: '⚑', href: '/pilotage/evacuation' },
-] as const);
-function change(event: Event) { router.get(window.location.pathname, { event: (event.target as HTMLSelectElement).value }); }
+type EventRef = { id: string; name: string };
+type Context = { event: EventRef | null; events: EventRef[]; openAlerts: number; criticalAlerts: number };
+const props = withDefaults(defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'litiges' | 'evacuation' | 'plus' | 'journal'; event?: EventRef | null; events?: EventRef[]; openAlerts?: number; title?: string; bare?: boolean }>(), { event: null, events: () => [], openAlerts: 0, title: '', bare: false });
+const page = usePage<{ auth?: { name: string; permissions: string[] } | null; criticalAlerts?: number; pilotageContext?: Context | null }>();
+const currentEvent = computed(() => props.event ?? page.props.pilotageContext?.event ?? null);
+const events = computed(() => props.events.length ? props.events : page.props.pilotageContext?.events ?? []);
+const openAlerts = computed(() => page.props.pilotageContext?.openAlerts ?? props.openAlerts);
+const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
+const sound = useAlertSound(() => openAlerts.value, () => page.props.criticalAlerts ?? page.props.pilotageContext?.criticalAlerts ?? 0);
+const open = ref(false);
+const items = [
+  { key: 'tableau', label: 'Tableau de bord', short: 'Tableau', icon: 'home', href: '/pilotage', permission: 'pilotage.consulter' },
+  { key: 'alertes', label: 'Alertes', short: 'Alertes', icon: 'alert', href: '/pilotage/alertes', permission: 'alertes.consulter' },
+  { key: 'presents', label: 'Personnes présentes', short: 'Présents', icon: 'users', href: '/pilotage/presents', permission: 'presences.consulter' },
+  { key: 'litiges', label: 'Litiges', short: 'Litiges', icon: 'shield', href: '/pilotage/litiges', permission: 'litiges.decider' },
+  { key: 'plus', label: 'Groupes et cars', short: 'Groupes', icon: 'bus', href: '/pilotage/groupes', permission: 'groupes.suivre' },
+  { key: 'evacuation', label: 'Évacuation', short: 'Évacuation', icon: 'arrow', href: '/pilotage/evacuation', permission: 'presences.consulter' },
+  { key: 'journal', label: 'Journal', short: 'Journal', icon: 'book', href: '/administration/journal', permission: 'journal.consulter' },
+] as const;
+const allowed = computed(() => items.filter(item => can(item.permission) && (item.key !== 'plus' || can('cars.suivre'))));
+const bottom = computed(() => allowed.value.filter(item => !['plus', 'journal'].includes(item.key)));
+const href = (path: string) => pilotageHref(path, currentEvent.value?.id);
+function change(event: Event) {
+  router.get(window.location.pathname, { ...Object.fromEntries(new URLSearchParams(window.location.search)), event: (event.target as HTMLSelectElement).value, page: undefined });
+}
 </script>
 <template>
-  <div class="min-h-screen bg-slate-50 pb-24 text-ikoma-navy">
-    <header class="no-print border-b-4 border-ikoma-orange bg-ikoma-navy px-4 py-3 text-white">
-      <div class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2">
-        <p class="font-bold">IKOMA <span class="font-normal">Pilotage</span></p>
-        <button v-if="!bare" type="button" class="inline-flex min-h-14 items-center gap-2 rounded-xl border-2 border-white px-3 font-semibold no-print" :aria-pressed="sound.enabled.value" data-testid="son-alertes" @click="sound.toggle"><span aria-hidden="true">{{ sound.enabled.value ? '♪' : '✕' }}</span> Son des alertes : {{ sound.enabled.value ? 'activé' : 'désactivé' }}</button>
-        <Link v-if="!bare" href="/espace" class="inline-flex min-h-14 items-center underline no-print">Mon espace</Link>
+  <div class="pilotage-shell" :class="{ 'is-bare': bare }" data-testid="pilotage-layout">
+    <a href="#contenu" class="pilotage-skip no-print">Aller au contenu</a>
+    <header v-if="!bare" class="pilotage-header no-print">
+      <div class="pilotage-brand"><span class="pilotage-logo"><AdminIcon name="qr" :size="26" /></span><p><strong>IKOMA</strong> Accueil <span class="pilotage-caption">Pilotage</span></p></div>
+      <div v-if="currentEvent" class="pilotage-event">
+        <label v-if="events.length > 1">Événement de référence<select :value="currentEvent.id" data-testid="evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select></label>
+        <p v-else data-testid="evenement"><span class="pilotage-caption">Événement de référence</span>{{ currentEvent.name }}</p>
       </div>
-      <div v-if="event" class="mx-auto max-w-3xl">
-        <p v-if="events.length < 2" class="text-lg" data-testid="evenement">{{ event.name }}</p>
-        <label v-else class="block text-lg">Événement
-          <select class="field !mt-1 !min-h-14 !text-ikoma-navy" :value="event.id" data-testid="evenement" @change="change">
-            <option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option>
-          </select>
-        </label>
+      <div class="pilotage-session">
+        <button type="button" class="pilotage-sound" :title="'Son des alertes : ' + (sound.enabled.value ? 'activé' : 'désactivé')" :aria-pressed="sound.enabled.value" data-testid="son-alertes" @click="sound.toggle"><span aria-hidden="true">{{ sound.enabled.value ? '♪' : '✕' }}</span><span>Son des alertes : {{ sound.enabled.value ? 'activé' : 'désactivé' }}</span></button>
+        <details class="pilotage-account"><summary :aria-label="'Session de ' + (page.props.auth?.name ?? 'superviseur')"><span class="pilotage-avatar" aria-hidden="true">{{ page.props.auth?.name?.charAt(0).toUpperCase() ?? 'S' }}</span><span class="pilotage-user">{{ page.props.auth?.name ?? 'Session' }}</span><span aria-hidden="true">⌄</span></summary><div><Link href="/securite">Sécurité du compte</Link><Link as="button" method="post" href="/logout" @click="wipePilotageLocal">Se déconnecter</Link></div></details>
+        <button type="button" class="pilotage-menu-toggle" :aria-expanded="open" aria-controls="menu-pilotage" data-testid="ouvrir-menu-pilotage" @click="open = !open"><AdminIcon name="menu" /><span>Menu superviseur</span></button>
       </div>
     </header>
-    <main id="contenu" class="mx-auto max-w-3xl space-y-5 px-4 py-5">
-      <h1 class="no-print text-display font-bold">{{ title }}</h1>
-      <p v-if="!event && !bare" role="status" class="rounded-xl bg-white p-4">Aucun événement n’est encore créé.</p>
-      <slot />
-    </main>
-    <nav v-if="!bare" aria-label="Navigation du pilotage" class="no-print fixed inset-x-0 bottom-0 z-40 border-t-2 border-ikoma-navy bg-white">
-      <ul class="mx-auto grid max-w-3xl grid-cols-5">
-        <li v-for="item in items" :key="item.key">
-          <Link :href="item.href + suffix" class="flex min-h-16 flex-col items-center justify-center px-1 text-sm font-semibold" :class="active === item.key ? 'bg-ikoma-navy text-white' : 'text-ikoma-navy'" :aria-current="active === item.key ? 'page' : undefined" :data-testid="'nav-' + item.key">
-            <span aria-hidden="true" class="text-xl leading-none">{{ item.icon }}</span>
-            <span>{{ item.label }}<span v-if="item.key === 'alertes' && openAlerts > 0" class="ml-1 rounded-full bg-red-700 px-2 text-white" data-testid="alertes-ouvertes">{{ openAlerts }}</span></span>
-          </Link>
-        </li>
-      </ul>
-    </nav>
+    <div class="pilotage-frame">
+      <aside v-if="!bare" class="pilotage-sidebar no-print">
+        <nav id="menu-pilotage" aria-label="Menu superviseur" :class="{ 'is-open': open }" @keydown.esc="open = false">
+          <p class="pilotage-nav-caption">Supervision</p>
+          <Link v-for="item in allowed" :key="item.key" :href="href(item.href)" :aria-current="active === item.key ? 'page' : undefined" class="pilotage-nav-link" :data-testid="'menu-' + item.key" @click="open = false"><AdminIcon :name="item.icon" :size="24" /><span>{{ item.label }}</span><span v-if="item.key === 'alertes' && openAlerts" class="pilotage-count">{{ openAlerts }}</span></Link>
+        </nav>
+      </aside>
+      <main id="contenu" class="pilotage-main" tabindex="-1">
+        <div v-if="title" class="pilotage-heading no-print"><div><h1>{{ title }}</h1><p v-if="active === 'tableau'" class="pilotage-muted">Surveiller, décider, agir.</p></div><slot name="heading-actions" /></div>
+        <p v-if="!currentEvent && !bare && active !== 'journal'" role="status" class="pilotage-card">Aucun événement n’est encore créé.</p>
+        <slot />
+      </main>
+    </div>
+    <nav v-if="!bare" aria-label="Navigation du pilotage" class="pilotage-bottom no-print">
+<ul>
+      <li v-for="item in bottom" :key="item.key"><Link :href="href(item.href)" :aria-current="active === item.key ? 'page' : undefined" :data-testid="'nav-' + item.key"><span class="pilotage-bottom-icon"><AdminIcon :name="item.icon" :size="22" /><span v-if="item.key === 'alertes' && openAlerts" class="pilotage-count" data-testid="alertes-ouvertes">{{ openAlerts }}</span></span><span>{{ item.short }}</span></Link></li>
+    </ul>
+</nav>
   </div>
 </template>
