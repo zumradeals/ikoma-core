@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminIcon from '../admin/AdminIcon.vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { captureJpeg, closeCamera, DOCUMENT_MAX_SIDE, openCamera } from '../../poste/media';
 import { documentLabels, type IdentityDocument } from '../../poste/types';
@@ -41,13 +42,13 @@ onBeforeUnmount(() => { closeCamera(video.value, stream); if (preview.value) URL
 <h2 class="mb-3">Photo du visiteur</h2>
         <div class="agent-camera"><video v-show="!photo" ref="video" playsinline muted aria-label="Aperçu de la caméra"></video><img v-if="photo" :src="preview" alt="Photo prise du visiteur"></div>
         <p v-if="cameraError" role="alert" class="mt-3 font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ cameraError }}</p>
-        <div class="agent-photo-actions"><button v-if="!photo" type="button" class="btn-main" @click="take"><span aria-hidden="true">📷</span> Prendre la photo</button><button v-else type="button" class="btn-soft" @click="retake">Reprendre la photo</button><button v-if="cameraError" type="button" class="btn-soft" @click="start">Réessayer la caméra</button></div>
+        <div class="agent-photo-actions"><button v-if="!photo" type="button" class="btn-main" @click="take"><AdminIcon name="camera" /> Prendre la photo</button><button v-else type="button" class="btn-soft" @click="retake">Reprendre la photo</button><button v-if="cameraError" type="button" class="btn-soft" @click="start">Réessayer la caméra</button></div>
       </div>
       <div v-if="documentRequired" class="agent-photo-panel space-y-4" data-testid="bloc-piece">
 <h2>Pièce d’identité</h2><p>Type et photo obligatoires selon le réglage administratif.</p>
         <label class="block text-lg font-semibold" for="piece-type">Type de pièce<select id="piece-type" v-model="docType" class="field" data-testid="piece-type"><option value="" disabled>Choisir…</option><option v-for="(label, key) in documentLabels" :key="key" :value="key">{{ label }}</option></select></label>
         <label class="block text-lg font-semibold" for="piece-numero">Numéro (facultatif)<input id="piece-numero" v-model="docNumber" class="field uppercase" maxlength="40" autocomplete="off" autocapitalize="characters" data-testid="piece-numero"></label>
-        <button v-if="!docPhoto" type="button" class="btn-soft w-full" data-testid="photo-piece" @click="takeDocument"><span aria-hidden="true">🪪</span> Photographier la pièce</button>
+        <button v-if="!docPhoto" type="button" class="btn-soft w-full" data-testid="photo-piece" @click="takeDocument"><AdminIcon name="book" /> Photographier la pièce</button>
         <template v-else><img :src="docPreview" alt="Photo de la pièce d’identité" class="max-h-32 rounded-lg border"><button type="button" class="btn-soft" @click="retakeDocument">Reprendre la pièce</button></template>
       </div>
       <div v-else class="agent-badge-help"><h2>Contrôle de l’identité</h2><p class="mt-3">Vérifiez que le visiteur correspond à la fiche. La photographie du document n’est pas demandée et aucun document n’est enregistré.</p><p class="agent-help">Les vérifications restent obligatoires avant de passer à la décision.</p></div>

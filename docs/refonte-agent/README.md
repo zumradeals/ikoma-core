@@ -8,7 +8,7 @@ Mission et maquette validées par le dirigeant le 29 octobre 2026. Base `main` a
 
 `PosteApp`, `ControleApp` et `GroupeApp` utilisent le cadre commun et gardent leurs scripts, dépôts, synchronisation et événements. `StatusBar` conserve tous ses états et actions. `StepTracker`, `StepSearch`, `StepIdentity` et `StepBadge` changent de présentation. Les écrans d’enrôlement et de PIN gardent leurs contrôles et ne montrent aucune liste avant déverrouillage. Les pages Sécurité et Confirmation du mot de passe gardent leurs actions et utilisent le cadre Agent uniquement pour ce rôle.
 
-Aucun changement de route, migration, machine à états, API, service, stockage local, contrat métier, attribution de permission ou durée de verrouillage. Le test de comparaison des scripts confirme que les composants opérationnels conservent leur logique, avec uniquement l’import du cadre dans les trois applications.
+Aucun changement de route, migration, machine à états, API, service, stockage local, contrat métier, attribution de permission ou durée de verrouillage. Le test de comparaison des scripts confirme que les composants opérationnels conservent leur logique, hors imports de présentation (cadre et icônes SVG).
 
 ## Écarts nécessaires entre illustration et données réelles
 

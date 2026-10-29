@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminIcon from '../admin/AdminIcon.vue';
 import { onBeforeUnmount, ref, watch } from 'vue';
 import CategorySwatch from '../CategorySwatch.vue';
 import type { PosteRepository } from '../../poste/repository';
@@ -40,6 +41,6 @@ onBeforeUnmount(() => window.clearTimeout(timer));
       </li>
     </ul>
     <p v-if="searched && !results.length && !loading" role="status">Aucun visiteur ne correspond. Vérifiez l’orthographe ou enregistrez un visiteur non listé.</p>
-    <button type="button" class="btn-soft" @click="$emit('unlisted')"><span aria-hidden="true">＋</span> Visiteur non listé</button>
+    <button type="button" class="btn-soft" @click="$emit('unlisted')"><AdminIcon name="plus" /> Visiteur non listé</button>
   </section>
 </template>

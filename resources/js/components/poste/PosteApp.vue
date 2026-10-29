@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminIcon from '../admin/AdminIcon.vue';
 import AgentLayout from '../../layouts/AgentLayout.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { initial, reduce, stepNumber, validateBlockedReason, type Ev } from '../../poste/machine';
@@ -148,7 +149,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
       <template v-else>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <StepTracker :current="stepNumber[ctx.step]" class="min-w-64 flex-1" />
-          <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><span aria-hidden="true">⏱</span> {{ clockLabel }}</p>
+          <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><AdminIcon name="clock" /> {{ clockLabel }}</p>
         </div>
         <div v-if="ctx.step === 'recherche'" class="grid gap-6" :class="summary ? 'lg:grid-cols-[minmax(0,1fr)_21rem]' : ''">
           <StepSearch :repository="repo" @select="onSelect" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
