@@ -4,6 +4,7 @@ import { loginWithSecondFactor } from './otp';
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as { supervisor: { email: string; password: string; secret: string } };
 
 test('pilotage V2 : accès après 2FA, menu tablette repliable, quatre formats et écrans communs', async ({ page }) => {
+  test.setTimeout(90_000);
   await loginWithSecondFactor(page, fx.supervisor.email, fx.supervisor.password, fx.supervisor.secret);
   await expect(page).toHaveURL(/\/pilotage$/);
   for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]]) {

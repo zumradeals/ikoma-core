@@ -141,7 +141,6 @@ it('refuse UPDATE DELETE TRUNCATE avec le compte applicatif et dÃ©tecte une altÃ
     $this->artisan('audit:verify')->assertSuccessful();
 });
 
-
 it('ne laisse jamais la redirection superviseur contourner la 2FA', function () {
     $user = account('superviseur');
     $this->actingAs($user)->get('/espace')->assertRedirect('/securite');

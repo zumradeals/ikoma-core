@@ -43,7 +43,7 @@ function change(event: Event) {
         <p v-else data-testid="evenement"><span class="pilotage-caption">Événement de référence</span>{{ currentEvent.name }}</p>
       </div>
       <div class="pilotage-session">
-        <button type="button" class="pilotage-sound" :title="'Son des alertes : ' + (sound.enabled.value ? 'activé' : 'désactivé')" :aria-pressed="sound.enabled.value" data-testid="son-alertes" @click="sound.toggle"><span aria-hidden="true">{{ sound.enabled.value ? '♪' : '✕' }}</span><span>Son des alertes : {{ sound.enabled.value ? 'activé' : 'désactivé' }}</span></button>
+        <button type="button" class="pilotage-sound" :title="'Son des alertes : ' + (sound.enabled.value ? 'activé' : 'désactivé')" :aria-pressed="sound.enabled.value" data-testid="son-alertes" @click="sound.toggle"><AdminIcon :name="sound.enabled.value ? 'speaker' : 'speakerOff'" :size="24" /><span>Son des alertes : {{ sound.enabled.value ? 'activé' : 'désactivé' }}</span></button>
         <details class="pilotage-account"><summary :aria-label="'Session de ' + (page.props.auth?.name ?? 'superviseur')"><span class="pilotage-avatar" aria-hidden="true">{{ page.props.auth?.name?.charAt(0).toUpperCase() ?? 'S' }}</span><span class="pilotage-user">{{ page.props.auth?.name ?? 'Session' }}</span><span aria-hidden="true">⌄</span></summary><div><Link href="/securite">Sécurité du compte</Link><Link as="button" method="post" href="/logout" @click="wipePilotageLocal">Se déconnecter</Link></div></details>
         <button type="button" class="pilotage-menu-toggle" :aria-expanded="open" aria-controls="menu-pilotage" data-testid="ouvrir-menu-pilotage" @click="open = !open"><AdminIcon name="menu" /><span>Menu superviseur</span></button>
       </div>
