@@ -35,7 +35,7 @@ const roles = [
     <header class="sticky top-0 z-40 border-b border-[#DDE8F3] bg-white/95 shadow-sm backdrop-blur">
       <div class="mx-auto flex min-h-[82px] w-full max-w-[1800px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
         <a href="/" class="flex shrink-0 items-center gap-3" aria-label="IKOMA ACCESS — accueil">
-          <img src="/brand/ikoma-access-icon.svg" alt="" width="46" height="46" class="h-11 w-11">
+          <img :src="'/brand/ikoma-access-icon.svg'" alt="" width="46" height="46" class="h-11 w-11">
           <span class="text-lg font-extrabold tracking-tight sm:text-xl">IKOMA <span class="text-[#F75C03]">ACCESS</span></span>
         </a>
         <nav aria-label="Navigation principale" class="hidden items-center gap-7 text-sm font-semibold text-[#345B82] lg:flex">
@@ -77,7 +77,7 @@ const roles = [
             <div class="absolute -bottom-6 left-7 right-7 top-8 rounded-3xl bg-[#F75C03]/20 blur-3xl" aria-hidden="true"></div>
             <div class="relative overflow-hidden rounded-2xl border border-white/20 bg-[#F7FAFE] text-[#0B3C6B] shadow-[0_30px_85px_rgba(0,13,32,.35)]">
               <div class="flex min-h-14 items-center justify-between gap-3 border-b border-[#DDE7F3] bg-white px-5">
-                <div class="flex items-center gap-2"><img src="/brand/ikoma-access-icon.svg" alt="" class="h-8 w-8"><span class="text-sm font-extrabold">IKOMA <span class="text-[#F75C03]">ACCESS</span></span></div>
+                <div class="flex items-center gap-2"><img :src="'/brand/ikoma-access-icon.svg'" alt="" class="h-8 w-8"><span class="text-sm font-extrabold">IKOMA <span class="text-[#F75C03]">ACCESS</span></span></div>
                 <span class="rounded-full bg-[#E7F5ED] px-3 py-1 text-xs font-bold text-[#14733F]">Plateforme unifiée</span>
               </div>
               <div class="grid grid-cols-[84px_minmax(0,1fr)] sm:grid-cols-[132px_minmax(0,1fr)]">
@@ -180,7 +180,7 @@ const roles = [
 
     <footer class="bg-[#082B50] text-white">
       <div class="mx-auto flex w-full max-w-[1800px] flex-col justify-between gap-5 px-5 py-8 text-sm sm:px-8 lg:flex-row lg:items-center lg:px-12">
-        <div class="flex items-center gap-3"><img src="/brand/ikoma-access-icon.svg" alt="" class="h-9 w-9"><p><strong>IKOMA ACCESS</strong><span class="block text-[#BDCEE2]">Contrôlez les accès. Maîtrisez les visites.</span></p></div>
+        <div class="flex items-center gap-3"><img :src="'/brand/ikoma-access-icon.svg'" alt="" class="h-9 w-9"><p><strong>IKOMA ACCESS</strong><span class="block text-[#BDCEE2]">Contrôlez les accès. Maîtrisez les visites.</span></p></div>
         <p class="text-[#BDCEE2]">Une solution IKOMA GROUP · Cocody Angré Soleil 3, Abidjan</p>
         <a href="/login" class="font-semibold underline underline-offset-4">Connexion à l'application</a>
       </div>

@@ -10,7 +10,7 @@ defineProps<{ title: string; eyebrow: string }>();
     <header class="border-b border-[#DCE6F0] bg-white">
       <div class="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-4 px-5 py-4 sm:px-8 lg:px-12">
         <a href="/" aria-label="Retour à l'accueil IKOMA ACCESS" class="flex items-center gap-3">
-          <img src="/brand/ikoma-access-icon.svg" alt="" width="44" height="44" class="h-11 w-11 shrink-0">
+          <img :src="'/brand/ikoma-access-icon.svg'" alt="" width="44" height="44" class="h-11 w-11 shrink-0">
           <span class="text-lg font-extrabold tracking-tight text-[#0B3C6B] sm:text-xl">IKOMA <span class="text-[#F75C03]">ACCESS</span></span>
         </a>
         <a href="/" class="inline-flex min-h-12 items-center rounded-lg border border-[#C9D9EA] px-4 text-sm font-semibold hover:bg-slate-50">Retour au site <span aria-hidden="true" class="ml-2">↗</span></a>
