@@ -13,7 +13,7 @@ test('un administrateur contrôle 1000 lignes, confirme et retrouve les visiteur
  await page.setViewportSize({width:1280,height:960});
  await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(user.email); await page.getByLabel('Mot de passe', {exact:true}).fill(user.password); await page.getByRole('button',{name:'Se connecter'}).click();
  await page.getByLabel('Code à six chiffres').fill(otp(user.secret)); await page.getByRole('button',{name:'Vérifier',exact:true}).click();
- await page.getByRole('link',{name:'Importer une liste',exact:true}).click();await expect(page.getByRole('heading',{name:'1. Choisir l’événement et le fichier'})).toBeVisible();await page.screenshot({path:'test-results/l3-etape-1.png',fullPage:true});
+ await page.getByRole('link',{name:'Liste d’invités',exact:true}).click();await expect(page.getByRole('heading',{name:'1. Choisir l’événement et le fichier'})).toBeVisible();await page.screenshot({path:'test-results/l3-etape-1.png',fullPage:true});
  await page.getByLabel('Fichier de visiteurs').setInputFiles('tests/fixtures/liste-fictive-1000.csv');await page.getByRole('button',{name:'Vérifier le fichier',exact:true}).click();
  const report=page.getByRole('region',{name:'Rapport de contrôle'});await expect(report).toContainText('985');await expect(report).toContainText('15');await expect(report).toContainText('Homonyme');await expect(report).toContainText('Doublon');
  await page.screenshot({path:'test-results/l3-etape-2.png',fullPage:true});await page.getByRole('button',{name:'Continuer vers la confirmation'}).click();await expect(page.getByRole('heading',{name:'3. Confirmer l’import'})).toBeVisible();await page.screenshot({path:'test-results/l3-etape-3.png',fullPage:true});

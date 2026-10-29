@@ -16,7 +16,8 @@ test('connexion, double authentification, comptes et journal', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Vérifier votre connexion' })).toBeVisible();
   await page.screenshot({ path: 'test-results/double-authentification.png', fullPage: true });
   await page.getByLabel('Code à six chiffres').fill(otp(user.secret)); await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
-  await page.getByRole('link', { name: 'Comptes', exact: true }).click();
+  await page.getByTestId('ouvrir-menu').click();
+ await page.getByRole('link', { name: 'Comptes', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Administration · Comptes' })).toBeVisible();
   await page.screenshot({ path: 'test-results/comptes.png', fullPage: true });
   await page.goto('/administration/journal'); await expect(page.getByRole('heading', { name: 'Administration · Journal' })).toBeVisible();

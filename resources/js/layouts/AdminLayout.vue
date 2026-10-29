@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
 import { wipePilotageLocal } from '../pilotage/evacuation';
 
-defineProps<{ active: string; event: { id: string; name: string } | null; events: { id: string; name: string }[] }>();
-const page = usePage<{ auth: { name: string; permissions: string[] } }>();
+type EventRef = { id: string; name: string };
+const props = withDefaults(defineProps<{ active: string; event?: EventRef | null; events?: EventRef[] }>(), { event: null, events: () => [] });
+const page = usePage<{ auth: { name: string; permissions: string[] }; adminContext?: { event: EventRef } | null; flash?: { status?: string } }>();
+const eventRef = computed(() => props.event ?? page.props.adminContext?.event ?? null);
 const can = (permission: string) => page.props.auth.permissions.includes(permission);
 const open = ref(false);
 const items = [
@@ -15,48 +17,43 @@ const items = [
   { key: 'imports', label: 'Liste d’invités', icon: 'list', href: '/administration/imports', permission: 'listes.importer' },
   { key: 'badges', label: 'Badges', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
-  { key: 'postes', label: 'Tablettes', icon: 'tablet', href: '/administration/postes', permission: 'postes.gerer' },
+  { key: 'postes', label: 'Postes et tablettes', icon: 'monitor', href: '/administration/postes', permission: 'postes.gerer' },
   { key: 'comptes', label: 'Comptes', icon: 'users', href: '/administration/comptes', permission: 'comptes.gerer' },
   { key: 'journal', label: 'Journal', icon: 'book', href: '/administration/journal', permission: 'journal.consulter' },
+  { key: 'securite', label: 'Sécurité', icon: 'shield', href: '/securite', permission: null },
+  { key: 'conservation', label: 'Conservation des données', icon: 'database', href: '/administration/conservation', permission: 'comptes.gerer' },
 ];
-function change(e: Event) { router.get(window.location.pathname, { event: (e.target as HTMLSelectElement).value }); }
+function change(e: Event) { router.get('/administration', { event: (e.target as HTMLSelectElement).value }); }
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-ikoma-navy">
-    <header class="bg-ikoma-navy px-4 py-3 text-white sm:px-8">
-      <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <span class="grid size-11 place-items-center rounded-xl bg-ikoma-orange" aria-hidden="true"><AdminIcon name="qr" :size="26" /></span>
-          <p class="text-xl"><strong class="font-extrabold">IKOMA</strong> Accueil</p>
-        </div>
-        <div class="flex min-w-0 max-w-full flex-wrap items-center gap-3">
-          <label v-if="event && events.length > 1" class="flex min-w-0 max-w-full items-center gap-2 text-sm font-medium">Événement
-            <select class="min-h-12 min-w-0 max-w-full rounded-xl border-0 bg-white px-3 text-base font-semibold text-ikoma-navy" :value="event.id" data-testid="choix-evenement" @change="change">
-              <option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option>
-            </select>
-          </label>
-          <p v-else-if="event" class="min-w-0 break-words text-base font-semibold" data-testid="nom-evenement">{{ event.name }}</p>
-          <span class="flex min-w-0 items-center gap-2 text-base"><span class="grid size-10 place-items-center rounded-full bg-white font-extrabold text-ikoma-navy" aria-hidden="true">{{ page.props.auth.name.charAt(0).toUpperCase() }}</span>{{ page.props.auth.name }}</span>
-          <Link as="button" method="post" href="/logout" class="inline-flex min-h-12 items-center rounded-xl border-2 border-white px-4 font-semibold" @click="wipePilotageLocal">Se déconnecter</Link>
-        </div>
+  <div class="admin-shell" data-testid="admin-layout">
+    <a href="#contenu" class="admin-skip">Aller au contenu</a>
+    <header class="admin-header">
+      <div class="admin-brand"><span class="admin-logo" aria-hidden="true"><AdminIcon name="qr" :size="27" /></span><p><strong>IKOMA</strong> Accueil</p></div>
+      <div class="admin-event">
+        <label v-if="eventRef && events.length > 1 && active === 'tableau'" class="admin-event-select"><span class="sr-only">Événement</span>
+          <select :value="eventRef.id" data-testid="choix-evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
+        </label>
+        <p v-else-if="eventRef" data-testid="nom-evenement"><span v-if="active !== 'tableau'" class="admin-event-caption">Événement de référence</span>{{ eventRef.name }}</p>
+        <p v-else>Aucun événement enregistré</p>
+      </div>
+      <div class="admin-session">
+<span class="admin-user"><span class="admin-avatar" aria-hidden="true">{{ page.props.auth.name.charAt(0).toUpperCase() }}</span><span>{{ page.props.auth.name }}</span></span>
+        <Link as="button" method="post" href="/logout" class="admin-logout" @click="wipePilotageLocal">Se déconnecter</Link>
       </div>
     </header>
-
-    <div class="mx-auto flex max-w-7xl flex-wrap items-start gap-6 px-4 py-6 sm:px-8">
-      <div class="w-full lg:w-60 lg:flex-none">
-        <button type="button" class="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border-2 border-ikoma-blue bg-white px-4 text-lg font-bold lg:hidden" :aria-expanded="open" aria-controls="menu-admin" data-testid="ouvrir-menu" @click="open = !open">
-          <span>Menu</span><AdminIcon name="menu" :size="26" :stroke="2.5" />
-        </button>
-        <nav id="menu-admin" aria-label="Menu administrateur" class="mt-3 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-3 lg:mt-0 lg:flex" :class="open ? 'flex' : 'hidden lg:flex'">
-          <template v-for="item in items" :key="item.key">
-            <Link v-if="can(item.permission)" :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="flex min-h-14 items-center gap-3 rounded-xl px-4 font-semibold" :class="active === item.key ? 'bg-ikoma-orange font-bold text-white' : 'text-ikoma-navy'" :data-testid="'menu-' + item.key">
-              <span :class="active === item.key ? 'text-white' : 'text-ikoma-blue'"><AdminIcon :name="item.icon" /></span>{{ item.label }}
-            </Link>
-          </template>
+    <div class="admin-frame">
+      <aside class="admin-sidebar">
+        <button type="button" class="admin-menu-toggle" :aria-expanded="open" aria-controls="menu-admin" data-testid="ouvrir-menu" @click="open = !open"><span>Menu administrateur</span><AdminIcon name="menu" /></button>
+        <nav id="menu-admin" aria-label="Menu administrateur" :class="{ 'is-open': open }">
+          <template v-for="item in items" :key="item.key"><Link v-if="!item.permission || can(item.permission)" :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="admin-nav-link" :data-testid="'menu-' + item.key" @click="open = false"><AdminIcon :name="item.icon" :size="24" /><span>{{ item.label }}</span></Link></template>
         </nav>
-      </div>
-      <main id="contenu" class="min-w-0 grow basis-[34rem] space-y-6"><slot /></main>
+      </aside>
+      <main id="contenu" class="admin-main" tabindex="-1">
+        <p v-if="page.props.flash?.status" class="admin-flash" role="status">{{ page.props.flash.status }}</p>
+        <slot />
+      </main>
     </div>
   </div>
 </template>

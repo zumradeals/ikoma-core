@@ -13,6 +13,7 @@ test('un administrateur crée une zone puis une catégorie qui l’utilise', asy
  await page.setViewportSize({ width: 820, height: 1180 });
  await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(user.email); await page.getByLabel('Mot de passe', { exact: true }).fill(user.password); await page.getByRole('button', { name: 'Se connecter' }).click();
  await page.getByLabel('Code à six chiffres').fill(otp(user.secret)); await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
+ await page.getByTestId('ouvrir-menu').click();
  await page.getByRole('link', { name: 'Zones', exact: true }).click();
  const zone = `Zone fictive recette ${Date.now()}`; const zoneForm = page.getByRole('form', { name: 'Créer une zone' });
  await zoneForm.getByLabel('Nom de la zone').fill(zone); await zoneForm.getByRole('button', { name: 'Créer la zone', exact: true }).click();

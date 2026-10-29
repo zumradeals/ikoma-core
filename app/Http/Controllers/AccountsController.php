@@ -21,7 +21,7 @@ class AccountsController
     {
         Gate::authorize('comptes.gerer');
 
-        return Inertia::render('Admin/Accounts', ['twoFactorReset' => session('twoFactorReset'), 'users' => User::with('roles')->orderBy('name')->get()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'active' => $u->active, 'role' => $u->getRoleNames()->first()]), 'hosts' => DB::table('hosts as h')->join('events as e', 'e.id', '=', 'h.event_id')->orderBy('e.name')->get(['h.id', 'h.name', 'h.user_id', 'e.name as event_name']), 'hostTimeout' => (int) (DB::table('settings')->where('key', 'hote_delai_reponse_minutes')->value('value') ?? 2), 'roles' => array_keys(config('roles')), 'idle' => (int) DB::table('settings')->where('key', 'session_idle_minutes')->value('value')]);
+        return Inertia::render('Admin/Accounts', ['twoFactorReset' => session('twoFactorReset'), 'users' => User::with('roles')->orderBy('name')->get()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'active' => $u->active, 'two_factor_confirmed' => $u->two_factor_confirmed_at !== null, 'role' => $u->getRoleNames()->first()]), 'hosts' => DB::table('hosts as h')->join('events as e', 'e.id', '=', 'h.event_id')->orderBy('e.name')->get(['h.id', 'h.name', 'h.user_id', 'e.name as event_name']), 'hostTimeout' => (int) (DB::table('settings')->where('key', 'hote_delai_reponse_minutes')->value('value') ?? 2), 'roles' => array_keys(config('roles')), 'idle' => (int) DB::table('settings')->where('key', 'session_idle_minutes')->value('value')]);
     }
 
     public function store(Request $r): RedirectResponse

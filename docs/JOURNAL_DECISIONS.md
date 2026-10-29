@@ -318,3 +318,12 @@ Documents : [DEPLOIEMENT.md](DEPLOIEMENT.md), [DURCISSEMENT_SERVEUR.md](DURCISSE
 - **Santé** : `/sante` sans connexion, sans donnée ni version ; 503 si la base ne répond pas.
 - **Exceptions assumées** : PostgreSQL démarre en root pour initialiser son volume puis abandonne ses droits (comportement de l'image officielle) avec capacités réduites ; les failles élevées et critiques des paquets Debian des images sans correctif publié restent un **risque résiduel connu** (décision du dirigeant, option B, voir REVUE_SECURITE).
 - **Non fait / à décider** : lieu d'hébergement (HEBERGEMENT.md), centralisation des journaux et détection d'intrusion (audit F3), SBOM et signature des images (audit G2), gestion des appareils (tablettes), test d'intrusion indépendant, PSSI du client, politique de conservation des sauvegardes alignée sur la purge. Les **images, le compose et les scripts sont exécutés par la CI seulement** ; aucun serveur réel n'a été touché.
+
+## Administration unifiée — 29 octobre 2026
+
+Mission et deux maquettes validées par le dirigeant : un administrateur, un espace, une navigation. Les pages des modules rejoignent `AdminLayout` ; `/espace` redirige uniquement le rôle administrateur après le contrôle 2FA existant. Journal et sécurité gardent leur cadre antérieur pour les autres rôles. Aucun droit ni service métier modifié.
+
+- L'événement de référence du tableau est mémorisé en session et identifié comme tel dans les modules multiévénements, dont la portée et les sélecteurs restent inchangés.
+- Comptes : synthèse calculée sur les données du contrôleur, liste tabulaire avec recherche locale, formulaires par ligne dépliable, rattachement des fiches par compte hôte, réglages initialisés depuis les valeurs serveur. Le seul champ serveur ajouté est le booléen `two_factor_confirmed`, sans secret. Les actions sensibles gardent leurs contrôles et la réinitialisation 2FA en deux étapes.
+- Cadre et styles limités à l'administration. Menu orange avec texte marine contrasté ; cibles tactiles agrandies ; défilement horizontal limité à la table des comptes. Aucun ajout de dépendance, migration, mécanisme hors ligne ou nouvelle fonctionnalité.
+- Contrat, écarts intentionnels, recette et limites de déploiement : `docs/refonte-administration/README.md`. Le lot reste à revoir avant toute fusion.

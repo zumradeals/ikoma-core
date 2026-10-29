@@ -28,3 +28,7 @@ Champs de 56 px minimum et labels explicites. FormButton conserve la soumission 
 ## Poste d'accueil L5
 
 Boutons d'action du poste : 64 px de haut, texte de 20 px en gras. Le vert d'action est `green-700` (#15803d) et le rouge `red-700` (#b91c1c), plus sombres que les couleurs de marque pour tenir le contraste AA avec du texte blanc ; ils s'accompagnent toujours d'un symbole (✓ ✕) et d'un mot. Une action désactivée est grise et sa raison est écrite sous le bouton (`aria-describedby`). Le bandeau permanent affiche le réseau (symbole + « En ligne » ou « Hors ligne »), les opérations en attente, le poste et l'agent. La progression est annoncée en texte (« Étape 3 sur 7 ») en plus de la barre. Composants : `resources/js/components/poste/`.
+
+## Administration unifiée (29 octobre 2026)
+
+`AdminLayout` est le cadre commun des modules administratifs. Styles limités à `.admin-shell` : barre marine, menu blanc 256 px, orange pour le module actif, cartes blanches bordées sur fond clair. Le texte sur orange reste marine pour le contraste. Menu repliable sous 1024 px ; panneaux réorganisés sur tablette et téléphone ; défilement des comptes contenu dans une région nommée. Corps administratif 16 px sur ordinateur, champs tactiles 18 px et cibles 56 px avec pointeur tactile. Les écrans d'accueil et de pilotage conservent leurs règles existantes. Contrat détaillé dans `refonte-administration/README.md`.

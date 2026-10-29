@@ -24,7 +24,7 @@ async function login(context: BrowserContext, email: string, password: string, s
   const page = await context.newPage();
   await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(email); await page.getByLabel('Mot de passe', { exact: true }).fill(password); await page.getByRole('button', { name: 'Se connecter' }).click();
   if (secret) { await page.getByLabel('Code à six chiffres').fill(await freshOtp(secret)); await page.getByRole('button', { name: 'Vérifier', exact: true }).click(); }
-  await expect(page).toHaveURL(/\/espace/);
+  await expect(page).toHaveURL(email === fx.admin.email ? /\/administration$/ : /\/espace/);
   await page.close();
 }
 

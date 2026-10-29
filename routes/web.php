@@ -116,7 +116,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/postes/{device}/code', [PostesController::class, 'code'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
 
-        Route::get('/espace', fn () => Inertia::render('Space'))->name('space');
+        Route::get('/espace', fn (\Illuminate\Http\Request $request) => $request->user()->hasRole('administrateur')
+            ? redirect('/administration')
+            : Inertia::render('Space'))->name('space');
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
         Route::post('/administration/comptes/{user}/2fa/preparer', [TwoFactorRecoveryController::class, 'prepare'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::post('/administration/comptes/{user}/2fa/confirmer', [TwoFactorRecoveryController::class, 'confirm'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);

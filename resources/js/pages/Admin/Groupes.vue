@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'; import { Link, router, useForm } from '@inertiajs/vue3';
-import BaseLayout from '../../layouts/BaseLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
+import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
 type Group = { id: string; name: string; bus_number: string | null; supervisor_id: string | null; supervisor_name: string | null; departed_at: string | null; members: { id: string; full_name: string; category: string }[]; badges_reserves: number; badges_libres: number };
 const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; groups: Group[]; mode: 'identite' | 'encadreur'; encadreurs: { id: string; name: string }[]; search: string; candidates: { id: string; full_name: string; organisation: string | null }[] }>();
 const create = useForm({ event_id: props.event?.id ?? '', name: '', bus_number: '', supervisor_id: '' });
@@ -14,8 +14,8 @@ function detach(g: Group, visitor: string) { router.delete(`/administration/grou
 function look() { router.get('/administration/groupes', { event: props.event?.id, q: q.value }, { preserveState: true, preserveScroll: true }); }
 </script>
 <template>
-<BaseLayout>
-<Link href="/espace" class="block min-h-14 underline">Mon espace</Link><h1 class="mb-4 text-display font-bold">Administration · Groupes</h1><p class="mb-6">Créez les cars de stagiaires, désignez l’encadreur de chaque groupe et rattachez les stagiaires. Un stagiaire ne peut appartenir qu’à un seul groupe. Les badges d’un groupe se réservent dans <Link href="/administration/badges" class="underline">Administration · Badges</Link>.</p>
+<AdminLayout active="groupes">
+<h1 class="mb-4 text-display font-bold">Administration · Groupes</h1><p class="mb-6">Créez les cars de stagiaires, désignez l’encadreur de chaque groupe et rattachez les stagiaires. Un stagiaire ne peut appartenir qu’à un seul groupe. Les badges d’un groupe se réservent dans <Link href="/administration/badges" class="underline">Administration · Badges</Link>.</p>
 <div class="space-y-6">
 <BaseCard>
 <h2 class="mb-3 text-heading font-bold">Contrôle de correspondance des stagiaires</h2><p class="mb-4">À l’appel, l’agent vérifie que la personne correspond bien à la liste. Choisissez comment : par la pièce d’identité de chaque stagiaire, ou par la confirmation de l’encadreur du groupe. <strong>Valeur initiale : confirmation de l’encadreur (à confirmer avec le client).</strong></p>
@@ -51,5 +51,5 @@ function look() { router.get('/administration/groupes', { event: props.event?.id
 </div>
 </BaseCard>
 </div><p v-if="!groups.length" class="mt-6">Aucun groupe enregistré.</p>
-</BaseLayout>
+</AdminLayout>
 </template>

@@ -241,7 +241,7 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
   const admin = await adminContext.newPage();
   await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
   await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
-  await expect(admin).toHaveURL(/\/espace/);
+  await expect(admin).toHaveURL(/\/administration$/);
   const before = await adminCounters(admin);
 
   await tablet.setOffline(true);
@@ -304,7 +304,7 @@ test('la révocation par l’administrateur efface la tablette à sa prochaine s
   const admin = await adminContext.newPage();
   await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
   await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
-  await expect(admin).toHaveURL(/\/espace/);
+  await expect(admin).toHaveURL(/\/administration$/);
   await admin.goto('/administration/postes');
   admin.once('dialog', dialog => dialog.accept());
   const card = admin.locator(`xpath=//h2[contains(., "${fx.poste}")]/ancestor::*[self::section or self::div][1]`);
