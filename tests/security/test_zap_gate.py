@@ -28,8 +28,13 @@ class ZapGateTest(unittest.TestCase):
         self.assertEqual(self.run_gate(alert), 1)
 
     def test_unknown_alert_or_changed_severity_blocks(self):
-        alert = {'alertRef': '10112', 'riskcode': '0', 'instances': [{'uri': 'http://localhost', 'param': 'laravel-session'}]}
+        alert = {'alertRef': '10112', 'riskcode': '0', 'instances': [{'uri': 'http://localhost', 'param': 'laravel-session', 'evidence': 'laravel-session'}]}
         self.assertEqual(self.run_gate(alert), 0)
+        alert['instances'][0].update(param='XSRF-TOKEN', evidence='XSRF-TOKEN')
+        self.assertEqual(self.run_gate(alert), 0)
+        alert['instances'][0]['evidence'] = 'valeur non approuvée'
+        self.assertEqual(self.run_gate(alert), 1)
+        alert['instances'][0]['evidence'] = 'XSRF-TOKEN'
         alert['riskcode'] = '3'
         self.assertEqual(self.run_gate(alert), 1)
         alert['alertRef'] = 'inconnue'

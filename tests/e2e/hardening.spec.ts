@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { freshOtp } from './otp';
+import { loginWithSecondFactor } from './otp';
 
 test('CSP : aucun script injecté, caméra autorisée au poste, coquille réouverte hors ligne', async ({ page, context }) => {
   const violations: { directive: string; blocked: string }[] = [];
@@ -34,14 +34,9 @@ test('CSP : aucun script injecté, caméra autorisée au poste, coquille réouve
 });
 
 test('administrateur : politique de conservation proposée et export daté du journal sans nom', async ({ page }) => {
-  test.setTimeout(90_000); // le serveur refuse un code à six chiffres déjà utilisé : l'attente de la période suivante peut durer 30 s
+  test.setTimeout(180_000); // intègre la limite de connexion et l'attente TOTP
   const fx = JSON.parse(readFileSync('.secrets/screen-account.json', 'utf8')) as { email: string; password: string; secret: string };
-  await page.goto('/login');
-  await page.getByLabel('Adresse électronique').fill(fx.email);
-  await page.getByLabel('Mot de passe', { exact: true }).fill(fx.password);
-  await page.getByRole('button', { name: 'Se connecter' }).click();
-  await page.getByLabel('Code à six chiffres').fill(await freshOtp(fx.secret));
-  await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await loginWithSecondFactor(page, fx.email, fx.password, fx.secret);
   await page.getByRole('link', { name: 'Conservation des données' }).click();
   await expect(page.getByRole('heading', { name: 'Conservation des données' })).toBeVisible();
   await expect(page.getByLabel(/Le client a approuvé/)).not.toBeChecked();

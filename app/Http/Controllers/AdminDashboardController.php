@@ -18,6 +18,10 @@ final class AdminDashboardController
         Gate::authorize('evenements.gerer');
         $data = $r->validate(['event' => 'nullable|uuid']);
 
-        return Inertia::render('Admin/Tableau', $this->dashboard->build($data['event'] ?? null));
+        $reference = $data['event'] ?? $r->session()->get('admin_reference_event');
+        $dashboard = $this->dashboard->build(is_string($reference) ? $reference : null);
+        $r->session()->put('admin_reference_event', $dashboard['event']['id'] ?? null);
+
+        return Inertia::render('Admin/Tableau', $dashboard);
     }
 }

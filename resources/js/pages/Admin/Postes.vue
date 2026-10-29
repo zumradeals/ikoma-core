@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Link, router, useForm } from '@inertiajs/vue3';
-import BaseLayout from '../../layouts/BaseLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
+import { router, useForm } from '@inertiajs/vue3';
+import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
 import { displayDate } from '../../labels';
 type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
 const props = defineProps<{
@@ -14,8 +14,8 @@ const reasons: Record<string, string> = { deja_associe: 'Badge déjà associé',
 function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station || poste.name} » ? La tablette sera effacée à sa prochaine connexion.`)) router.post(`/administration/postes/${poste.id}/revoquer`); }
 </script>
 <template>
-<BaseLayout>
-<Link href="/espace" class="block min-h-14 underline">Mon espace</Link><h1 class="mb-4 text-display font-bold">Administration · Postes</h1>
+<AdminLayout active="postes">
+<h1 class="mb-4 text-display font-bold">Administration · Postes</h1>
 <p class="mb-6">Un poste est une tablette d’accueil. Pour l’enrôler : générez un code, saisissez-le sur la tablette dans les 15 minutes ; il ne sert qu’une fois. Une tablette révoquée est effacée dès qu’elle contacte le serveur.</p>
 <div v-if="newCode" role="status" class="mb-6 rounded-2xl border-4 border-ikoma-orange bg-orange-50 p-6" data-testid="code">
   <p class="text-heading font-bold">Code d’enrôlement (affiché une seule fois)</p>
@@ -77,5 +77,5 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <p v-if="!conflicts.length">Aucun conflit en attente.</p><p class="mt-3">Le superviseur les traitera dans l’écran de pilotage (lot L8).</p>
 </BaseCard>
 </div>
-</BaseLayout>
+</AdminLayout>
 </template>

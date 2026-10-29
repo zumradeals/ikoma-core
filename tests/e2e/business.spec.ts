@@ -1,18 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { createHmac } from 'node:crypto';
-function otp(secret: string): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = ''; for (const c of secret) bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
-  const bytes = []; for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
-  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
-  const hash = createHmac('sha1', Buffer.from(bytes)).update(counter).digest(); const offset = hash[19] & 15;
-  return ((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');
-}
+import { loginWithSecondFactor } from './otp';
 test('un administrateur crée une zone puis une catégorie qui l’utilise', async ({ page }) => {
+ test.setTimeout(180_000); // inclut toute attente temporaire imposée par la connexion
+
  const user = JSON.parse(readFileSync('.secrets/screen-business.json', 'utf8')) as { email: string; password: string; secret: string };
  await page.setViewportSize({ width: 820, height: 1180 });
- await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(user.email); await page.getByLabel('Mot de passe', { exact: true }).fill(user.password); await page.getByRole('button', { name: 'Se connecter' }).click();
- await page.getByLabel('Code à six chiffres').fill(otp(user.secret)); await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
+ await loginWithSecondFactor(page, user.email, user.password, user.secret);
+ await page.getByTestId('ouvrir-menu').click();
  await page.getByRole('link', { name: 'Zones', exact: true }).click();
  const zone = `Zone fictive recette ${Date.now()}`; const zoneForm = page.getByRole('form', { name: 'Créer une zone' });
  await zoneForm.getByLabel('Nom de la zone').fill(zone); await zoneForm.getByRole('button', { name: 'Créer la zone', exact: true }).click();

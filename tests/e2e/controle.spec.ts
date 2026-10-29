@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { freshOtp } from './otp';
+import { loginWithSecondFactor } from './otp';
 
 type Fixtures = { email: string; password: string; names: Record<string, string>; enrolCode2: string; poste2: string; controlNames: string[]; controlBadges: string[]; controlQrSvg: string; admin: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
@@ -164,9 +164,8 @@ test('sans réseau : contrôles et sortie sur la situation connue, puis resynchr
   await expect(online.getByTestId('en-attente')).toHaveText('0');
   const adminContext = await browser.newContext({ baseURL });
   const admin = await adminContext.newPage();
-  await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
-  await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
-  await expect(admin).toHaveURL(/\/espace/);
+  await loginWithSecondFactor(admin, fx.admin.email, fx.admin.password, fx.admin.secret);
+  await expect(admin).toHaveURL(/\/administration$/);
   const before = await adminCounters(admin);
   const presentBefore = await presents(online);
 

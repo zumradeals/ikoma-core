@@ -19,7 +19,7 @@ it('sépare la préparation du 2FA de sa confirmation explicite avec mot de pass
   expect(post).toHaveBeenCalledWith('/administration/comptes/u1/2fa/confirmer', expect.any(Object));
 });
 it('présente les durées comme des propositions sans approbation implicite et sans bouton de purge', () => {
-  const w = mount(Retention, { props: { durations: { visiteurs: 30, evenements: 90, photos: 7, synchronisations: 30, alertes: 30, notifications: 7, audit: 365 }, approved: false, exportMaximum: 10000 }, global: { stubs: { BaseLayout: { template: '<main><slot /></main>' } } } });
+  const w = mount(Retention, { props: { durations: { visiteurs: 30, evenements: 90, photos: 7, synchronisations: 30, alertes: 30, notifications: 7, audit: 365 }, approved: false, exportMaximum: 10000 }, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' } } } });
   expect(w.text()).toContain('Valeurs proposées');
   expect((w.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false);
   expect(w.findAll('button').map(b => b.text())).toEqual(['Enregistrer la politique']);

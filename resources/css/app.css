@@ -50,3 +50,123 @@ html { scroll-padding-bottom: 6rem; }
 #nprogress .spinner { display: block; position: fixed; z-index: 1031; top: 15px; right: 15px; }
 #nprogress .spinner-icon { width: 18px; height: 18px; box-sizing: border-box; border: solid 2px transparent; border-top-color: #29d; border-left-color: #29d; border-radius: 50%; animation: nprogress-spinner 400ms linear infinite; }
 @keyframes nprogress-spinner { to { transform: rotate(360deg); } }
+
+/* Cadre administratif commun. Aucun style ne touche les postes ou le pilotage. */
+.admin-shell { min-height:100vh; background:#f5f9fd; color:#0b3c6b; font-size:1rem; line-height:1.5; }
+.admin-header { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:10px 38px; min-height:64px; background:linear-gradient(110deg,#0b3c6b,#073766); color:white; }
+.admin-brand { display:flex; align-items:center; gap:14px; flex-shrink:0; font-size:20px; }
+.admin-brand strong { font-weight:850; }
+.admin-logo { display:grid; place-items:center; width:40px; height:40px; border-radius:10px; background:#ff6b16; color:white; }
+.admin-event { min-width:0; max-width:38%; font-size:14px; font-weight:650; overflow-wrap:anywhere; }
+.admin-event-caption { display:block; font-size:11px; font-weight:400; color:#dbeafe; }
+.admin-event-select select { min-height:48px; max-width:100%; background:#0b3c6b; color:white; border:1px solid #93b5d8; padding:8px; border-radius:8px; }
+.admin-session { display:flex; align-items:center; justify-content:flex-end; gap:24px; min-width:0; font-size:14px; }
+.admin-user { display:flex; align-items:center; gap:10px; min-width:0; overflow-wrap:anywhere; }
+.admin-avatar { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; background:#eff6ff; color:#0b3c6b; font-weight:800; }
+.admin-logout { min-height:48px; flex:none; border:1px solid white; border-radius:8px; padding:8px 16px; font-weight:650; }
+.admin-frame { display:grid; grid-template-columns:256px minmax(0,1fr); max-width:1800px; margin:auto; }
+.admin-sidebar { align-self:stretch; background:white; border-right:1px solid #e5edf6; padding:24px 16px; }
+.admin-sidebar nav { display:flex; flex-direction:column; gap:5px; position:sticky; top:16px; }
+.admin-nav-link { display:flex; align-items:center; gap:20px; min-height:56px; padding:10px 20px; border-radius:10px; font-weight:650; color:#00469c; }
+.admin-nav-link svg { flex:none; }
+.admin-nav-link:hover { background:#eef5ff; }
+.admin-nav-link[aria-current=page] { background:#ff6b16; color:#172e4b; font-weight:750; }
+.admin-main { min-width:0; padding:20px 24px 28px; }
+.admin-main h1 { font-size:30px; line-height:1.2; font-weight:850; letter-spacing:-.5px; }
+.admin-main h2 { font-size:21px; line-height:1.3; font-weight:800; letter-spacing:-.3px; }
+.admin-main > section, .admin-main > div > section { box-shadow:none; }
+.admin-main .field { margin-top:6px; min-height:48px; padding:10px 12px; border:1px solid #cbdcee; border-radius:7px; font-size:14px; }
+.admin-main label { font-size:14px; }
+.admin-main form > label:not(.flex) { display:block; }
+.admin-main form > p[role=alert] { color:#a51d1d; font-weight:600; }
+.admin-main form button[type=submit], .admin-main .action, .admin-main .btn-main { font-size:14px; min-height:48px; border-radius:7px; }
+.admin-main .action { padding:10px 18px; }
+.admin-main section { border-color:#e0ebf7; }
+.admin-menu-toggle { display:none; }
+.admin-skip { position:absolute; left:8px; top:-120px; z-index:60; background:white; color:#0b3c6b; padding:12px; }
+.admin-skip:focus { top:8px; }
+.admin-flash { margin-bottom:16px; border:1px solid #b4dfcc; border-radius:8px; padding:14px; background:#ecfdf5; }
+.admin-shell :is(button,input,select,textarea,a,summary):focus-visible { outline:3px solid #0f5aa6; outline-offset:3px; }
+.admin-header :is(button,select,a):focus-visible { outline-color:#fff; }
+.admin-shell button, .admin-shell summary { cursor:pointer; }
+.admin-shell button:disabled { cursor:not-allowed; }
+.admin-card { border:1px solid #e0ebf7; border-radius:12px; background:white; padding:20px; min-width:0; }
+.admin-muted { color:#506d94; font-size:14px; }
+.admin-section-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.admin-primary { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:48px; border-radius:8px; padding:10px 20px; background:#ff6b16; color:#172e4b; font-weight:750; }
+.admin-outline { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:8px 14px; border:1px solid #397bd4; border-radius:5px; color:#00469c; font-size:13px; font-weight:650; background:white; }
+.admin-primary:disabled { opacity:.6; }
+@media (max-width:1199px) { .admin-header { padding:12px 20px; gap:16px; flex-wrap:wrap; } .admin-event { order:3; max-width:100%; width:100%; } .admin-frame { grid-template-columns:230px minmax(0,1fr); } .admin-main { padding:20px; } .admin-nav-link { padding:10px 12px; gap:14px; } }
+@media (max-width:1023px) { .admin-frame { display:block; } .admin-sidebar { padding:12px 20px; border-right:0; border-bottom:1px solid #e0ebf7; } .admin-menu-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:56px; font-weight:700; } .admin-sidebar nav { display:none; position:static; padding-top:10px; } .admin-sidebar nav.is-open { display:flex; } .admin-sidebar .admin-nav-link { min-height:56px; } }
+@media (max-width:599px) { .admin-header { padding:12px 16px; gap:12px; } .admin-brand { font-size:18px; } .admin-session { width:100%; justify-content:space-between; gap:12px; } .admin-main { padding:16px 12px 24px; } .admin-main h1 { font-size:26px; } .admin-card { padding:16px; } .admin-sidebar { padding:8px 16px; } }
+@media (pointer:coarse) { .admin-main .field, .admin-shell button, .admin-shell summary, .admin-main .action, .admin-outline, .admin-primary { min-height:56px; } .admin-main .field { font-size:18px; } }
+.account-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.account-summary-tile { display:flex; align-items:center; gap:18px; padding:16px 20px; }
+.account-summary-tile strong { font-size:40px; line-height:1; font-weight:850; }
+.account-summary-tile b { font-size:14px; }
+.account-metric-icon { display:grid; place-items:center; flex:none; width:60px; height:60px; border-radius:12px; color:#0063ce; background:#e9f3ff; }
+.account-metric-icon.green { color:#078747; background:#e8faf0; }
+.account-metric-icon.orange { color:#b83b00; background:#fff0e5; }
+.account-create-form { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)) auto; align-items:end; gap:12px; margin-top:16px; }
+.account-form-help { grid-column:1/-1; font-size:12px; }
+.account-password { display:block; position:relative; }
+.account-password input { padding-right:60px; }
+.account-password button { position:absolute; right:4px; top:0; height:100%; padding:6px; font-size:12px; color:#00469c; }
+.account-search { width:340px; max-width:100%; }
+.account-search .field { margin:0; }
+.account-table-scroll { max-width:100%; overflow-x:auto; margin:16px -8px -8px; }
+.account-table { width:100%; border-collapse:collapse; min-width:900px; font-size:12px; text-align:left; }
+.account-table th, .account-table td { padding:8px 10px; border-bottom:1px solid #e7eff9; vertical-align:middle; }
+.account-table thead { background:#eff5fc; color:#00428d; }
+.account-table thead th { font-weight:650; padding-top:10px; padding-bottom:10px; }
+.account-table tbody th { font-weight:600; min-width:170px; max-width:240px; }
+.account-name { display:flex; align-items:center; gap:10px; }
+.account-initials { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; flex:none; background:#dceeff; color:#00469c; font-size:12px; }
+.account-email { color:#506d94; overflow-wrap:anywhere; max-width:210px; }
+.account-role, .account-status { display:inline-block; border-radius:20px; padding:5px 12px; white-space:nowrap; font-size:11px; background:#e5f0ff; color:#00469c; }
+.account-status.is-active { background:#e3f9ee; color:#06773d; }
+.account-status.is-disabled { background:#fff1f1; color:#a12323; }
+.account-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.account-actions .admin-outline { min-height:36px; padding:6px 10px; font-size:11px; }
+.account-panel { padding:16px; background:#f5f9fd; border-radius:8px; }
+.account-edit-form { display:flex; flex-wrap:wrap; align-items:end; gap:16px; margin-top:12px; }
+.account-settings { display:grid; grid-template-columns:1.05fr 1fr 1.05fr; gap:12px; }
+.account-settings h2 { font-size:18px; }
+.account-settings :is(p,legend,label) { font-size:12px; }
+.account-settings .btn-main { width:100%; padding:10px; font-size:13px; }
+@media (max-width:1350px) { .account-summary-tile { gap:10px; padding:16px; } .account-metric-icon { width:44px; height:44px; } .account-summary-tile strong { font-size:34px; } .account-create-form { grid-template-columns:repeat(2,minmax(0,1fr)); } .account-create-form > button { justify-self:start; } }
+@media (max-width:1199px) { .account-settings { grid-template-columns:repeat(2,minmax(0,1fr)); } .account-settings > :first-child { grid-column:1/-1; } }
+@media (max-width:699px) { .account-summary { grid-template-columns:1fr; } .account-summary-tile { padding:14px 18px; } .account-create-form, .account-settings { grid-template-columns:minmax(0,1fr); } .account-search { width:100%; } .account-settings > :first-child { grid-column:auto; } }
+.dashboard-hero { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:24px; border-radius:14px; background:radial-gradient(circle at 90% 100%,#134f86 0,transparent 38%),#0b3c6b; padding:24px 28px; color:white; margin-bottom:16px; }
+.dashboard-hero h1 { font-size:34px; color:white; }
+.dashboard-next { min-width:240px; min-height:56px; }
+.dashboard-tiles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+.dashboard-tile { padding:18px 20px; }
+.dashboard-tile > p:first-child { font-size:15px; }
+.dashboard-tile > p:last-child { line-height:1.5; color:#506d94; }
+.dashboard-columns { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); align-items:start; gap:14px; }
+.dashboard-step { display:flex; align-items:center; flex-wrap:wrap; gap:12px; border-radius:10px; padding:10px 12px; font-size:14px; }
+.dashboard-step > div { flex-basis:120px; }
+.dashboard-step > div > p:last-child { font-size:12px; }
+.dashboard-step > span.rounded-full { font-size:12px; padding:4px 10px; }
+.dashboard-step-action { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:8px 16px; border-radius:7px; min-width:104px; font-weight:700; }
+.dashboard-watch { display:flex; gap:12px; align-items:start; padding:14px; border-radius:10px; background:#eef6ff; font-size:14px; }
+.dashboard-watch.severity-haute { background:#fff1f2; }
+.dashboard-watch.severity-normale { background:#fff4e8; }
+@media (max-width:1399px) { .dashboard-columns { grid-template-columns:minmax(0,1fr); } .dashboard-columns > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; } .dashboard-columns > div > section { margin-top:0; } .dashboard-tiles { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:699px) { .dashboard-hero { padding:20px; } .dashboard-hero h1 { font-size:28px; } .dashboard-hero > div { flex-basis:100%; } .dashboard-tiles, .dashboard-columns > div { grid-template-columns:minmax(0,1fr); } .dashboard-step > div { flex-basis:160px; } .dashboard-step-action { margin-left:auto; } .dashboard-next { width:100%; min-width:0; } }
+.admin-main section.rounded-2xl { border-radius:12px; padding:20px; box-shadow:none; }
+.admin-main > .space-y-6 { display:grid; gap:18px; margin-top:0; }
+.admin-main > .space-y-6 > * { margin-top:0; min-width:0; }
+@media (min-width:1200px) { .admin-main > .space-y-6 { grid-template-columns:repeat(2,minmax(0,1fr)); } .admin-main > .space-y-6 > :first-child { grid-column:1/-1; } }
+/* Le contenant positionné retient aussi les libellés sr-only des actions dans le défilement local. */
+.account-table-scroll { position:relative; }
+.admin-nav-link { padding-inline:16px; gap:16px; font-size:15px; }
+.admin-frame { min-height:calc(100vh - 64px); }
+.dashboard-hero { padding-block:20px; }
+.dashboard-watch { position:relative; padding-right:60px; }
+.dashboard-watch > div > a { position:absolute; right:14px; top:50%; transform:translateY(-50%); }
+.dashboard-watch > div > p:last-of-type { font-size:12px; }
+@media (pointer:coarse) {
+  .admin-shell .admin-main :is(button, a.action, summary), .admin-shell .admin-main .field { min-height:56px; }
+}

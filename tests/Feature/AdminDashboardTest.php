@@ -6,6 +6,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 
 function dashUser(string $role): User
 {
@@ -92,4 +93,35 @@ it('n\'expose aucun nom de personne : ni dans les alertes, ni dans les dernière
 
         return true;
     });
+});
+
+it('oriente seulement l’administrateur vers son tableau sans page-menu', function () {
+    $this->actingAs($this->admin)->get('/espace')->assertRedirect('/administration');
+    foreach (['agent_accueil', 'superviseur', 'hote', 'encadreur'] as $role) {
+        $this->actingAs(dashUser($role))->get('/espace')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Space')->where('auth.isAdmin', false)->where('adminContext', null));
+    }
+});
+
+it('fournit le même contexte aux modules et garde les liens profonds accessibles', function () {
+    foreach (['/administration', '/administration/comptes', '/administration/badges?status=Disponible&page=2', '/administration/zones', '/administration/categories', '/administration/imports', '/administration/postes', '/administration/groupes', '/administration/journal', '/administration/conservation', '/securite'] as $url) {
+        $this->actingAs($this->admin)->withSession(['auth.password_confirmed_at' => time()])->get($url)->assertOk()->assertInertia(fn (Assert $p) => $p->where('auth.isAdmin', true)->where('adminContext.event.id', $this->event));
+    }
+});
+
+it('préserve les refus de permission même pour un administrateur et le journal du superviseur', function () {
+    $role = Role::findByName('administrateur');
+    $role->revokePermissionTo('badges.gerer');
+    $this->admin->unsetRelation('roles');
+    $this->actingAs($this->admin)->get('/administration/badges')->assertForbidden();
+    $this->actingAs(dashUser('superviseur'))->get('/administration/journal')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Journal')->where('auth.isAdmin', false)->where('adminContext', null));
+});
+
+it('expose uniquement le statut public de confirmation 2FA des comptes', function () {
+    $this->actingAs($this->admin)->get('/administration/comptes')->assertInertia(fn (Assert $p) => $p->where('users', function ($users) {
+        foreach ($users as $user) {
+            expect($user)->toHaveKey('two_factor_confirmed')->not->toHaveKeys(['password', 'two_factor_secret', 'two_factor_recovery_codes']);
+        }
+
+        return true;
+    }));
 });

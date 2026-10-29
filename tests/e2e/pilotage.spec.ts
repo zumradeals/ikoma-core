@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { freshOtp } from './otp';
+import { loginWithSecondFactor } from './otp';
 
 type Fixtures = { email: string; password: string; enrolCode3: string; poste3: string; pilotageNames: string[]; pilotageBadges: string[]; supervisor: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
@@ -19,11 +19,11 @@ const noOverflow = async (page: Page) => expect(await page.evaluate(() => docume
 const counter = (page: Page, key: string) => page.getByTestId('compteur-' + key).getByTestId('valeur');
 
 test.beforeAll(async ({ browser }, info) => {
+  test.setTimeout(180_000);
   const baseURL = info.project.use.baseURL;
   phone = await browser.newContext({ baseURL, viewport: { width: 380, height: 800 }, hasTouch: true, isMobile: true });
   sup = await phone.newPage();
-  await sup.goto('/login'); await sup.getByLabel('Adresse électronique').fill(fx.supervisor.email); await sup.getByLabel('Mot de passe', { exact: true }).fill(fx.supervisor.password); await sup.getByRole('button', { name: 'Se connecter' }).click();
-  await sup.getByLabel('Code à six chiffres').fill(await freshOtp(fx.supervisor.secret)); await sup.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await loginWithSecondFactor(sup, fx.supervisor.email, fx.supervisor.password, fx.supervisor.secret);
   await expect(sup).toHaveURL(/\/espace/);
   tablet = await browser.newContext({ baseURL, viewport: { width: 1024, height: 768 }, permissions: ['camera'] });
   const agent = await tablet.newPage();

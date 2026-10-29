@@ -318,3 +318,31 @@ Documents : [DEPLOIEMENT.md](DEPLOIEMENT.md), [DURCISSEMENT_SERVEUR.md](DURCISSE
 - **Santé** : `/sante` sans connexion, sans donnée ni version ; 503 si la base ne répond pas.
 - **Exceptions assumées** : PostgreSQL démarre en root pour initialiser son volume puis abandonne ses droits (comportement de l'image officielle) avec capacités réduites ; les failles élevées et critiques des paquets Debian des images sans correctif publié restent un **risque résiduel connu** (décision du dirigeant, option B, voir REVUE_SECURITE).
 - **Non fait / à décider** : lieu d'hébergement (HEBERGEMENT.md), centralisation des journaux et détection d'intrusion (audit F3), SBOM et signature des images (audit G2), gestion des appareils (tablettes), test d'intrusion indépendant, PSSI du client, politique de conservation des sauvegardes alignée sur la purge. Les **images, le compose et les scripts sont exécutés par la CI seulement** ; aucun serveur réel n'a été touché.
+
+## Administration unifiée — 29 octobre 2026
+
+Mission et deux maquettes validées par le dirigeant : un administrateur, un espace, une navigation. Les pages des modules rejoignent `AdminLayout` ; `/espace` redirige uniquement le rôle administrateur après le contrôle 2FA existant. Journal et sécurité gardent leur cadre antérieur pour les autres rôles. Aucun droit ni service métier modifié.
+
+- L'événement de référence du tableau est mémorisé en session et identifié comme tel dans les modules multiévénements, dont la portée et les sélecteurs restent inchangés.
+- Comptes : synthèse calculée sur les données du contrôleur, liste tabulaire avec recherche locale, formulaires par ligne dépliable, rattachement des fiches par compte hôte, réglages initialisés depuis les valeurs serveur. Le seul champ serveur ajouté est le booléen `two_factor_confirmed`, sans secret. Les actions sensibles gardent leurs contrôles et la réinitialisation 2FA en deux étapes.
+- Cadre et styles limités à l'administration. Menu orange avec texte marine contrasté ; cibles tactiles agrandies ; défilement horizontal limité à la table des comptes. Aucun ajout de dépendance, migration, mécanisme hors ligne ou nouvelle fonctionnalité.
+- Contrat, écarts intentionnels, recette et limites de déploiement : `docs/refonte-administration/README.md`. Le lot reste à revoir avant toute fusion.
+
+
+## PR #26 — recette de la refonte administrative (29 octobre 2026)
+
+- Les deux scénarios navigateur qui échouaient avant le formulaire TOTP ont désormais une gestion limitée et explicite des refus temporaires de connexion : un seul nouvel essai après le délai du serveur. Les limites de connexion, le TOTP et les rôles de l'application restent inchangés. Les tests complets doivent être relancés.
+- L'observation ZAP 10112 de niveau informatif est acceptée uniquement pour `laravel-session` et `XSRF-TOKEN` sur la racine, avec la preuve exacte du nom du cookie ; les propriétés de sécurité des cookies restent surveillées et toutes les autres instances bloquent.
+- Trivy reste actif et bloquant dans la CI. Le risque résiduel du lot L12 avait été accepté provisoirement ; toute nouvelle faille ou évolution de correctif demande un réexamen avant le déploiement chez le client.
+
+
+### PR #26 — diagnostic de la CI #143
+
+La CI #143 présente 36 parcours navigateurs réussis et un refus de connexion sur le compte fictif du scénario Zones/Catégories. La réponse HTTP 302 revient à `/login` sans atteindre le formulaire TOTP. La cause précise de cette redirection n'est pas encore établie : elle ne doit pas être qualifiée de régression métier sans preuve.
+
+La commande `test:screen-account`, strictement réservée à `APP_ENV=testing`, utilise désormais un mot de passe aléatoire long à encodage simple et vérifie côté serveur le hachage, l'authentification des identifiants et le rôle avant de transmettre les données à Playwright. Les diagnostics E2E peuvent afficher la route de redirection et la présence d'une erreur de formulaire, jamais les identifiants, le mot de passe ou le secret TOTP. Les contrôles de sécurité de l'application sont inchangés. Une nouvelle CI est obligatoire pour confirmer la correction.
+
+
+### PR #26 — CI #144 : preuve de la redirection normale du login
+
+La [CI #144](https://github.com/zumradeals/ikoma-core/actions/runs/40871410125) obtient 36 succès E2E et un échec lors d'un scénario distinct (Conservation/Journaux), avant d'afficher la 2FA. La réponse POST /login est bien HTTP 302 vers /two-factor-challenge : il n'est pas justifié de suspecter les identifiants ou de modifier la 2FA. La page reste pourtant /login après 15 secondes. Une sonde de recette supplémentaire, exécutée uniquement en cas d'échec et sans suivre les redirections, relève le statut HTTP du GET /two-factor-challenge depuis la session du navigateur ; elle permettra de départager une perte de session et un problème de transition côté Inertia. Aucune tentative n'est faite pour contourner la 2FA. Trivy demeure inchangé et le contrôle ZAP est passé.
