@@ -16,7 +16,7 @@ import AdminLayout from '../../resources/js/layouts/AdminLayout.vue';
 describe('création des événements dans IKOMA ACCESS', () => {
   it('affiche le formulaire et un état vide explicite', () => {
     const wrapper = mount(Evenements, { props: { events: [] } });
-    expect(wrapper.get('[data-testid=form-creer-evenement]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid=form-creer-evenement]').exists()).toBe(true);
     expect(wrapper.get('[data-testid=liste-evenements-vide]').text()).toContain('Aucun événement');
     expect(wrapper.get('[data-testid=creer-evenement]').text()).toContain('Créer l’événement');
   });
