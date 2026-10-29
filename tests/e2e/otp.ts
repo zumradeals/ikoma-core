@@ -57,7 +57,7 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
         // Elle ne suit pas la redirection et ne transmet aucun identifiant/secret.
         // 200 : session de challenge conservée, vérifier alors la transition Inertia.
         // 302 /login : session de challenge absente, vérifier stockage/cookies.
-        let challengeStatus = 'sonde indisponible';
+        let challengeStatus: string;
         try {
           const probe = await page.request.get('/two-factor-challenge', { maxRedirects: 0, timeout: 5_000, failOnStatusCode: false });
           const probeLocation = probe.headers()['location'] ?? '';
