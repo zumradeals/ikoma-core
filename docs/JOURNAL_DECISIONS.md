@@ -350,3 +350,7 @@ La [CI #144](https://github.com/zumradeals/ikoma-core/actions/runs/40871410125) 
 ## 29 octobre 2026 — Pilotage superviseur V2
 
 GO du dirigeant après présentation des maquettes ordinateur, tablette et téléphone. Menu repliable en tablette paysage ; annulation de badge dans Autres actions, avec accès depuis la fiche conservé. Cadre visuel partagé avec les écrans opérationnels et le journal suivant les permissions, redirection du seul superviseur depuis `/espace` après le middleware 2FA. Logique métier, fréquences d’actualisation, droits et évacuation hors ligne conservés. Contrat et références : `docs/refonte-pilotage/README.md`. Aucune fusion ni déploiement autorisés par ce GO d’implémentation.
+
+## 29 octobre 2026 — Agent d’accueil V2
+
+GO écrit du dirigeant pour une branche et une PR dédiées depuis main après fusion de la PR #27. Cadre Agent commun et modernisation de Mon espace, accueil, groupes, contrôle et sécurité, sans modification des moteurs. Priorité du code métier sur la maquette : scan/association à l’étape 5, remise à l’étape 6, photographie de pièce selon `identite_piece_active`, aucun portrait/stock/zone inventé. Contrat et limites : `docs/refonte-agent/README.md`. Captures réelles demandées avant validation ; aucune fusion ou déploiement automatique.

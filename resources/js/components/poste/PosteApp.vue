@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AdminIcon from '../admin/AdminIcon.vue';
+import AgentLayout from '../../layouts/AgentLayout.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { initial, reduce, stepNumber, validateBlockedReason, type Ev } from '../../poste/machine';
 import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../poste/repository';
@@ -135,9 +137,10 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-ikoma-navy">
-    <StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" :offline-minutes="offlineMinutes" :call-after="summary?.offlineCallMinutes" @sync="emit('sync')" @lock="emit('lock')" />
-    <main id="contenu" class="mx-auto space-y-6 px-4 py-6" :class="context && summary ? 'max-w-6xl' : 'max-w-4xl'">
+  <AgentLayout active="poste" :agent="agent" :online="online">
+    <template #header-context><span v-if="posteName">Poste : {{ posteName }}</span></template>
+    <template #status><StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" :offline-minutes="offlineMinutes" :call-after="summary?.offlineCallMinutes" @sync="emit('sync')" @lock="emit('lock')" /></template>
+    <div class="agent-workspace agent-desk-workspace">
       <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur">
         <p class="font-bold"><span aria-hidden="true">⚠</span> {{ error.message }}</p>
         <p v-if="error.action && !error.message.includes(error.action)" class="mt-1 font-semibold">{{ error.action }}</p>
@@ -146,7 +149,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
       <template v-else>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <StepTracker :current="stepNumber[ctx.step]" class="min-w-64 flex-1" />
-          <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><span aria-hidden="true">⏱</span> {{ clockLabel }}</p>
+          <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><AdminIcon name="clock" /> {{ clockLabel }}</p>
         </div>
         <div v-if="ctx.step === 'recherche'" class="grid gap-6" :class="summary ? 'lg:grid-cols-[minmax(0,1fr)_21rem]' : ''">
           <StepSearch :repository="repo" @select="onSelect" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
@@ -162,6 +165,6 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
         <StepDone v-else-if="ctx.step === 'entree' && fiche" :name="fiche.full_name" :badge-code="ctx.badgeCode ?? ''" :zones="entryZones" :duration-ms="ctx.durationMs ?? 0" @next="onNext" />
         <StepRefused v-else-if="ctx.step === 'refus' && fiche" :name="fiche.full_name" @next="onNext" />
       </template>
-    </main>
-  </div>
+    </div>
+  </AgentLayout>
 </template>

@@ -31,6 +31,9 @@ jobs:
         run: make test
       - run: make test-front
       - run: make e2e
+      - name: Recette et captures Agent V2 sur données fictives isolées
+        if: ${{ !cancelled() }}
+        run: make e2e-agent
       - name: Vérifier le contrôle des exceptions de sécurité
         run: python3 -m unittest discover -s tests/security
       - name: Auditer les dépendances applicatives (blocage élevé et critique)

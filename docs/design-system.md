@@ -36,3 +36,7 @@ Boutons d'action du poste : 64 px de haut, texte de 20 px en gras. Le vert d'act
 ## Pilotage superviseur V2 (29 octobre 2026)
 
 Cadre `PilotageLayout` et styles `.pilotage-*`, alignés sur la palette et les cartes de l’administration. Menu permanent à partir de 1200 px, repliable en tablette paysage et portrait ; navigation inférieure sous 900 px. Cibles de 56 px et champs 18 px. Deux colonnes sur ordinateur/tablette paysage, KPI 2 × 2 et pile de priorités en portrait/téléphone. Autres actions contient l’annulation contrôlée ; la fiche visiteur conserve son accès. Contrat : `refonte-pilotage/README.md`. Aucun changement des interfaces de poste.
+
+## Agent d’accueil V2 (29 octobre 2026)
+
+`AgentLayout`, `AgentHome` et feuille isolée `agent.css` réutilisent la palette institutionnelle et `AdminIcon`. Menu latéral à partir de 1200 px, repliable sur tablette ; cartes tactiles et étapes numérotées non navigables (aucun saut d’étape). Les composants métier gardent leurs événements et validations. Les états document, réseau, liste périmée, file d’envoi, erreur et résultat associent mot et symbole à la couleur. Contrat : `refonte-agent/README.md`.

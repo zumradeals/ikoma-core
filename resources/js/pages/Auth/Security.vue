@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import AgentLayout from '../../layouts/AgentLayout.vue';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import { usePage } from '@inertiajs/vue3';
-const page = usePage<{ auth: { isAdmin?: boolean } | null }>();
+const page = usePage<{ auth: { isAdmin?: boolean; name: string; permissions: string[] } | null }>();
 import { ref } from 'vue'; import { router, useForm } from '@inertiajs/vue3'; import BaseLayout from '../../layouts/BaseLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
 defineProps<{ confirmed: boolean }>(); const qr = ref(''); const codes = ref<string[]>([]); const message = ref(''); const form = useForm({ code: '' });
 async function load() {
@@ -13,7 +14,7 @@ async function load() {
 function enable() { router.post('/user/two-factor-authentication', {}, { onSuccess: load }); }
 </script>
 <template>
-<component :is="page.props.auth?.isAdmin ? AdminLayout : BaseLayout" active="securite">
+<component :is="page.props.auth?.isAdmin ? AdminLayout : page.props.auth?.permissions.includes('visiteurs.rechercher') ? AgentLayout : BaseLayout" active="securite" :agent="page.props.auth?.name">
 <BaseCard>
 <h1 class="mb-4 text-display font-bold">Sécuriser mon compte</h1><p class="mb-6">La double authentification est obligatoire pour les administrateurs et superviseurs. Conservez vos codes de secours dans un endroit sûr.</p>
 <p v-if="confirmed" role="status">✓ Double authentification activée.</p><template v-else>
