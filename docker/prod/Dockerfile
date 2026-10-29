@@ -56,6 +56,7 @@ COPY resources/views ./resources/views
 COPY artisan composer.json ./
 COPY --from=assets /app/public/build ./public/build
 COPY public/index.php public/robots.txt public/favicon.ico public/icon.svg ./public/
+COPY public/brand ./public/brand
 COPY scripts/provision-db.php scripts/grant-db.php ./scripts/
 COPY docker/prod/migrate.sh ./scripts/migrate-prod.sh
 COPY docker/prod/entrypoint.sh /usr/local/bin/ikoma-entrypoint
@@ -74,4 +75,5 @@ CMD ["php-fpm"]
 FROM nginxinc/nginx-unprivileged:stable-alpine-slim AS nginx
 COPY --from=assets /app/public/build /var/www/html/public/build
 COPY public/favicon.ico public/icon.svg public/robots.txt /var/www/html/public/
+COPY public/brand /var/www/html/public/brand
 COPY docker/security-common-headers.conf /etc/nginx/ikoma-headers.conf
