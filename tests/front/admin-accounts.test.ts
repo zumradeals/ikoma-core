@@ -31,6 +31,15 @@ describe('comptes intégrés au cadre administrateur', () => {
     expect(w.findAll('input[type=number]').map(x => (x.element as HTMLInputElement).value)).toEqual(['9', '27']);
     expect(w.get('[aria-label="Synthèse des comptes"]').text()).toContain('0superviseurs actifs');
   });
+  it('garde le rattachement cohérent quand le compte hôte sélectionné change de rôle', async () => {
+    const hosts = ['h1', 'h2', 'h3'].map(id => ({ ...user, id, name: 'Compte ' + id, role: 'hote' }));
+    const w = mount(Accounts, { props: { ...props, users: hosts } });
+    const selector = w.findAll('select').find(s => s.find('option[value=h3]').exists())!;
+    await selector.setValue('h3');
+    await w.setProps({ users: hosts.slice(0, 2) });
+    expect((selector.element as HTMLSelectElement).value).toBe('h1');
+    expect(w.find('form[aria-label="Rattacher les fiches de Compte h1"]').exists()).toBe(true);
+  });
   it('masque création et modification si roles.attribuer manque sans supprimer la réinitialisation', () => {
     const index = permissions.indexOf('roles.attribuer'); permissions.splice(index, 1);
     const w = mount(Accounts, { props });

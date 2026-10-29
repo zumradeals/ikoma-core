@@ -65,7 +65,7 @@ const hostSettings = useForm({ minutes: props.hostTimeout });
     <div class="account-settings mt-4">
       <section class="admin-card" aria-labelledby="rattachement-hotes">
 <h2 id="rattachement-hotes">Rattachement des fiches hôte</h2><p class="admin-muted mb-3">Les fiches restent classées par événement.</p>
-        <label v-if="hostUsers.length > 1" class="mb-3 block">Compte hôte<select v-model="selectedHost" class="field"><option v-for="u in hostUsers" :key="u.id" :value="u.id">{{ u.name }}</option></select></label>
+        <label v-if="hostUsers.length > 1" class="mb-3 block">Compte hôte<select :value="hostUser?.id" class="field" @change="selectedHost = ($event.target as HTMLSelectElement).value"><option v-for="u in hostUsers" :key="u.id" :value="u.id">{{ u.name }}</option></select></label>
         <HostAccountLink v-if="hostUser" :key="hostUser.id" :user="hostUser" :hosts="hosts" /><p v-else class="admin-muted">Créez un compte avec le rôle Hôte pour rattacher ses fiches.</p>
       </section>
       <section class="admin-card"><h2>Alerte sans réponse de l’hôte</h2><p class="admin-muted">Délai actuel : {{ hostTimeout }} minute(s).</p><form class="mt-4 space-y-3" @submit.prevent="hostSettings.put('/administration/comptes/delai-hote')"><label>Délai en minutes<input v-model="hostSettings.minutes" type="number" min="1" max="120" class="field" required></label><p v-for="e in hostSettings.errors" :key="e" role="alert">{{ e }}</p><FormButton :busy="hostSettings.processing">Enregistrer le délai</FormButton></form></section>
