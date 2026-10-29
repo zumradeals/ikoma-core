@@ -31,7 +31,15 @@ def approved(alert):
             if path not in ['/', '/sitemap.xml'] or instance.get('evidence') not in ['private', 'no-store']:
                 return False
         elif ref == '10049-3' and risk == '0':
-            if not (path.startswith('/build/') or path == '/robots.txt'):
+            # Cache informatif uniquement pour les ressources publiques statiques.
+            # Aucune route applicative, session ou réponse métier n'est exceptée.
+            static_icons = {
+                '/icon.svg',
+                '/brand/ikoma-access-icon.svg',
+                '/brand/ikoma-access-logo.svg',
+                '/brand/ikoma-access-logo-slogan.svg',
+            }
+            if not (path.startswith('/build/') or path == '/robots.txt' or path in static_icons):
                 return False
         else:
             return False

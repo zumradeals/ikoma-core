@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 
-const highlights = [
-  { value: '01', title: 'Accueil guidé', description: 'Un parcours lisible du premier contact à la remise du badge.' },
-  { value: '02', title: 'Contrôle des accès', description: 'Des autorisations liées aux catégories et aux zones définies.' },
-  { value: '03', title: 'Supervision active', description: 'Présences, alertes et décisions réunies dans un même espace.' },
-];
 const features = [
   { icon: 'person', title: 'Accueil des visiteurs', text: 'Recherche, vérification, validation et remise des badges dans un parcours en sept étapes.' },
   { icon: 'shield', title: 'Accès et zones', text: 'Gestion des zones autorisées, catégories de visiteurs et contrôles des passages.' },
