@@ -34,12 +34,13 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
   const agentContext = await browser.newContext({ baseURL: info.project.use.baseURL, permissions: ['camera'], viewport: { width: 1024, height: 768 } });
   const admin = await adminContext.newPage(); const page = await agentContext.newPage();
   let original: boolean | undefined;
+  let primaryFailure = false;
   async function setDocument(value: boolean) {
     await admin.goto('/administration/postes');
     const box = admin.getByTestId('reglage-piece-identite');
     if (original === undefined) original = await box.isChecked();
     await box.setChecked(value);
-    const saved = admin.waitForResponse(r => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/administration/postes/reglages');
+    const saved = admin.waitForResponse(r => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/administration/postes/reglages', { timeout: 30_000 });
     await admin.getByRole('button', { name: 'Enregistrer les réglages' }).click();
     expect((await saved).status()).toBeLessThan(400);
     await expect(box).toBeChecked({ checked: value });
@@ -85,7 +86,8 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await captures(page, '09-securite');
     await setDocument(true);
     await open(page, '/poste');
-    const synced = page.waitForResponse(r => new URL(r.url()).pathname === '/poste/api/sync' && r.status() === 200);
+    // Sans opération en attente, la synchronisation vérifie la version par GET ; aucun POST vide n’est émis.
+    const synced = page.waitForResponse(r => new URL(r.url()).pathname === '/poste/api/liste/version' && r.status() === 200, { timeout: 30_000 });
     await page.getByTestId('synchroniser').click(); await synced;
     await expect(page.getByTestId('synchroniser')).toBeEnabled();
     await identity(page, fx.names.second);
@@ -101,8 +103,15 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await expect(page.getByText('Étape 4 sur 7')).toBeVisible();
     await page.getByTestId('verrouiller').click(); await expect(page.getByTestId('ecran-verrou')).toBeVisible();
     await captures(page, '11-verrouillage');
+  } catch (error) {
+    primaryFailure = true;
+    throw error;
   } finally {
-    if (original !== undefined) await setDocument(original);
+    try { if (original !== undefined) await setDocument(original); }
+    catch (error) {
+      if (!primaryFailure) throw error;
+      console.error('Restauration du réglage impossible dans cette recette isolée ; l’échec principal est conservé.');
+    }
     await agentContext.close(); await adminContext.close();
   }
 });
