@@ -11,6 +11,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
+use stdClass;
 
 final class BadgeWorkshopController
 {
@@ -19,10 +20,11 @@ final class BadgeWorkshopController
         Gate::authorize('badges.gerer');
         $events = DB::table('events')->orderBy('name')->get(['id', 'name']);
         $preferences = [];
+        $settings = DB::table('settings')->where('key', 'like', 'badge_atelier_%')->pluck('value', 'key');
         foreach ($events as $event) {
             $preferences[$event->id] = BadgeArtwork::defaults();
             foreach ($preferences[$event->id] as $key => $default) {
-                $preferences[$event->id][$key] = DB::table('settings')->where('key', 'badge_atelier_'.$event->id.'_'.$key)->value('value') ?? $default;
+                $preferences[$event->id][$key] = $settings->get('badge_atelier_'.$event->id.'_'.$key, $default);
             }
         }
         $number = "CASE WHEN code ~ '^B-[0-9]+\$' THEN substring(code from 3)::integer END";
@@ -42,8 +44,8 @@ final class BadgeWorkshopController
         $badges = $artwork->select($options);
 
         return response()->json([
-            'html' => $artwork->card($badges->first(), $options), 'count' => $badges->count(),
-            'first' => $badges->first()->code, 'last' => $badges->last()->code,
+            'html' => $artwork->card($badges->firstOrFail(), $options), 'count' => $badges->count(),
+            'first' => $badges->firstOrFail()->code, 'last' => $badges->reverse()->firstOrFail()->code,
             'inactive' => $badges->whereNotIn('status', ['Disponible', 'Associé'])->count(),
         ])->header('Cache-Control', 'no-store, private');
     }
@@ -70,14 +72,14 @@ final class BadgeWorkshopController
         $options = $artwork->validate($request);
         $badges = $artwork->select($options);
         $perSheet = $options['format'] === 'pvc' ? 1 : (int) $options['cols'] * (int) $options['rows'];
-        $cards = $badges->map(fn (object $badge) => $artwork->card($badge, $options))->all();
+        $cards = $badges->map(fn (stdClass $badge) => $artwork->card($badge, $options))->all();
         $nonce = base64_encode(random_bytes(16));
         $request->attributes->set('csp_style_nonce', $nonce);
         // Il s’agit d’une préparation : le navigateur ne permet pas de confirmer le tirage physique.
         app(Audit::class)->append('badge.impression_preparee', auth()->id(), [
             'event_id' => $options['event'], 'batch_id' => $options['batch'], 'modele' => $options['design'],
             'format' => $options['format'], 'face' => $options['side'], 'nombre' => $badges->count(),
-            'premier' => $badges->first()->code, 'dernier' => $badges->last()->code,
+            'premier' => $badges->firstOrFail()->code, 'dernier' => $badges->reverse()->firstOrFail()->code,
         ]);
 
         return response()->view('badges.artwork-print', [

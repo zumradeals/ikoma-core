@@ -75,6 +75,12 @@ it('refuse plus de 1000 badges plutôt que de tronquer silencieusement', functio
     $this->postJson('/administration/badges/modeles/apercu', [...$this->options, 'batch' => $batch->id])->assertUnprocessable()->assertJsonValidationErrors('to');
 });
 
+it('utilise les catégories réelles pour les trois modèles et distingue les stagiaires', function (int $category, string $design, string $mention) {
+    $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category'.$category), 1, $this->admin);
+    $response = $this->postJson('/administration/badges/modeles/apercu', [...$this->options, 'batch' => $batch->id, 'design' => $design])->assertOk()->assertJsonPath('count', 1);
+    expect($response->json('html'))->toContain($mention)->toContain('Badge à restituer à la sortie');
+})->with([[0, 'vip', 'VIP'], [1, 'visiteur', 'VISITEUR'], [2, 'prestataire', 'PRESTATAIRE'], [3, 'prestataire', 'STAGIAIRE']]);
+
 it('sépare strictement les événements pour un même numéro de badge', function () {
     $event = Str::uuid()->toString();
     DB::table('events')->insert(['id' => $event, 'name' => 'Autre événement fictif', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);

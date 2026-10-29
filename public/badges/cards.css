@@ -2,10 +2,10 @@
 .access-card, .access-card * { box-sizing: border-box; }
 .access-card { --badge-primary: #0066B3; --badge-accent: #F75C03; position: relative; display: flex; flex-direction: column; flex-shrink: 0; width: 85.60mm; height: 53.98mm; padding: 3mm; border: .25mm solid #cbd5e1; border-top: 1.6mm solid var(--badge-primary); overflow: hidden; background: #fff; color: #0B3C6B; font-family: Arial, sans-serif; line-height: 1.15; text-align: left; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .access-card p { margin: 0; }
-.access-card__identity { display: flex; align-items: center; justify-content: space-between; gap: 3mm; min-height: 7mm; }
-.access-card__identity img { width: 31mm; height: 7mm; object-fit: contain; }
+.access-card__identity { display: flex; align-items: center; justify-content: space-between; gap: 3mm; min-height: 6mm; }
+.access-card__identity img { width: 31mm; height: 6mm; object-fit: contain; }
 .access-card__identity p { font-size: 2.5mm; font-weight: 700; max-width: 41mm; overflow-wrap: anywhere; max-height: 6mm; overflow: hidden; }
-.access-card__type { margin-top: 1.5mm; border-left: 1.2mm solid var(--badge-accent); padding-left: 2mm; font-size: 5mm; font-weight: 800; letter-spacing: .6mm; }
+.access-card__type { margin-top: 1mm; border-left: 1.2mm solid var(--badge-accent); padding-left: 2mm; font-size: 4.5mm; font-weight: 800; letter-spacing: .6mm; }
 .access-card__content { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 3mm; min-height: 0; }
 .access-card__details { display: flex; flex-direction: column; gap: 1.2mm; min-width: 0; }
 .access-card__caption { font-size: 2mm; letter-spacing: .35mm; }
@@ -15,7 +15,7 @@
 .access-card__qr svg { display: block; width: 100%; height: 100%; }
 .access-card__footer { margin-top: auto; padding-top: 1.4mm; border-top: .25mm solid #cbd5e1; font-size: 2.5mm; font-weight: 700; text-align: center; color: #27384b; }
 .access-card--vip { border-top-color: var(--badge-primary); border-bottom: 1.4mm solid var(--badge-accent); background: #fffdf7; }
-.access-card--vip .access-card__type { color: #0B3C6B; border-left: 0; border-bottom: .5mm solid var(--badge-accent); padding-left: 0; font-family: Georgia, serif; font-size: 6mm; letter-spacing: 1.4mm; }
+.access-card--vip .access-card__type { color: #0B3C6B; border-left: 0; border-bottom: .5mm solid var(--badge-accent); padding-left: 0; font-family: Georgia, serif; font-size: 4.5mm; letter-spacing: 1.4mm; }
 .access-card--vip .access-card__caption { color: #69501b; }
 .access-card--prestataire { border-top-color: var(--badge-primary); border-left: 2mm solid var(--badge-accent); }
 .access-card--prestataire .access-card__type { background: #0B3C6B; color: #fff; border-left: 1.5mm solid var(--badge-accent); font-size: 4mm; padding: 1mm 2mm; letter-spacing: .35mm; }
@@ -27,7 +27,7 @@
 .access-card--portrait .access-card__details { align-items: center; text-align: center; gap: 1mm; }
 .access-card--portrait .access-card__qr { width: 30mm; height: 30mm; }
 .access-card--portrait .access-card__code { font-size: 6mm; }
-.access-card--portrait .access-card__category { max-height: 7mm; }
+.access-card--portrait .access-card__category { max-height: 6mm; }
 .access-card--portrait.access-card--prestataire .access-card__type { font-size: 3.5mm; }
 .access-card__instructions { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 2mm; font-size: 2.8mm; }
 .access-card__instructions strong { font-size: 3.5mm; }

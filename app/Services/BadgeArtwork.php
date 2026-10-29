@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use stdClass;
 
 /** Présentation seule : aucune écriture dans les badges, associations ou autorisations. */
 final class BadgeArtwork
@@ -65,7 +66,7 @@ final class BadgeArtwork
     }
 
     /** @param array<string, mixed> $options
-     * @return Collection<int, object>
+     * @return Collection<int, stdClass>
      */
     public function select(array $options): Collection
     {
@@ -92,7 +93,7 @@ final class BadgeArtwork
     }
 
     /** @param array<string, mixed> $options */
-    public function card(object $badge, array $options): string
+    public function card(stdClass $badge, array $options): string
     {
         // Une couleur personnalisée ne touche jamais au QR noir sur blanc ni aux textes noirs.
         return view('badges.card', [
