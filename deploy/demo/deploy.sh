@@ -1,7 +1,7 @@
 #!/bin/sh
 # Déploiement (et mise à jour) de la démonstration IKOMA Accueil sur le serveur Contabo : https://ikoma.dgafrique.com
 # À lancer en root sur le serveur : sh deploy.sh   (voir docs/DEPLOIEMENT_DEMO.md)
-# DONNÉES FICTIVES UNIQUEMENT. Ce n'est pas la production (lot L12).
+# Environnement de développement propriétaire : aucun jeu fictif créé automatiquement.
 set -eu
 
 DOMAIN="${DOMAIN:-ikoma.dgafrique.com}"
@@ -64,10 +64,9 @@ fi
 echo "Port local de l'application : 127.0.0.1:$PORT"
 $COMPOSE up -d --build --wait
 
-say "6/7 Comptes et données fictives (idempotent : aucun compte existant n'est modifié)"
-umask 077
-$COMPOSE exec -T php php artisan db:seed --force | tee /root/ikoma-comptes-demo.txt
-echo "Mots de passe créés cette fois-ci : /root/ikoma-comptes-demo.txt (lisez-le, notez-les dans un gestionnaire de mots de passe, puis supprimez-le)."
+say "6/7 Aucun réensemencement fictif automatique"
+echo "Comptes, événements et visiteurs existants conservés. Aucun compte ou visiteur fictif créé."
+echo "Pour retirer l'ancien jeu fictif après sauvegarde, consultez docs/SORTIE_MODE_DEMO.md."
 
 say "7/7 HTTPS : site $DOMAIN devant l'application (127.0.0.1:$PORT)"
 # Le serveur peut déjà héberger d'autres sites : on s'intègre au serveur web en place, sans toucher aux sites existants.

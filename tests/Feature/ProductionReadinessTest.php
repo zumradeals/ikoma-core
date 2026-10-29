@@ -27,12 +27,14 @@ it('refuse de créer des données de démonstration en production', function () 
     expect(DB::table('users')->where('email', 'like', '%@exemple.test')->count())->toBe($before);
 });
 
-it('affiche un bandeau « démonstration » seulement dans l’environnement de démonstration', function () {
+it('ne présente aucun bandeau fictif sur les pages publiques, même dans l’environnement historique demo', function () {
     $this->get('/login')->assertOk()->assertDontSee('bandeau-demo', false);
     $previous = app()->environment();
     app()['env'] = 'demo';
     try {
-        $this->get('/login')->assertOk()->assertSee('bandeau-demo', false)->assertSee('Démonstration : données fictives', false);
+        $this->get('/login')->assertOk()->assertDontSee('bandeau-demo', false)
+            ->assertDontSee('Démonstration : données fictives', false);
+        $this->get('/')->assertOk()->assertDontSee('bandeau-demo', false);
     } finally {
         app()['env'] = $previous;
     }

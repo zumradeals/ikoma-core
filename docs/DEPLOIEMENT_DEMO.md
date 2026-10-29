@@ -1,67 +1,49 @@
-# Déploiement de la démonstration — https://ikoma.dgafrique.com
+# IKOMA ACCESS — Serveur de travail et mises à jour
 
-Statut : projet de travail de l'architecte, **non encore exécuté sur le serveur** (le script a été vérifié seulement pour sa syntaxe ; la première exécution réelle est à surveiller). Cadre : plan de conception section 10, environnement « Démonstration » (sous-domaine de test, **données fictives uniquement**).
+Ce document décrit le déploiement historique de `ikoma.dgafrique.com` depuis `deploy/demo/deploy.sh`. Ce serveur est l'environnement de travail du propriétaire et **n'est pas le VPS d'un client**. Son nom de configuration `APP_ENV=demo` reste historique.
 
-> **Ce n'est pas la production.** Le paquet Docker actuel est celui du développement. N'y mettez jamais de vraie liste de visiteurs, de vraie pièce d'identité ni de vraie photo. La production se fera sur un serveur dédié et durci, avec les sauvegardes chiffrées et l'installation guidée du lot L12, après décision d'hébergement du client.
+## Déploiement
 
-## Avant de commencer (une seule fois)
-
-1. **DNS** : chez le gestionnaire du domaine dgafrique.com, créer un enregistrement **A** `ikoma` → adresse IPv4 publique du serveur Contabo. Attendre quelques minutes la propagation (`nslookup ikoma.dgafrique.com`).
-2. **Serveur** : Contabo VPS sous Ubuntu 22.04/24.04 ou Debian 12, accès SSH root (ou sudo), au moins 2 Go de mémoire et 15 Go de disque libres. Ports **80 et 443** ouverts (pare-feu Contabo et `ufw` si actif) ; le port 22 reste ouvert.
-3. **Autres sites déjà présents** : le script détecte nginx ou Apache et y ajoute un site `ikoma.dgafrique.com` sans toucher aux autres (la configuration est testée avant rechargement et retirée si elle est refusée). Si aucun serveur web n'est installé, il installe Caddy.
-4. **Dépôt privé ?** Si `zumradeals/ikoma-core` est privé, préparer sur le serveur une clé de déploiement en lecture seule (GitHub → Settings → Deploy keys) puis lancer avec `REPO=git@github.com:zumradeals/ikoma-core.git`. Ne jamais coller un jeton personnel dans une commande conservée dans l'historique du serveur.
-
-## La commande de déploiement
-
-Connectez-vous au serveur (`ssh root@ADRESSE_IP`) puis exécutez :
+Sur le serveur déjà configuré :
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/zumradeals/ikoma-core/main/deploy/demo/deploy.sh -o /root/deploy-ikoma.sh && sh /root/deploy-ikoma.sh
+cd /opt/ikoma
+sudo sh deploy/demo/deploy.sh
 ```
 
-(Dépôt privé : `git clone git@github.com:zumradeals/ikoma-core.git /opt/ikoma && REPO=git@github.com:zumradeals/ikoma-core.git sh /opt/ikoma/deploy/demo/deploy.sh`.)
+La procédure de déploiement :
+- récupère la branche configurée (`main` par défaut) ;
+- garde les secrets et la base PostgreSQL existants ;
+- construit les conteneurs Docker, applique les migrations et vérifie leur disponibilité ;
+- configure ou conserve le serveur HTTPS du sous-domaine ;
+- **ne crée plus de comptes, événements ou visiteurs fictifs**.
 
-Le script, dans l'ordre : installe Git, Make et Docker s'ils manquent ; vérifie que `ikoma.dgafrique.com` pointe bien vers ce serveur ; récupère la branche `main` dans `/opt/ikoma` ; génère la clé de l'application et les mots de passe de base de données (fichiers `.env` et `.secrets/`, jamais dans Git) ; construit et démarre l'application (PostgreSQL, PHP, nginx local sur 127.0.0.1 (port 8080, ou le premier port libre suivant si 8080 est déjà pris ; il est mémorisé dans `IKOMA_PORT` du fichier `.env`), tâches planifiées) ; applique les migrations ; charge les comptes et données **fictifs** ; ajoute le site au serveur web existant (nginx ou Apache, ou installe Caddy s'il n'y en a aucun) et obtient un certificat HTTPS Let's Encrypt renouvelé automatiquement (variable facultative `EMAIL=vous@exemple.com` pour les avis d'expiration).
+Si le dépôt GitHub est privé, utilisez une clé de déploiement en lecture seule, sans inscrire de jeton dans les commandes de l'historique du serveur.
 
-La première exécution dure plusieurs minutes (téléchargements). Les variables optionnelles : `DOMAIN`, `BRANCH` (par défaut `main`), `DIR` (par défaut `/opt/ikoma`), `REPO`.
+Les variables facultatives restent `DOMAIN`, `BRANCH`, `DIR` et `REPO`. Le serveur peut héberger d'autres sites : le déploiement ne doit pas écraser leurs configurations.
 
-## Après le déploiement
+## Première installation sans données fictives
 
-- Les mots de passe des cinq comptes fictifs (administrateur, superviseur, agent d'accueil, hôte, encadreur) sont dans `/root/ikoma-comptes-demo.txt`, affichés **une seule fois**. Notez-les dans un gestionnaire de mots de passe puis supprimez le fichier : `shred -u /root/ikoma-comptes-demo.txt`.
-- Les comptes administrateur et superviseur doivent activer la double authentification à la première connexion ; conservez les codes de secours hors de l'application.
-- Ouvrez https://ikoma.dgafrique.com. Contrôles : `curl -sI https://ikoma.dgafrique.com/up | head -1` (réponse 200) et `cd /opt/ikoma && docker compose ps` (services « running »/« healthy »).
-- Poste d'accueil : connectez-vous avec le compte agent, **Mon espace → Poste d'accueil** (disponible quand le lot L5 est fusionné). Autorisez la caméra du navigateur.
+Le nouvel environnement doit être initialisé par le mécanisme d'installation adapté à sa configuration, et par son premier administrateur réel, avec 2FA confirmée. La commande `db:seed` est exclusivement destinée à une recette fictive demandée explicitement ; elle n'est plus lancée par le script de déploiement.
 
-## Mettre à jour
+## Ancienne base contenant le seed
 
-Relancer la même commande (ou `sh /opt/ikoma/deploy/demo/deploy.sh`) : le script récupère la dernière version de `main`, reconstruit, applique les nouvelles migrations et complète les données fictives sans modifier les comptes existants. Pour déployer une autre branche : `BRANCH=nom-de-branche sh /opt/ikoma/deploy/demo/deploy.sh`.
+Un simple `git pull`, un redémarrage ou un nouveau déploiement ne supprime pas les enregistrements existants.
 
-## Remettre la démonstration à zéro
+**Ne lancez jamais `make migrate-fresh-seed` pour faire disparaître les données fictives : cette commande détruit toute la base.**
 
-`cd /opt/ikoma && make migrate-fresh-seed` **efface toutes les données** de la démonstration et recrée les comptes (nouveaux mots de passe affichés une fois). Arrêt : `docker compose down` (la base est conservée) ; redémarrage : relancer le script.
+Pour l'ancien événement « Exercice fictif IKOMA — démonstration », les 300 visiteurs, 400 badges et les comptes `@exemple.test`, suivez la procédure transactionnelle et contrôlée : [SORTIE_MODE_DEMO.md](SORTIE_MODE_DEMO.md). Elle inclut la sauvegarde, la simulation, la préservation d'un compte administrateur réel et le refus de supprimer des données ayant servi aux opérations.
 
-## Serveur web déjà présent
+## Contrôles après mise à jour
 
-Cas d'un serveur web non reconnu par le script : garder l'application sur `127.0.0.1:8080` et ajouter un site dans le serveur existant. Exemple nginx (puis `certbot --nginx -d ikoma.dgafrique.com` pour le certificat) :
-
-```nginx
-server {
-    server_name ikoma.dgafrique.com;
-    client_max_body_size 6m;
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+```sh
+curl -sI https://ikoma.dgafrique.com/up | head -1
+cd /opt/ikoma
+docker compose -f docker-compose.yml -f deploy/demo/docker-compose.demo.yml ps
 ```
 
-L'application doit recevoir `X-Forwarded-Proto: https` : elle y fait confiance (le conteneur n'écoute que sur 127.0.0.1) pour construire ses liens et cookies en HTTPS. Le script s'arrête alors à l'étape 7, après avoir démarré l'application : configurez le site ci-dessus.
+Vérifiez également l'ouverture de la landing IKOMA ACCESS et de la connexion, le parcours 2FA et le fonctionnement des espaces Admin, Superviseur et Agent.
 
-## Sécurité de la démonstration
+## Note de conformité
 
-- Données fictives uniquement ; aucune inscription publique ; comptes nominatifs avec mots de passe aléatoires ; double authentification obligatoire pour l'administrateur et le superviseur.
-- PostgreSQL n'est pas exposé hors du réseau Docker ; l'application n'écoute que sur 127.0.0.1:8080 ; seul le serveur web du serveur (nginx, Apache ou Caddy) est public.
-- Limites connues du paquet de développement (traitées au lot L12) : images non figées par version de production, code monté depuis le dossier du serveur, `npm ci` à chaque démarrage, pas de sauvegarde automatique, journaux sans rotation, pas de politique de contenu stricte (lot L11).
-- Si le site ne doit pas être visible de tous, ajouter un `basic_auth` ou une liste d'adresses autorisées dans le Caddyfile (`deploy/demo/Caddyfile`).
+L'absence de bandeau jaune indique seulement qu'il ne s'affiche plus. Elle **ne constitue pas une certification de production client**. Les vraies données personnelles doivent être traitées dans un environnement conforme aux exigences d'hébergement, de confidentialité et de sécurité applicables. Les tests automatisés conservent leurs propres fixtures sur une base isolée.
