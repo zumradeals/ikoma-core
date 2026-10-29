@@ -52,6 +52,7 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await expect(page.getByTestId('agent-layout')).toBeVisible();
     await captures(page, '01-mon-espace');
     await open(page, '/poste');
+    await expect(page.getByText('Étape 1 sur 7')).toBeVisible();
     await captures(page, '02-etape-1-recherche');
     const toggle = page.getByTestId('menu-agent-toggle');
     await expect(toggle).toHaveAttribute('aria-expanded', 'false'); await toggle.click();
@@ -72,7 +73,7 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await expect(page.getByRole('heading', { name: /Entrée enregistrée/ })).toBeVisible();
     await captures(page, '06-etape-7-entree');
     await page.getByRole('button', { name: 'Visiteur suivant' }).click();
-    await open(page, '/groupe'); await captures(page, '07-groupes-cars');
+    await open(page, '/groupe'); await expect(page.getByTestId('choisir-groupe').first()).toBeVisible(); await captures(page, '07-groupes-cars');
     await open(page, '/controle'); await page.getByTestId('choix-point').getByRole('button').first().click();
     await captures(page, '08-controle-site');
     await page.goto('/securite');
@@ -86,6 +87,7 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await open(page, '/poste');
     const synced = page.waitForResponse(r => new URL(r.url()).pathname === '/poste/api/sync' && r.status() === 200);
     await page.getByTestId('synchroniser').click(); await synced;
+    await expect(page.getByTestId('synchroniser')).toBeEnabled();
     await identity(page, fx.names.second);
     await expect(page.getByTestId('bloc-piece')).toBeVisible();
     await page.getByLabel('Pièce d’identité contrôlée', { exact: true }).check();
