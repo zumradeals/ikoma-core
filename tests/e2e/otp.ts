@@ -53,7 +53,20 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
         const target = response.headers()['location'] ?? '';
         const redirectPath = target ? new URL(target, page.url()).pathname : '(aucune)';
         const errorVisible = await page.getByRole('alert').count() > 0;
-        throw new Error(`Écran 2FA absent après POST /login (HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}). Aucune donnée de connexion n'est enregistrée.`);
+        // La sonde utilise uniquement les cookies de ce contexte de navigateur.
+        // Elle ne suit pas la redirection et ne transmet aucun identifiant/secret.
+        // 200 : session de challenge conservée, vérifier alors la transition Inertia.
+        // 302 /login : session de challenge absente, vérifier stockage/cookies.
+        let challengeStatus = 'sonde indisponible';
+        try {
+          const probe = await page.request.get('/two-factor-challenge', { maxRedirects: 0, timeout: 5_000, failOnStatusCode: false });
+          const probeLocation = probe.headers()['location'] ?? '';
+          const probePath = probeLocation ? new URL(probeLocation, page.url()).pathname : '(aucune)';
+          challengeStatus = `HTTP ${probe.status()}, redirection ${probePath}`;
+        } catch {
+          challengeStatus = 'requête impossible';
+        }
+        throw new Error(`Écran 2FA absent après POST /login (HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}, contrôle direct du challenge : ${challengeStatus}). Aucun identifiant ou secret journalisé.`);
       }
       if (await challenge.isVisible()) {
         await challenge.fill(await freshOtp(secret));
