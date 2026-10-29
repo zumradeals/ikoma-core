@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./pilotage.css";
+@import "./agent.css";
 @source "../js";
 @theme {
   --color-ikoma-blue: #0F5AA6;

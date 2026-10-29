@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AgentLayout from '../../layouts/AgentLayout.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import CategorySwatch from '../CategorySwatch.vue';
 import StatusBar from './StatusBar.vue';
@@ -98,9 +99,10 @@ onBeforeUnmount(() => { stopCamera(); window.clearTimeout(dismissTimer); window.
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-ikoma-navy">
-    <StatusBar :poste="point?.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
-    <main id="contenu" class="mx-auto max-w-3xl space-y-5 px-4 py-6">
+  <AgentLayout active="controle" :agent="agent" :online="online">
+    <template #header-context><span v-if="point?.name ?? null">Point de contrôle : {{ point?.name ?? null }}</span></template>
+    <template #status><StatusBar context-label="Point de contrôle" :poste="point?.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" /></template>
+    <div class="agent-workspace agent-controle-workspace">
       <section v-if="!point" aria-labelledby="point-titre" class="space-y-4" data-testid="choix-point">
         <h1 id="point-titre" class="text-display font-bold">Où effectuez-vous les contrôles ?</h1>
         <p>Choisissez votre point de contrôle : il sera retenu sur cet appareil.</p>
@@ -128,7 +130,7 @@ onBeforeUnmount(() => { stopCamera(); window.clearTimeout(dismissTimer); window.
         </form>
         <button type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Changer de point de contrôle</button>
       </template>
-    </main>
+    </div>
 
     <div v-if="showing" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 px-6 py-8 text-center text-white" :class="good ? 'bg-green-700' : 'bg-red-700'" role="alertdialog" aria-modal="true" :aria-label="good ? 'Résultat : valide' : 'Résultat : refusé'" :data-latency-ms="latency ?? undefined" data-testid="resultat" :data-verdict="good ? 'valide' : 'refuse'" @click="dismiss">
       <template v-if="control">
@@ -161,5 +163,5 @@ onBeforeUnmount(() => { stopCamera(); window.clearTimeout(dismissTimer); window.
       <p v-if="known" class="rounded-xl bg-white/20 px-4 py-2 text-xl font-semibold" data-testid="connu-a">Hors ligne : situation connue à {{ known }}</p>
       <button type="button" class="btn-soft !bg-white !text-xl" data-testid="suivant" @click.stop="dismiss">Badge suivant</button>
     </div>
-  </div>
+  </AgentLayout>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AgentLayout from '../../layouts/AgentLayout.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import StatusBar from './StatusBar.vue';
 import { startScan, type ScanHandle } from '../../poste/media';
@@ -159,9 +160,10 @@ function statusOf(m: GroupMemberView): string {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-ikoma-navy">
-    <StatusBar :poste="view?.group.bus_number ?? view?.group.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
-    <main id="contenu" class="mx-auto max-w-3xl space-y-5 px-4 py-6" :data-busy="busy">
+  <AgentLayout active="groupe" :agent="agent" :online="online">
+    <template #header-context><span v-if="view?.group.bus_number ?? view?.group.name ?? null">Groupe : {{ view?.group.bus_number ?? view?.group.name ?? null }}</span></template>
+    <template #status><StatusBar context-label="Groupe" :poste="view?.group.bus_number ?? view?.group.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" /></template>
+    <div class="agent-workspace agent-groupe-workspace" :data-busy="busy">
       <div class="grid grid-cols-2 gap-3" role="group" aria-label="Mode">
         <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="tab === 'appel' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="tab === 'appel'" data-testid="onglet-appel" @click="tab = 'appel'">Appel et badges</button>
         <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="tab === 'arrivee' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="tab === 'arrivee'" data-testid="onglet-arrivee" @click="tab = 'arrivee'">Arrivée du car</button>
@@ -268,6 +270,6 @@ function statusOf(m: GroupMemberView): string {
           <p v-if="finish" role="status" class="rounded-2xl border-2 p-4 text-xl font-bold" :class="finish.missing ? 'border-amber-700 bg-amber-50 text-amber-950' : 'border-green-700 bg-green-50 text-green-900'" data-testid="bilan-arrivee"><span aria-hidden="true">{{ finish.missing ? '⚠' : '✓' }}</span> {{ finish.group }} : {{ finish.arrived }} arrivé{{ finish.arrived > 1 ? 's' : '' }}<template v-if="finish.missing"> · {{ finish.missing }} embarqué{{ finish.missing > 1 ? 's' : '' }} non scanné{{ finish.missing > 1 ? 's' : '' }} (écart signalé au superviseur)</template><template v-else> · aucun écart</template></p>
         </section>
       </template>
-    </main>
-  </div>
+    </div>
+  </AgentLayout>
 </template>

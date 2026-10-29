@@ -16,13 +16,19 @@ onBeforeUnmount(() => handle?.stop());
 <template>
   <section aria-labelledby="badge-titre" class="space-y-5">
     <h1 id="badge-titre" class="text-display font-bold">Scannez le badge de {{ name }}</h1>
-    <div class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[40vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
+    <div class="agent-badge-grid">
+<div>
+    <div class="agent-camera"><video ref="video" class="mx-auto max-h-[40vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
     <p v-if="scanning" role="status">Présentez le QR du badge devant la caméra arrière.</p>
     <p v-if="scanError" role="alert" class="font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ scanError }}</p>
-    <form class="space-y-3" aria-label="Saisir le code du badge" @submit.prevent="code.trim() && emit('submit', code.trim())">
+    </div><div class="agent-badge-help">
+<h2>Choisir et associer le badge</h2><p class="mt-3">Prenez un badge disponible du lot réservé à ce poste. Le scan ou le code imprimé permet de vérifier son attribution.</p>
+    <form class="mt-4 space-y-3" aria-label="Saisir le code du badge" @submit.prevent="code.trim() && emit('submit', code.trim())">
       <label class="block text-xl font-semibold">QR illisible ? Saisissez le code imprimé (exemple : B-014)<input v-model="code" class="field !min-h-16 !text-2xl uppercase" autocomplete="off" maxlength="100"></label>
       <button type="submit" class="btn-main" :disabled="!code.trim() || busy">Associer ce badge</button>
     </form>
+    </div>
+</div>
     <button v-if="scanError" type="button" class="btn-soft" @click="start">Réessayer la caméra</button>
   </section>
 </template>
