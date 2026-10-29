@@ -13,6 +13,7 @@ use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HostController;
 use App\Http\Controllers\InstallationController;
+use App\Http\Controllers\EventsController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalExportController;
 use App\Http\Controllers\ListImportsController;
@@ -128,6 +129,8 @@ Route::middleware(['auth'])->group(function (): void {
             return Inertia::render('Space');
         })->name('space');
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
+        Route::get('/administration/evenements', [EventsController::class, 'index'])->middleware('can:evenements.gerer');
+        Route::post('/administration/evenements', [EventsController::class, 'store'])->middleware('can:evenements.gerer');
         Route::post('/administration/comptes/{user}/2fa/preparer', [TwoFactorRecoveryController::class, 'prepare'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::post('/administration/comptes/{user}/2fa/confirmer', [TwoFactorRecoveryController::class, 'confirm'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::get('/administration/comptes', [AccountsController::class, 'index'])->middleware('can:comptes.gerer');

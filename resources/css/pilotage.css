@@ -6,7 +6,7 @@
 .pilotage-header { display:flex; align-items:center; justify-content:space-between; gap:20px; min-height:80px; padding:12px 24px; background:#0b3c6b; color:white; }
 .pilotage-header :is(button,a,summary,select):focus-visible { outline-color:white; }
 .pilotage-brand { display:flex; align-items:center; gap:12px; flex:none; font-size:20px; }
-.pilotage-logo { display:grid; place-items:center; width:44px; height:44px; background:#f26b21; color:white; border-radius:10px; }
+.pilotage-logo { display:grid; place-items:center; width:44px; height:44px; padding:3px; background:#fff; border-radius:10px; }
 .pilotage-caption { display:block; font-size:14px; font-weight:400; }
 .pilotage-event { min-width:0; flex:1; max-width:420px; font-size:14px; }
 .pilotage-event select { display:block; width:100%; min-height:56px; padding:8px; border:1px solid #b6cce2; background:#0b3c6b; color:white; border-radius:8px; font-size:16px; }

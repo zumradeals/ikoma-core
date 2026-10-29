@@ -43,10 +43,12 @@ const time = (at: string) => new Date(at).toLocaleTimeString('fr-FR', { hour: '2
   <AdminLayout active="tableau" :event="event" :events="events">
     <div v-if="!event" class="rounded-2xl border border-slate-200 bg-white p-6" data-testid="aucun-evenement">
       <h1 class="text-display font-bold">Tableau de bord</h1>
-      <p class="mt-2">Aucun événement n’est encore enregistré. Il faut en créer un avant de préparer les zones, les badges et les tablettes.</p>
+      <p class="mt-2">Aucun événement n’est encore enregistré. Créez votre premier événement pour préparer ensuite les zones, les badges et les tablettes.</p>
+      <Link href="/administration/evenements" class="admin-primary mt-5 inline-flex min-h-14 items-center gap-3" data-testid="creer-premier-evenement"><AdminIcon name="plus" :size="20" />Créer mon premier événement</Link>
     </div>
 
     <template v-else>
+      <div class="mb-4 flex justify-end"><Link href="/administration/evenements" class="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-ikoma-blue bg-white px-5 py-2 font-bold text-ikoma-navy" data-testid="gerer-evenements"><AdminIcon name="plus" :size="20" />Gérer les événements</Link></div>
       <section aria-labelledby="titre-etat" class="dashboard-hero" data-testid="tableau-admin">
         <div class="min-w-0 flex-1 basis-80">
           <p class="text-sm font-bold uppercase tracking-wide text-orange-200">Bonjour</p>

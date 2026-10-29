@@ -60,5 +60,6 @@ describe('tableau de bord de l’administrateur', () => {
   it('explique quoi faire quand aucun événement n’existe', () => {
     const w = mount(Tableau, { props: { ...base, event: null, events: [], steps: [], tiles: null, watch: [], summary: { done: 0, total: 0, next: null }, recent: [] } });
     expect(w.get('[data-testid=aucun-evenement]').text()).toContain('Aucun événement');
+    expect(w.get('[data-testid=creer-premier-evenement]').attributes('href')).toBe('/administration/evenements');
   });
 });
