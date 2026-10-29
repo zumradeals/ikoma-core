@@ -334,3 +334,10 @@ Mission et deux maquettes validées par le dirigeant : un administrateur, un esp
 - Les deux scénarios navigateur qui échouaient avant le formulaire TOTP ont désormais une gestion limitée et explicite des refus temporaires de connexion : un seul nouvel essai après le délai du serveur. Les limites de connexion, le TOTP et les rôles de l'application restent inchangés. Les tests complets doivent être relancés.
 - L'observation ZAP 10112 de niveau informatif est acceptée uniquement pour `laravel-session` et `XSRF-TOKEN` sur la racine, avec la preuve exacte du nom du cookie ; les propriétés de sécurité des cookies restent surveillées et toutes les autres instances bloquent.
 - Trivy reste actif et bloquant dans la CI. Le risque résiduel du lot L12 avait été accepté provisoirement ; toute nouvelle faille ou évolution de correctif demande un réexamen avant le déploiement chez le client.
+
+
+### PR #26 — diagnostic de la CI #143
+
+La CI #143 présente 36 parcours navigateurs réussis et un refus de connexion sur le compte fictif du scénario Zones/Catégories. La réponse HTTP 302 revient à `/login` sans atteindre le formulaire TOTP. La cause précise de cette redirection n'est pas encore établie : elle ne doit pas être qualifiée de régression métier sans preuve.
+
+La commande `test:screen-account`, strictement réservée à `APP_ENV=testing`, utilise désormais un mot de passe aléatoire long à encodage simple et vérifie côté serveur le hachage, l'authentification des identifiants et le rôle avant de transmettre les données à Playwright. Les diagnostics E2E peuvent afficher la route de redirection et la présence d'une erreur de formulaire, jamais les identifiants, le mot de passe ou le secret TOTP. Les contrôles de sécurité de l'application sont inchangés. Une nouvelle CI est obligatoire pour confirmer la correction.

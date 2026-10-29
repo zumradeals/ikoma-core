@@ -50,7 +50,10 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
       } catch {
         // Indications techniques sans journaliser les identifiants ni les secrets TOTP.
         const currentPath = new URL(page.url()).pathname;
-        throw new Error(`Écran 2FA absent après POST /login (HTTP ${response.status()}, page ${currentPath}). Vérifier la réponse serveur et le formulaire de connexion.`);
+        const target = response.headers()['location'] ?? '';
+        const redirectPath = target ? new URL(target, page.url()).pathname : '(aucune)';
+        const errorVisible = await page.getByRole('alert').count() > 0;
+        throw new Error(`Écran 2FA absent après POST /login (HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}). Aucune donnée de connexion n'est enregistrée.`);
       }
       if (await challenge.isVisible()) {
         await challenge.fill(await freshOtp(secret));
