@@ -51,7 +51,7 @@ final class BadgeArtwork
             'batch.exists' => 'Ce lot n’appartient pas à l’événement choisi.',
             'to.gte' => 'Le dernier numéro doit être supérieur ou égal au premier.',
             'primary.regex' => 'Choisissez une couleur valide.', 'accent.regex' => 'Choisissez une couleur valide.',
-            'mode.in' => 'Cet atelier imprime uniquement des badges réutilisables sans données personnelles.',
+            'mode.in' => 'Choisissez le mode standard ou nominatif.',
         ]);
         if (($data['mode'] ?? '') === 'nominatif') {
             Gate::authorize('listes.importer');

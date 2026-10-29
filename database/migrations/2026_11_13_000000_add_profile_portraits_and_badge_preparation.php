@@ -21,7 +21,7 @@ return new class extends Migration
         });
         // Une carte portant une identité ne retourne jamais silencieusement dans le stock anonyme.
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION public.ikoma_badge_printed_person_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION public.ikoma_badge_printed_person_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF OLD.printed_for_visitor_id IS NOT NULL AND NEW.printed_for_visitor_id IS DISTINCT FROM OLD.printed_for_visitor_id THEN
         RAISE EXCEPTION 'La destination nominative est immuable : annuler la carte et utiliser un autre badge.' USING ERRCODE = 'check_violation';

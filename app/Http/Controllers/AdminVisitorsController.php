@@ -61,6 +61,7 @@ final class AdminVisitorsController
             $result = $guests->save($request->user(), $data, $visitor, true);
             $v = Visitor::lockForUpdate()->findOrFail($result['id']);
             if (($data['group_id'] ?? null) !== $v->group_id) {
+                Gate::authorize('groupes.gerer');
                 if ($v->group_id) {
                     app(Groups::class)->detach($v->group_id, $v->id, $request->user());
                 }

@@ -63,12 +63,12 @@ final class BadgeWorkshopController
         Gate::authorize('listes.importer');
         $input = $request->validate(['event' => 'required|uuid|exists:events,id', 'batch' => 'required|uuid|exists:badge_batches,id', 'q' => 'nullable|string|max:160']);
         $category = DB::table('badge_batches')->where('id', $input['batch'])->where('event_id', $input['event'])->value('category_id');
-        $query = DB::table('visitors')->where('event_id', $input['event'])->where('category_id', $category)->whereNull('withdrawn_at');
+        $query = DB::table('visitors as v')->leftJoin('hosts as h', 'h.id', '=', 'v.host_id')->where('v.event_id', $input['event'])->where('v.category_id', $category)->whereNull('v.withdrawn_at');
         if (! empty($input['q'])) {
-            $query->where('full_name', 'ilike', '%'.$input['q'].'%');
+            $query->where('v.full_name', 'ilike', '%'.$input['q'].'%');
         }
 
-        return response()->json(['people' => $query->orderBy('full_name')->orderBy('id')->limit(200)->get(['id', 'full_name', 'organisation', 'valid_from', 'valid_until'])])->header('Cache-Control', 'no-store, private');
+        return response()->json(['people' => $query->orderBy('v.full_name')->orderBy('v.id')->limit(200)->get(['v.id', 'v.full_name', 'v.organisation', 'v.valid_from', 'v.valid_until', 'h.name as host'])])->header('Cache-Control', 'no-store, private');
     }
 
     public function prepare(Request $request, BadgePreparation $preparation): JsonResponse

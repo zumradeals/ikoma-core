@@ -6,6 +6,7 @@ use App\Models\Visitor;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -34,8 +35,7 @@ final class ProfilePortrait
             $jpeg = (string) ob_get_contents();
         } finally {
             ob_end_clean();
-            imagedestroy($source);
-            imagedestroy($target);
+            unset($source, $target);
         }
 
         return $jpeg;
@@ -43,6 +43,7 @@ final class ProfilePortrait
 
     public function update(Visitor $visitor, ?UploadedFile $photo, bool $remove, bool $printAllowed): void
     {
+        Gate::authorize('listes.importer');
         app(HostGuests::class)->editable($visitor, true);
         $old = $visitor->profile_photo_file;
         $path = $old;
@@ -73,6 +74,7 @@ final class ProfilePortrait
 
     public function read(Visitor $visitor, bool $printing = false): ?string
     {
+        Gate::authorize('listes.importer');
         if (! $visitor->profile_photo_file || ($printing && ! $visitor->profile_photo_print_allowed)) {
             return null;
         }

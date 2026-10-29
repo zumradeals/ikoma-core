@@ -14,7 +14,7 @@ const batches = computed(() => props.batches.filter(b => b.event_id === form.eve
 const batch = computed(() => batches.value.find(b => b.id === form.batch));
 const result = ref<{ html: string; count: number; first: string; last: string; inactive: number } | null>(null);
 const errors = ref<string[]>([]);
-const people = ref<{ id: string; full_name: string; organisation: string | null }[]>([]);
+const people = ref<{ id: string; full_name: string; organisation: string | null; host: string | null }[]>([]);
 const selected = ref<string[]>([]); const personQuery = ref(props.person?.full_name ?? ''); const preparationMessage = ref('');
 async function personalApi(path: string, body: object) {
   errors.value = [];
@@ -115,7 +115,7 @@ onMounted(() => { chooseBatch(); if (form.batch) void preview(); });
 <button type="button" class="btn-soft" :disabled="!form.batch || busy" @click="loadPeople">Charger les personnes de cette catégorie (200 max.)</button>
 <template v-if="people.length">
 <div class="flex flex-wrap gap-3"><button type="button" class="btn-soft" @click="selected = people.map(p => p.id)">Tout sélectionner</button><button type="button" class="btn-soft" @click="selected = []">Tout désélectionner</button></div>
-<div class="max-h-80 overflow-auto rounded-lg border p-3"><label v-for="candidate in people" :key="candidate.id" class="flex min-h-14 items-center gap-3"><input v-model="selected" type="checkbox" :value="candidate.id"><span>{{ candidate.full_name }} · {{ candidate.organisation }}</span></label></div>
+<div class="max-h-80 overflow-auto rounded-lg border p-3"><label v-for="candidate in people" :key="candidate.id" class="flex min-h-14 items-center gap-3"><input v-model="selected" type="checkbox" :value="candidate.id"><span>{{ candidate.full_name }} · {{ candidate.organisation }} · {{ candidate.host }}</span></label></div>
 <p class="text-base">{{ selected.length }} personne(s). Les destinations suivent l’ordre des cases sélectionnées et les numéros croissants. La plage doit contenir exactement ce nombre de badges.</p>
 <button type="button" class="btn-soft" :disabled="!form.personal_allowed || !selected.length || busy" @click="preparePeople">Réserver {{ selected.length }} destination(s) nominative(s)</button>
 </template>

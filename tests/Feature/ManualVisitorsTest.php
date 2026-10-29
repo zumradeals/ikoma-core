@@ -136,3 +136,24 @@ it('refuse une préparation sur stock réservé ou sur une catégorie différent
     expect(fn () => app(BadgePreparation::class)->prepare($person->event_id, DemoSeeder::id('batch'), 1, 1, [$person->id], $this->admin))->toThrow(ValidationException::class);
     expect(Badge::whereNotNull('printed_for_visitor_id')->count())->toBe(0);
 });
+
+it('prépare et imprime 200 destinations nominatives sans activation ni modification des QR', function () {
+    DB::table('settings')->where('key', 'badge_marge_pourcent')->update(['value' => '0']);
+    $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 200, $this->admin);
+    $ids = [];
+    for ($i = 0; $i < 200; $i++) {
+        $id = (string) Str::uuid();
+        $ids[] = $id;
+        DB::table('visitors')->insert(['id' => $id, 'event_id' => DemoSeeder::id('event'), 'full_name' => 'Nominatif fictif '.$i, 'category_id' => DemoSeeder::id('category1'), 'valid_from' => '2027-01-10 08:00:00', 'valid_until' => '2027-01-10 20:00:00', 'source' => 'listé', 'status' => 'attendu', 'created_at' => now(), 'updated_at' => now()]);
+    }
+    $tokens = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->pluck('qr_token')->all();
+    $badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->get();
+    $from = (int) substr($badges->first()->code, 2);
+    $to = (int) substr($badges->last()->code, 2);
+    $this->postJson('/administration/badges/modeles/preparer', ['event' => DemoSeeder::id('event'), 'batch' => $batch->id, 'from' => $from, 'to' => $to, 'visitor_ids' => $ids, 'personal_allowed' => true])->assertOk();
+    $options = [...$this->printData, 'batch' => $batch->id, 'format' => 'a4', 'mode' => 'nominatif', 'personal_allowed' => true];
+    $response = $this->get('/administration/badges/modeles/imprimer?'.http_build_query($options))->assertOk();
+    expect(substr_count($response->getContent(), '<article class="access-card '))->toBe(200)
+        ->and(Badge::where('badge_batch_id', $batch->id)->where('status', 'Disponible')->count())->toBe(200)
+        ->and(Badge::where('badge_batch_id', $batch->id)->orderBy('code')->pluck('qr_token')->all())->toBe($tokens);
+});
