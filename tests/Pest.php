@@ -33,3 +33,5 @@ pest()->use(DatabaseTransactions::class)->in('Feature/ProductionReadinessTest.ph
 pest()->use(DatabaseTransactions::class)->in('Feature/InstallationTest.php');
 
 pest()->use(DatabaseTransactions::class)->in('Feature/DemoCleanupTest.php');
+
+pest()->use(DatabaseTransactions::class)->in('Feature/EventsTest.php');

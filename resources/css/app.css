@@ -58,7 +58,7 @@ html { scroll-padding-bottom: 6rem; }
 .admin-header { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:10px 38px; min-height:64px; background:linear-gradient(110deg,#0b3c6b,#073766); color:white; }
 .admin-brand { display:flex; align-items:center; gap:14px; flex-shrink:0; font-size:20px; }
 .admin-brand strong { font-weight:850; }
-.admin-logo { display:grid; place-items:center; width:40px; height:40px; border-radius:10px; background:#ff6b16; color:white; }
+.admin-logo { display:grid; place-items:center; width:40px; height:40px; padding:3px; border-radius:10px; background:#fff; }
 .admin-event { min-width:0; max-width:38%; font-size:14px; font-weight:650; overflow-wrap:anywhere; }
 .admin-event-caption { display:block; font-size:11px; font-weight:400; color:#dbeafe; }
 .admin-event-select select { min-height:48px; max-width:100%; background:#0b3c6b; color:white; border:1px solid #93b5d8; padding:8px; border-radius:8px; }

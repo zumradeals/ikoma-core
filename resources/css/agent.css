@@ -8,7 +8,7 @@
 .agent-header :is(a,button):focus-visible { outline-color:white; }
 .agent-brand { display:flex; align-items:center; gap:12px; font-size:20px; flex:none; }
 .agent-brand p > span { display:block; font-size:13px; font-weight:400; }
-.agent-logo { display:grid; place-items:center; width:44px; height:44px; border-radius:10px; background:#f26b21; color:white; }
+.agent-logo { display:grid; place-items:center; width:44px; height:44px; padding:3px; border-radius:10px; background:#fff; }
 .agent-header-context { min-width:0; font-size:16px; overflow-wrap:anywhere; }
 .agent-session { display:flex; align-items:center; gap:18px; }
 .agent-network { display:flex; align-items:center; gap:6px; font-size:14px; white-space:nowrap; }
