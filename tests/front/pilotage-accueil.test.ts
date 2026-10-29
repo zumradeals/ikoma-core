@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@inertiajs/vue3', () => ({
   router: { post: vi.fn(), reload: vi.fn(), get: vi.fn() },
   Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
-  usePage: () => ({ props: { errors: {} } }),
+  usePage: () => ({ props: { errors: {}, auth: { name: 'Superviseur fictif', permissions: ['pilotage.consulter', 'presences.consulter', 'alertes.consulter', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'journal.consulter', 'badges.annuler'] } } }),
 }));
 import Index from '../../resources/js/pages/Pilotage/Index.vue';
 
@@ -42,7 +42,7 @@ describe('accueil du superviseur', () => {
       expect(w.get(`[data-testid=terrain-${key}]`).text()).toContain('À voir');
     }
     expect(w.get('[data-testid=terrain-postes]').text()).toContain('2 tablettes sans nouvelles');
-    expect(w.get('[data-testid=terrain-litiges] a').attributes('href')).toBe('/pilotage/litiges');
+    expect(w.get('[data-testid=terrain-litiges] a').attributes('href')).toBe('/pilotage/litiges?event=e1');
   });
 
   it('garde les quatre compteurs attendus par les parcours existants', () => {

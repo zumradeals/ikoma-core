@@ -95,9 +95,10 @@ it('n\'expose aucun nom de personne : ni dans les alertes, ni dans les dernière
     });
 });
 
-it('oriente seulement l’administrateur vers son tableau sans page-menu', function () {
+it('oriente administrateur et superviseur vers leurs tableaux sans changer les autres rôles', function () {
     $this->actingAs($this->admin)->get('/espace')->assertRedirect('/administration');
-    foreach (['agent_accueil', 'superviseur', 'hote', 'encadreur'] as $role) {
+    $this->actingAs(dashUser('superviseur'))->get('/espace')->assertRedirect('/pilotage');
+    foreach (['agent_accueil', 'hote', 'encadreur'] as $role) {
         $this->actingAs(dashUser($role))->get('/espace')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Space')->where('auth.isAdmin', false)->where('adminContext', null));
     }
 });
@@ -113,7 +114,7 @@ it('préserve les refus de permission même pour un administrateur et le journal
     $role->revokePermissionTo('badges.gerer');
     $this->admin->unsetRelation('roles');
     $this->actingAs($this->admin)->get('/administration/badges')->assertForbidden();
-    $this->actingAs(dashUser('superviseur'))->get('/administration/journal')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Journal')->where('auth.isAdmin', false)->where('adminContext', null));
+    $this->actingAs(dashUser('superviseur'))->get('/administration/journal')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Journal')->where('auth.isAdmin', false)->where('adminContext', null)->where('pilotageContext.event.id', $this->event));
 });
 
 it('expose uniquement le statut public de confirmation 2FA des comptes', function () {

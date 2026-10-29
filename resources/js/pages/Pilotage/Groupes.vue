@@ -10,7 +10,7 @@ const cells = (g: Group) => [['Badges remis', g.badges_remis], ['Embarqués', g.
 <template>
   <PilotageLayout active="plus" :event="event" :events="events" :open-alerts="openAlerts" title="Groupes et cars">
     <p>Lecture seule : l’avancement de chaque car, de la remise des badges à l’arrivée sur le site.</p>
-    <ul class="space-y-3" data-testid="liste-groupes">
+    <ul class="pilotage-record-grid" data-testid="liste-groupes">
       <li v-for="g in groups" :key="g.id" class="space-y-2 rounded-2xl border-2 border-ikoma-navy bg-white p-4">
         <p class="text-xl font-bold">{{ g.name }}<span v-if="g.bus_number" class="font-normal"> · car {{ g.bus_number }}</span></p>
         <p>{{ g.total }} personne{{ g.total > 1 ? 's' : '' }} · {{ g.parti ? 'car parti' : 'car pas encore parti' }}</p>

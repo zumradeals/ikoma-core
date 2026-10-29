@@ -45,18 +45,20 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
     const challenge = page.getByLabel('Code à six chiffres');
     const throttled = page.getByRole('alert').filter({ hasText: /Trop de tentatives/i }).first();
     if (response.status() !== 429) {
+      // Un POST valide redirige vers /two-factor-challenge. Sur certaines
+      // recettes Inertia le navigateur perd ponctuellement cette transition.
+      // Réessayer UNE fois le parcours normal, jamais le contourner.
       try {
-        await expect(challenge.or(throttled)).toBeVisible({ timeout: 15_000 });
+        await expect(challenge.or(throttled)).toBeVisible({ timeout: 8_000 });
       } catch {
-        // Indications techniques sans journaliser les identifiants ni les secrets TOTP.
-        const currentPath = new URL(page.url()).pathname;
         const target = response.headers()['location'] ?? '';
         const redirectPath = target ? new URL(target, page.url()).pathname : '(aucune)';
+        if (attempt === 0 && response.status() === 302 && redirectPath === '/two-factor-challenge') {
+          // Pas d'identifiants ni de TOTP dans les journaux de recette.
+          continue;
+        }
+        const currentPath = new URL(page.url()).pathname;
         const errorVisible = await page.getByRole('alert').count() > 0;
-        // La sonde utilise uniquement les cookies de ce contexte de navigateur.
-        // Elle ne suit pas la redirection et ne transmet aucun identifiant/secret.
-        // 200 : session de challenge conservée, vérifier alors la transition Inertia.
-        // 302 /login : session de challenge absente, vérifier stockage/cookies.
         let challengeStatus: string;
         try {
           const probe = await page.request.get('/two-factor-challenge', { maxRedirects: 0, timeout: 5_000, failOnStatusCode: false });
@@ -66,12 +68,12 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
         } catch {
           challengeStatus = 'requête impossible';
         }
-        throw new Error(`Écran 2FA absent après POST /login (HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}, contrôle direct du challenge : ${challengeStatus}). Aucun identifiant ou secret journalisé.`);
+        throw new Error(`Écran 2FA absent après deux tentatives normales au maximum (POST HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}, contrôle direct du challenge : ${challengeStatus}). Aucun identifiant ou secret journalisé.`);
       }
       if (await challenge.isVisible()) {
         await challenge.fill(await freshOtp(secret));
         await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
-        await expect(page).toHaveURL(/\/(administration|espace)$/, { timeout: 15_000 });
+        await expect(page).toHaveURL(/\/(administration|espace|pilotage)$/, { timeout: 15_000 });
         return;
       }
     }

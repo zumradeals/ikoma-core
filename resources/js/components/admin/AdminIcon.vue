@@ -3,6 +3,8 @@ import { computed } from 'vue';
 
 const props = withDefaults(defineProps<{ name: string; size?: number; stroke?: number }>(), { size: 22, stroke: 2 });
 const icons: Record<string, string[]> = {
+  speaker: ['M11 5L6 9H3v6h3l5 4z', 'M15 8a6 6 0 0 1 0 8', 'M18 5a10 10 0 0 1 0 14'],
+  speakerOff: ['M11 5L6 9H3v6h3l5 4z', 'M16 9l6 6', 'M22 9l-6 6'],
   monitor: ['M3 3h18v13H3z', 'M12 16v5', 'M8 21h8'],
   database: ['M21 5c0 2-4 3-9 3S3 7 3 5s4-3 9-3 9 1 9 3z', 'M3 5v14c0 2 4 3 9 3s9-1 9-3V5', 'M3 12c0 2 4 3 9 3s9-1 9-3'],
   home: ['M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z'],

@@ -32,3 +32,7 @@ Boutons d'action du poste : 64 px de haut, texte de 20 px en gras. Le vert d'act
 ## Administration unifiée (29 octobre 2026)
 
 `AdminLayout` est le cadre commun des modules administratifs. Styles limités à `.admin-shell` : barre marine, menu blanc 256 px, orange pour le module actif, cartes blanches bordées sur fond clair. Le texte sur orange reste marine pour le contraste. Menu repliable sous 1024 px ; panneaux réorganisés sur tablette et téléphone ; défilement des comptes contenu dans une région nommée. Corps administratif 16 px sur ordinateur, champs tactiles 18 px et cibles 56 px avec pointeur tactile. Les écrans d'accueil et de pilotage conservent leurs règles existantes. Contrat détaillé dans `refonte-administration/README.md`.
+
+## Pilotage superviseur V2 (29 octobre 2026)
+
+Cadre `PilotageLayout` et styles `.pilotage-*`, alignés sur la palette et les cartes de l’administration. Menu permanent à partir de 1200 px, repliable en tablette paysage et portrait ; navigation inférieure sous 900 px. Cibles de 56 px et champs 18 px. Deux colonnes sur ordinateur/tablette paysage, KPI 2 × 2 et pile de priorités en portrait/téléphone. Autres actions contient l’annulation contrôlée ; la fiche visiteur conserve son accès. Contrat : `refonte-pilotage/README.md`. Aucun changement des interfaces de poste.

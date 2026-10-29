@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
+import { pilotageHref } from '../../pilotage/navigation';
 import PilotageLayout from '../../layouts/PilotageLayout.vue';
 import { displayDate } from '../../labels';
 
@@ -17,9 +18,9 @@ const todo = () => props.rows.filter(r => !r.decision || r.decision === 'a_revoi
     <p>Refus d’accès enregistrés par l’accueil. Votre décision est tracée ; si vous autorisez, la personne repasse « attendue » avec la mention de votre autorisation.</p>
     <p v-if="page.props.errors?.pilotage" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900"><span aria-hidden="true">⚠</span> {{ page.props.errors.pilotage }}</p>
     <p role="status" data-testid="a-traiter">{{ todo().length }} cas à traiter</p>
-    <ul class="space-y-3" data-testid="liste-litiges">
+    <ul class="pilotage-record-grid" data-testid="liste-litiges">
       <li v-for="row in rows" :key="row.id" class="space-y-2 rounded-2xl border-2 bg-white p-4" :class="!row.decision ? 'border-red-700' : 'border-slate-300'" :data-decision="row.decision ?? 'aucune'">
-        <p class="flex flex-wrap items-center justify-between gap-2"><Link :href="'/pilotage/visiteurs/' + row.visitor_id" class="text-xl font-bold underline">{{ row.full_name }}</Link><span class="rounded-full border-2 px-3" :style="{ borderColor: row.color }">{{ row.category_name }}</span></p>
+        <p class="flex flex-wrap items-center justify-between gap-2"><Link :href="pilotageHref('/pilotage/visiteurs/' + row.visitor_id, event?.id)" class="text-xl font-bold underline">{{ row.full_name }}</Link><span class="rounded-full border-2 px-3" :style="{ borderColor: row.color }">{{ row.category_name }}</span></p>
         <p>Motif du refus : {{ row.reason }}</p>
         <p class="text-sm">{{ displayDate(row.refused_at) }}</p>
         <p v-if="row.decision" data-testid="decision"><span aria-hidden="true">{{ row.decision === 'autorise' ? '✓' : row.decision === 'maintenu' ? '✕' : '↻' }}</span> {{ labels[row.decision] }}<template v-if="row.supervisor_decision"> · {{ row.supervisor_decision }}</template></p>

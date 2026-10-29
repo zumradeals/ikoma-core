@@ -346,3 +346,7 @@ La commande `test:screen-account`, strictement réservée à `APP_ENV=testing`, 
 ### PR #26 — CI #144 : preuve de la redirection normale du login
 
 La [CI #144](https://github.com/zumradeals/ikoma-core/actions/runs/40871410125) obtient 36 succès E2E et un échec lors d'un scénario distinct (Conservation/Journaux), avant d'afficher la 2FA. La réponse POST /login est bien HTTP 302 vers /two-factor-challenge : il n'est pas justifié de suspecter les identifiants ou de modifier la 2FA. La page reste pourtant /login après 15 secondes. Une sonde de recette supplémentaire, exécutée uniquement en cas d'échec et sans suivre les redirections, relève le statut HTTP du GET /two-factor-challenge depuis la session du navigateur ; elle permettra de départager une perte de session et un problème de transition côté Inertia. Aucune tentative n'est faite pour contourner la 2FA. Trivy demeure inchangé et le contrôle ZAP est passé.
+
+## 29 octobre 2026 — Pilotage superviseur V2
+
+GO du dirigeant après présentation des maquettes ordinateur, tablette et téléphone. Menu repliable en tablette paysage ; annulation de badge dans Autres actions, avec accès depuis la fiche conservé. Cadre visuel partagé avec les écrans opérationnels et le journal suivant les permissions, redirection du seul superviseur depuis `/espace` après le middleware 2FA. Logique métier, fréquences d’actualisation, droits et évacuation hors ligne conservés. Contrat et références : `docs/refonte-pilotage/README.md`. Aucune fusion ni déploiement autorisés par ce GO d’implémentation.
