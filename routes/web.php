@@ -7,6 +7,7 @@ use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgeReservationsController;
 use App\Http\Controllers\BadgesController;
 use App\Http\Controllers\BadgeSettingsController;
+use App\Http\Controllers\BadgeWorkshopController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
 use App\Http\Controllers\EventsController;
@@ -80,6 +81,10 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
         Route::get('/administration/badges', BadgesController::class)->middleware('can:badges.gerer');
+        Route::get('/administration/badges/modeles', [BadgeWorkshopController::class, 'index'])->middleware('can:badges.gerer');
+        Route::post('/administration/badges/modeles/apercu', [BadgeWorkshopController::class, 'preview'])->middleware('can:badges.gerer');
+        Route::put('/administration/badges/modeles', [BadgeWorkshopController::class, 'save'])->middleware('can:badges.gerer');
+        Route::get('/administration/badges/modeles/imprimer', [BadgeWorkshopController::class, 'print'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/lots', [BadgeLotsController::class, 'store'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/reservations', [BadgeReservationsController::class, 'store'])->middleware('can:badges.gerer');
         Route::put('/administration/badges/reglages', [BadgeSettingsController::class, 'update'])->middleware('can:badges.gerer');

@@ -14,6 +14,7 @@ const form = useForm({ status: props.filters.status || '', batch: props.filters.
 <template>
 <AdminLayout active="badges">
 <h1 class="mb-4 text-display font-bold">Administration · Badges</h1><p class="mb-6">Fabriquez les lots de badges par catégorie, réservez des plages à un poste ou à un groupe, puis imprimez les étiquettes. Aucun nom de personne n’apparaît sur cet écran.</p>
+<BaseCard class="mb-6"><div class="flex flex-wrap items-center justify-between gap-4"><div><h2 class="text-heading font-bold">Modèles et impression</h2><p>Créez vos badges Visiteur, VIP ou Prestataire, puis imprimez en PVC ou sur papier A4.</p></div><Link href="/administration/badges/modeles" class="action">Ouvrir l’atelier</Link></div></BaseCard>
 <div class="mb-8 space-y-6">
 <BaseCard><h2 class="mb-5 text-heading font-bold">Générer un lot</h2><BadgeLotForm :events="events" :categories="categories" :margin="settings.margin" /></BaseCard>
 <BaseCard><h2 class="mb-5 text-heading font-bold">Réserver une plage de badges</h2><BadgeReservationForm :batches="batches" :devices="devices" :groups="groups" /></BaseCard>
