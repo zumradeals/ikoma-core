@@ -50,7 +50,7 @@ Exceptions vérifiées par règle, niveau **et** instances dans `scripts/securit
 |---|---|---|
 | 10010, faible | Cookie XSRF-TOKEN uniquement, évidence exacte Set-Cookie | Le client Inertia doit lire le jeton pour l’en-tête CSRF. Le cookie de session reste HttpOnly. L’exception ne couvre aucun autre cookie ; un XSS actif reste un risque traité par CSP et échappement |
 | 10109, information | Page racine contenant le module JavaScript | Identifie une application moderne ; rappelle la limite de l’exploration passive sans authentification. Les parcours authentifiés sont testés par Playwright |
-| 10112, information | Cookie laravel-session reconnu sur la page racine | Détection de mécanisme de session, pas exposition de sa valeur. Aucune exception sur la sécurité du cookie |
+| 10112, information | Cookies `laravel-session` et `XSRF-TOKEN` identifiés sur la page racine, preuve limitée au nom exact du cookie | Détection du mécanisme de session et du jeton CSRF, pas exposition de leurs valeurs. Exception limitée aux deux noms et aux instances exactes ; aucune exception sur les attributs de sécurité des cookies |
 | 10049-1, information | Racine privée et sitemap.xml absent avec no-store | L’absence de cache est attendue pour les réponses de session/erreur ; aucun écran authentifié ne doit être mis en cache |
 | 10049-3, information | Ressources publiques /build/ et robots.txt | Ressources sans identité destinées au navigateur/PWA ; exception non applicable aux routes de données |
 

@@ -327,3 +327,10 @@ Mission et deux maquettes validées par le dirigeant : un administrateur, un esp
 - Comptes : synthèse calculée sur les données du contrôleur, liste tabulaire avec recherche locale, formulaires par ligne dépliable, rattachement des fiches par compte hôte, réglages initialisés depuis les valeurs serveur. Le seul champ serveur ajouté est le booléen `two_factor_confirmed`, sans secret. Les actions sensibles gardent leurs contrôles et la réinitialisation 2FA en deux étapes.
 - Cadre et styles limités à l'administration. Menu orange avec texte marine contrasté ; cibles tactiles agrandies ; défilement horizontal limité à la table des comptes. Aucun ajout de dépendance, migration, mécanisme hors ligne ou nouvelle fonctionnalité.
 - Contrat, écarts intentionnels, recette et limites de déploiement : `docs/refonte-administration/README.md`. Le lot reste à revoir avant toute fusion.
+
+
+## PR #26 — recette de la refonte administrative (29 octobre 2026)
+
+- Les deux scénarios navigateur qui échouaient avant le formulaire TOTP ont désormais une gestion limitée et explicite des refus temporaires de connexion : un seul nouvel essai après le délai du serveur. Les limites de connexion, le TOTP et les rôles de l'application restent inchangés. Les tests complets doivent être relancés.
+- L'observation ZAP 10112 de niveau informatif est acceptée uniquement pour `laravel-session` et `XSRF-TOKEN` sur la racine, avec la preuve exacte du nom du cookie ; les propriétés de sécurité des cookies restent surveillées et toutes les autres instances bloquent.
+- Trivy reste actif et bloquant dans la CI. Le risque résiduel du lot L12 avait été accepté provisoirement ; toute nouvelle faille ou évolution de correctif demande un réexamen avant le déploiement chez le client.

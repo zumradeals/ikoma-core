@@ -1,3 +1,4 @@
+import { expect, type Page } from '@playwright/test';
 import { createHmac } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
@@ -26,4 +27,36 @@ export async function freshOtp(secret: string): Promise<string> {
   writeFileSync(LAST, JSON.stringify(used));
 
   return code(secret, window * 30000);
+}
+
+/**
+ * Le serveur impose une limite aux connexions. Les recettes E2E ne désactivent
+ * jamais cette limite : elles retentent une seule fois si elle est signalée.
+ */
+export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.goto('/login');
+    await page.getByLabel('Adresse électronique').fill(email);
+    await page.getByLabel('Mot de passe', { exact: true }).fill(password);
+    const [response] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === '/login' && r.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Se connecter' }).click(),
+    ]);
+    const challenge = page.getByLabel('Code à six chiffres');
+    const throttled = page.getByRole('alert').filter({ hasText: /Trop de tentatives/i }).first();
+    if (response.status() !== 429) {
+      await expect(challenge.or(throttled)).toBeVisible({ timeout: 15_000 });
+      if (await challenge.isVisible()) {
+        await challenge.fill(await freshOtp(secret));
+        await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
+        return;
+      }
+    }
+    if (attempt === 1) throw new Error('La connexion de recette reste limitée après le délai serveur.');
+    const message = await throttled.isVisible() ? await throttled.innerText() : '';
+    const secondsInMessage = message.match(/(\d+)\s*secondes?/i);
+    const secondsInHeader = Number(response.headers()['retry-after']);
+    const seconds = secondsInMessage ? Number(secondsInMessage[1]) : Number.isFinite(secondsInHeader) && secondsInHeader > 0 ? secondsInHeader : 60;
+    await page.waitForTimeout(Math.min(65, Math.max(2, seconds + 2)) * 1_000);
+  }
 }

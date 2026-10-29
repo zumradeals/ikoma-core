@@ -2,7 +2,7 @@
 // dans l'événement de recette, et le test d'alertes du pilotage compte précisément les siennes.
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { freshOtp } from './otp';
+import { loginWithSecondFactor } from './otp';
 
 type Car = { id: string; name: string; bus: string; members: string[]; ids: string[]; badges: string[]; qr: Record<string, string> };
 type Fixtures = {
@@ -22,8 +22,10 @@ const button = (page: Page, name: string | RegExp) => page.getByRole('button', {
 
 async function login(context: BrowserContext, email: string, password: string, secret?: string): Promise<void> {
   const page = await context.newPage();
-  await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(email); await page.getByLabel('Mot de passe', { exact: true }).fill(password); await page.getByRole('button', { name: 'Se connecter' }).click();
-  if (secret) { await page.getByLabel('Code à six chiffres').fill(await freshOtp(secret)); await page.getByRole('button', { name: 'Vérifier', exact: true }).click(); }
+  if (secret) await loginWithSecondFactor(page, email, password, secret);
+  else {
+    await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(email); await page.getByLabel('Mot de passe', { exact: true }).fill(password); await page.getByRole('button', { name: 'Se connecter' }).click();
+  }
   await expect(page).toHaveURL(email === fx.admin.email ? /\/administration$/ : /\/espace/);
   await page.close();
 }
@@ -224,6 +226,7 @@ test('arrivée du car : scan continu, écarts signalés au superviseur', async (
 });
 
 test('administration : règle de contrôle des stagiaires et groupes', async ({ browser }, info) => {
+  test.setTimeout(180_000); // délai TOTP et limitation temporaire éventuelle
   const admin = await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 1024, height: 900 } });
   await login(admin, fx.admin.email, fx.admin.password, fx.admin.secret);
   const page = await admin.newPage();

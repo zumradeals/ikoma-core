@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { freshOtp } from './otp';
+import { loginWithSecondFactor } from './otp';
 
 type Fixtures = { email: string; password: string; poste: string; names: Record<string, string>; takenBadge: string; vipBadges: string[]; freeBadges: string[]; qrSvg: string; qrBadge: string; enrolCode: string; bulk: string[]; bulkPrefix: string; admin: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
@@ -239,8 +239,7 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
   await expect(online.getByTestId('en-attente')).toHaveText('0');
   const adminContext = await browser.newContext({ baseURL });
   const admin = await adminContext.newPage();
-  await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
-  await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await loginWithSecondFactor(admin, fx.admin.email, fx.admin.password, fx.admin.secret);
   await expect(admin).toHaveURL(/\/administration$/);
   const before = await adminCounters(admin);
 
@@ -297,13 +296,12 @@ test('30 visiteurs traités sans réseau, tablette rouverte sans réseau, puis e
 });
 
 test('la révocation par l’administrateur efface la tablette à sa prochaine synchronisation', async ({ browser, baseURL }) => {
-  test.setTimeout(90_000); // le serveur refuse un code à six chiffres déjà utilisé : l'attente de la période suivante peut durer 30 s
+  test.setTimeout(180_000); // inclut le délai TOTP et une éventuelle limitation temporaire du serveur
   const page = await desk();
   await expect(page.getByRole('button', { name: 'Effacer cette tablette' })).toHaveCount(0); // l'effacement n'est pas à la portée de l'agent
   const adminContext = await browser.newContext({ baseURL });
   const admin = await adminContext.newPage();
-  await admin.goto('/login'); await admin.getByLabel('Adresse électronique').fill(fx.admin.email); await admin.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password); await admin.getByRole('button', { name: 'Se connecter' }).click();
-  await admin.getByLabel('Code à six chiffres').fill(await freshOtp(fx.admin.secret)); await admin.getByRole('button', { name: 'Vérifier', exact: true }).click();
+  await loginWithSecondFactor(admin, fx.admin.email, fx.admin.password, fx.admin.secret);
   await expect(admin).toHaveURL(/\/administration$/);
   await admin.goto('/administration/postes');
   admin.once('dialog', dialog => dialog.accept());

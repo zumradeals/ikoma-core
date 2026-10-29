@@ -23,7 +23,9 @@ def approved(alert):
             if path != '/' or 'type="module"' not in instance.get('evidence', ''):
                 return False
         elif ref == '10112' and risk == '0':
-            if path != '/' or instance.get('param') != 'laravel-session':
+            # Deux cookies connus, niveau informatif et preuve du seul nom.
+            param = instance.get('param')
+            if path != '/' or param not in ('laravel-session', 'XSRF-TOKEN') or instance.get('evidence') != param:
                 return False
         elif ref == '10049-1' and risk == '0':
             if path not in ['/', '/sitemap.xml'] or instance.get('evidence') not in ['private', 'no-store']:
