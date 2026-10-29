@@ -6,19 +6,37 @@ import '../../../../public/badges/cards.css';
 
 type Visual = { design: string; title: string; primary: string; accent: string; orientation: string };
 type Batch = { id: string; event_id: string; name: string; category: string | null; first_number: number | null; last_number: number | null };
-const props = defineProps<{ events: { id: string; name: string }[]; batches: Batch[]; preferences: Record<string, Visual> }>();
-const initialEvent = props.events[0]?.id ?? '';
+const props = defineProps<{ events: { id: string; name: string }[]; batches: Batch[]; preferences: Record<string, Visual>; person?: { id: string; event_id: string; category_id: string; full_name: string } | null }>();
+const initialEvent = props.person?.event_id ?? props.events[0]?.id ?? '';
 const defaults: Visual = { design: 'visiteur', title: 'IKOMA ACCESS', primary: '#0066B3', accent: '#F75C03', orientation: 'paysage' };
-const form = useForm({ event: initialEvent, batch: '', ...defaults, ...props.preferences[initialEvent], from: '', to: '', format: 'pvc', cols: 2, rows: 5, side: 'recto', mode: 'reutilisable' });
+const form = useForm({ event: initialEvent, batch: '', ...defaults, ...props.preferences[initialEvent], from: '', to: '', format: 'pvc', cols: 2, rows: 5, side: 'recto', mode: 'reutilisable', personal_allowed: false, show_photo: false, show_org: false, show_period: false });
 const batches = computed(() => props.batches.filter(b => b.event_id === form.event));
 const batch = computed(() => batches.value.find(b => b.id === form.batch));
 const result = ref<{ html: string; count: number; first: string; last: string; inactive: number } | null>(null);
 const errors = ref<string[]>([]);
+const people = ref<{ id: string; full_name: string; organisation: string | null }[]>([]);
+const selected = ref<string[]>([]); const personQuery = ref(props.person?.full_name ?? ''); const preparationMessage = ref('');
+async function personalApi(path: string, body: object) {
+  errors.value = [];
+  try {
+    const response = await fetch('/administration/badges/modeles/' + path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': decodeURIComponent(document.cookie.split('; ').find(c => c.startsWith('XSRF-TOKEN='))?.slice(11) ?? '') }, body: JSON.stringify(body) });
+    const data = await response.json();
+    if (!response.ok) { errors.value = data.errors ? Object.values(data.errors as Record<string, string[]>).flat() : ['Opération refusée. Vérifiez votre session et vos droits.']; return null; }
+    return data;
+  } catch { errors.value = ['Connexion interrompue. Réessayez une fois le réseau rétabli.']; return null; }
+}
+async function loadPeople() { const data = await personalApi('personnes', { event: form.event, batch: form.batch, q: personQuery.value }); if (data) { people.value = data.people; selected.value = []; preparationMessage.value = ''; } }
+async function preparePeople() {
+  if (busy.value) return; busy.value = true;
+  const data = await personalApi('preparer', { event: form.event, batch: form.batch, from: form.from, to: form.to, visitor_ids: selected.value, personal_allowed: form.personal_allowed });
+  if (data) preparationMessage.value = data.prepared.length + ' destination(s) réservée(s). Aucun badge activé. Actualisez l’aperçu.';
+  busy.value = false; result.value = null;
+}
 const busy = ref(false);
 const signature = computed(() => JSON.stringify(form.data()));
 const previewSignature = ref('');
 const ready = computed(() => !!result.value && previewSignature.value === signature.value && !busy.value);
-const printUrl = computed(() => '/administration/badges/modeles/imprimer?' + new URLSearchParams(Object.entries(form.data()).filter(([, value]) => value !== '').map(([key, value]) => [key, String(value)])).toString());
+const printUrl = computed(() => '/administration/badges/modeles/imprimer?' + new URLSearchParams(Object.entries(form.data()).filter(([, value]) => value !== '').map(([key, value]) => [key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value)])).toString());
 const designs = [
   { id: 'visiteur', name: 'Visiteur', label: 'A', description: 'Blanc, bleu et orange. Clair et essentiel.', color: '#0066B3', primary: '#0066B3', accent: '#F75C03' },
   { id: 'vip', name: 'VIP', label: 'B', description: 'Crème et or. Une présentation soignée.', color: '#C9962B', primary: '#0B3C6B', accent: '#C9962B' },
@@ -37,7 +55,8 @@ watch(() => form.event, () => {
   Object.assign(form, props.preferences[form.event] ?? defaults);
   chooseBatch();
 });
-watch(() => form.batch, range);
+watch(() => form.batch, () => { range(); people.value = []; selected.value = []; });
+watch(() => form.mode, () => { form.personal_allowed = false; form.show_photo = false; form.show_org = false; form.show_period = false; people.value = []; selected.value = []; });
 watch(() => form.orientation, () => { form.cols = form.orientation === 'portrait' ? 3 : 2; form.rows = form.orientation === 'portrait' ? 3 : 5; });
 watch(signature, () => { errors.value = []; });
 async function preview() {
@@ -74,11 +93,12 @@ onMounted(() => { chooseBatch(); if (form.batch) void preview(); });
       <div><p class="text-sm font-bold uppercase tracking-widest text-blue-700">Atelier de badges · IKOMA ACCESS</p><h1 class="mt-2 text-display font-bold">Modèles et impression</h1><p class="mt-2 max-w-3xl">Choisissez votre lot, personnalisez le modèle, puis préparez l’impression à taille réelle.</p></div>
       <Link href="/administration/badges" class="btn-soft">Retour aux badges</Link>
     </div>
-    <p class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-base">Badges réutilisables : aucun nom, aucune photo et aucune zone autorisée ne sont imprimés. Le modèle VIP ne donne aucun droit d’accès supplémentaire.</p>
+    <p class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-base">Le mode standard reste anonyme. Les données personnelles apparaissent seulement en mode nominatif explicitement autorisé. Les zones ne sont jamais imprimées. Le modèle VIP ne donne aucun droit d’accès supplémentaire.</p>
     <div class="workshop-layout">
       <form class="space-y-5" aria-label="Configurer les badges" @submit.prevent="preview">
         <section class="workshop-panel">
 <h2>1. Choisir les badges</h2>
+<label>Mode de badge<select v-model="form.mode" class="field"><option value="reutilisable">Standard réutilisable · sans identité</option><option value="nominatif">Nominatif · depuis une fiche</option></select></label>
           <label>Événement<select v-model="form.event" class="field"><option v-for="event in events" :key="event.id" :value="event.id">{{ event.name }}</option></select></label>
           <label>Lot<select v-model="form.batch" class="field"><option v-for="item in batches" :key="item.id" :value="item.id">{{ item.name }} · {{ item.category || 'Sans catégorie' }}</option></select></label>
           <p v-if="!batches.length" role="status">Aucun lot pour cet événement. <Link href="/administration/badges" class="underline">Générer un lot</Link>.</p>
@@ -88,6 +108,21 @@ onMounted(() => { chooseBatch(); if (form.batch) void preview(); });
           <p class="text-base">Pour un seul badge, saisissez le même numéro dans les deux champs. Maximum : 1 000 badges par préparation.</p>
         </section>
         <section class="workshop-panel">
+<div v-if="form.mode === 'nominatif'" class="mb-5 space-y-4 rounded-xl border-2 border-blue-200 p-4">
+<h2>Destinations nominatives</h2><p class="text-base">La préparation réserve chaque carte définitivement à une personne, sans contrôle d’identité ni activation. Utilisez des badges disponibles non réservés à un poste ou groupe ; réservez-les ensuite aux tablettes et synchronisez-les.</p>
+<label class="flex min-h-14 items-center gap-3"><input v-model="form.personal_allowed" type="checkbox">La politique du client autorise l’impression nominative</label>
+<label>Rechercher une personne<input v-model="personQuery" class="field" maxlength="160" placeholder="Nom, ou vide pour la catégorie du lot"></label>
+<button type="button" class="btn-soft" :disabled="!form.batch || busy" @click="loadPeople">Charger les personnes de cette catégorie (200 max.)</button>
+<template v-if="people.length">
+<div class="flex flex-wrap gap-3"><button type="button" class="btn-soft" @click="selected = people.map(p => p.id)">Tout sélectionner</button><button type="button" class="btn-soft" @click="selected = []">Tout désélectionner</button></div>
+<div class="max-h-80 overflow-auto rounded-lg border p-3"><label v-for="candidate in people" :key="candidate.id" class="flex min-h-14 items-center gap-3"><input v-model="selected" type="checkbox" :value="candidate.id"><span>{{ candidate.full_name }} · {{ candidate.organisation }}</span></label></div>
+<p class="text-base">{{ selected.length }} personne(s). Les destinations suivent l’ordre des cases sélectionnées et les numéros croissants. La plage doit contenir exactement ce nombre de badges.</p>
+<button type="button" class="btn-soft" :disabled="!form.personal_allowed || !selected.length || busy" @click="preparePeople">Réserver {{ selected.length }} destination(s) nominative(s)</button>
+</template>
+<p v-if="preparationMessage" role="status">{{ preparationMessage }}</p>
+<label class="flex min-h-14 items-center gap-3"><input v-model="form.show_photo" type="checkbox">Afficher le portrait de profil autorisé, si disponible</label><label class="flex min-h-14 items-center gap-3"><input v-model="form.show_org" type="checkbox">Afficher la fonction ou l’organisation</label><label class="flex min-h-14 items-center gap-3"><input v-model="form.show_period" type="checkbox">Afficher la période de validité</label>
+<p class="text-base">Nom récupéré automatiquement. Sans portrait autorisé, le modèle sans photo est utilisé. Les photos du contrôle et des pièces ne sont jamais récupérées.</p>
+</div>
 <h2>2. Choisir le modèle</h2>
           <div class="space-y-3"><label v-for="design in designs" :key="design.id" class="workshop-design" :class="{ selected: form.design === design.id }"><input v-model="form.design" type="radio" name="design" :value="design.id" @change="designColors(design)"><span class="workshop-design-letter" :style="{ background: design.color }">{{ design.label }}</span><span><strong>{{ design.name }}</strong><small>{{ design.description }}</small></span></label></div>
           <label>Titre du site<input v-model="form.title" class="field" maxlength="60" required></label>

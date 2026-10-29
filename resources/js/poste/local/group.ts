@@ -79,6 +79,7 @@ export function applyGroupOp(list: LocalList, type: string, p: Record<string, un
       if (!badge) throw refuse('badge_inconnu', 'Badge inconnu : vérifiez le code imprimé ou prenez un autre badge.', 'Saisissez le code imprimé ou prenez un autre badge.');
       if (visitor.badge_code === badge.code) return { badge_code: badge.code };
       if (badge.group_id !== group.id) throw refuse('hors_lot_groupe', 'Ce badge n’appartient pas au lot réservé à ce groupe.', 'Prenez un badge du lot de ce groupe.');
+      if (badge.printed_for_visitor_id && badge.printed_for_visitor_id !== visitor.id) throw refuse('destination_nominative', 'Ce badge nominatif est réservé à une autre personne.');
       if (badge.status !== 'Disponible') {
         if (badge.status === 'Associé') throw refuse('deja_associe', `Badge déjà associé${holderOf(list, badge.code) ? ` à ${holderOf(list, badge.code)!.full_name}` : ''}. Prenez un autre badge.`, 'Prenez un autre badge du lot du groupe.');
         throw refuse(badge.status === 'Annulé' ? 'annule' : 'indisponible', badge.status === 'Annulé' ? 'Badge annulé : il ne peut plus être utilisé.' : 'Badge restitué ou clos : il ne peut plus être associé.', 'Prenez un autre badge du lot du groupe.');

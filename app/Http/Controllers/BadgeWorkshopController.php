@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Audit;
 use App\Services\BadgeArtwork;
+use App\Services\BadgePreparation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,9 +16,15 @@ use stdClass;
 
 final class BadgeWorkshopController
 {
-    public function index(): \Inertia\Response
+    public function index(Request $request): \Inertia\Response
     {
         Gate::authorize('badges.gerer');
+        $personInput = $request->validate(['person' => 'nullable|uuid|exists:visitors,id']);
+        $person = null;
+        if (! empty($personInput['person'])) {
+            Gate::authorize('listes.importer');
+            $person = DB::table('visitors')->where('id', $personInput['person'])->whereNull('withdrawn_at')->first(['id', 'event_id', 'category_id', 'full_name']);
+        }
         $events = DB::table('events')->orderBy('name')->get(['id', 'name']);
         $preferences = [];
         $settings = DB::table('settings')->where('key', 'like', 'badge_atelier_%')->pluck('value', 'key');
@@ -30,7 +37,7 @@ final class BadgeWorkshopController
         $number = "CASE WHEN code ~ '^B-[0-9]+\$' THEN substring(code from 3)::integer END";
 
         return Inertia::render('Admin/BadgeWorkshop', [
-            'events' => $events, 'preferences' => $preferences,
+            'events' => $events, 'preferences' => $preferences, 'person' => $person,
             'batches' => DB::table('badge_batches as batch')->leftJoin('categories as c', 'c.id', '=', 'batch.category_id')
                 ->selectRaw("batch.id, batch.event_id, batch.name, c.name as category, (SELECT min($number) FROM badges WHERE badge_batch_id = batch.id) as first_number, (SELECT max($number) FROM badges WHERE badge_batch_id = batch.id) as last_number")
                 ->orderBy('batch.name')->get(),
@@ -50,12 +57,36 @@ final class BadgeWorkshopController
         ])->header('Cache-Control', 'no-store, private');
     }
 
+    public function people(Request $request): JsonResponse
+    {
+        Gate::authorize('badges.gerer');
+        Gate::authorize('listes.importer');
+        $input = $request->validate(['event' => 'required|uuid|exists:events,id', 'batch' => 'required|uuid|exists:badge_batches,id', 'q' => 'nullable|string|max:160']);
+        $category = DB::table('badge_batches')->where('id', $input['batch'])->where('event_id', $input['event'])->value('category_id');
+        $query = DB::table('visitors')->where('event_id', $input['event'])->where('category_id', $category)->whereNull('withdrawn_at');
+        if (! empty($input['q'])) {
+            $query->where('full_name', 'ilike', '%'.$input['q'].'%');
+        }
+
+        return response()->json(['people' => $query->orderBy('full_name')->orderBy('id')->limit(200)->get(['id', 'full_name', 'organisation', 'valid_from', 'valid_until'])])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function prepare(Request $request, BadgePreparation $preparation): JsonResponse
+    {
+        Gate::authorize('badges.gerer');
+        Gate::authorize('listes.importer');
+        $input = $request->validate(['event' => 'required|uuid|exists:events,id', 'batch' => 'required|uuid|exists:badge_batches,id', 'from' => 'required|integer|min:1', 'to' => 'required|integer|gte:from', 'visitor_ids' => 'required|array|min:1|max:200', 'visitor_ids.*' => 'required|uuid|distinct', 'personal_allowed' => 'accepted']);
+
+        return response()->json(['prepared' => $preparation->prepare($input['event'], $input['batch'], (int) $input['from'], (int) $input['to'], $input['visitor_ids'], $request->user())]);
+    }
+
     public function save(Request $request, BadgeArtwork $artwork): RedirectResponse
     {
         Gate::authorize('badges.gerer');
         $data = $artwork->validate($request, false);
+        $data = array_intersect_key($data, array_flip(['event', 'design', 'title', 'primary', 'accent', 'orientation']));
         $event = $data['event'];
-        unset($data['event'], $data['mode']);
+        unset($data['event']);
         DB::transaction(function () use ($event, $data): void {
             foreach ($data as $key => $value) {
                 DB::table('settings')->updateOrInsert(['key' => 'badge_atelier_'.$event.'_'.$key], ['value' => $value]);

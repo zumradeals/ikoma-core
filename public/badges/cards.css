@@ -34,3 +34,16 @@
 
 .access-card__identity p.access-card__title-long { font-size: 2mm; }
 .access-card .access-card__code-long { font-size: 4.5mm; }
+
+.access-card__portrait { display: block; width: 12mm; height: 16mm; object-fit: cover; flex-shrink: 0; }
+.access-card__name { font-size: 2.8mm; line-height: 1.1; overflow-wrap: anywhere; }
+.access-card__personal { font-size: 2mm; line-height: 1.1; overflow-wrap: anywhere; }
+.access-card--nominatif .access-card__details { gap: .7mm; }
+.access-card--nominatif .access-card__code { font-size: 4.5mm; }
+.access-card--nominatif .access-card__category { font-size: 2.3mm; }
+.access-card--photo .access-card__content { gap: 1.5mm; }
+.access-card--photo .access-card__name { font-size: 2.3mm; }
+.access-card--portrait.access-card--photo .access-card__portrait { width: 12mm; height: 16mm; }
+.access-card--portrait.access-card--nominatif .access-card__content { gap: 1mm; }
+.access-card--portrait.access-card--nominatif .access-card__qr { width: 25mm; height: 25mm; }
+.access-card--portrait.access-card--nominatif .access-card__name { font-size: 2.5mm; }

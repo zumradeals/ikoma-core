@@ -68,6 +68,12 @@ final class DataRetention
                         $counts['photos'] += DB::table('identity_checks')->where('id', $check->id)->update(['document_file' => null, 'document_number' => null]);
                     }
                 }
+                if (($days['photos'] > 0 && $elapsed >= $days['photos']) || ($days['visiteurs'] > 0 && $elapsed >= $days['visiteurs'])) {
+                    foreach ((clone $visitors)->whereNotNull('profile_photo_file')->get(['id', 'profile_photo_file']) as $portrait) {
+                        app(ProfilePortrait::class)->deleteFile($portrait->profile_photo_file);
+                        $counts['photos'] += DB::table('visitors')->where('id', $portrait->id)->update(['profile_photo_file' => null, 'profile_photo_print_allowed' => false]);
+                    }
+                }
                 if ($days['notifications'] > 0 && $elapsed >= $days['notifications']) {
                     $counts['notifications'] += DB::table('notifications')->where('event_id', $event->id)->delete();
                 }
@@ -79,7 +85,7 @@ final class DataRetention
                     $anonymized = true;
                     // Sans identité, aucune nouvelle admission ni rejeu n'est permis. Les références statistiques restent stables.
                     DB::table('devices')->where('event_id', $event->id)->update(['revoked_at' => $now, 'enrollment_hash' => null, 'enrollment_expires_at' => null, 'updated_at' => $now]);
-                    $counts['visiteurs'] += (clone $visitors)->update(['full_name' => DB::raw("'Visiteur anonymisé ' || id::text"), 'organisation' => null, 'host_id' => null, 'access_note' => null, 'withdrawn_at' => $now, 'updated_at' => $now]);
+                    $counts['visiteurs'] += (clone $visitors)->update(['full_name' => DB::raw("'Visiteur anonymisé ' || id::text"), 'organisation' => null, 'position' => null, 'host_id' => null, 'access_note' => null, 'withdrawn_at' => $now, 'updated_at' => $now]);
                     DB::table('hosts')->where('event_id', $event->id)->update(['name' => DB::raw("'Hôte anonymisé ' || id::text"), 'service' => null, 'user_id' => null, 'updated_at' => $now]);
                     DB::table('refusals')->whereIn('visitor_id', clone $ids)->update(['reason' => 'Motif effacé à échéance', 'supervisor_decision' => null]);
                     DB::table('notifications')->where('event_id', $event->id)->delete();

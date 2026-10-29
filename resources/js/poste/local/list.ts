@@ -5,7 +5,7 @@ export type SnapVisitor = {
   id: string; full_name: string; organisation: string | null; host_id: string | null; category_id: string; valid_from: string; valid_until: string; source: string; status: string;
   host_validation: 'en_attente' | 'accepte' | 'refuse' | null; access_note?: string | null; group_id?: string | null; a_rebadger?: boolean; rev: string | null; identity_done: boolean; photo_done: boolean; validated: boolean; badge_code: string | null;
 };
-export type SnapBadge = { code: string; token_hash: string; category_id: string | null; status: string; mine: boolean; group_id?: string | null };
+export type SnapBadge = { code: string; token_hash: string; category_id: string | null; status: string; mine: boolean; printed_for_visitor_id?: string | null; group_id?: string | null };
 export type SnapGroup = { id: string; name: string; bus_number: string | null; opened: boolean; departed: boolean; arrival_closed: boolean };
 export type SnapMember = { group_id: string; visitor_id: string; checked: boolean; confirmed: boolean; absent: boolean; boarded: boolean; arrived: boolean };
 export type Snapshot = {

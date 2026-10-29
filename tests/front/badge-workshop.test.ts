@@ -43,11 +43,11 @@ describe('atelier de badges', () => {
 
   it('change d’événement sans conserver une plage ou un lot de l’autre événement', async () => {
     const wrapper = render(); await flushPromises();
-    await wrapper.findAll('select')[0].setValue('event-b'); await flushPromises();
-    expect((wrapper.findAll('select')[1].element as HTMLSelectElement).value).toBe('lot-b');
+    await wrapper.findAll('select')[1].setValue('event-b'); await flushPromises();
+    expect((wrapper.findAll('select')[2].element as HTMLSelectElement).value).toBe('lot-b');
     expect((wrapper.get('input[type="number"]').element as HTMLInputElement).value).toBe('1');
     expect(wrapper.find('[data-testid="preparer-impression"]').exists()).toBe(false);
-    expect(wrapper.findAll('select')[1].text()).not.toContain('Visiteur');
+    expect(wrapper.findAll('select')[2].text()).not.toContain('Visiteur');
   });
 
   it('refuse d’afficher un aperçu reçu pour des options déjà modifiées', async () => {

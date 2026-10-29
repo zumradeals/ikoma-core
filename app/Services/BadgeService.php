@@ -32,6 +32,9 @@ final class BadgeService
             if ($badge->event_id !== $visitor->event_id) {
                 throw new BadgeRefused('autre_evenement', 'Ce badge appartient à un autre événement.');
             }
+            if ($badge->printed_for_visitor_id !== null && $badge->printed_for_visitor_id !== $visitor->id) {
+                throw new BadgeRefused('destination_nominative', 'Ce badge nominatif est réservé à une autre personne.');
+            }
             if ($badge->status !== BadgeStatus::Available) {
                 throw $this->unavailable($badge);
             }
