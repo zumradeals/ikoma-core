@@ -191,7 +191,7 @@ final class DemoLab
         self::authorize($actor);
         DB::transaction(function () use ($eventId, $actor): void {
             $event = DB::table('events')->where('id', $eventId)->where('is_demo', true)->first();
-            abort_unless($event, 404, 'Scénario de démonstration introuvable.');
+            abort_unless($event !== null, 404, 'Scénario de démonstration introuvable.');
             $this->queueFiles([$eventId]);
             DB::select('SELECT public.ikoma_reset_demo_event(CAST(? AS uuid))', [$eventId]);
             app(Audit::class)->append('demo.scenario_reinitialise', $actor->id, ['event_id' => $eventId]);
@@ -200,6 +200,7 @@ final class DemoLab
     }
 
     /** Efface tous les événements de cette installation DEMO, jamais les comptes ou la configuration. */
+    /** @return array<string, int> */
     public function clearBusiness(User $actor, bool $clearAccounts = false): array
     {
         self::authorize($actor);
