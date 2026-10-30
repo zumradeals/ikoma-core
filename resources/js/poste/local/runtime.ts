@@ -53,6 +53,7 @@ export class PosteRuntime {
     const data = await response.json().catch(() => null) as (Enrolled & { message?: string; code?: string; errors?: Record<string, string[]> }) | null;
     if (!response.ok || !data?.device_token) throw new ApiError(data?.code ?? 'erreur', data?.message ?? Object.values(data?.errors ?? {})[0]?.[0] ?? 'Enrôlement impossible. Vérifiez le code ou demandez-en un nouveau.', null, response.status);
     await this.vault.enrol({ token: data.device_token, secret: data.device_secret, pin, agent, poste: { id: data.poste.id, name: data.poste.station || data.poste.name }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    this.sync.resetAfterEnrollment();
     await this.sync.sync();
     if (!(await this.db.chunks.get('list:head'))) {
       await this.vault.wipe();
