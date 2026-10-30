@@ -24,7 +24,7 @@ export class SyncManager {
 
   constructor(
     private readonly vault: PosteVault, private readonly store: PosteStore,
-    private readonly hooks: { onState: (s: SyncState) => void; onSnapshot: (s: Snapshot) => Promise<void>; onRevoked: () => Promise<void>; now: () => number; fetcher?: typeof fetch },
+    private readonly hooks: { onState: (s: SyncState) => void; onSnapshot: (s: Snapshot) => Promise<void>; onRevoked: (reason: 'appareil_revoque' | 'appareil_non_enrole') => Promise<void>; now: () => number; fetcher?: typeof fetch },
   ) {}
 
   private emit(patch: Partial<SyncState>): void { this.state = { ...this.state, ...patch }; this.hooks.onState(this.state); }
@@ -110,7 +110,11 @@ export class SyncManager {
       this.emit({ needsLogin: false });
     } catch (e) {
       const error = e instanceof ApiError ? e : new ApiError('erreur', 'Erreur inattendue pendant la synchronisation.');
-      if (error.code === 'appareil_revoque') { this.emit({ revoked: true, syncing: false }); await this.hooks.onRevoked(); return; }
+      if (error.code === 'appareil_revoque' || error.code === 'appareil_non_enrole') {
+        this.emit({ revoked: true, syncing: false, lastError: error.message });
+        await this.hooks.onRevoked(error.code);
+        return;
+      }
       if (error.code === 'session_expiree') this.emit({ needsLogin: true, lastError: 'Votre session a expiré : reconnectez-vous pour envoyer vos opérations.' });
       else {
         this.failures++;
