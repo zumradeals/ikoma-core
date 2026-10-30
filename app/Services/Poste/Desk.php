@@ -45,6 +45,7 @@ final class Desk
         return [
             'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $poste->event_id],
             'event' => DB::table('events')->where('id', $poste->event_id)->first(['id', 'name', 'starts_at', 'ends_at']),
+            'visitor_count' => DB::table('visitors')->where('event_id', $poste->event_id)->whereNull('withdrawn_at')->count(),
             'hosts' => DB::table('hosts')->where('event_id', $poste->event_id)->orderBy('name')->get(['id', 'name', 'service']),
             'categories' => DB::table('categories')->where('event_id', $poste->event_id)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
         ];
@@ -53,7 +54,7 @@ final class Desk
     /** @return list<array<string, mixed>> */
     public function search(Device $poste, string $query): array
     {
-        return $this->search->searchDetailed($poste->event_id, $query);
+        return trim($query) === '' ? $this->search->preview($poste->event_id) : $this->search->searchDetailed($poste->event_id, $query);
     }
 
     /** @return array<string, mixed> */
