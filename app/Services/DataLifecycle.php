@@ -9,7 +9,7 @@ use Illuminate\Validation\ValidationException;
 /** Contrat commun d'analyse et d'exécution ; aucune commande arbitraire ni cascade implicite. */
 final class DataLifecycle
 {
-    public const ENTITIES = ['personne' => ['visitors', 'listes.importer'], 'lot' => ['badge_batches', 'badges.gerer'], 'evenement' => ['events', 'evenements.gerer'], 'categorie' => ['categories', 'categories.gerer'], 'zone' => ['zones', 'zones.gerer'], 'groupe' => ['groups', 'groupes.gerer']];
+    public const ENTITIES = ['personne' => ['visitors', 'listes.importer'], 'badge' => ['badges', 'badges.gerer'], 'lot' => ['badge_batches', 'badges.gerer'], 'evenement' => ['events', 'evenements.gerer'], 'categorie' => ['categories', 'categories.gerer'], 'zone' => ['zones', 'zones.gerer'], 'groupe' => ['groups', 'groupes.gerer']];
 
     public const TABLES = ['events', 'hosts', 'devices', 'visitors', 'badge_batches', 'badges', 'badge_assignments', 'access_events', 'identity_checks', 'photos', 'sync_operations', 'sync_conflicts', 'notifications', 'alerts', 'refusals', 'import_batches', 'groups', 'group_members', 'categories', 'zones', 'category_zone', 'settings'];
 
@@ -55,6 +55,16 @@ final class DataLifecycle
             if ($row->profile_photo_file !== null || $has('badges', 'printed_for_visitor_id', $id) || $row->group_id !== null) {
                 $reasons[] = 'Un portrait, un groupe ou un badge nominatif impose de conserver cette fiche.';
             }
+        } elseif ($entity === 'badge') {
+            $batch = DB::table('badge_batches')->where('id', $row->badge_batch_id)->first();
+            if ($row->status !== 'Disponible' || $row->reserved_device_id !== null
+                || $row->reserved_group_id !== null || $row->printed_for_visitor_id !== null
+                || $batch?->print_exposed_at !== null
+                || $has('badge_assignments', 'badge_id', $id)
+                || $has('access_events', 'badge_id', $id)
+                || $has('groups', 'badge_batch_id', $row->badge_batch_id)) {
+                $reasons[] = 'Badge déjà utilisé, réservé, nominatif ou présenté à l’impression. Il peut être annulé par un superviseur, mais pas supprimé individuellement.';
+            }
         } elseif ($entity === 'lot') {
             $badges = DB::table('badges')->where('badge_batch_id', $id);
             $counts['badges'] = (clone $badges)->count();
@@ -99,7 +109,7 @@ final class DataLifecycle
             }
         }
 
-        return ['entity' => $entity, 'id' => $id, 'label' => $row->name ?? $row->full_name ?? $id, 'event_id' => $entity === 'evenement' ? $id : $row->event_id, 'allowed' => $reasons === [], 'reasons' => $reasons, 'counts' => $counts, 'irreversible' => true, 'retained' => ['Journal d’audit', 'Identifiants de badges retirés, non réattribuables'], 'fingerprint' => $this->fingerprint()];
+        return ['entity' => $entity, 'id' => $id, 'label' => $row->name ?? $row->full_name ?? $row->code ?? $id, 'event_id' => $entity === 'evenement' ? $id : $row->event_id, 'allowed' => $reasons === [], 'reasons' => $reasons, 'counts' => $counts, 'irreversible' => true, 'retained' => ['Journal d’audit', 'Identifiants de badges retirés, non réattribuables'], 'fingerprint' => $this->fingerprint()];
     }
 
     /** @return array<string,int> */
@@ -126,7 +136,15 @@ final class DataLifecycle
             } elseif ($entity === 'categorie') {
                 DB::table('category_zone')->where('category_id', $id)->delete();
             }
+            $batchId = $entity === 'badge' ? DB::table('badges')->where('id', $id)->value('badge_batch_id') : null;
             DB::table(self::ENTITIES[$entity][0])->where('id', $id)->delete();
+            if ($batchId !== null) {
+                DB::table('badge_batches')->where('id', $batchId)->update([
+                    'quantity' => DB::raw('GREATEST(quantity - 1, 0)'),
+                    'margin' => DB::raw('GREATEST(margin - 1, 0)'),
+                    'updated_at' => now(),
+                ]);
+            }
             if ($entity !== 'evenement') {
                 DB::table('events')->where('id', $report['event_id'])->increment('list_revision');
             }

@@ -13,6 +13,7 @@ use App\Http\Controllers\BadgeWorkshopController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
 use App\Http\Controllers\DataManagementController;
+use App\Http\Controllers\DemoLabController;
 use App\Http\Controllers\EventsController;
 use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\HealthController;
@@ -144,6 +145,10 @@ Route::middleware(['auth'])->group(function (): void {
 
             return Inertia::render('Space');
         })->name('space');
+        Route::get('/administration/demonstration', [DemoLabController::class, 'index'])->middleware('can:comptes.gerer');
+        Route::post('/administration/demonstration/generer', [DemoLabController::class, 'generate'])->middleware(['can:comptes.gerer', 'throttle:5,1']);
+        Route::post('/administration/demonstration/remettre-a-zero', [DemoLabController::class, 'reset'])->middleware(['can:comptes.gerer', 'throttle:3,1']);
+        Route::post('/administration/demonstration/{event}/nettoyer', [DemoLabController::class, 'clear'])->whereUuid('event')->middleware(['can:comptes.gerer', 'throttle:3,1']);
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
         Route::get('/administration/evenements', [EventsController::class, 'index'])->middleware('can:evenements.gerer');
         Route::post('/administration/evenements', [EventsController::class, 'store'])->middleware('can:evenements.gerer');
