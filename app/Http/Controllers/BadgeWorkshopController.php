@@ -77,7 +77,16 @@ final class BadgeWorkshopController
         Gate::authorize('listes.importer');
         $input = $request->validate(['event' => 'required|uuid|exists:events,id', 'batch' => 'required|uuid|exists:badge_batches,id', 'from' => 'required|integer|min:1', 'to' => 'required|integer|gte:from', 'visitor_ids' => 'required|array|min:1|max:200', 'visitor_ids.*' => 'required|uuid|distinct', 'personal_allowed' => 'accepted']);
 
-        return response()->json(['prepared' => $preparation->prepare($input['event'], $input['batch'], (int) $input['from'], (int) $input['to'], $input['visitor_ids'], $request->user())]);
+        $prepared = $preparation->prepare($input['event'], $input['batch'], (int) $input['from'], (int) $input['to'], $input['visitor_ids'], $request->user());
+        $posteIds = collect($prepared)->pluck('poste_id')->filter()->unique()->values();
+        $postes = $posteIds->isEmpty() ? [] : DB::table('devices')->where('event_id', $input['event'])
+            ->whereIn('id', $posteIds)->orderBy('name')->pluck('name')->all();
+
+        return response()->json([
+            'prepared' => collect($prepared)->map(fn (array $item) => ['visitor_id' => $item['visitor_id'], 'code' => $item['code']])->all(),
+            'postes_a_synchroniser' => $postes,
+            'sync_required' => count($postes) > 0,
+        ]);
     }
 
     public function save(Request $request, BadgeArtwork $artwork): RedirectResponse
