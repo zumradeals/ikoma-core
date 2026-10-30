@@ -77,7 +77,7 @@ export class LocalPosteRepository implements GroupPosteRepository {
 
   async context(): Promise<DeskContext> {
     const s = this.list.snapshot;
-    return { poste: s.poste, event: { id: s.event.id, name: s.event.name }, hosts: s.hosts, categories: s.categories };
+    return { poste: s.poste, event: { id: s.event.id, name: s.event.name }, visitor_count: this.list.visitors.size, hosts: s.hosts, categories: s.categories };
   }
 
   async search(query: string): Promise<SearchResult[]> { return searchOf(this.list, query); }
