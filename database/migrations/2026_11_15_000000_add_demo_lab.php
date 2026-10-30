@@ -73,6 +73,45 @@ $$;
 REVOKE ALL ON FUNCTION public.ikoma_reset_demo_event(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_event(uuid) TO ikoma_app;
 SQL);
+        DB::unprepared(<<<'SQL'
+CREATE OR REPLACE FUNCTION public.ikoma_reset_demo_business(p_actor uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $
+BEGIN
+    -- Défense en profondeur, même si un appel SQL contourne le contrôleur web.
+    IF NOT EXISTS (
+        SELECT 1 FROM public.users u
+        JOIN public.model_has_roles mr ON mr.model_id = u.id
+            AND mr.model_type = 'App\\Models\\User'
+        JOIN public.roles r ON r.id = mr.role_id
+        WHERE u.id = p_actor AND u.active IS TRUE
+            AND u.two_factor_confirmed_at IS NOT NULL
+            AND r.name = 'administrateur'
+    ) THEN
+        RAISE EXCEPTION 'Réinitialisation interdite pour cet utilisateur.'
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    PERFORM pg_advisory_xact_lock(731903);
+    -- SANS CASCADE : une future table dépendante doit obliger une revue du contrat.
+    TRUNCATE TABLE
+        public.sync_conflicts, public.sync_operations,
+        public.notifications, public.alerts, public.access_events,
+        public.identity_checks, public.photos, public.refusals,
+        public.badge_assignments, public.group_members,
+        public.badges, public.visitors, public.groups,
+        public.badge_batches, public.devices, public.hosts,
+        public.import_batches, public.category_zone,
+        public.categories, public.zones, public.events,
+        public.retired_badge_identifiers
+    RESTART IDENTITY;
+    -- Sécurité, migrations, réglages, comptes, sessions et audit sont conservés.
+END;
+$;
+REVOKE ALL ON FUNCTION public.ikoma_reset_demo_business(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_business(uuid) TO ikoma_app;
+SQL);
     }
 
     public function down(): void
