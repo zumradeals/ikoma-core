@@ -77,11 +77,11 @@ it('refuse les tentatives de remise à zéro sans phrase ou mot de passe correct
     $id = app(DemoLab::class)->generate('entreprise', 20, $this->admin);
     $this->actingAs($this->admin)->post('/administration/demonstration/remettre-a-zero', [
         'confirmation' => 'MAUVAISE PHRASE', 'password' => 'Motdepasse-De-Test-12345!',
-        'acknowledge' => true,
+        'acknowledge' => true, 'clear_users' => false,
     ])->assertSessionHasErrors('confirmation');
     $this->post('/administration/demonstration/remettre-a-zero', [
         'confirmation' => 'REMETTRE A ZERO IKOMA', 'password' => 'mauvais',
-        'acknowledge' => true,
+        'acknowledge' => true, 'clear_users' => false,
     ])->assertSessionHasErrors('password');
     expect(DB::table('events')->where('id', $id)->exists())->toBeTrue();
 });
@@ -94,7 +94,7 @@ it('remet à zéro toutes les données métier et conserve le compte administrat
         'created_at' => now(), 'updated_at' => now()]);
     $this->actingAs($this->admin)->post('/administration/demonstration/remettre-a-zero', [
         'confirmation' => 'REMETTRE A ZERO IKOMA', 'password' => 'Motdepasse-De-Test-12345!',
-        'acknowledge' => true,
+        'acknowledge' => true, 'clear_users' => false,
     ])->assertRedirect('/administration/demonstration');
     expect(DB::table('events')->count())->toBe(0)
         ->and(DB::table('badges')->count())->toBe(0)
@@ -113,6 +113,19 @@ it('interdit la remise à zéro sans rôle administrateur', function () {
     $this->actingAs($actor)->get('/administration/demonstration')->assertForbidden();
     $this->post('/administration/demonstration/remettre-a-zero', [
         'confirmation' => 'REMETTRE A ZERO IKOMA', 'password' => 'Autre-Mot-de-passe-123!',
-        'acknowledge' => true,
+        'acknowledge' => true, 'clear_users' => false,
     ])->assertForbidden();
+});
+
+it('peut supprimer les comptes secondaires après confirmation explicite du reset', function () {
+    $other = User::create(['name' => 'Agent secondaire', 'email' => Str::uuid().'@exemple.test',
+        'password' => 'Compte-secondaire-123!', 'two_factor_confirmed_at' => now()]);
+    $other->assignRole('agent_accueil');
+    $this->actingAs($this->admin)->post('/administration/demonstration/remettre-a-zero', [
+        'confirmation' => 'REMETTRE A ZERO IKOMA',
+        'password' => 'Motdepasse-De-Test-12345!',
+        'acknowledge' => true, 'clear_users' => true,
+    ])->assertRedirect('/administration/demonstration');
+    expect(User::find($this->admin->id))->not->toBeNull()
+        ->and(User::find($other->id))->toBeNull();
 });
