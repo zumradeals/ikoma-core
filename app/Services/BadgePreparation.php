@@ -43,7 +43,7 @@ final class BadgePreparation
                     ->where('id', $badge->reserved_device_id)->where('event_id', $event)
                     ->whereNull('revoked_at')->exists();
                 if ($badge->printed_for_visitor_id !== null || $badge->status !== BadgeStatus::Available
-                    || $badge->reserved_group_id !== null || ! $posteValide
+                    || $badge->reserved_group_id !== null || $posteValide === false
                     || $badge->category_id !== $person->category_id
                     || DB::table('badge_assignments')->where('badge_id', $badge->id)->exists()
                     || Badge::where('printed_for_visitor_id', $person->id)->whereIn('status', ['Disponible', 'Associé'])->exists()
