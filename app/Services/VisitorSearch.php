@@ -25,6 +25,41 @@ final class VisitorSearch
     }
 
     /**
+     * Les dix premières personnes de l'événement du poste, même sans recherche.
+     * Ne jamais élargir à d'autres événements ni exposer les personnes retirées.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function preview(string $eventId): array
+    {
+        if (! Str::isUuid($eventId)) {
+            throw new InvalidArgumentException('Événement invalide.');
+        }
+
+        $rows = DB::table('visitors as v')
+            ->join('categories as c', 'c.id', '=', 'v.category_id')
+            ->leftJoin('hosts as h', 'h.id', '=', 'v.host_id')
+            ->where('v.event_id', $eventId)
+            ->whereNull('v.withdrawn_at')
+            ->orderBy('v.full_name')->orderBy('v.id')
+            ->limit(10)
+            ->get(['v.id', 'v.full_name', 'v.organisation', 'h.name as host_name',
+                'c.id as category_id', 'c.name as category_name', 'c.color', 'c.priority_circuit']);
+
+        return $rows->map(function ($row) use ($eventId): array {
+            $homonyms = DB::table('visitors')
+                ->where('event_id', $eventId)->whereNull('withdrawn_at')
+                ->whereRaw('public.ikoma_normalize(full_name) = public.ikoma_normalize(?)', [$row->full_name])
+                ->count();
+
+            return ['id' => $row->id, 'full_name' => $row->full_name, 'organisation' => $row->organisation,
+                'host' => $row->host_name, 'homonyms' => $homonyms,
+                'category' => ['id' => $row->category_id, 'name' => $row->category_name,
+                    'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit]];
+        })->all();
+    }
+
+    /**
      * Même recherche avec les éléments utiles au second critère en cas d'homonyme (organisation, personne reçue).
      *
      * @return list<array{id:string,full_name:string,organisation:?string,host:?string,homonyms:int,category:array{id:string,name:string,color:string,priority_circuit:bool}}>
