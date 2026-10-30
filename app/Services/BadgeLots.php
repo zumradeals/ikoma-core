@@ -30,12 +30,15 @@ final class BadgeLots
         }
 
         return DB::transaction(function () use ($eventId, $categoryId, $expected, $actor): BadgeBatch {
+            EventAvailability::requireOpen($eventId);
             $category = DB::table('categories')->where('id', $categoryId)->where('event_id', $eventId)->first(['name']) ?? throw new BadgeRefused('categorie', 'Catégorie inconnue pour cet événement.');
             // Verrou par événement : deux générations simultanées ne peuvent pas produire le même code.
             DB::statement("SELECT pg_advisory_xact_lock(hashtextextended('badge-codes:'||?, 4))", [$eventId]);
             $percent = (int) DB::table('settings')->where('key', 'badge_marge_pourcent')->value('value');
             $total = self::manufactured($expected, $percent);
             $number = (int) DB::table('badges')->where('event_id', $eventId)->whereRaw("code ~ '^B-[0-9]+\$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $retired = (int) DB::table('retired_badge_identifiers')->where('event_id', $eventId)->whereRaw("code ~ '^B-[0-9]+$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $number = max($number, $retired);
             $rank = DB::table('badge_batches')->where('event_id', $eventId)->where('category_id', $categoryId)->count() + 1;
             $batch = BadgeBatch::create(['event_id' => $eventId, 'category_id' => $categoryId, 'name' => "Lot {$category->name} n°{$rank}", 'quantity' => $total, 'margin' => $total - $expected]);
             $now = now();
@@ -64,6 +67,7 @@ final class BadgeLots
 
         return DB::transaction(function () use ($batchId, $from, $to, $target, $actor): int {
             $batch = BadgeBatch::query()->lockForUpdate()->find($batchId) ?? throw new BadgeRefused('lot', 'Lot inconnu.');
+            EventAvailability::requireOpen($batch->event_id);
             if ($target->event_id !== $batch->event_id) {
                 throw new BadgeRefused('autre_evenement', 'Le poste ou le groupe appartient à un autre événement que le lot.');
             }

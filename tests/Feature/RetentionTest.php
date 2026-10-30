@@ -96,9 +96,11 @@ it('refuse une purge non approuvée puis efface les identités, photos et répon
     $this->artisan('donnees:purger')->assertSuccessful();
     expect(Storage::disk('local')->exists($path))->toBeTrue();
     $this->artisan('donnees:purger --confirmer')->assertSuccessful();
-    expect(Storage::disk('local')->exists($path))->toBeFalse();
+    // La transaction de recette reste ouverte : aucun fichier ne doit disparaître avant son commit.
+    expect(Storage::disk('local')->exists($path))->toBeTrue();
+    expect(DB::table('pending_file_deletions')->where('path', $path)->whereNull('completed_at')->exists())->toBeTrue();
     expect(DB::table('photos')->where('visitor_id', $visitor)->count())->toBe(0);
-    expect(Storage::disk('local')->exists($portraitPath))->toBeFalse()->and(DB::table('visitors')->where('id', $visitor)->value('profile_photo_file'))->toBeNull();
+    expect(Storage::disk('local')->exists($portraitPath))->toBeTrue()->and(DB::table('visitors')->where('id', $visitor)->value('profile_photo_file'))->toBeNull();
     expect(DB::table('visitors')->where('event_id', $event)->count())->toBe(300);
     expect(DB::table('visitors')->where('event_id', $event)->whereNotNull('organisation')->count())->toBe(0);
     expect(DB::table('visitors')->where('event_id', $event)->whereIn('full_name', $before)->count())->toBe(0);

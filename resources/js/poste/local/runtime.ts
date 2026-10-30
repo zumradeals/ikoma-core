@@ -30,7 +30,7 @@ export class PosteRuntime {
     this.sync = new SyncManager(this.vault, this.store, {
       onState: s => this.handlers.onState(s), now: () => Date.now(), fetcher: options.fetcher,
       onSnapshot: async snapshot => { await this.afterSnapshot(snapshot); },
-      onRevoked: async () => { await this.wipe('deconnexion', false); },
+      onRevoked: async () => { await this.wipe('deconnexion', true); },
     });
     this.fetcher = options.fetcher ?? ((...args) => fetch(...args));
   }
@@ -109,7 +109,7 @@ export class PosteRuntime {
     this.repo = null; this.profile = null;
     this.handlers.onWiped(reason);
     if (token) {
-      void this.fetcher('/poste/api/efface', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN'), 'X-Device-Token': token }, body: JSON.stringify({ motif: reason, operations_perdues: lost }), credentials: 'same-origin' }).catch(() => undefined);
+      void this.fetcher('/poste/api/efface', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN'), 'X-Device-Token': token }, body: JSON.stringify({ motif: reason, operations_perdues: lost }), credentials: 'same-origin', keepalive: true }).catch(() => undefined);
     }
   }
 

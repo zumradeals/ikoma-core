@@ -31,8 +31,9 @@ final class SyncProcessor
     public function process(Device $device, User $session, array $operations, ?string $sentAt): array
     {
         return DB::transaction(function () use ($device, $session, $operations, $sentAt): array {
+            $event = DB::table('events')->where('id', $device->event_id)->sharedLock()->first(['status']);
             $locked = Device::query()->lockForUpdate()->findOrFail($device->id);
-            if ($locked->revoked_at !== null) {
+            if ($locked->revoked_at !== null || in_array($event?->status, ['clos', 'archive'], true)) {
                 return ['revoked' => true];
             }
 

@@ -40,6 +40,8 @@ final class ZonesController
         Gate::authorize('zones.gerer');
         $data = $r->validate(['name' => ['required', 'string', 'max:120', Rule::unique('zones')->where('event_id', $zone->event_id)->ignore($zone->id)], 'est_accueil' => 'sometimes|boolean']);
         DB::transaction(function () use ($zone, $data): void {
+            DB::table('zones')->where('event_id', $zone->event_id)->orderBy('id')->lockForUpdate()->get(['id']);
+            abort_if($zone->est_accueil && array_key_exists('est_accueil', $data) && ! $data['est_accueil'] && ! Zone::where('event_id', $zone->event_id)->where('id', '<>', $zone->id)->where('est_accueil', true)->exists(), 422, 'La zone d’accueil obligatoire doit être conservée.');
             $zone->fill($data);
             $fields = array_keys($zone->getDirty());
             if (! $fields) {

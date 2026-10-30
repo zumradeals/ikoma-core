@@ -62,6 +62,7 @@ final class HostGuests
         }
 
         return DB::transaction(function () use ($actor, $data, $id, $host, $administration, $eventId) {
+            EventAvailability::requireOpen($eventId);
             // Même verrou que les imports L3 : pas de doublons créés par deux saisies/imports concurrents.
             DB::statement('SELECT pg_advisory_xact_lock(hashtextextended(?,3))', [$eventId]);
             if (! $administration) {
@@ -131,7 +132,13 @@ final class HostGuests
         DB::transaction(function () use ($actor, $id, $administration) {
             abort_unless(! $administration || $actor->can('listes.importer'), 403);
             $v = $administration ? Visitor::whereNull('withdrawn_at')->lockForUpdate()->findOrFail($id) : $this->owned($actor, $id, true);
-            $this->editable($v, $administration);
+            if ($administration) {
+                if ($v->status === 'present' || app(Presence::class)->visitorPresent($id)) {
+                    throw new DeskRefused('personne_presente', 'Cette personne est encore présente. Enregistrez sa sortie avant de la retirer.', 409);
+                }
+            } else {
+                $this->editable($v);
+            }
             // Retrait logique : préserve les références des contrôles et journaux en ajout seul.
             DB::table('visitors')->where('id', $id)->update(['withdrawn_at' => now(), 'updated_at' => now()]);
             DB::table('events')->where('id', $v->event_id)->increment('list_revision');

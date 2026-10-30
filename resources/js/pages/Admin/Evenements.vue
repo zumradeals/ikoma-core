@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import AdminIcon from '../../components/admin/AdminIcon.vue';
 import { displayDate } from '../../labels';
 
 defineProps<{
-  events: { id: string; name: string; site: string | null; starts_at: string; ends_at: string }[];
+  archives?: boolean;
+  events: { id: string; name: string; site: string | null; starts_at: string; ends_at: string; status?: string | null }[];
 }>();
 
+const editing = ref<string | null>(null);
+const operationError = ref('');
+function transition(id: string, action: string) { if (window.confirm(action === 'cloturer' ? 'Clôturer cet événement ? Les présences, tablettes et opérations en attente seront vérifiées.' : 'Archiver cet événement clôturé ?')) router.post(`/administration/evenements/${id}/${action}`, { confirmation: true }, { onError: errors => { operationError.value = Object.values(errors).join(' '); } }); }
 const form = useForm({ name: '', site: '', starts_at: '', ends_at: '' });
 function createEvent() {
-  form.post('/administration/evenements', {
-    preserveScroll: true,
-    onSuccess: () => form.reset(),
-  });
+  const options = { preserveScroll: true, onSuccess: () => { form.reset(); editing.value = null; } };
+  if (editing.value) form.put('/administration/evenements/' + editing.value, options);
+  else form.post('/administration/evenements', options);
 }
 </script>
 
@@ -29,7 +33,7 @@ function createEvent() {
 
     <div class="grid items-start gap-5 xl:grid-cols-[minmax(340px,2fr)_minmax(320px,3fr)]">
       <section class="admin-card" aria-labelledby="titre-creer-evenement">
-        <h2 id="titre-creer-evenement" class="text-2xl font-bold">Créer un événement</h2>
+        <h2 id="titre-creer-evenement" class="text-2xl font-bold">{{ editing ? "Modifier l’événement" : "Créer un événement" }}</h2>
         <p class="admin-muted mt-2">Une zone d’accueil sera créée automatiquement. Les autres réglages viendront ensuite.</p>
         <form class="mt-6 space-y-5" data-testid="form-creer-evenement" @submit.prevent="createEvent">
           <div>
@@ -57,24 +61,25 @@ function createEvent() {
           <p class="text-sm text-slate-600">La date de fin doit être postérieure au début. Les heures sont celles du site de l’événement.</p>
           <button type="submit" class="admin-primary flex min-h-14 items-center justify-center gap-2" :disabled="form.processing" data-testid="creer-evenement">
             <AdminIcon name="plus" :size="20" />
-            {{ form.processing ? 'Création en cours…' : 'Créer l’événement' }}
+            {{ form.processing ? 'Enregistrement…' : (editing ? 'Enregistrer les modifications' : 'Créer l’événement') }}
           </button>
         </form>
       </section>
 
       <section class="admin-card" aria-labelledby="titre-liste-evenements">
-        <h2 id="titre-liste-evenements" class="text-2xl font-bold">Événements enregistrés</h2>
+        <Link :href="archives ? '/administration/evenements' : '/administration/evenements?archives=1'" class="btn-soft mb-4">{{ archives ? 'Voir les événements opérationnels' : 'Consulter les archives' }}</Link><p v-if="operationError" role="alert" class="my-4 text-red-800">{{ operationError }}</p><h2 id="titre-liste-evenements" class="text-2xl font-bold">Événements enregistrés</h2>
         <p v-if="!events.length" class="admin-muted mt-4" data-testid="liste-evenements-vide">Aucun événement pour le moment. Utilisez le formulaire pour commencer.</p>
         <ul v-else class="mt-4 space-y-3" data-testid="liste-evenements">
           <li v-for="event in events" :key="event.id" class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div class="min-w-0">
-              <h3 class="font-bold">{{ event.name }}</h3>
+              <h3 class="font-bold">{{ event.name }}</h3><p>{{ event.status === 'archive' ? 'Archivé' : event.status === 'clos' ? 'Clôturé' : 'Ouvert' }}</p>
               <p v-if="event.site" class="text-sm text-slate-600">{{ event.site }}</p>
               <p class="mt-1 text-sm text-slate-600">{{ displayDate(event.starts_at) }} – {{ displayDate(event.ends_at) }}</p>
             </div>
             <a :href="'/administration?event=' + encodeURIComponent(event.id)" class="admin-primary inline-flex min-h-12 items-center gap-2" :data-testid="'ouvrir-evenement-' + event.id">
               Ouvrir <AdminIcon name="arrow" :size="18" />
             </a>
+            <details class="w-full"><summary class="cursor-pointer font-semibold">Actions</summary><div class="mt-3 flex flex-wrap gap-3"><button v-if="!['clos', 'archive'].includes(event.status ?? '')" class="btn-soft" @click="editing = event.id; form.name = event.name; form.site = event.site ?? ''; form.starts_at = new Date(event.starts_at).toISOString().slice(0, 16); form.ends_at = new Date(event.ends_at).toISOString().slice(0, 16)">Modifier</button><button v-if="!['clos', 'archive'].includes(event.status ?? '')" class="btn-soft" @click="transition(event.id, 'cloturer')">Clôturer</button><button v-if="event.status === 'clos'" class="btn-soft" @click="transition(event.id, 'archiver')">Archiver</button><Link :href="`/administration/donnees?entity=evenement&id=${event.id}`" class="btn-soft">Analyser une suppression</Link></div></details>
           </li>
         </ul>
       </section>

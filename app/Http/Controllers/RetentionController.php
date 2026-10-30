@@ -38,6 +38,17 @@ final class RetentionController
             throw ValidationException::withMessages(['durations.evenements' => 'Ce délai doit couvrir celui des visiteurs.']);
         }
         DB::transaction(function () use ($data, $r): void {
+            DB::table('settings')->orderBy('key')->lockForUpdate()->get(['key']);
+            if (DB::table('settings')->where('key', 'conservation_validee')->value('value') === '1') {
+                foreach (app(DataRetention::class)->settings() as $type => $current) {
+                    if ($data['durations'][$type] < $current) {
+                        throw ValidationException::withMessages(['durations.'.$type => 'Une durée approuvée ne peut pas être raccourcie pour provoquer un effacement.']);
+                    }
+                }
+            }
+            if (DB::table('settings')->where('key', 'conservation_validee')->value('value') === '1' && ! $data['approved']) {
+                throw ValidationException::withMessages(['approved' => 'Une politique approuvée ne peut pas être désapprouvée pour contourner sa conservation.']);
+            }
             foreach ($data['durations'] as $type => $days) {
                 DB::table('settings')->where('key', 'conservation_'.$type.'_jours')->update(['value' => (string) $days]);
             }

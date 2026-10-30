@@ -20,7 +20,7 @@ final class PosteApiController
 
     public function postes(): JsonResponse
     {
-        return response()->json(['postes' => DB::table('devices as d')->join('events as e', 'e.id', '=', 'd.event_id')->orderBy('e.name')->orderBy('d.name')->get(['d.id', 'd.name', 'd.station', 'd.event_id', 'e.name as event_name'])]);
+        return response()->json(['postes' => DB::table('devices as d')->join('events as e', 'e.id', '=', 'd.event_id')->whereNull('d.revoked_at')->where(fn ($q) => $q->whereNull('e.status')->orWhereNotIn('e.status', ['clos', 'archive']))->orderBy('e.name')->orderBy('d.name')->get(['d.id', 'd.name', 'd.station', 'd.event_id', 'e.name as event_name'])]);
     }
 
     public function contexte(Request $r): JsonResponse

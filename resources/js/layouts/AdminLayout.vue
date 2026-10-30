@@ -22,6 +22,7 @@ const items = [
   { key: 'comptes', label: 'Comptes', icon: 'users', href: '/administration/comptes', permission: 'comptes.gerer' },
   { key: 'journal', label: 'Journal', icon: 'book', href: '/administration/journal', permission: 'journal.consulter' },
   { key: 'securite', label: 'Sécurité', icon: 'shield', href: '/securite', permission: null },
+  { key: 'donnees', label: 'Gestion des données', icon: 'database', href: '/administration/donnees', permission: 'comptes.gerer' },
   { key: 'conservation', label: 'Conservation des données', icon: 'database', href: '/administration/conservation', permission: 'comptes.gerer' },
 ];
 function change(e: Event) { router.get('/administration', { event: (e.target as HTMLSelectElement).value }); }

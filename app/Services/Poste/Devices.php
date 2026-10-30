@@ -5,6 +5,7 @@ namespace App\Services\Poste;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\EventAvailability;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -38,6 +39,7 @@ final class Devices
             $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
         }
         DB::transaction(function () use ($device, $code, $actor): void {
+            EventAvailability::requireOpen($device->event_id);
             DB::table('devices')->where('id', $device->id)->update(['enrollment_hash' => self::hash($code), 'enrollment_expires_at' => now()->addMinutes(self::CODE_VALID_MINUTES), 'updated_at' => now()]);
             $this->audit->append('poste.code_emis', $actor->id, ['device_id' => $device->id]);
         });
@@ -65,6 +67,7 @@ final class Devices
                 $this->audit->append('poste.enrolement_refuse', $agent->id, ['raison' => 'code_invalide']);
                 throw new DeskRefused('code_invalide', 'Code d’enrôlement invalide ou expiré : demandez-en un nouveau à l’administrateur.', 422);
             }
+            EventAvailability::requireOpen($device->event_id);
             $token = bin2hex(random_bytes(32));
             $secret = base64_encode(random_bytes(32));
             DB::table('devices')->where('id', $device->id)->update(['sync_seq' => 0, 'token_hash' => hash('sha256', $token), 'enrollment_hash' => null, 'enrollment_expires_at' => null, 'enrolled_at' => now(), 'revoked_at' => null, 'wipe_acknowledged_at' => null, 'updated_at' => now()]);

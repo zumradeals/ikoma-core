@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 final class DataRetention
 {
@@ -30,7 +29,7 @@ final class DataRetention
         }
         $days = $this->settings();
 
-        return DB::transaction(function () use ($days): array {
+        $counts = DB::transaction(function () use ($days): array {
             DB::statement('SELECT pg_advisory_xact_lock(731902)');
             // La purge est une maintenance privilégiée : bloquer les écritures concurrentes avant de décider ou d'effacer un fichier.
             DB::statement('LOCK TABLE events, hosts, devices, visitors, badges, badge_assignments, access_events, identity_checks, photos, sync_operations, sync_conflicts, notifications, alerts, refusals, import_batches, groups IN SHARE ROW EXCLUSIVE MODE');
@@ -41,7 +40,7 @@ final class DataRetention
             $now = now();
             foreach (DB::table('events')->where('ends_at', '<', $now)->orderBy('id')->lockForUpdate()->get() as $event) {
                 // Ne jamais effacer une identité nécessaire à une évacuation en cours, même si la date de fin est dépassée.
-                if (app(Presence::class)->count($event->id) > 0) {
+                if (app(Presence::class)->count($event->id) > 0 || DB::table('sync_conflicts')->where('event_id', $event->id)->whereNull('resolved_at')->exists() || DB::table('alerts')->where('event_id', $event->id)->whereNull('resolved_at')->exists()) {
                     continue;
                 }
                 $elapsed = (int) Carbon::parse($event->ends_at)->diffInDays($now);
@@ -52,9 +51,7 @@ final class DataRetention
                         if (preg_match('~^photos/[0-9a-f-]{36}\.enc$~', $photo->file_reference) !== 1) {
                             throw new \RuntimeException('Référence de photo non conforme : purge arrêtée.');
                         }
-                        if (Storage::disk('local')->exists($photo->file_reference) && ! Storage::disk('local')->delete($photo->file_reference)) {
-                            throw new \RuntimeException('Suppression de photo impossible.');
-                        }
+                        app(FileDeletionQueue::class)->enqueue($photo->file_reference);
                         $counts['photos'] += DB::table('photos')->where('id', $photo->id)->delete();
                     }
                     // Photos de pièces d'identité (option de l'administrateur) : même échéance que les photos ; le type reste, le fichier et le numéro disparaissent.
@@ -62,15 +59,13 @@ final class DataRetention
                         if (preg_match('~^identity-documents/[0-9a-f-]{36}\.enc$~', $check->document_file) !== 1) {
                             throw new \RuntimeException('Référence de pièce non conforme : purge arrêtée.');
                         }
-                        if (Storage::disk('local')->exists($check->document_file) && ! Storage::disk('local')->delete($check->document_file)) {
-                            throw new \RuntimeException('Suppression de pièce impossible.');
-                        }
+                        app(FileDeletionQueue::class)->enqueue($check->document_file);
                         $counts['photos'] += DB::table('identity_checks')->where('id', $check->id)->update(['document_file' => null, 'document_number' => null]);
                     }
                 }
                 if (($days['photos'] > 0 && $elapsed >= $days['photos']) || ($days['visiteurs'] > 0 && $elapsed >= $days['visiteurs'])) {
                     foreach ((clone $visitors)->whereNotNull('profile_photo_file')->get(['id', 'profile_photo_file']) as $portrait) {
-                        app(ProfilePortrait::class)->deleteFile($portrait->profile_photo_file);
+                        app(FileDeletionQueue::class)->enqueue($portrait->profile_photo_file);
                         $counts['photos'] += DB::table('visitors')->where('id', $portrait->id)->update(['profile_photo_file' => null, 'profile_photo_print_allowed' => false]);
                     }
                 }
@@ -115,6 +110,9 @@ final class DataRetention
 
             return $counts;
         });
+        DB::afterCommit(fn () => app(FileDeletionQueue::class)->drain());
+
+        return $counts;
     }
 
     public function requirePrivileged(): void
