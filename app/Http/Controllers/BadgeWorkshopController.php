@@ -80,7 +80,8 @@ final class BadgeWorkshopController
         $prepared = $preparation->prepare($input['event'], $input['batch'], (int) $input['from'], (int) $input['to'], $input['visitor_ids'], $request->user());
         $posteIds = collect($prepared)->pluck('poste_id')->filter()->unique()->values();
         $postes = $posteIds->isEmpty() ? [] : DB::table('devices')->where('event_id', $input['event'])
-            ->whereIn('id', $posteIds)->orderBy('name')->pluck('name')->all();
+            ->whereIn('id', $posteIds)->orderBy('name')
+            ->selectRaw("COALESCE(NULLIF(station, ''), name) AS libelle")->pluck('libelle')->all();
 
         return response()->json([
             'prepared' => collect($prepared)->map(fn (array $item) => ['visitor_id' => $item['visitor_id'], 'code' => $item['code']])->all(),
