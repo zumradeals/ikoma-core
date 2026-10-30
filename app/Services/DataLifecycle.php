@@ -109,7 +109,7 @@ final class DataLifecycle
             }
         }
 
-        return ['entity' => $entity, 'id' => $id, 'label' => $row->name ?? $row->full_name ?? $id, 'event_id' => $entity === 'evenement' ? $id : $row->event_id, 'allowed' => $reasons === [], 'reasons' => $reasons, 'counts' => $counts, 'irreversible' => true, 'retained' => ['Journal d’audit', 'Identifiants de badges retirés, non réattribuables'], 'fingerprint' => $this->fingerprint()];
+        return ['entity' => $entity, 'id' => $id, 'label' => $row->name ?? $row->full_name ?? $row->code ?? $id, 'event_id' => $entity === 'evenement' ? $id : $row->event_id, 'allowed' => $reasons === [], 'reasons' => $reasons, 'counts' => $counts, 'irreversible' => true, 'retained' => ['Journal d’audit', 'Identifiants de badges retirés, non réattribuables'], 'fingerprint' => $this->fingerprint()];
     }
 
     /** @return array<string,int> */
