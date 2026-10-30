@@ -37,6 +37,13 @@ async function refreshSummary() {
   catch { /* le panneau est un confort : son échec ne doit jamais gêner l'accueil */ }
 }
 watch([() => ctx.value.step, () => props.sync?.pending, () => props.sync?.lastSyncAt, context], () => { void refreshSummary(); });
+watch(() => props.sync?.lastSyncAt, () => {
+  if (!context.value) return;
+  const currentPoste = context.value.poste.id;
+  void repo.context().then(latest => {
+    if (context.value?.poste.id === currentPoste && latest.poste.id === currentPoste) context.value = latest;
+  }).catch(() => { /* une synchronisation peut échouer : conserver le dernier contexte connu */ });
+});
 
 function send(event: Ev) { ctx.value = reduce(ctx.value, event); }
 function readStored(): string | null { try { return window.localStorage.getItem(STORAGE_KEY); } catch { return null; } }
