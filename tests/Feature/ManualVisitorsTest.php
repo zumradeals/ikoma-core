@@ -39,6 +39,29 @@ beforeEach(function () {
     $this->printData = ['event' => DemoSeeder::id('event'), 'design' => 'vip', 'title' => 'Site fictif', 'primary' => '#0B3C6B', 'accent' => '#C9962B', 'orientation' => 'paysage', 'format' => 'pvc', 'cols' => 2, 'rows' => 5, 'side' => 'recto'];
 });
 
+it('affiche dès l’ouverture la liste paginée de l’événement choisi, sans mélanger les événements', function () {
+    $this->get('/administration/invites?event_id='.DemoSeeder::id('event'))
+        ->assertOk()->assertInertia(fn (\\Inertia\\Testing\\AssertableInertia $page) => $page
+            ->component('Admin/Visitors')->where('eventId', DemoSeeder::id('event'))
+            ->has('list.data')->where('searchQuery', ''));
+
+    $event = DemoSeeder::id('event');
+    $now = now();
+    foreach (range(1, 28) as $i) {
+        DB::table('visitors')->insert(['id' => (string) Str::uuid(), 'event_id' => $event,
+            'full_name' => 'Nouveau fictif '.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+            'category_id' => DemoSeeder::id('category1'), 'valid_from' => $now,
+            'valid_until' => $now->copy()->addDay(), 'source' => 'listé',
+            'status' => 'attendu', 'created_at' => $now, 'updated_at' => $now]);
+    }
+
+    $this->get('/administration/invites?event_id='.$event.'&page=2')
+        ->assertOk()->assertInertia(fn (\\Inertia\\Testing\\AssertableInertia $page) => $page
+            ->component('Admin/Visitors')->where('eventId', $event)
+            ->where('list.current_page', 2)->where('list.total', fn ($total) => $total > 20)
+            ->has('list.data'));
+});
+
 it('crée sans photo et synchronise la fiche sans assimiler le profil au contrôle d’identité', function () {
     $this->post('/administration/invites', manualInput())->assertRedirect();
     $person = Visitor::where('full_name', 'Personne fictive atelier')->firstOrFail();
