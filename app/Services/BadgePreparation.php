@@ -12,8 +12,7 @@ use Illuminate\Validation\ValidationException;
 /** Destination d'impression immuable ; aucune association, validation ni entrée. */
 final class BadgePreparation
 {
-    /**
-     * @param list<string> $visitorIds
+    /** @param list<string> $visitorIds
      * @return list<array{visitor_id:string,code:string,poste_id:string|null}>
      */
     public function prepare(string $event, string $batch, int $from, int $to, array $visitorIds, User $actor): array
