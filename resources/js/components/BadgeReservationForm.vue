@@ -12,7 +12,7 @@ function submit() { form.post('/administration/badges/reservations', { onSuccess
 </script>
 <template>
   <form aria-label="Réserver des badges" class="space-y-5" @submit.prevent="submit">
-    <label class="block">Lot<select v-model="form.batch_id" class="field" required><option v-for="item in batches" :key="item.id" :value="item.id">{{ item.event_name ? `${item.event_name} · ${item.name}` : item.name }}</option></select></label>
+    <label class="block">Lot<select v-model="form.batch_id" data-testid="reservation-lot" class="field" required><option v-for="item in batches" :key="item.id" :value="item.id">{{ item.event_name ? `${item.event_name} · ${item.name}` : item.name }}</option></select></label>
     <p v-if="batch && batch.first_number !== null">Numéros de ce lot : du {{ batch.first_number }} au {{ batch.last_number }}.</p>
     <label v-if="form.target_type === 'poste'" class="flex items-center gap-3 rounded-lg border p-3 font-semibold" data-testid="reserver-badges-libres">
       <input v-model="form.all_available" type="checkbox" class="h-6 w-6">
