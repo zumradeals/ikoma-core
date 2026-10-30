@@ -280,6 +280,17 @@ describe('file hors ligne, règles locales et envoi', () => {
     expect(await vault.db.chunks.count()).toBe(0);
   });
 
+  it('autorise un nouveau cycle de synchronisation après invalidation d’un ancien poste', async () => {
+    const { sync } = await setup(undefined, () =>
+      new Response(JSON.stringify({ code: 'appareil_non_enrole' }), { status: 401 }));
+    await sync.sync();
+    expect(sync.state.revoked).toBe(true);
+    sync.resetAfterEnrollment();
+    expect(sync.state.revoked).toBe(false);
+    expect(sync.state.needsLogin).toBe(false);
+    expect(sync.state.lastSyncAt).toBeNull();
+  });
+
   it('ne laisse aucune donnée personnelle ni jeton en clair dans IndexedDB', async () => {
     const { repo, vault } = await setup([visitor('v1', 'Koné Mariam', { organisation: 'Organisation Secrète fictive' })]);
     await repo.saveIdentity('i1', 'v1', new Blob(['PHOTO-IDENTIFIABLE'], { type: 'image/jpeg' }));
