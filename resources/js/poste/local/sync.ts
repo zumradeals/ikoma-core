@@ -40,6 +40,13 @@ export class SyncManager {
     this.timer = setTimeout(() => { void this.sync(); }, delay);
   }
   stop(): void { clearTimeout(this.timer); }
+  /** Un nouvel enrôlement repart d'une identité d'appareil distincte, après purge de l'ancienne copie. */
+  resetAfterEnrollment(): void {
+    this.stop();
+    this.failures = 0;
+    this.again = false;
+    this.emit({ revoked: false, needsLogin: false, pending: 0, conflicts: 0, lastSyncAt: null, stale: true, lastError: null, clockWarning: false });
+  }
 
   /** Un seul envoi à la fois ; une demande reçue pendant un envoi en provoque un second juste après (une opération arrivée en fin de course n'attend pas). */
   sync(): Promise<void> {
