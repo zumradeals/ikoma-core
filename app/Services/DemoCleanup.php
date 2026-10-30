@@ -14,6 +14,7 @@ final class DemoCleanup
     public function run(bool $execute = false, ?string $actor = null): array
     {
         return DB::transaction(function () use ($execute, $actor): array {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
             app(DataLifecycle::class)->lock();
             $id = static fn (string $key): string => DemoSeeder::id($key);
             $eventId = $id('event');
@@ -26,6 +27,10 @@ final class DemoCleanup
                 if ($account->name !== 'Compte fictif '.$role) {
                     throw new RuntimeException('Un compte @exemple.test a été renommé : suppression automatique refusée.');
                 }
+            }
+
+            if (DB::table('audit_logs')->whereIn('actor_id', $accounts->pluck('id'))->exists()) {
+                throw new RuntimeException('Un compte fictif a participé à des opérations auditées : conserver sa référence historique. Nettoyage automatique refusé.');
             }
 
             if ($event) {

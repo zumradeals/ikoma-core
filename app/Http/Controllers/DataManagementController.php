@@ -93,6 +93,7 @@ final class DataManagementController
         $data = $r->validate(['operation' => 'required|in:demo,conservation']);
         try {
             $report = DB::transaction(function () use ($data) {
+                DB::statement('SELECT pg_advisory_xact_lock(731903)');
                 app(DataLifecycle::class)->lock();
 
                 return app(Maintenance::class)->preview($data['operation']);
@@ -118,6 +119,7 @@ final class DataManagementController
                 throw ValidationException::withMessages(['operation' => 'Analyse expirée ou confirmation incorrecte.']);
             }
             DB::transaction(function () use ($data, $preview, $r): void {
+                DB::statement('SELECT pg_advisory_xact_lock(731903)');
                 app(DataLifecycle::class)->lock();
                 $report = app(Maintenance::class)->preview($data['operation']);
                 if (! hash_equals($report['fingerprint'], $preview['fingerprint'])) {

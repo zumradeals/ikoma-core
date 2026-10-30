@@ -20,7 +20,7 @@ Un événement clôturé peut être archivé. « Consulter les archives » perme
 
 ## Gestion des données
 
-Le menu regroupe les compteurs réels, archives, durées applicables, analyses et historique. Le nettoyage de démonstration concerne uniquement le jeu identifié, jamais un événement jugé fictif d'après son nom. Le nettoyage de conservation applique les échéances approuvées et conserve les références statistiques.
+Le menu regroupe les compteurs réels, archives, durées applicables, analyses et historique. Le nettoyage de démonstration concerne uniquement le jeu identifié, jamais un événement jugé fictif d'après son nom. Un compte fictif ayant participé à des opérations auditées bloque également ce nettoyage : sa référence historique doit être conservée. Le nettoyage de conservation applique les échéances approuvées et conserve les références statistiques.
 
 1. Sélectionnez l'opération puis « Analyser sans supprimer ».
 2. Lisez les quantités et les références conservées.

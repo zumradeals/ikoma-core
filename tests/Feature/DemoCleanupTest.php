@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\Audit;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Support\Facades\DB;
@@ -82,4 +83,12 @@ it('refuse tout effacement si des opérations ont été réalisées dans le jeu 
     $this->artisan('demo:purger', ['--confirmer' => true])->assertExitCode(1);
     expect(DB::table('events')->where('id', DemoSeeder::id('event'))->exists())->toBeTrue()
         ->and(User::where('email', 'administrateur@exemple.test')->exists())->toBeTrue();
+});
+
+it('préserve un compte fictif ayant effectué une opération auditée hors du jeu de démonstration', function () {
+    $account = User::where('email', 'administrateur@exemple.test')->firstOrFail();
+    app(Audit::class)->append('evenement.cree', $account->id, ['id' => (string) Str::uuid()]);
+    $this->artisan('demo:purger', ['--confirmer' => true])->assertFailed();
+    expect(User::find($account->id))->not->toBeNull()
+        ->and(DB::table('events')->where('id', DemoSeeder::id('event'))->exists())->toBeTrue();
 });

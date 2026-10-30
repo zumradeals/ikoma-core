@@ -106,6 +106,9 @@ final class DataLifecycle
     public function delete(string $entity, string $id, User $actor, string $fingerprint): array
     {
         return DB::transaction(function () use ($entity, $id, $actor, $fingerprint): array {
+            DB::statement('SELECT pg_advisory_xact_lock(731903)');
+            $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
+            abort_unless($actor->active && $actor->two_factor_confirmed_at !== null, 403);
             $this->lock();
             $report = $this->inspect($entity, $id, $actor);
             if (! hash_equals($report['fingerprint'], $fingerprint)) {

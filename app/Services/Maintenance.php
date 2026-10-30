@@ -86,6 +86,7 @@ final class Maintenance
         try {
             $this->verifyBackup($manifest);
             DB::transaction(function () use ($id): void {
+                DB::statement('SELECT pg_advisory_xact_lock(731903)');
                 app(DataLifecycle::class)->lock();
                 $request = DB::table('maintenance_requests')->where('id', $id)->lockForUpdate()->first();
                 if (! $request || $request->status !== 'en_attente') {
