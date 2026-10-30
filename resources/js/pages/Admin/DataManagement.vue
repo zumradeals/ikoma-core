@@ -2,7 +2,7 @@
 import { Link, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 type Report = { entity: string; id: string; label: string; allowed: boolean; reasons: string[]; counts: Record<string, number>; retained: string[] };
-defineProps<{ demoCounts?: Record<string, number>; preview: Report | null; counts: Record<string, number>; badges: Record<string, number>; durations: Record<string, number>; approved: boolean; events: { id: string; name: string; status: string | null }[]; history: { id: number; actor_id: string | null; occurred_at: string; action: string; details: string }[]; requests: { id: string; operation: string; status: string; result: unknown; created_at: string }[]; pendingFiles: number; maintenanceReport: { operation: string; counts?: Record<string, number>; events?: { id: string; personnes: number; photos_echues: boolean; historique_echu: boolean; photos: number; mouvements: number; notifications: number; alertes: number }[]; retained?: string[] } | null }>();
+defineProps<{ demoEnabled?: boolean; demoCounts?: Record<string, number>; preview: Report | null; counts: Record<string, number>; badges: Record<string, number>; durations: Record<string, number>; approved: boolean; events: { id: string; name: string; status: string | null }[]; history: { id: number; actor_id: string | null; occurred_at: string; action: string; details: string }[]; requests: { id: string; operation: string; status: string; result: unknown; created_at: string }[]; pendingFiles: number; maintenanceReport: { operation: string; counts?: Record<string, number>; events?: { id: string; personnes: number; photos_echues: boolean; historique_echu: boolean; photos: number; mouvements: number; notifications: number; alertes: number }[]; retained?: string[] } | null }>();
 const deletion = useForm({ reference: '', password: '' });
 const analyse = useForm({ operation: 'demo' });
 const maintenance = useForm({ operation: '', confirmation: '', password: '' });
@@ -14,7 +14,7 @@ const operationNames: Record<string, string> = { 'gestion.maintenance_terminee':
 <template>
   <AdminLayout active="donnees">
     <h1 class="text-display font-bold">Gestion des données</h1>
-    <p class="admin-muted my-4">Retrouvez les archives et préparez les nettoyages admissibles. Les historiques protégés restent conservés.</p>
+    <p class="admin-muted my-4">Retrouvez les archives et préparez les nettoyages admissibles. Les historiques protégés restent conservés.</p><div v-if="demoEnabled" class="admin-card my-4"><h2>Vous cherchez à générer ou remettre à zéro des données de test ?</h2><p class="my-3">Ce menu concerne la conservation. Pour créer des invités fictifs ou repartir d’une installation métier vide, utilisez le laboratoire.</p><Link class="btn-soft" href="/administration/demonstration">Ouvrir Démonstration et remise à zéro</Link></div>
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"><section v-for="(total, key) in counts" :key="key" class="admin-card"><h2>{{ labels[key] }}</h2><p class="text-3xl font-bold">{{ total }}</p></section></div>
     <section class="admin-card my-5"><h2>Badges par état</h2><dl class="mt-4 flex flex-wrap gap-6"><div v-for="(total, status) in badges" :key="status"><dt>{{ status }}</dt><dd class="font-bold">{{ total }}</dd></div></dl></section>
     <section v-if="preview" class="admin-card my-5" aria-labelledby="analyse-title">
