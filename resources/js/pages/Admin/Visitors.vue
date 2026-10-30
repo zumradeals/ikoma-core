@@ -28,7 +28,7 @@ function withdraw() { if (v && window.confirm('Retirer cette fiche de la liste ?
     <p v-if="feedback" role="status" class="mb-5 rounded-xl border bg-green-50 p-4">{{ feedback }}</p>
     <section class="mb-6 space-y-4 rounded-xl border bg-white p-5" data-testid="liste-invites-visible">
       <h2 class="text-heading font-bold">Liste des invités</h2>
-      <label class="block font-semibold">Événement
+      <label class="block font-semibold">Liste de l’événement
         <select v-model="browseEvent" class="field mt-2" @change="selectListEvent">
           <option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option>
         </select>
