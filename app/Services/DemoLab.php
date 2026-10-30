@@ -200,15 +200,15 @@ final class DemoLab
     }
 
     /** Efface tous les événements de cette installation DEMO, jamais les comptes ou la configuration. */
-    public function clearBusiness(User $actor): array
+    public function clearBusiness(User $actor, bool $clearAccounts = false): array
     {
         self::authorize($actor);
         $counts = [];
-        DB::transaction(function () use ($actor, &$counts): void {
+        DB::transaction(function () use ($actor, $clearAccounts, &$counts): void {
             $counts = $this->totals();
             $eventIds = DB::table('events')->pluck('id')->all();
             $this->queueFiles($eventIds);
-            DB::select('SELECT public.ikoma_reset_demo_business(CAST(? AS uuid))', [$actor->id]);
+            DB::select('SELECT public.ikoma_reset_demo_business(CAST(? AS uuid), ?)', [$actor->id, $clearAccounts]);
             app(Audit::class)->append('demo.remise_zero_metier', $actor->id, ['nombres' => $counts]);
         });
         app(FileDeletionQueue::class)->drain();
