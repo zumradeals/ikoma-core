@@ -102,7 +102,6 @@ final class BadgeWorkshopController
         Gate::authorize('badges.gerer');
         $options = $artwork->validate($request);
         $badges = $artwork->select($options);
-        DB::table('badge_batches')->where('id', $options['batch'])->update(['print_exposed_at' => now()]);
         $perSheet = $options['format'] === 'pvc' ? 1 : (int) $options['cols'] * (int) $options['rows'];
         $cards = $badges->map(fn (stdClass $badge) => $artwork->card($badge, $options))->all();
         $nonce = base64_encode(random_bytes(16));

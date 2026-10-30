@@ -20,6 +20,7 @@ final class BadgePreparation
         abort_unless($actor->can('badges.gerer') && $actor->can('listes.importer'), 403);
 
         return DB::transaction(function () use ($event, $batch, $from, $to, $visitorIds, $actor) {
+            EventAvailability::requireOpen($event);
             $badges = Badge::where('event_id', $event)->where('badge_batch_id', $batch)
                 ->whereRaw("(CASE WHEN code ~ '^B-[0-9]+$' THEN substring(code from 3)::integer END) BETWEEN ? AND ?", [$from, $to])
                 ->orderByRaw('length(code), code')->limit(201)->lockForUpdate()->get();

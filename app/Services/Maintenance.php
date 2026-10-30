@@ -33,7 +33,15 @@ final class Maintenance
                 throw new RuntimeException('Un événement terminé reste ouvert. Clôturez-le avant le nettoyage de conservation.');
             }
             $elapsed = (int) Carbon::parse($event->ends_at)->diffInDays(now());
-            $eligible[] = ['id' => $event->id, 'personnes' => $elapsed >= $days['visiteurs'] && $event->anonymized_at === null ? DB::table('visitors')->where('event_id', $event->id)->count() : 0, 'photos_echues' => $elapsed >= $days['photos'], 'historique_echu' => $elapsed >= $days['evenements']];
+            $ids = DB::table('visitors')->where('event_id', $event->id)->select('id');
+            $eligible[] = ['id' => $event->id,
+                'personnes' => $elapsed >= $days['visiteurs'] && $event->anonymized_at === null ? DB::table('visitors')->where('event_id', $event->id)->count() : 0,
+                'photos_echues' => $elapsed >= $days['photos'], 'historique_echu' => $elapsed >= $days['evenements'],
+                'photos' => $elapsed >= $days['photos'] ? DB::table('photos')->whereIn('visitor_id', clone $ids)->count() + DB::table('identity_checks')->whereIn('visitor_id', clone $ids)->whereNotNull('document_file')->count() + DB::table('visitors')->where('event_id', $event->id)->whereNotNull('profile_photo_file')->count() : 0,
+                'mouvements' => $elapsed >= $days['evenements'] && $event->retention_summary === null ? DB::table('access_events')->where('event_id', $event->id)->count() : 0,
+                'notifications' => $elapsed >= $days['notifications'] ? DB::table('notifications')->where('event_id', $event->id)->count() : 0,
+                'alertes' => $elapsed >= $days['alertes'] ? DB::table('alerts')->where('event_id', $event->id)->whereNotNull('resolved_at')->count() : 0,
+            ];
         }
 
         return ['events' => $eligible, 'fingerprint' => app(DataLifecycle::class)->fingerprint(), 'retained' => ['Journal d’audit intact', 'Références statistiques conservées', 'Les fichiers détachés sont effacés après validation, avec reprise']];
@@ -96,7 +104,10 @@ final class Maintenance
                 app(Audit::class)->append('gestion.maintenance_base_validee', $actor->id, ['id' => $id, 'operation' => $request->operation, 'nombres' => $counts]);
             });
             $remaining = app(FileDeletionQueue::class)->drain();
-            DB::table('maintenance_requests')->where('id', $id)->where('status', 'base_validee')->update(['status' => $remaining ? 'fichiers_a_reprendre' : 'terminee', 'updated_at' => now()]);
+            DB::transaction(function () use ($id, $remaining): void {
+                DB::table('maintenance_requests')->where('id', $id)->where('status', 'base_validee')->update(['status' => $remaining ? 'fichiers_a_reprendre' : 'terminee', 'updated_at' => now()]);
+                app(Audit::class)->append($remaining ? 'gestion.fichiers_a_reprendre' : 'gestion.maintenance_terminee', null, ['id' => $id, 'fichiers_restants' => $remaining]);
+            });
         } catch (\Throwable $e) {
             DB::table('maintenance_requests')->where('id', $id)->where('status', 'en_attente')->update(['status' => 'refusee', 'result' => json_encode(['message' => $e instanceof RuntimeException ? $e->getMessage() : 'Échec de maintenance. Aucune modification de base validée.'], JSON_THROW_ON_ERROR), 'updated_at' => now()]);
             app(Audit::class)->append('gestion.maintenance_refusee', null, ['id' => $id, 'resultat' => 'refus']);

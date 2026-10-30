@@ -34,12 +34,12 @@ final class Devices
     /** Génère un code à afficher une seule fois ; seul son hachage est conservé. */
     public function issueCode(Device $device, User $actor): string
     {
-        EventAvailability::requireOpen($device->event_id);
         $code = '';
         for ($i = 0; $i < 12; $i++) {
             $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
         }
         DB::transaction(function () use ($device, $code, $actor): void {
+            EventAvailability::requireOpen($device->event_id);
             DB::table('devices')->where('id', $device->id)->update(['enrollment_hash' => self::hash($code), 'enrollment_expires_at' => now()->addMinutes(self::CODE_VALID_MINUTES), 'updated_at' => now()]);
             $this->audit->append('poste.code_emis', $actor->id, ['device_id' => $device->id]);
         });

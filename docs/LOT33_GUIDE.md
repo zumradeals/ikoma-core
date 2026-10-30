@@ -10,7 +10,7 @@ Dans Liste d'invités, recherchez et ouvrez la fiche. « Retirer la fiche » blo
 
 « Consulter le lot » filtre ses badges ; chaque carte possède un lien vers ses détails, réservations et associations. L'annulation reste du ressort du superviseur, avec motif. L'administrateur ne reçoit pas ce droit automatiquement.
 
-Un lot réservé, nominatif, utilisé ou présenté à l'impression ne peut pas être supprimé. Pour les lots antérieurs à cette version, l'absence d'impression ne peut pas être prouvée : ils restent protégés. Les numéros des lots retirés ne sont jamais réattribués.
+Un lot réservé, nominatif, utilisé ou présenté à l'impression ou à un aperçu contenant un véritable QR ne peut pas être supprimé. Pour les lots antérieurs à cette version, l'absence d'impression ne peut pas être prouvée : ils restent protégés. Les numéros des lots retirés ne sont jamais réattribués.
 
 ## Événements
 

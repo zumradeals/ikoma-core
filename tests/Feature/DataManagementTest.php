@@ -7,6 +7,7 @@ use App\Models\Visitor;
 use App\Models\Zone;
 use App\Services\BadgeLots;
 use App\Services\DataLifecycle;
+use App\Services\DataRetention;
 use App\Services\FileDeletionQueue;
 use App\Services\HostGuests;
 use App\Services\Maintenance;
@@ -83,7 +84,9 @@ it('refuse un aperçu expiré et un compte non habilité ou sans 2FA', function 
     $this->travel(11)->minutes();
     $this->post('/administration/donnees/supprimer', ['reference' => $this->personId, 'password' => 'Fictif-L33!01234'])->assertSessionHasErrors('operation');
     $this->travelBack();
-    $this->actingAs(User::where('email', 'agent_accueil@exemple.test')->firstOrFail())->get('/administration/donnees')->assertForbidden();
+    $agent = User::create(['name' => 'Agent fictif L33', 'email' => Str::uuid().'@exemple.test', 'password' => 'Fictif-L33!01234']);
+    $agent->assignRole('agent_accueil');
+    $this->actingAs($agent)->get('/administration/donnees')->assertForbidden();
     $this->admin->update(['two_factor_confirmed_at' => null]);
     $this->actingAs($this->admin)->get('/administration/donnees')->assertRedirect('/securite');
 });
@@ -173,4 +176,22 @@ it('annule aussi la file de fichiers si la transaction métier échoue', functio
     app(FileDeletionQueue::class)->enqueue($path);
     expect(app(FileDeletionQueue::class)->drain())->toBe(0)->and(app(FileDeletionQueue::class)->drain())->toBe(0)
         ->and(Storage::disk('local')->exists($path))->toBeFalse();
+});
+
+it('refuse la suppression d’un événement marqué actif même sans dépendance', function () {
+    $event = Event::create(['name' => 'Événement actif fictif', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'status' => 'actif']);
+    expect($this->engine->inspect('evenement', $event->id, $this->admin)['allowed'])->toBeFalse();
+});
+
+it('refuse la clôture d’un parcours de groupe encore ouvert', function () {
+    DB::table('groups')->where('id', DemoSeeder::id('group'))->update(['opened_at' => now()]);
+    expect($this->engine->closureReasons($this->eventId))->not->toBeEmpty();
+});
+
+it('ne peut ni désapprouver ni raccourcir une politique de conservation approuvée', function () {
+    DB::table('settings')->where('key', 'conservation_validee')->update(['value' => '1']);
+    $durations = app(DataRetention::class)->settings();
+    $this->actingAs($this->admin)->put('/administration/conservation', ['approved' => false, 'exportMaximum' => 10000, 'durations' => $durations])->assertSessionHasErrors('approved');
+    $durations['photos'] = 1;
+    $this->put('/administration/conservation', ['approved' => true, 'exportMaximum' => 10000, 'durations' => $durations])->assertSessionHasErrors('durations.photos');
 });

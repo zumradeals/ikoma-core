@@ -30,6 +30,7 @@ final class BadgeLots
         }
 
         return DB::transaction(function () use ($eventId, $categoryId, $expected, $actor): BadgeBatch {
+            EventAvailability::requireOpen($eventId);
             $category = DB::table('categories')->where('id', $categoryId)->where('event_id', $eventId)->first(['name']) ?? throw new BadgeRefused('categorie', 'Catégorie inconnue pour cet événement.');
             // Verrou par événement : deux générations simultanées ne peuvent pas produire le même code.
             DB::statement("SELECT pg_advisory_xact_lock(hashtextextended('badge-codes:'||?, 4))", [$eventId]);
@@ -66,6 +67,7 @@ final class BadgeLots
 
         return DB::transaction(function () use ($batchId, $from, $to, $target, $actor): int {
             $batch = BadgeBatch::query()->lockForUpdate()->find($batchId) ?? throw new BadgeRefused('lot', 'Lot inconnu.');
+            EventAvailability::requireOpen($batch->event_id);
             if ($target->event_id !== $batch->event_id) {
                 throw new BadgeRefused('autre_evenement', 'Le poste ou le groupe appartient à un autre événement que le lot.');
             }

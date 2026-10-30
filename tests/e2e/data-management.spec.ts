@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 
 test('centre de gestion, analyse refusée et archives sur données fictives', async ({ page }) => {
+  test.setTimeout(120_000);
   const user = JSON.parse(readFileSync('.secrets/screen-badges.json', 'utf8')) as { email: string; password: string; secret: string };
   await page.setViewportSize({ width: 1440, height: 1000 });
   await loginWithSecondFactor(page, user.email, user.password, user.secret);

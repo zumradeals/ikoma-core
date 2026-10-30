@@ -77,6 +77,8 @@ final class BadgeArtwork
      */
     public function select(array $options): Collection
     {
+        // Un aperçu contient un véritable QR et peut être capturé ou imprimé. Protéger le lot avant de lire ses jetons.
+        abort_unless(DB::table('badge_batches')->where('id', $options['batch'])->where('event_id', $options['event'])->update(['print_exposed_at' => now()]) === 1, 404);
         $number = "CASE WHEN b.code ~ '^B-[0-9]+\$' THEN substring(b.code from 3)::integer END";
         $query = DB::table('badges as b')->leftJoin('categories as c', 'c.id', '=', 'b.category_id')
             ->where('b.event_id', $options['event'])->where('b.badge_batch_id', $options['batch'])

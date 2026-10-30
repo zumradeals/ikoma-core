@@ -109,7 +109,7 @@ export class PosteRuntime {
     this.repo = null; this.profile = null;
     this.handlers.onWiped(reason);
     if (token) {
-      void this.fetcher('/poste/api/efface', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN'), 'X-Device-Token': token }, body: JSON.stringify({ motif: reason, operations_perdues: lost }), credentials: 'same-origin' }).catch(() => undefined);
+      void this.fetcher('/poste/api/efface', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN'), 'X-Device-Token': token }, body: JSON.stringify({ motif: reason, operations_perdues: lost }), credentials: 'same-origin', keepalive: true }).catch(() => undefined);
     }
   }
 

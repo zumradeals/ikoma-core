@@ -2,6 +2,7 @@
 
 namespace App\Services\Poste;
 
+use App\Services\EventAvailability;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,6 +39,12 @@ final class Operations
                 return response()->json(json_decode((string) $row->result, true), (int) $row->status_code, ['X-Idempotent-Replay' => 'true']);
             }
             try {
+                if ($device !== null) {
+                    EventAvailability::requireOpen($device->event_id);
+                    if (DB::table('devices')->where('id', $device->id)->whereNotNull('revoked_at')->exists()) {
+                        throw new DeskRefused('appareil_revoque', 'Cette tablette a été révoquée.', 401);
+                    }
+                }
                 $body = DB::transaction($handler); // point de sauvegarde : un refus annule les écritures de l'opération, pas son enregistrement
                 $status = 200;
             } catch (DeskRefused $e) {

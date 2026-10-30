@@ -40,7 +40,7 @@ final class EventsController
             if (in_array(DB::table('events')->where('id', $event)->value('status'), ['clos', 'archive'], true)) {
                 throw ValidationException::withMessages(['name' => 'Cet événement est clôturé ou archivé.']);
             }
-            foreach (['access_events', 'badge_assignments', 'import_batches', 'sync_conflicts'] as $table) {
+            foreach (['access_events', 'badge_assignments', 'sync_conflicts'] as $table) {
                 if (DB::table($table)->where('event_id', $event)->exists()) {
                     throw ValidationException::withMessages(['name' => 'Cet événement possède une activité : modification de préparation interdite.']);
                 }

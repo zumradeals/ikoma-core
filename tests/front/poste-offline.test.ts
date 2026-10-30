@@ -293,3 +293,23 @@ it('refuse hors ligne la remise d’une carte nominative à une autre personne',
   expect(() => applyOp(list, op, now0)).toThrow('autre personne');
   expect(applyOp(list, { ...op, payload: { visitor_id: 'v1', code: 'B-001' } }, now0)).toEqual({ badge_code: 'B-001' });
 });
+
+it('déclare l’effacement après révocation seulement une fois les données locales effacées', async () => {
+  let runtime: PosteRuntime;
+  const receipts: { motif: string; operations_perdues: number }[] = [];
+  const fetcher: typeof fetch = async (input, init) => {
+    if (String(input) === '/poste/api/efface') {
+      expect(await runtime.db.meta.count()).toBe(0);
+      expect(await runtime.db.ops.count()).toBe(0);
+      expect(init?.keepalive).toBe(true);
+      receipts.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ ok: true }));
+    }
+    return new Response(JSON.stringify({ code: 'appareil_revoque', message: 'Révoquée' }), { status: 401 });
+  };
+  runtime = new PosteRuntime(undefined, { dbName: dbName(), iterations: ITER, fetcher });
+  await runtime.vault.enrol({ token: 'c'.repeat(64), secret: SECRET, pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste fictif' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+  await runtime.sync.sync();
+  await vi.waitFor(() => expect(receipts).toEqual([{ motif: 'deconnexion', operations_perdues: 0 }]));
+  expect(await runtime.vault.state()).toBe('vide');
+});

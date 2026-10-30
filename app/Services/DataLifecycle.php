@@ -69,8 +69,8 @@ final class DataLifecycle
                 $reasons[] = 'Lot réservé, nominatif, utilisé ou exposé à une tablette : suppression interdite.';
             }
         } elseif ($entity === 'evenement') {
-            if (in_array($row->status, ['clos', 'archive'], true)) {
-                $reasons[] = 'Cet événement est clôturé ou archivé : conservez ses références.';
+            if ($row->status !== null) {
+                $reasons[] = 'Cet événement possède un état opérationnel : conservez ses références.';
             }
             foreach (['visitors', 'hosts', 'devices', 'badge_batches', 'badges', 'groups', 'import_batches', 'access_events', 'badge_assignments', 'notifications', 'alerts', 'sync_conflicts'] as $dependency) {
                 if ($has($dependency, 'event_id', $id)) {
@@ -142,6 +142,9 @@ final class DataLifecycle
         }
         if (DB::table('devices')->where('event_id', $id)->whereNotNull('enrolled_at')->where(fn ($q) => $q->whereNull('revoked_at')->orWhereNull('wipe_acknowledged_at'))->exists()) {
             $reasons[] = 'Synchronisez les tablettes, révoquez-les puis reconnectez-les pour confirmer leur effacement. Les opérations locales inconnues ne peuvent pas être déclarées résolues.';
+        }
+        if (DB::table('groups')->where('event_id', $id)->whereNotNull('opened_at')->whereNull('arrival_closed_at')->exists()) {
+            $reasons[] = 'Un parcours de groupe reste ouvert. Terminez son arrivée et résolvez ses écarts.';
         }
         if (DB::table('devices')->where('event_id', $id)->whereNotNull('enrollment_hash')->exists()
             || DB::table('sync_conflicts')->where('event_id', $id)->whereNull('resolved_at')->exists()

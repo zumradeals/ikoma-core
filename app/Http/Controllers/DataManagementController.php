@@ -7,6 +7,7 @@ use App\Services\Audit;
 use App\Services\DataLifecycle;
 use App\Services\DataRetention;
 use App\Services\Maintenance;
+use Database\Seeders\DemoSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,7 @@ final class DataManagementController
             'approved' => DB::table('settings')->where('key', 'conservation_validee')->value('value') === '1',
             'history' => DB::table('audit_logs')->where(fn ($q) => $q->where('action', 'like', 'gestion.%')->orWhere('action', 'donnees.purgees')->orWhere('action', 'demo.donnees_purgees'))->orderByDesc('id')->limit(50)->get(['id', 'actor_id', 'occurred_at', 'action', 'details']),
             'requests' => DB::table('maintenance_requests')->orderByDesc('created_at')->limit(30)->get(['id', 'operation', 'status', 'result', 'created_at']),
+            'demoCounts' => ['evenements' => DB::table('events')->where('id', DemoSeeder::id('event'))->count(), 'visiteurs' => DB::table('visitors')->where('event_id', DemoSeeder::id('event'))->count(), 'badges' => DB::table('badges')->where('event_id', DemoSeeder::id('event'))->count()],
             'pendingFiles' => DB::table('pending_file_deletions')->whereNull('completed_at')->count(),
         ]);
     }
