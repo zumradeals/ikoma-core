@@ -117,7 +117,10 @@ it('renforce progressivement les blocages et journalise IP et empreinte sans ide
         for ($i = 0; $i < 5; $i++) {
             $this->withHeaders(['X-Device-Token' => $token])->post('/login', ['email' => $email, 'password' => 'incorrect'])->assertStatus(302)->assertSessionHasErrors('email');
         }
-        $this->post('/login', ['email' => $email, 'password' => 'incorrect'])->assertStatus(429)->assertHeader('Retry-After', (string) $seconds);
+        $blocked = $this->post('/login', ['email' => $email, 'password' => 'incorrect'])->assertStatus(429);
+        // Le TTL est arrondi aux secondes : l'entier peut décrémenter pendant la requête.
+        $retryAfter = (int) $blocked->headers->get('Retry-After');
+        expect($retryAfter)->toBeGreaterThanOrEqual($seconds - 1)->toBeLessThanOrEqual($seconds);
         $this->travel($seconds + 1)->seconds();
     }
     $details = DB::table('audit_logs')->where('action', 'connexion.echec')->orderByDesc('id')->value('details');
