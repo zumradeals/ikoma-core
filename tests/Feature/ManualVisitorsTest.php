@@ -137,7 +137,6 @@ it('refuse une préparation sur stock réservé ou sur une catégorie différent
     expect(Badge::whereNotNull('printed_for_visitor_id')->count())->toBe(0);
 });
 
-
 it('actualise la version du snapshot lorsque des badges sont réservés à une tablette', function () {
     DB::table('settings')->where('key', 'badge_marge_pourcent')->update(['value' => '0']);
     $poste = Device::findOrFail(DemoSeeder::id('device'));
