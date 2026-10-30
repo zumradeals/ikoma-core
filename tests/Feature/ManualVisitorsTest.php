@@ -41,10 +41,12 @@ beforeEach(function () {
 });
 
 it('affiche dès l’ouverture la liste paginée de l’événement choisi, sans mélanger les événements', function () {
-    $this->get('/administration/invites?event_id='.DemoSeeder::id('event'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Visitors')->where('eventId', DemoSeeder::id('event'))
-            ->has('list.data')->where('searchQuery', ''));
+    $this->get('/administration/invites?event_id='.DemoSeeder::id('event'))->assertOk()->assertInertia(function (Assert $page) {
+        $page->component('Admin/Visitors')
+            ->where('eventId', DemoSeeder::id('event'))
+            ->has('list.data')
+            ->where('searchQuery', '');
+    });
 
     $event = DemoSeeder::id('event');
     $now = now();
@@ -56,11 +58,13 @@ it('affiche dès l’ouverture la liste paginée de l’événement choisi, sans
             'status' => 'attendu', 'created_at' => $now, 'updated_at' => $now]);
     }
 
-    $this->get('/administration/invites?event_id='.$event.'&page=2')
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Visitors')->where('eventId', $event)
-            ->where('list.current_page', 2)->where('list.total', fn ($total) => $total > 20)
-            ->has('list.data'));
+    $this->get('/administration/invites?event_id='.$event.'&page=2')->assertOk()->assertInertia(function (Assert $page) use ($event) {
+        $page->component('Admin/Visitors')
+            ->where('eventId', $event)
+            ->where('list.current_page', 2)
+            ->where('list.total', fn ($total) => $total > 20)
+            ->has('list.data');
+    });
 });
 
 it('crée sans photo et synchronise la fiche sans assimiler le profil au contrôle d’identité', function () {
