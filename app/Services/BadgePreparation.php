@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 final class BadgePreparation
 {
     /** @param list<string> $visitorIds
-     * @return list<array{visitor_id:string,code:string}>
+     * @return list<array{visitor_id:string,code:string,poste_id:string|null}>
      */
     public function prepare(string $event, string $batch, int $from, int $to, array $visitorIds, User $actor): array
     {
@@ -31,20 +31,29 @@ final class BadgePreparation
             foreach ($badges as $index => $badge) {
                 $person = Visitor::where('event_id', $event)->whereNull('withdrawn_at')->lockForUpdate()->findOrFail($visitorIds[$index]);
                 if ($badge->printed_for_visitor_id === $person->id) {
-                    $result[] = ['visitor_id' => $person->id, 'code' => $badge->code];
+                    $result[] = ['visitor_id' => $person->id, 'code' => $badge->code, 'poste_id' => $badge->reserved_device_id];
 
                     continue;
                 }
-                if ($badge->printed_for_visitor_id !== null || $badge->status !== BadgeStatus::Available || $badge->reserved_device_id !== null || $badge->reserved_group_id !== null || $badge->category_id !== $person->category_id
+                // La réservation au poste est une affectation de stock, pas une remise à une personne.
+                // Conserver le poste et le QR. Ne jamais transformer un badge déjà utilisé, réservé à
+                // un groupe, ou réservé à un poste désactivé / rattaché à un autre événement.
+                $posteValide = $badge->reserved_device_id === null || DB::table('devices')
+                    ->where('id', $badge->reserved_device_id)->where('event_id', $event)
+                    ->whereNull('revoked_at')->exists();
+                if ($badge->printed_for_visitor_id !== null || $badge->status !== BadgeStatus::Available
+                    || $badge->reserved_group_id !== null || $posteValide === false
+                    || $badge->category_id !== $person->category_id
+                    || DB::table('badge_assignments')->where('badge_id', $badge->id)->exists()
                     || Badge::where('printed_for_visitor_id', $person->id)->whereIn('status', ['Disponible', 'Associé'])->exists()
                     || DB::table('badge_assignments')->where('visitor_id', $person->id)->whereNull('returned_at')->whereNull('cancelled_at')->exists()) {
-                    throw ValidationException::withMessages(['visitor_ids' => 'Préparation refusée : choisissez des badges disponibles, non réservés, de la même catégorie et des personnes sans autre badge actif ou préparé.']);
+                    throw ValidationException::withMessages(['visitor_ids' => 'Préparation refusée : badge indisponible, déjà utilisé, réservé à un groupe ou à un poste inactif, catégorie différente, ou personne ayant un autre badge. Aucune destination n’a été modifiée.']);
                 }
                 $badge->update(['printed_for_visitor_id' => $person->id]);
-                $result[] = ['visitor_id' => $person->id, 'code' => $badge->code];
+                $result[] = ['visitor_id' => $person->id, 'code' => $badge->code, 'poste_id' => $badge->reserved_device_id];
             }
             DB::table('events')->where('id', $event)->increment('list_revision');
-            app(Audit::class)->append('badge.destination_preparee', $actor->id, ['event_id' => $event, 'batch_id' => $batch, 'destinations' => $result]);
+            app(Audit::class)->append('badge.destination_preparee', $actor->id, ['event_id' => $event, 'batch_id' => $batch, 'destinations' => $result, 'mise_a_jour_poste_requise' => collect($result)->contains(fn (array $destination) => $destination['poste_id'] !== null)]);
 
             return $result;
         });

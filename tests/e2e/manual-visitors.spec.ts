@@ -35,6 +35,12 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   await expect(lots.getByRole('link', { name: 'Imprimer les étiquettes' })).toHaveCount(before.length + 1);
   const link = (await lots.getByRole('link', { name: 'Imprimer les étiquettes' }).evaluateAll(links => links.map(a => a.getAttribute('href')!))).find(href => !before.includes(href))!;
   const batch = new URL(link, 'http://localhost').searchParams.get('batch')!;
+  // Réserver le stock à la tablette AVANT le tirage nominatif, comme dans le parcours réel.
+  const reserve = page.getByRole('form', { name: 'Réserver des badges' });
+  await reserve.getByTestId('reservation-lot').selectOption(batch);
+  await reserve.getByTestId('reserver-badges-libres').locator('input[type="checkbox"]').check();
+  await reserve.locator('select').nth(1).selectOption({ label: 'Poste fictif A' });
+  await reserve.getByRole('button', { name: 'Réserver les badges disponibles', exact: true }).click();
   await page.goto('/administration/badges/modeles?person=' + person);
   await page.getByRole('combobox', { name: 'Lot', exact: true }).selectOption(batch);
   await page.getByLabel('Au badge n°').fill(await page.getByLabel('Du badge n°').inputValue());
@@ -42,8 +48,9 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   await page.getByLabel('La politique du client autorise').check();
   await page.getByRole('button', { name: 'Charger les personnes de cette catégorie (200 max.)', exact: true }).click();
   await page.locator(`input[type="checkbox"][value="${person}"]`).check();
-  await page.getByRole('button', { name: 'Réserver 1 destination(s) nominative(s)', exact: true }).click();
-  await expect(page.getByText('1 destination(s) réservée(s).', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Préparer 1 destination(s) nominative(s)', exact: true }).click();
+  await expect(page.getByText('1 destination(s) nominative(s) préparée(s)', { exact: false })).toBeVisible();
+  await expect(page.getByTestId('synchronisation-nominative')).toContainText('Poste fictif A');
   for (const design of ['visiteur', 'vip', 'prestataire']) {
     await page.locator(`input[name="design"][value="${design}"]`).check();
     for (const orientation of ['paysage', 'portrait']) {

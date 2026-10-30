@@ -165,6 +165,83 @@ it('refuse une préparation sur stock réservé ou sur une catégorie différent
     expect(Badge::whereNotNull('printed_for_visitor_id')->count())->toBe(0);
 });
 
+it('prépare un badge déjà réservé au poste sans toucher au QR, au statut ou à la réservation', function () {
+    $this->post('/administration/invites', manualInput('Personne nominative du poste'))->assertRedirect();
+    $person = Visitor::where('full_name', 'Personne nominative du poste')->firstOrFail();
+    $batch = app(BadgeLots::class)->generate($person->event_id, $person->category_id, 1, $this->admin);
+    $badge = Badge::where('badge_batch_id', $batch->id)->firstOrFail();
+    $token = $badge->qr_token;
+    $number = (int) substr($badge->code, 2);
+    $poste = Device::findOrFail(DemoSeeder::id('device'));
+    app(BadgeLots::class)->reserveAvailable($batch->id, $poste, $this->admin);
+    $versionBefore = app(ListSnapshot::class)->version($poste);
+    $data = ['event' => $person->event_id, 'batch' => $batch->id, 'from' => $number, 'to' => $number,
+        'visitor_ids' => [$person->id], 'personal_allowed' => true];
+
+    $this->postJson('/administration/badges/modeles/preparer', $data)
+        ->assertOk()->assertJsonPath('prepared.0.code', $badge->code)
+        ->assertJsonPath('sync_required', true)->assertJsonPath('postes_a_synchroniser.0', $poste->station ?: $poste->name);
+    $prepared = $badge->fresh();
+    expect($prepared->printed_for_visitor_id)->toBe($person->id)
+        ->and($prepared->reserved_device_id)->toBe($poste->id)
+        ->and($prepared->qr_token)->toBe($token)
+        ->and($prepared->status->value)->toBe('Disponible')
+        ->and(DB::table('badge_assignments')->where('badge_id', $badge->id)->count())->toBe(0)
+        ->and(app(ListSnapshot::class)->version($poste))->not->toBe($versionBefore);
+    $snapshot = collect(app(ListSnapshot::class)->build($poste)['badges'])->firstWhere('code', $badge->code);
+    expect($snapshot['mine'])->toBeTrue()->and($snapshot['printed_for_visitor_id'])->toBe($person->id);
+
+    $this->postJson('/administration/badges/modeles/preparer', $data)->assertOk()->assertJsonPath('sync_required', true);
+    $options = [...$this->printData, 'batch' => $batch->id, 'from' => $number, 'to' => $number,
+        'mode' => 'nominatif', 'personal_allowed' => true];
+    $this->postJson('/administration/badges/modeles/apercu', $options)->assertOk()->assertSee('Personne nominative du poste');
+});
+
+it('refuse un badge déjà utilisé, celui d’un groupe et celui d’un poste révoqué', function () {
+    $this->post('/administration/invites', manualInput('Personne nominative sécurisée'))->assertRedirect();
+    $person = Visitor::where('full_name', 'Personne nominative sécurisée')->firstOrFail();
+    $batch = app(BadgeLots::class)->generate($person->event_id, $person->category_id, 3, $this->admin);
+    $badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->get();
+    $poste = Device::findOrFail(DemoSeeder::id('device'));
+    $data = fn (Badge $badge) => [
+        'event' => $person->event_id, 'batch' => $batch->id, 'from' => (int) substr($badge->code, 2),
+        'to' => (int) substr($badge->code, 2), 'visitor_ids' => [$person->id], 'personal_allowed' => true,
+    ];
+    // Historique d'attribution, même si le badge est redevenu disponible.
+    DB::table('badge_assignments')->insert([
+        'id' => (string) Str::uuid(), 'event_id' => $person->event_id,
+        'badge_id' => $badges[0]->id, 'visitor_id' => DemoSeeder::id('visitor1'),
+        'actor_id' => $this->admin->id, 'assigned_at' => now(), 'returned_at' => now(),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $this->postJson('/administration/badges/modeles/preparer', $data($badges[0]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
+    $groupId = DB::table('groups')->where('event_id', $person->event_id)->value('id');
+    if ($groupId !== null) {
+        DB::table('badges')->where('id', $badges[1]->id)->update(['reserved_group_id' => $groupId]);
+        $this->postJson('/administration/badges/modeles/preparer', $data($badges[1]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
+    }
+    DB::table('badges')->where('id', $badges[2]->id)->update(['reserved_device_id' => $poste->id]);
+    $poste->forceFill(['revoked_at' => now()])->save();
+    $this->postJson('/administration/badges/modeles/preparer', $data($badges[2]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
+    expect(Badge::where('badge_batch_id', $batch->id)->whereNotNull('printed_for_visitor_id')->count())->toBe(0);
+});
+
+it('annule toute la préparation multi-badges si un badge est déjà affecté', function () {
+    $this->post('/administration/invites', manualInput('Destination fictive première'))->assertRedirect();
+    $this->post('/administration/invites', manualInput('Destination fictive deuxième'))->assertRedirect();
+    $a = Visitor::where('full_name', 'Destination fictive première')->firstOrFail();
+    $b = Visitor::where('full_name', 'Destination fictive deuxième')->firstOrFail();
+    $batch = app(BadgeLots::class)->generate($a->event_id, $a->category_id, 2, $this->admin);
+    $badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->get();
+    DB::table('badges')->where('id', $badges[1]->id)->update(['reserved_group_id' => DB::table('groups')->where('event_id', $a->event_id)->value('id')]);
+    $this->postJson('/administration/badges/modeles/preparer', [
+        'event' => $a->event_id, 'batch' => $batch->id,
+        'from' => (int) substr($badges[0]->code, 2), 'to' => (int) substr($badges[1]->code, 2),
+        'visitor_ids' => [$a->id, $b->id], 'personal_allowed' => true,
+    ])->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
+    expect(Badge::where('badge_batch_id', $batch->id)->whereNotNull('printed_for_visitor_id')->count())->toBe(0);
+});
+
 it('actualise la version du snapshot lorsque des badges sont réservés à une tablette', function () {
     DB::table('settings')->where('key', 'badge_marge_pourcent')->update(['value' => '0']);
     $poste = Device::findOrFail(DemoSeeder::id('device'));
