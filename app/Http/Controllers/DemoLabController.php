@@ -59,9 +59,10 @@ final class DemoLabController
             'confirmation' => ['required', 'in:REMETTRE A ZERO IKOMA'],
             'password' => ['required', 'string', 'max:1024'],
             'acknowledge' => ['required', 'accepted'],
+            'clear_users' => ['required', 'boolean'],
         ]);
         $this->checkPassword($request->user(), $data['password']);
-        $counts = $lab->clearBusiness($request->user());
+        $counts = $lab->clearBusiness($request->user(), (bool) $data['clear_users']);
         $request->session()->forget(['admin_reference_event', 'data_preview', 'maintenance_preview', 'maintenance_report']);
 
         return redirect('/administration/demonstration')->with('status',
