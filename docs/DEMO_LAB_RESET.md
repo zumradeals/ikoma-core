@@ -26,8 +26,8 @@ Une troisième opération, volontairement plus destructive, est proposée :
    `REMETTRE A ZERO IKOMA` et saisir le mot de passe courant.
 
 **Ce n'est PAS une destruction physique de la base PostgreSQL.**
-Les comptes et rôles, mots de passe, configuration technique, migrations,
-sessions et **journal d'audit de sécurité** sont conservés pour ne pas
+Par défaut, les comptes sont conservés ; une case facultative supprime tous les\ncomptes secondaires et leurs sessions, en conservant **l'administrateur qui confirme**.\nLes rôles, la configuration technique, les migrations,
+et **journal d'audit de sécurité** sont conservés pour ne pas
 perdre le contrôle de l'installation. Pour reconstruire une installation
 complètement neuve, il faut un processus d'exploitation séparé et une
 nouvelle identité administrateur. Aucun `migrate:fresh` n'est exposé au web.
