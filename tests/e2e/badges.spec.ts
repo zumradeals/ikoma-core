@@ -31,12 +31,12 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
 
   // 2. Réservation des 5 premiers badges du lot au poste fictif.
   const reserve = page.getByRole('form', { name: 'Réserver des badges' });
-  await reserve.getByLabel('Lot', { exact: true }).selectOption({ label: lotLabel });
+  await reserve.getByTestId('reservation-lot').selectOption({ label: lotLabel });
   await reserve.getByLabel('Du badge n°').fill(String(first)); await reserve.getByLabel('Au badge n°').fill(String(first + 4));
   await reserve.locator('select').nth(1).selectOption({ label: 'Poste fictif A' });
   await reserve.getByRole('button', { name: 'Réserver la plage', exact: true }).click();
   const filter = page.getByRole('form', { name: 'Filtrer les badges' });
-  await filter.getByLabel('Lot', { exact: true }).selectOption({ label: lotLabel });
+  await filter.getByTestId('filtre-lot').selectOption({ label: lotLabel });
   await filter.getByLabel('Réservation').selectOption('oui');
   await filter.getByRole('button', { name: 'Filtrer les badges', exact: true }).click();
   await expect(page.getByText('Poste réservé : Poste fictif A').first()).toBeVisible();
