@@ -14,7 +14,7 @@ const creator = useForm({ scenario: 'entreprise', quantity: 100 });
 const selectedDemo = ref<DemoEvent | null>(null);
 const resetOpen = ref(false);
 const demoDeletion = useForm({ confirmation: '', password: '' });
-const reset = useForm({ confirmation: '', password: '', acknowledge: false });
+const reset = useForm({ confirmation: '', password: '', acknowledge: false, clear_users: false });
 
 function generate() {
   creator.post('/administration/demonstration/generer');
@@ -117,7 +117,7 @@ function resetAll() {
           <div class="rounded-lg bg-slate-50 p-3"><dt>Postes et tablettes</dt><dd class="text-2xl font-bold">{{ totals.devices }}</dd></div>
           <div class="rounded-lg bg-slate-50 p-3"><dt>Scénarios DÉMO</dt><dd class="text-2xl font-bold">{{ totals.demo_events }}</dd></div>
         </dl>
-        <p class="admin-muted">Le compte administrateur, son mot de passe, la configuration technique, les migrations et la trace de sécurité du reset sont conservés. Les tablettes ayant des copies hors ligne doivent aussi être vidées ou réenrôlées avant de les réutiliser.</p>
+        <p class="admin-muted">Ton compte administrateur, son mot de passe, la configuration technique, les migrations et la trace de sécurité du reset sont conservés. Les tablettes ayant des copies hors ligne doivent aussi être vidées ou réenrôlées avant de les réutiliser.</p>
         <button v-if="!resetOpen" type="button" class="btn-soft border-red-600 text-red-800" @click="resetOpen = true" data-testid="business-reset-open">
           Préparer la remise à zéro totale
         </button>
@@ -128,6 +128,7 @@ function resetAll() {
             <input v-model="reset.acknowledge" type="checkbox" required class="mt-1">
             <span>Je confirme qu'il s'agit d'une installation de test et que je veux supprimer toutes les données métier, même non fictives.</span>
           </label>
+          <label class="flex items-start gap-2"><input v-model="reset.clear_users" type="checkbox" class="mt-1"><span>Supprimer aussi les autres comptes (agents, superviseurs et autres administrateurs). Seul mon compte administrateur actuel restera actif.</span></label>
           <label class="block">Recopiez exactement REMETTRE A ZERO IKOMA
             <input v-model="reset.confirmation" class="field mt-2" required autocomplete="off">
           </label>
