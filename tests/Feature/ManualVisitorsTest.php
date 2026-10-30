@@ -137,6 +137,21 @@ it('refuse une préparation sur stock réservé ou sur une catégorie différent
     expect(Badge::whereNotNull('printed_for_visitor_id')->count())->toBe(0);
 });
 
+
+it('actualise la version du snapshot lorsque des badges sont réservés à une tablette', function () {
+    DB::table('settings')->where('key', 'badge_marge_pourcent')->update(['value' => '0']);
+    $poste = Device::findOrFail(DemoSeeder::id('device'));
+    $lot = app(BadgeLots::class)->generate($poste->event_id, DemoSeeder::id('category1'), 1, $this->admin);
+    $badge = Badge::where('badge_batch_id', $lot->id)->firstOrFail();
+    $snapshot = app(ListSnapshot::class);
+    $avant = $snapshot->version($poste);
+    DB::table('badges')->where('id', $badge->id)->update(['reserved_device_id' => $poste->id, 'updated_at' => now()]);
+    $apres = $snapshot->version($poste);
+    expect($apres)->not->toBe($avant);
+    $ligne = collect($snapshot->build($poste)['badges'])->firstWhere('code', $badge->code);
+    expect($ligne)->not->toBeNull()->and($ligne['mine'])->toBeTrue();
+});
+
 it('prépare et imprime 200 destinations nominatives sans activation ni modification des QR', function () {
     DB::table('settings')->where('key', 'badge_marge_pourcent')->update(['value' => '0']);
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 200, $this->admin);
