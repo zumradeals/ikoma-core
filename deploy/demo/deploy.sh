@@ -81,7 +81,21 @@ if [ -n "${EMAIL:-}" ]; then CERT_ARGS="$CERT_ARGS -m $EMAIL"; else CERT_ARGS="$
 case "$WEB" in
   nginx)
     if [ -d /etc/nginx/sites-available ]; then CONF=/etc/nginx/sites-available/ikoma-demo.conf; else CONF=/etc/nginx/conf.d/ikoma-demo.conf; fi
-    cat > "$CONF" <<NGINX
+    # Une mise à jour de l'application ne doit JAMAIS recréer le vhost HTTP ni réémettre un certificat
+    # d'un domaine déjà configuré. Cela effacerait le bloc 443 posé par Certbot et casserait le HTTPS.
+    if [ -f "$CONF" ]; then
+      nginx -t || fail "Nginx a une configuration invalide ; aucun vhost IKOMA n'a été modifié."
+      echo "Vhost existant préservé : $CONF ; aucun Certbot lancé."
+      # Vérifie le certificat réellement servi en local (SNI + nom de domaine), sans ignorer TLS.
+      # Ne cherche jamais à réparer un problème Nginx en écrasant le vhost sur un VPS mutualisé.
+      if ! curl --noproxy '*' --fail --silent --show-error --max-time 15 \
+        --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/sante" >/dev/null; then
+        fail "HTTPS existant invalide sur $DOMAIN : vérifiez les vhosts Nginx et le certificat présenté (SNI). Le déploiement n'a pas touché à la configuration TLS."
+      fi
+    else
+      # Première installation uniquement : créer le HTTP nécessaire au défi ACME, puis laisser
+      # Certbot établir le HTTPS. Le script n'écrase jamais de vhost IKOMA préexistant.
+      cat > "$CONF" <<NGINX
 server {
     listen 80;
     listen [::]:80;
@@ -91,18 +105,22 @@ server {
         proxy_pass http://127.0.0.1:$PORT;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 NGINX
-    if [ -d /etc/nginx/sites-enabled ]; then ln -sf "$CONF" /etc/nginx/sites-enabled/ikoma-demo.conf; fi
-    if ! nginx -t 2>/dev/null; then rm -f "$CONF" /etc/nginx/sites-enabled/ikoma-demo.conf; fail "la configuration nginx a été refusée ; elle a été retirée, vos autres sites ne sont pas touchés."; fi
-    systemctl reload nginx
-    command -v certbot >/dev/null || { apt-get update -qq && apt-get install -y -qq certbot python3-certbot-nginx; }
-    # shellcheck disable=SC2086
-    certbot --nginx -d "$DOMAIN" $CERT_ARGS
-    nginx -t && systemctl reload nginx ;;
+      if [ -d /etc/nginx/sites-enabled ]; then ln -sf "$CONF" /etc/nginx/sites-enabled/ikoma-demo.conf; fi
+      if ! nginx -t 2>/dev/null; then rm -f "$CONF" /etc/nginx/sites-enabled/ikoma-demo.conf; fail "la configuration nginx a été refusée ; elle a été retirée, vos autres sites ne sont pas touchés."; fi
+      systemctl reload nginx
+      command -v certbot >/dev/null || { apt-get update -qq && apt-get install -y -qq certbot python3-certbot-nginx; }
+      # shellcheck disable=SC2086
+      certbot --nginx -d "$DOMAIN" $CERT_ARGS
+      nginx -t && systemctl reload nginx
+      curl --noproxy '*' --fail --silent --show-error --max-time 15 \
+        --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/sante" >/dev/null \
+        || fail "Le certificat a été demandé mais HTTPS ne répond pas correctement sur $DOMAIN."
+    fi ;;
   apache)
     a2enmod -q proxy proxy_http headers rewrite ssl >/dev/null
     cat > /etc/apache2/sites-available/ikoma-demo.conf <<APACHE
