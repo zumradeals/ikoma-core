@@ -1,6 +1,6 @@
 export type Category = { id: string; name: string; color: string; priority_circuit: boolean };
 export type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string };
-export type DeskContext = { poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string }; hosts: { id: string; name: string; service: string | null }[]; categories: Category[] };
+export type DeskContext = { poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string }; visitor_count?: number; hosts: { id: string; name: string; service: string | null }[]; categories: Category[] };
 export type SearchResult = { id: string; full_name: string; organisation: string | null; host: string | null; homonyms: number; category: Category };
 export type IdentityDocument = { type: string; number?: string; photo: Blob };
 export const documentLabels: Record<string, string> = { cni: 'Carte nationale d’identité', passeport: 'Passeport', permis: 'Permis de conduire', carte_militaire: 'Carte militaire', carte_professionnelle: 'Carte professionnelle', autre: 'Autre pièce' };

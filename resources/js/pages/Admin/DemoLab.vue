@@ -79,10 +79,11 @@ function resetAll() {
         <ul v-else class="space-y-3">
           <li v-for="event in demoEvents" :key="event.id" class="rounded-lg border p-4">
             <p class="font-semibold">{{ event.name }}</p>
-            <p class="admin-muted text-sm">Données fictives — vous pouvez supprimer toute cette démonstration après les essais.</p>
+            <p class="admin-muted text-sm">Données fictives — vous pouvez supprimer toute cette démonstration après les essais.</p><p class="text-sm">Pour tester sur une tablette : ouvrez Postes, identifiez le poste associé à cet événement, puis générez son code d’enrôlement. Un poste d’un autre événement ne recevra pas cette liste.</p>
             <div class="mt-3 flex flex-wrap gap-2">
               <Link class="btn-soft" href="/administration/evenements">Voir l'événement</Link>
               <Link class="btn-soft" :href="'/administration/invites?event_id=' + event.id">Voir les invités</Link>
+              <Link class="btn-soft" href="/administration/postes">Préparer le poste d’accueil</Link>
               <button type="button" class="btn-soft border-red-600 text-red-800" @click="selectForRemoval(event)">Effacer cette démonstration</button>
             </div>
           </li>

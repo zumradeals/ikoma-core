@@ -28,7 +28,10 @@ export function ficheOf(list: LocalList, id: string, now: number): Fiche {
 }
 
 export function searchOf(list: LocalList, query: string): SearchResult[] {
-  return searchIndex(list.indexed(), query).map(e => {
+  const entries = query.trim() === ''
+    ? [...list.indexed()].sort((a, b) => a.full_name.localeCompare(b.full_name, 'fr') || a.id.localeCompare(b.id)).slice(0, 10)
+    : searchIndex(list.indexed(), query);
+  return entries.map(e => {
     const v = list.visitors.get(e.id)!;
     return { id: e.id, full_name: e.full_name, organisation: e.organisation, host: e.host, homonyms: e.homonyms, category: list.categories.get(v.category_id)! };
   });

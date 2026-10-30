@@ -106,6 +106,14 @@ describe('recherche locale', () => {
   const names = ['Koné Mariam', 'Marie Koné', 'Yao Brou', 'Yao Brou', 'Yao Brou', 'Aminata Dembélé', 'Bamba Seydou', ...Array.from({ length: 30 }, (_, i) => `Visiteur fictif ${i + 1}`)];
   const list = () => new LocalList(snapshot(names.map((name, i) => visitor(`v${i}`, name, name === 'Yao Brou' && i === 4 ? { category_id: 'c0' } : {}))));
   const find = (q: string) => searchOf(list(), q);
+  it('affiche les dix premières personnes par ordre alphabétique même sans saisie, depuis la copie locale', () => {
+    const initial = find('');
+    expect(initial).toHaveLength(10);
+    expect(initial[0].full_name).toBe('Aminata Dembélé');
+    expect(initial.every(v => v.category && v.id)).toBe(true);
+    expect(find('k')).toEqual([]);
+    expect(find('ko').map(v => v.full_name)).toContain('Koné Mariam');
+  });
   it('tolère accents et fautes, et cherche sur n’importe quel mot', () => {
     expect(find('Koné').map(r => r.full_name)).toEqual(expect.arrayContaining(['Marie Koné', 'Koné Mariam']));
     expect(find('kone').map(r => r.full_name)).toEqual(expect.arrayContaining(['Marie Koné', 'Koné Mariam']));

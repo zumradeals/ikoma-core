@@ -117,6 +117,12 @@ it('cherche sur n’importe quel mot du nom, avec accents et fautes, VIP d’abo
     $now = now();
     DB::table('visitors')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'full_name' => 'Marie Koné', 'organisation' => 'Organisation fictive 3', 'category_id' => DemoSeeder::id('category1'), 'valid_from' => $now, 'valid_until' => $now->copy()->addDay(), 'source' => 'listé', 'status' => 'attendu', 'created_at' => $now, 'updated_at' => $now]);
     $search = fn (string $q) => collect($this->getJson('/poste/api/recherche?q='.urlencode($q), deskHeaders())->assertOk()->json('results'));
+    $preview = collect($this->getJson('/poste/api/recherche', deskHeaders())->assertOk()->json('results'));
+    expect($preview)->toHaveCount(10)
+        ->and($preview->first())->toHaveKeys(['id', 'full_name', 'organisation', 'host', 'homonyms', 'category'])
+        ->and($this->getJson('/poste/api/contexte', deskHeaders())->json('visitor_count'))->toBe(
+            DB::table('visitors')->where('event_id', $event)->whereNull('withdrawn_at')->count()
+        );
     expect($search('Koné')->pluck('full_name')->all())->toContain('Marie Koné')->toContain('Koné Mariam');
     expect($search('kone')->pluck('full_name')->all())->toContain('Marie Koné')->toContain('Koné Mariam');
     expect($search('mariam kone')->pluck('full_name')->take(2)->all())->toBe(['Koné Mariam', 'Koné Mariam']);
@@ -136,6 +142,8 @@ it('cherche sur n’importe quel mot du nom, avec accents et fautes, VIP d’abo
     DB::table('categories')->insert(['id' => $category, 'event_id' => $other, 'name' => 'Visiteur', 'color' => '#0F5AA6', 'created_at' => $now, 'updated_at' => $now]);
     DB::table('visitors')->insert(['id' => (string) Str::uuid(), 'event_id' => $other, 'full_name' => 'Personne fictive Ailleurs', 'category_id' => $category, 'valid_from' => $now, 'valid_until' => $now->copy()->addDay(), 'source' => 'listé', 'created_at' => $now, 'updated_at' => $now]);
     expect($search('Ailleurs'))->toHaveCount(0);
+    $previewOther = collect($this->getJson('/poste/api/recherche', deskHeaders())->assertOk()->json('results'));
+    expect($previewOther->pluck('full_name')->all())->not->toContain('Personne fictive Ailleurs');
     $this->getJson('/poste/api/visiteurs/'.DB::table('visitors')->where('event_id', $other)->value('id'), deskHeaders())->assertNotFound();
 });
 

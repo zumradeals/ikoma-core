@@ -88,13 +88,34 @@ describe('composants du poste', () => {
     vi.useFakeTimers();
     const search = vi.fn(async () => [result({ homonyms: 2 }), result({ id: 'v2', full_name: 'Yao Brou', category: vip })]);
     const wrapper = mount(StepSearch, { props: { repository: fakeRepo({ search }) } });
-    await wrapper.get('input').setValue('k'); await vi.advanceTimersByTimeAsync(400); expect(search).not.toHaveBeenCalled();
+    await flushPromises();
+    expect(search).toHaveBeenCalledWith('');
+    expect(wrapper.get('[data-testid="apercu-liste"]').text()).toContain('Dix premières personnes');
+    await wrapper.get('input').setValue('k'); await vi.advanceTimersByTimeAsync(400);
+    expect(search).not.toHaveBeenCalledWith('k');
     await wrapper.get('input').setValue('ko'); await vi.advanceTimersByTimeAsync(400); await flushPromises();
     expect(search).toHaveBeenCalledWith('ko'); expect(wrapper.emitted('started')).toBeTruthy();
     expect(wrapper.text()).toContain('Homonyme : 2'); expect(wrapper.text()).toContain('Personnalité VIP'); expect(wrapper.text()).toContain('Prioritaire');
     await wrapper.findAll('ul[aria-label="Résultats de la recherche"] button')[0].trigger('click'); expect(wrapper.emitted('select')![0][0]).toMatchObject({ id: 'v1' });
     await wrapper.findAll('button').find(b => b.text().includes('Visiteur non listé'))!.trigger('click'); expect(wrapper.emitted('unlisted')).toHaveLength(1);
     vi.useRealTimers();
+  });
+  it('affiche immédiatement les dix premiers, puis revient à cet aperçu si la recherche est effacée', async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => result({ id: String(i), full_name: 'Personne fictive ' + (i + 1) }));
+    const search = vi.fn(async (query: string) => query === '' ? ten : [result({ full_name: 'Koné Mariam' })]);
+    const wrapper = mount(StepSearch, { props: { repository: fakeRepo({ search }) } });
+    await flushPromises();
+    expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] button')).toHaveLength(10);
+    expect(wrapper.text()).toContain('Personne fictive 1');
+    await wrapper.get('input').setValue('ko');
+    await new Promise(r => setTimeout(r, 200));
+    await flushPromises();
+    expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] button')).toHaveLength(1);
+    expect(wrapper.text()).toContain('Koné Mariam');
+    await wrapper.get('input').setValue('');
+    await flushPromises();
+    expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] button')).toHaveLength(10);
+    expect(search).toHaveBeenCalledWith('');
   });
   it('prépare la fiche rapide d’un non listé avec la catégorie « Visiteur » par défaut', async () => {
     const context = await fakeRepo().context();

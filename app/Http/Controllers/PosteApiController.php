@@ -30,9 +30,9 @@ final class PosteApiController
 
     public function recherche(Request $r): JsonResponse
     {
-        $data = $r->validate(['q' => 'required|string|max:160']);
+        $data = $r->validate(['q' => 'nullable|string|max:160']);
 
-        return response()->json(['results' => $this->desk->search($this->poste($r), $data['q'])]);
+        return response()->json(['results' => $this->desk->search($this->poste($r), $data['q'] ?? '')]);
     }
 
     public function fiche(Request $r, string $visitor): JsonResponse
