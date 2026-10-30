@@ -268,6 +268,18 @@ describe('file hors ligne, règles locales et envoi', () => {
     expect(await vault.db.ops.count()).toBe(0);
   });
 
+  it('considère le poste supprimé lors d’une remise à zéro comme invalide et efface son ancienne copie', async () => {
+    const { repo, sync, vault, revoked } = await setup(undefined, () =>
+      new Response(JSON.stringify({ code: 'appareil_non_enrole', message: 'Poste supprimé après reset' }), { status: 401 }));
+    await repo.refuse('ancienne-operation', 'v1', 'Essai');
+    await sync.sync();
+    expect(revoked).toHaveBeenCalledWith('appareil_non_enrole');
+    expect(sync.state.revoked).toBe(true);
+    expect(await vault.db.meta.count()).toBe(0);
+    expect(await vault.db.ops.count()).toBe(0);
+    expect(await vault.db.chunks.count()).toBe(0);
+  });
+
   it('ne laisse aucune donnée personnelle ni jeton en clair dans IndexedDB', async () => {
     const { repo, vault } = await setup([visitor('v1', 'Koné Mariam', { organisation: 'Organisation Secrète fictive' })]);
     await repo.saveIdentity('i1', 'v1', new Blob(['PHOTO-IDENTIFIABLE'], { type: 'image/jpeg' }));
