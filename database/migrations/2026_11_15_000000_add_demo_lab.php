@@ -77,13 +77,13 @@ SQL);
 CREATE OR REPLACE FUNCTION public.ikoma_reset_demo_business(p_actor uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
-AS $
+AS $$
 BEGIN
     -- Défense en profondeur, même si un appel SQL contourne le contrôleur web.
     IF NOT EXISTS (
         SELECT 1 FROM public.users u
         JOIN public.model_has_roles mr ON mr.model_id = u.id
-            AND mr.model_type = 'App\\Models\\User'
+            AND mr.model_type = concat('App', chr(92), 'Models', chr(92), 'User')
         JOIN public.roles r ON r.id = mr.role_id
         WHERE u.id = p_actor AND u.active IS TRUE
             AND u.two_factor_confirmed_at IS NOT NULL
@@ -108,7 +108,7 @@ BEGIN
     RESTART IDENTITY;
     -- Sécurité, migrations, réglages, comptes, sessions et audit sont conservés.
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.ikoma_reset_demo_business(uuid) FROM PUBLIC;
 
 SQL);
