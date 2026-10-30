@@ -128,6 +128,7 @@ final class Groups
     private function open(string $groupId, User $actor): object
     {
         $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
+        EventAvailability::requireOpen($group->event_id);
         if ($group->opened_at === null) {
             DB::table('groups')->where('id', $groupId)->update(['opened_at' => now(), 'updated_at' => now()]);
             $this->audit->append('groupe.ouvert', $actor->id, ['group_id' => $groupId, 'event_id' => $group->event_id]);

@@ -37,6 +37,13 @@ final class RetentionController
         if ($data['durations']['evenements'] < $data['durations']['visiteurs']) {
             throw ValidationException::withMessages(['durations.evenements' => 'Ce délai doit couvrir celui des visiteurs.']);
         }
+        if (DB::table('settings')->where('key', 'conservation_validee')->value('value') === '1') {
+            foreach (app(DataRetention::class)->settings() as $type => $current) {
+                if ($data['durations'][$type] < $current) {
+                    throw ValidationException::withMessages(['durations.'.$type => 'Une durée approuvée ne peut pas être raccourcie pour provoquer un effacement.']);
+                }
+            }
+        }
         DB::transaction(function () use ($data, $r): void {
             foreach ($data['durations'] as $type => $days) {
                 DB::table('settings')->where('key', 'conservation_'.$type.'_jours')->update(['value' => (string) $days]);

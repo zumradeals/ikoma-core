@@ -104,6 +104,8 @@ fi
 say "9/9 Sauvegarde quotidienne"
 if [ "$SCHEDULE" = 1 ] && [ "$(id -u)" -eq 0 ] && [ -d /etc/cron.d ]; then
   printf '# IKOMA Accueil : sauvegarde chiffrée quotidienne\n17 2 * * * root bash %s/deploy/prod/backup.sh >> /var/log/ikoma-sauvegarde.log 2>&1\n' "$ROOT" > /etc/cron.d/ikoma-sauvegarde
+  printf '# IKOMA ACCESS : demandes de maintenance autorisées depuis l’interface\n* * * * * root bash %s/deploy/prod/maintenance.sh >> /var/log/ikoma-maintenance.log 2>&1\n' "$ROOT" > /etc/cron.d/ikoma-maintenance
+  chmod 0644 /etc/cron.d/ikoma-maintenance
   chmod 0644 /etc/cron.d/ikoma-sauvegarde; echo "Programmée tous les jours à 02 h 17 (/etc/cron.d/ikoma-sauvegarde)."
 else
   echo "Non programmée automatiquement. Ajoutez à la planification du serveur : 17 2 * * * bash $ROOT/deploy/prod/backup.sh"

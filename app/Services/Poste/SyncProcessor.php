@@ -32,7 +32,7 @@ final class SyncProcessor
     {
         return DB::transaction(function () use ($device, $session, $operations, $sentAt): array {
             $locked = Device::query()->lockForUpdate()->findOrFail($device->id);
-            if ($locked->revoked_at !== null) {
+            if ($locked->revoked_at !== null || in_array(DB::table('events')->where('id', $locked->event_id)->value('status'), ['clos', 'archive'], true)) {
                 return ['revoked' => true];
             }
 

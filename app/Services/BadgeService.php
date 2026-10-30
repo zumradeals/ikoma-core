@@ -27,6 +27,7 @@ final class BadgeService
         $deviceId = $device instanceof Device ? $device->id : $device;
 
         return DB::transaction(function () use ($badgeId, $visitorId, $deviceId, $agent, $avis): BadgeAssignment {
+            EventAvailability::requireOpen((string) DB::table('badges')->where('id', $badgeId)->value('event_id'));
             $badge = $this->lockBadge($badgeId);
             $visitor = Visitor::query()->lockForUpdate()->find($visitorId) ?? throw new BadgeRefused('visiteur_inconnu', 'Visiteur introuvable.');
             if ($badge->event_id !== $visitor->event_id) {
@@ -156,6 +157,9 @@ final class BadgeService
             return $this->refuse($rows->isEmpty() ? 'inconnu' : 'evenement_requis', $rows->isEmpty() ? 'Badge inconnu.' : 'Plusieurs événements portent ce code : précisez l’événement.', null, null, $actor, $journaliser);
         }
         $row = $rows->first();
+        if (in_array(DB::table('events')->where('id', $row->event_id)->value('status'), ['clos', 'archive'], true)) {
+            return $this->refuse('evenement_indisponible', 'Événement clôturé ou archivé.', $row->id, $row->event_id, $actor, $journaliser);
+        }
         $status = BadgeStatus::from($row->status);
         if ($status === BadgeStatus::Cancelled) {
             return $this->refuse('annule', 'Badge annulé : accès refusé.', $row->id, $row->event_id, $actor, $journaliser);

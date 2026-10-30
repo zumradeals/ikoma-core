@@ -21,10 +21,10 @@ final class AdminVisitorsController
     public function index(Request $request): Response
     {
         Gate::authorize('listes.importer');
-        $input = $request->validate(['event_id' => 'nullable|uuid|exists:events,id', 'q' => 'nullable|string|max:160', 'visitor' => 'nullable|uuid|exists:visitors,id']);
-        $visitor = isset($input['visitor']) ? Visitor::whereNull('withdrawn_at')->findOrFail($input['visitor']) : null;
+        $input = $request->validate(['event_id' => 'nullable|uuid|exists:events,id', 'q' => 'nullable|string|max:160', 'withdrawn' => 'nullable|boolean', 'visitor' => 'nullable|uuid|exists:visitors,id']);
+        $visitor = isset($input['visitor']) ? Visitor::findOrFail($input['visitor']) : null;
         $event = $visitor->event_id ?? ($input['event_id'] ?? DB::table('events')->orderBy('name')->value('id'));
-        $editable = true;
+        $editable = $visitor?->withdrawn_at === null;
         if ($visitor) {
             try {
                 app(HostGuests::class)->editable($visitor, true);
@@ -37,7 +37,8 @@ final class AdminVisitorsController
             'events' => DB::table('events')->orderBy('name')->get(['id', 'name', 'starts_at', 'ends_at']), 'eventId' => $event,
             'hosts' => DB::table('hosts')->orderBy('name')->get(['id', 'event_id', 'name']), 'categories' => DB::table('categories')->orderBy('name')->get(['id', 'event_id', 'name']),
             'groups' => DB::table('groups')->orderBy('name')->get(['id', 'event_id', 'name']),
-            'visitor' => $visitor ? [...$visitor->only(['id', 'event_id', 'full_name', 'organisation', 'position', 'category_id', 'host_id', 'group_id', 'valid_from', 'valid_until', 'profile_photo_print_allowed']), 'has_photo' => (bool) $visitor->profile_photo_file, 'revision' => (string) $visitor->updated_at] : null,
+            'visitor' => $visitor ? [...$visitor->only(['id', 'event_id', 'full_name', 'organisation', 'position', 'category_id', 'host_id', 'group_id', 'valid_from', 'valid_until', 'profile_photo_print_allowed', 'withdrawn_at']), 'has_photo' => (bool) $visitor->profile_photo_file, 'revision' => (string) $visitor->updated_at] : null,
+            'withdrawn' => $request->boolean('withdrawn'), 'withdrawnVisitors' => $event && $request->boolean('withdrawn') ? DB::table('visitors')->where('event_id', $event)->whereNotNull('withdrawn_at')->orderBy('full_name')->limit(200)->get(['id', 'full_name', 'organisation']) : [],
             'editable' => $editable, 'feedback' => $request->session()->get('visitor_feedback'),
             'results' => $event && ! empty($input['q']) ? app(VisitorSearch::class)->searchDetailed($event, $input['q']) : [],
         ]);

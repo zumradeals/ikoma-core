@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminVisitorsController;
+use App\Http\Controllers\BadgeDetailsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgeReservationsController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\BadgeSettingsController;
 use App\Http\Controllers\BadgeWorkshopController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
+use App\Http\Controllers\DataManagementController;
 use App\Http\Controllers\EventsController;
 use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\HealthController;
@@ -97,6 +99,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/badges/reservations', [BadgeReservationsController::class, 'store'])->middleware('can:badges.gerer');
         Route::put('/administration/badges/reglages', [BadgeSettingsController::class, 'update'])->middleware('can:badges.gerer');
         Route::get('/administration/badges/etiquettes', BadgeLabelsController::class)->middleware('can:badges.gerer');
+        Route::get('/administration/badges/{badge}', BadgeDetailsController::class)->whereUuid('badge')->middleware('can:badges.gerer');
 
         Route::middleware(EnsureAgentAccueil::class)->group(function (): void {
             Route::get('/poste', PosteController::class)->middleware('can:visiteurs.rechercher');
@@ -151,6 +154,12 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/comptes/inactivite', [AccountsController::class, 'inactivity'])->middleware('can:comptes.gerer');
         Route::put('/administration/comptes/{user}', [AccountsController::class, 'update'])->middleware(['can:comptes.gerer', 'can:roles.attribuer']);
         Route::put('/administration/comptes/{user}/mot-de-passe', [AccountsController::class, 'password'])->middleware('can:comptes.gerer');
+        Route::get('/administration/donnees', [DataManagementController::class, 'index'])->middleware('can:comptes.gerer');
+        Route::post('/administration/donnees/analyser', [DataManagementController::class, 'maintenancePreview'])->middleware(['can:comptes.gerer', 'throttle:6,1']);
+        Route::post('/administration/donnees/demander', [DataManagementController::class, 'maintenanceRequest'])->middleware(['can:comptes.gerer', 'throttle:6,1']);
+        Route::post('/administration/donnees/supprimer', [DataManagementController::class, 'destroy'])->middleware(['can:comptes.gerer', 'throttle:6,1']);
+        Route::put('/administration/evenements/{event}', [EventsController::class, 'update'])->whereUuid('event')->middleware('can:evenements.gerer');
+        Route::post('/administration/evenements/{event}/{action}', [DataManagementController::class, 'transition'])->whereUuid('event')->whereIn('action', ['cloturer', 'archiver'])->middleware('can:evenements.gerer');
         Route::get('/administration/conservation', [RetentionController::class, 'index'])->middleware('can:comptes.gerer');
         Route::put('/administration/conservation', [RetentionController::class, 'update'])->middleware('can:comptes.gerer');
         Route::get('/administration/journal/exporter', JournalExportController::class)->middleware(['can:journal.exporter', 'throttle:exports']);

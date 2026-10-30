@@ -84,6 +84,21 @@ services:
       migrator: {condition: service_completed_successfully}
     mem_limit: 512m
 
+  maintenance:
+    <<: *durci
+    profiles: [maintenance]
+    restart: 'no'
+    image: ikoma-php:${IKOMA_VERSION:?version manquante}
+    command: [sh, scripts/process-maintenance-prod.sh]
+    secrets: [app_key, db_app, db_owner]
+    volumes:
+      - storage:/var/www/html/storage
+      - ./prod-data/backups:/maintenance-backups:ro
+    networks: [interne]
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 512m
+
   nginx:
     <<: *durci
     image: ikoma-nginx:${IKOMA_VERSION:?version manquante}

@@ -20,6 +20,7 @@ final class BadgeLabelsController
     {
         Gate::authorize('badges.gerer');
         $q = $r->validate(['batch' => 'required|uuid|exists:badge_batches,id', 'from' => 'nullable|integer|min:1', 'to' => 'nullable|integer|min:1|gte:from', 'cols' => 'nullable|integer|between:1,4', 'rows' => 'nullable|integer|between:1,10']);
+        DB::table('badge_batches')->where('id', $q['batch'])->update(['print_exposed_at' => now()]);
         $cols = (int) ($q['cols'] ?? 3);
         $rows = (int) ($q['rows'] ?? 5);
         $number = "CASE WHEN b.code ~ '^B-[0-9]+\$' THEN substring(b.code from 3)::integer END";

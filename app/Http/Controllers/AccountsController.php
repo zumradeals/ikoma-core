@@ -48,6 +48,9 @@ class AccountsController
         DB::transaction(function () use ($user, $data): void {
             DB::statement('SELECT pg_advisory_xact_lock(731903)');
             $user = User::query()->lockForUpdate()->findOrFail($user->id);
+            if ($user->active && $user->hasRole('administrateur') && (! $data['active'] || $data['role'] !== 'administrateur') && ! User::role('administrateur')->where('active', true)->where('id', '<>', $user->id)->exists()) {
+                throw ValidationException::withMessages(['active' => 'Le dernier administrateur actif doit conserver son accès.']);
+            }
             if ($user->active !== $data['active']) {
                 $user->update(['active' => $data['active'], 'remember_token' => null]);
                 app(Audit::class)->append($data['active'] ? 'compte.active' : 'compte.desactive', auth()->id(), ['id' => $user->id]);

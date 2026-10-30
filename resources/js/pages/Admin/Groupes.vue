@@ -49,7 +49,7 @@ function look() { router.get('/administration/groupes', { event: props.event?.id
 <form class="space-y-3" aria-label="Chercher un stagiaire à ajouter" @submit.prevent="look"><label class="block">Chercher un stagiaire sans groupe<input v-model="q" class="field" autocomplete="off" data-testid="chercher-stagiaire"></label><button type="submit" class="btn-soft">Chercher</button></form>
 <ul class="space-y-2"><li v-for="c in candidates" :key="c.id" class="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-white px-4"><span>{{ c.full_name }}<template v-if="c.organisation"> · {{ c.organisation }}</template></span><button type="button" class="action" @click="attach(g, c.id)">Ajouter</button></li></ul>
 </div>
-</BaseCard>
+<Link :href="`/administration/donnees?entity=groupe&id=${g.id}`" class="btn-soft mt-3">Analyser une suppression</Link></BaseCard>
 </div><p v-if="!groups.length" class="mt-6">Aucun groupe enregistré.</p>
 </AdminLayout>
 </template>

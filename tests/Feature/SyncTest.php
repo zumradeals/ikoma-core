@@ -90,11 +90,18 @@ it('refuse un appareil sans jeton, non enrôlé ou révoqué, sur la liste comme
     $this->postJson('/poste/api/sync', ['operations' => [syncOp('valider', ['visitor_id' => syncVisitor(1)], $this->agent, 1)]], syncHeaders($unknown))->assertStatus(401)->assertJson(['code' => 'appareil_non_enrole']);
     $this->getJson('/poste/api/liste', syncHeaders('pas-un-jeton'))->assertStatus(401);
     expect(DB::table('sync_operations')->count())->toBe(0);
-    // révocation : refus immédiat, ordre d'effacement journalisé une seule fois
+    // Révocation : refus immédiat ; l'envoi d'un ordre ne prouve pas l'effacement local.
     app(Devices::class)->revoke(Device::findOrFail($this->deviceA), syncUser('administrateur'));
     $this->getJson('/poste/api/liste', syncHeaders())->assertStatus(401)->assertJson(['code' => 'appareil_revoque']);
     $this->postJson('/poste/api/sync', ['operations' => [syncOp('valider', ['visitor_id' => syncVisitor(1)], $this->agent, 1)]], syncHeaders())->assertStatus(401)->assertJson(['code' => 'appareil_revoque']);
-    expect(syncAudit()->where('action', 'poste.efface')->count())->toBe(1)->and(syncAudit()->where('action', 'poste.revoque')->count())->toBe(1)->and(DB::table('sync_operations')->count())->toBe(0);
+    expect(syncAudit()->where('action', 'poste.efface')->count())->toBe(0)
+        ->and(DB::table('devices')->where('id', $this->deviceA)->value('wipe_acknowledged_at'))->toBeNull();
+    $this->postJson('/poste/api/efface', ['motif' => 'deconnexion', 'operations_perdues' => 1], syncHeaders())->assertOk();
+    expect(syncAudit()->where('action', 'poste.efface')->count())->toBe(1)
+        ->and(DB::table('devices')->where('id', $this->deviceA)->value('wipe_acknowledged_at'))->not->toBeNull()
+        ->and(DB::table('sync_conflicts')->where('reason', 'effacement_operations_non_synchronisees')->whereNull('resolved_at')->exists())->toBeTrue()
+        ->and(syncAudit()->where('action', 'poste.revoque')->count())->toBe(1)
+        ->and(DB::table('sync_operations')->count())->toBe(0);
 });
 
 it('réserve la liste, l’enrôlement et la synchronisation aux agents d’accueil', function () {

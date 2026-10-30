@@ -36,6 +36,8 @@ final class BadgeLots
             $percent = (int) DB::table('settings')->where('key', 'badge_marge_pourcent')->value('value');
             $total = self::manufactured($expected, $percent);
             $number = (int) DB::table('badges')->where('event_id', $eventId)->whereRaw("code ~ '^B-[0-9]+\$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $retired = (int) DB::table('retired_badge_identifiers')->where('event_id', $eventId)->whereRaw("code ~ '^B-[0-9]+$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $number = max($number, $retired);
             $rank = DB::table('badge_batches')->where('event_id', $eventId)->where('category_id', $categoryId)->count() + 1;
             $batch = BadgeBatch::create(['event_id' => $eventId, 'category_id' => $categoryId, 'name' => "Lot {$category->name} n°{$rank}", 'quantity' => $total, 'margin' => $total - $expected]);
             $now = now();

@@ -5,6 +5,7 @@ namespace App\Services\Poste;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\EventAvailability;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -33,6 +34,7 @@ final class Devices
     /** Génère un code à afficher une seule fois ; seul son hachage est conservé. */
     public function issueCode(Device $device, User $actor): string
     {
+        EventAvailability::requireOpen($device->event_id);
         $code = '';
         for ($i = 0; $i < 12; $i++) {
             $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
@@ -65,6 +67,7 @@ final class Devices
                 $this->audit->append('poste.enrolement_refuse', $agent->id, ['raison' => 'code_invalide']);
                 throw new DeskRefused('code_invalide', 'Code d’enrôlement invalide ou expiré : demandez-en un nouveau à l’administrateur.', 422);
             }
+            EventAvailability::requireOpen($device->event_id);
             $token = bin2hex(random_bytes(32));
             $secret = base64_encode(random_bytes(32));
             DB::table('devices')->where('id', $device->id)->update(['sync_seq' => 0, 'token_hash' => hash('sha256', $token), 'enrollment_hash' => null, 'enrollment_expires_at' => null, 'enrolled_at' => now(), 'revoked_at' => null, 'wipe_acknowledged_at' => null, 'updated_at' => now()]);

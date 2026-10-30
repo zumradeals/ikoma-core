@@ -9,6 +9,7 @@ use App\Services\Alerts;
 use App\Services\Audit;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
+use App\Services\EventAvailability;
 use App\Services\HostNotifications;
 use App\Services\PrivatePhoto;
 use App\Services\QrSvg;
@@ -301,6 +302,7 @@ final class Desk
 
     private function visitor(Device $poste, string $id, bool $lock = false): Visitor
     {
+        EventAvailability::requireOpen($poste->event_id);
         $query = Visitor::query()->where('event_id', $poste->event_id)->whereNull('withdrawn_at');
         if ($lock) {
             $query->lockForUpdate();

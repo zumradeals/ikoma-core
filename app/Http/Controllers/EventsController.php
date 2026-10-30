@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\Zone;
 use App\Services\Audit;
+use App\Services\DataLifecycle;
+use App\Services\EventAvailability;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,14 +20,34 @@ use Inertia\Response;
  */
 final class EventsController
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         Gate::authorize('evenements.gerer');
 
         return Inertia::render('Admin/Evenements', [
-            'events' => Event::query()->orderByDesc('starts_at')
-                ->get(['id', 'name', 'site', 'starts_at', 'ends_at']),
+            'archives' => $request->boolean('archives'),
+            'events' => Event::query()->when($request->boolean('archives'), fn ($q) => $q->where('status', 'archive'), fn ($q) => $q->where(fn ($q) => $q->whereNull('status')->orWhere('status', '<>', 'archive')))->orderByDesc('starts_at')
+                ->get(['id', 'name', 'site', 'starts_at', 'ends_at', 'status']),
         ]);
+    }
+
+    public function update(Request $request, string $event): RedirectResponse
+    {
+        Gate::authorize('evenements.gerer');
+        $data = $request->validate(['name' => 'required|string|max:160', 'site' => 'nullable|string|max:255', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at']);
+        DB::transaction(function () use ($event, $data): void {
+            app(DataLifecycle::class)->lock();
+            EventAvailability::requireOpen($event);
+            foreach (['access_events', 'badge_assignments', 'import_batches', 'sync_conflicts'] as $table) {
+                abort_if(DB::table($table)->where('event_id', $event)->exists(), 409, 'Cet événement possède une activité : modification de préparation interdite.');
+            }
+            abort_if(DB::table('devices')->where('event_id', $event)->whereNotNull('enrolled_at')->exists(), 409, 'Une tablette a déjà été enrôlée.');
+            abort_if(DB::table('identity_checks')->whereIn('visitor_id', DB::table('visitors')->where('event_id', $event)->select('id'))->exists(), 409, 'Des contrôles existent.');
+            DB::table('events')->where('id', $event)->update([...$data, 'updated_at' => now(), 'list_revision' => DB::raw('list_revision + 1')]);
+            app(Audit::class)->append('gestion.evenement_modifie', auth()->id(), ['event_id' => $event, 'fields' => array_keys($data)]);
+        });
+
+        return back()->with('status', 'Événement modifié.');
     }
 
     public function store(Request $request): RedirectResponse

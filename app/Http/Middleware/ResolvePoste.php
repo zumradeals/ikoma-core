@@ -3,10 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Models\Device;
-use App\Services\Audit;
+use App\Services\EventAvailability;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -25,14 +24,12 @@ class ResolvePoste
         if ($device === null) {
             return response()->json(['code' => 'appareil_non_enrole', 'message' => 'Cette tablette n’est pas enrôlée : demandez un code d’enrôlement à l’administrateur.', 'action' => null], 401);
         }
-        if ($device->revoked_at !== null) {
-            if ($device->wipe_acknowledged_at === null) {
-                // La tablette révoquée doit s'effacer ; on journalise une seule fois que l'ordre lui a été donné.
-                DB::table('devices')->where('id', $device->id)->update(['wipe_acknowledged_at' => now()]);
-                app(Audit::class)->append('poste.efface', null, ['device_id' => $device->id, 'motif' => 'revoque']);
-            }
-
+        $isWipeReceipt = $request->is('poste/api/efface') && $request->isMethod('POST');
+        if ($device->revoked_at !== null && ! $isWipeReceipt) {
             return response()->json(['code' => 'appareil_revoque', 'message' => 'Cette tablette a été révoquée : ses données locales vont être effacées.', 'action' => null], 401);
+        }
+        if (! $isWipeReceipt) {
+            EventAvailability::requireOpen($device->event_id);
         }
         $request->attributes->set('poste', $device);
 

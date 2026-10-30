@@ -30,7 +30,7 @@ export class PosteRuntime {
     this.sync = new SyncManager(this.vault, this.store, {
       onState: s => this.handlers.onState(s), now: () => Date.now(), fetcher: options.fetcher,
       onSnapshot: async snapshot => { await this.afterSnapshot(snapshot); },
-      onRevoked: async () => { await this.wipe('deconnexion', false); },
+      onRevoked: async () => { await this.wipe('deconnexion', true); },
     });
     this.fetcher = options.fetcher ?? ((...args) => fetch(...args));
   }
