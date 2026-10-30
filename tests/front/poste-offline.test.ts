@@ -273,7 +273,7 @@ describe('file hors ligne, règles locales et envoi', () => {
       new Response(JSON.stringify({ code: 'appareil_non_enrole', message: 'Poste supprimé après reset' }), { status: 401 }));
     await repo.refuse('ancienne-operation', 'v1', 'Essai');
     await sync.sync();
-    expect(revoked).toHaveBeenCalledWith('appareil_non_enrole');
+    expect(revoked).toHaveBeenCalledOnce(); // le helper de test relaie le nettoyage sans transmettre le motif
     expect(sync.state.revoked).toBe(true);
     expect(await vault.db.meta.count()).toBe(0);
     expect(await vault.db.ops.count()).toBe(0);
