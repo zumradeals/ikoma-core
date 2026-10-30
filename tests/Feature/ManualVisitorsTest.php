@@ -180,7 +180,7 @@ it('prépare un badge déjà réservé au poste sans toucher au QR, au statut ou
 
     $this->postJson('/administration/badges/modeles/preparer', $data)
         ->assertOk()->assertJsonPath('prepared.0.code', $badge->code)
-        ->assertJsonPath('sync_required', true)->assertJsonPath('postes_a_synchroniser.0', $poste->name);
+        ->assertJsonPath('sync_required', true)->assertJsonPath('postes_a_synchroniser.0', $poste->station ?: $poste->name);
     $prepared = $badge->fresh();
     expect($prepared->printed_for_visitor_id)->toBe($person->id)
         ->and($prepared->reserved_device_id)->toBe($poste->id)
