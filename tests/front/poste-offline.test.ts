@@ -316,6 +316,20 @@ describe('runtime', () => {
   });
 });
 
+it('explique la différence entre badge libre et badge réservé à un autre poste dans la copie locale', () => {
+  const snap = snapshot([visitor('v1', 'Visiteur Test', { validated: true })]);
+  snap.badges[0].mine = false;
+  snap.badges[0].reservation = 'aucune';
+  const list = new LocalList(snap);
+  const op = { id: 'badge-test', seq: 1, type: 'badge' as const, agent_id: 'u1', client_time: new Date(now0).toISOString(), visitor_rev: null, payload: { visitor_id: 'v1', code: 'B-001' } };
+  expect(() => applyOp(list, op, now0)).toThrow('pas encore réservé');
+  snap.badges[0].reservation = 'autre_poste';
+  expect(() => applyOp(new LocalList(snap), op, now0)).toThrow('autre poste');
+  snap.badges[0].reservation = 'ce_poste';
+  snap.badges[0].mine = true;
+  expect(applyOp(new LocalList(snap), op, now0)).toEqual({ badge_code: 'B-001' });
+});
+
 it('refuse hors ligne la remise d’une carte nominative à une autre personne', () => {
   const snap = snapshot([visitor('v1', 'Personne A', { validated: true }), visitor('v2', 'Personne B', { validated: true })]);
   snap.badges[0].printed_for_visitor_id = 'v1';
