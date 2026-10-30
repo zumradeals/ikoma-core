@@ -55,3 +55,37 @@ réseau de l'appareil, pas l'authentification de son jeton.
 
 **Ne déployer ni fusionner avant la validation CI.** Aucun reset du VPS n'est
 réalisé par cette PR.
+
+
+## Réservation des badges avant l'accueil
+
+La sécurité hors ligne impose un stock de badges réservé à chaque poste. La
+création d'un lot (même manuel, même sur l'événement et la bonne catégorie)
+ne vaut **pas** réservation. Avant cette correction, le serveur autorisait
+certains badges libres tandis que la copie locale les refusait.
+
+Le nouveau contrat est uniforme : depuis un poste d'accueil,
+**seul un badge explicitement réservé à ce poste** peut être attribué, en ligne
+comme hors ligne. Les lots de groupe restent exclus du parcours individuel.
+
+L'administration affiche deux étapes : générer un lot, puis choisir le poste
+et réserver soit une plage, soit **tous les badges disponibles non réservés**
+du lot en un clic. Cette réservation est transactionnelle : elle n'écrase
+aucune réservation existante et laisse intacts les badges attribués ou annulés.
+
+Le poste doit synchroniser sa copie après une réservation pour voir ses badges
+nouvellement affectés. Les messages distinguent : badge sans réservation,
+badge réservé à un autre poste, badge de groupe, mauvaise catégorie.
+
+### Recette obligatoire du cas manuel
+
+1. Créer manuellement un événement, une zone, une catégorie « Visiteur »,
+   une personne, un poste et un lot de badges avec `B-001`.
+2. Enrôler ce poste sur Chrome ; parcourir les étapes 1 à 5.
+3. Sans réservation, le message doit proposer l'action précise dans
+   Administration → Badges ; aucune association ne doit être écrite.
+4. Choisir le poste et « tous les badges disponibles du lot », enregistrer,
+   puis synchroniser Chrome ; l'attribution de `B-001` doit réussir.
+5. Réserver un autre badge à un deuxième poste ; vérifier qu'il est refusé
+   au premier et que la réservation automatique du premier ne le modifie pas.
+6. Vérifier l'absence de mélange entre événements, catégories et groupes.
