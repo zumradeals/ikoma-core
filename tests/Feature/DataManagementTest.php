@@ -18,6 +18,7 @@ use App\Services\Poste\ListSnapshot;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -222,4 +223,13 @@ it('protège un lot dès qu’un aperçu révèle ses véritables QR', function 
     expect($this->engine->inspect('lot', $batch->id, $this->admin)['allowed'])->toBeTrue();
     app(BadgeArtwork::class)->select(['event' => $this->eventId, 'batch' => $batch->id]);
     expect($this->engine->inspect('lot', $batch->id, $this->admin)['allowed'])->toBeFalse();
+});
+
+it('conserve la consultation habilitée du portrait d’une personne retirée', function () {
+    Storage::fake('local');
+    $path = 'profile-portraits/'.Str::uuid().'.enc';
+    Storage::disk('local')->put($path, Crypt::encryptString('Portrait fictif isolé'));
+    DB::table('visitors')->where('id', $this->personId)->update(['profile_photo_file' => $path]);
+    app(HostGuests::class)->withdraw($this->admin, $this->personId, true);
+    $this->actingAs($this->admin)->get('/administration/invites/'.$this->personId.'/portrait')->assertOk()->assertContent('Portrait fictif isolé');
 });

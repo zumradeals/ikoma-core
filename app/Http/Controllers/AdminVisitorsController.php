@@ -100,7 +100,7 @@ final class AdminVisitorsController
     public function portrait(string $visitor, ProfilePortrait $portraits): \Illuminate\Http\Response
     {
         Gate::authorize('listes.importer');
-        $v = Visitor::whereNull('withdrawn_at')->findOrFail($visitor);
+        $v = Visitor::findOrFail($visitor);
         $jpeg = $portraits->read($v);
         abort_if($jpeg === null, 404);
 
