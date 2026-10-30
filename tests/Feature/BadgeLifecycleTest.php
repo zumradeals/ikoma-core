@@ -129,6 +129,21 @@ it('réserve une plage à un poste ou à un groupe, tout ou rien, et journalise'
     expect($details)->toHaveCount(2)->and($details[0])->toMatchArray(['nombre' => 5, 'cible' => 'poste', 'cible_id' => $device->id])->and($details[1])->toMatchArray(['nombre' => 3, 'cible' => 'groupe']);
 });
 
+it('réserve tous les badges libres à un poste sans toucher aux réservations d’un autre poste', function () {
+    $lot = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 4, badgeAccount('administrateur'));
+    $badges = Badge::where('badge_batch_id', $lot->id)->orderBy('code')->get();
+    $number = (int) substr($badges[0]->code, 2);
+    $other = (string) Str::uuid();
+    DB::table('devices')->insert(['id' => $other, 'event_id' => DemoSeeder::id('event'), 'name' => 'Poste secondaire', 'created_at' => now(), 'updated_at' => now()]);
+    $admin = badgeAccount('administrateur');
+    app(BadgeLots::class)->reserve($lot->id, $number, $number, Device::findOrFail($other), $admin);
+    $reserved = app(BadgeLots::class)->reserveAvailable($lot->id, Device::findOrFail(DemoSeeder::id('device')), $admin);
+    expect($reserved)->toBe($lot->quantity - 1)
+        ->and(DB::table('badges')->where('id', $badges[0]->id)->value('reserved_device_id'))->toBe($other)
+        ->and(DB::table('badges')->where('badge_batch_id', $lot->id)->where('reserved_device_id', DemoSeeder::id('device'))->count())->toBe($lot->quantity - 1);
+    expect(refusalOf(fn () => app(BadgeLots::class)->reserveAvailable($lot->id, Device::findOrFail(DemoSeeder::id('device')), $admin))?->reason)->toBe('aucun_badge_libre');
+});
+
 it('associe un badge disponible de la bonne catégorie, de façon atomique et journalisée', function () {
     $badge = demoLot(5);
     $assignment = $this->service->associer($badge, demoVisitor(1), $this->agent);
