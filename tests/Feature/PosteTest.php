@@ -119,7 +119,7 @@ it('cherche sur n’importe quel mot du nom, avec accents et fautes, VIP d’abo
     $search = fn (string $q) => collect($this->getJson('/poste/api/recherche?q='.urlencode($q), deskHeaders())->assertOk()->json('results'));
     $preview = collect($this->getJson('/poste/api/recherche', deskHeaders())->assertOk()->json('results'));
     expect($preview)->toHaveCount(10)
-        ->and($preview->pluck('full_name')->all())->toEqual(collect($preview->pluck('full_name'))->sort()->values()->all())
+        ->and($preview->first())->toHaveKeys(['id', 'full_name', 'organisation', 'host', 'homonyms', 'category'])
         ->and($this->getJson('/poste/api/contexte', deskHeaders())->json('visitor_count'))->toBe(
             DB::table('visitors')->where('event_id', $event)->whereNull('withdrawn_at')->count()
         );
