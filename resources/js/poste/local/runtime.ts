@@ -9,7 +9,7 @@ import { SyncManager, type SyncState } from './sync';
 import { PosteVault } from './vault';
 
 export const WIPE_AFTER_EVENT_MS = 24 * 3_600_000;
-export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel';
+export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel' | 'poste_supprime' | 'compte_change';
 type Enrolled = { device_token: string; device_secret: string; poste: { id: string; name: string; station: string | null; event_id: string; event_name: string } };
 
 /** Assemble le coffre, le magasin chiffré, la synchronisation et le dépôt local d'une tablette. Un seul exemplaire par page. */
@@ -30,7 +30,9 @@ export class PosteRuntime {
     this.sync = new SyncManager(this.vault, this.store, {
       onState: s => this.handlers.onState(s), now: () => Date.now(), fetcher: options.fetcher,
       onSnapshot: async snapshot => { await this.afterSnapshot(snapshot); },
-      onRevoked: async () => { await this.wipe('deconnexion', true); },
+      onRevoked: async reason => {
+        await this.wipe(reason === 'appareil_non_enrole' ? 'poste_supprime' : 'deconnexion', reason === 'appareil_revoque');
+      },
     });
     this.fetcher = options.fetcher ?? ((...args) => fetch(...args));
   }
@@ -51,6 +53,7 @@ export class PosteRuntime {
     const data = await response.json().catch(() => null) as (Enrolled & { message?: string; code?: string; errors?: Record<string, string[]> }) | null;
     if (!response.ok || !data?.device_token) throw new ApiError(data?.code ?? 'erreur', data?.message ?? Object.values(data?.errors ?? {})[0]?.[0] ?? 'Enrôlement impossible. Vérifiez le code ou demandez-en un nouveau.', null, response.status);
     await this.vault.enrol({ token: data.device_token, secret: data.device_secret, pin, agent, poste: { id: data.poste.id, name: data.poste.station || data.poste.name }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    this.sync.resetAfterEnrollment();
     await this.sync.sync();
     if (!(await this.db.chunks.get('list:head'))) {
       await this.vault.wipe();
@@ -59,13 +62,22 @@ export class PosteRuntime {
     await this.open();
   }
 
-  async unlock(pin: string): Promise<void> {
+  async unlock(pin: string, expectedAgentId?: string): Promise<void> {
     try { await this.vault.unlock(pin); }
     catch (e) { if (e instanceof Error && 'code' in e && (e as { code: string }).code === 'efface') this.handlers.onWiped('echecs_pin'); throw e; }
     if (await this.expired()) {
       this.vault.lock();
       await this.wipe('fin_evenement', true);
       return;
+    }
+    // Après un reset, un compte recréé avec le même email possède un nouvel UUID.
+    // Ne jamais utiliser l'ancien coffre avec l'identité d'une nouvelle session.
+    if (expectedAgentId) {
+      const formerAgent = await this.vault.getSecret<{ id: string; name: string }>('profile');
+      if (!formerAgent || formerAgent.id !== expectedAgentId) {
+        await this.wipe('compte_change', false);
+        return;
+      }
     }
     await this.open();
     // Audit global F2 : une tablette restée trop longtemps sans réseau (volée, oubliée) ne reprend le travail qu'après une synchronisation réussie.

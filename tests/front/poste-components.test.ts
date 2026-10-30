@@ -5,13 +5,15 @@ import StepFiche from '../../resources/js/components/poste/StepFiche.vue';
 import StepDecision from '../../resources/js/components/poste/StepDecision.vue';
 import StepDone from '../../resources/js/components/poste/StepDone.vue';
 import StepSearch from '../../resources/js/components/poste/StepSearch.vue';
+import StepIdentity from '../../resources/js/components/poste/StepIdentity.vue';
 import UnlistedForm from '../../resources/js/components/poste/UnlistedForm.vue';
 import PosteApp from '../../resources/js/components/poste/PosteApp.vue';
 import { OperationIds, type PosteRepository } from '../../resources/js/poste/repository';
 import { ApiError, type Fiche, type SearchResult } from '../../resources/js/poste/types';
+import { closeCamera, openCamera } from '../../resources/js/poste/media';
 
 vi.mock('../../resources/js/poste/media', () => ({
-  PHOTO_MAX_SIDE: 640, openCamera: vi.fn(async () => ({ getTracks: () => [] })), closeCamera: vi.fn(), captureJpeg: vi.fn(async () => new Blob(['x'], { type: 'image/jpeg' })), startScan: vi.fn(async () => ({ stop: vi.fn() })),
+  DOCUMENT_MAX_SIDE: 1280, PHOTO_MAX_SIDE: 640, openCamera: vi.fn(async () => ({ getTracks: () => [] })), closeCamera: vi.fn(), captureJpeg: vi.fn(async () => new Blob(['x'], { type: 'image/jpeg' })), startScan: vi.fn(async () => ({ stop: vi.fn() })),
 }));
 
 const category = { id: 'c1', name: 'Visiteur', color: '#0F5AA6', priority_circuit: false };
@@ -84,6 +86,18 @@ describe('composants du poste', () => {
     const slow = mount(StepDone, { props: { name: 'Koné Mariam', badgeCode: 'B-014', zones: [], durationMs: 75000 } });
     expect(slow.text()).toContain('1 min 15 s'); expect(slow.text()).toContain('dépassé');
   });
+  it('privilégie la caméra arrière puis permet à l’agent de passer à l’avant', async () => {
+    vi.mocked(openCamera).mockClear(); vi.mocked(closeCamera).mockClear();
+    const wrapper = mount(StepIdentity, { props: { name: 'Visiteur fictif', busy: false } });
+    await flushPromises();
+    expect(vi.mocked(openCamera)).toHaveBeenCalledWith(expect.anything(), 'environment');
+    await wrapper.get('[data-testid="changer-camera"]').trigger('click');
+    await flushPromises();
+    expect(vi.mocked(closeCamera)).toHaveBeenCalled();
+    expect(vi.mocked(openCamera)).toHaveBeenLastCalledWith(expect.anything(), 'user');
+    wrapper.unmount();
+  });
+
   it('cherche dès deux caractères, signale VIP et homonymes, et propose le non listé', async () => {
     vi.useFakeTimers();
     const search = vi.fn(async () => [result({ homonyms: 2 }), result({ id: 'v2', full_name: 'Yao Brou', category: vip })]);

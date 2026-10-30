@@ -268,6 +268,29 @@ describe('file hors ligne, règles locales et envoi', () => {
     expect(await vault.db.ops.count()).toBe(0);
   });
 
+  it('considère le poste supprimé lors d’une remise à zéro comme invalide et efface son ancienne copie', async () => {
+    const { repo, sync, vault, revoked } = await setup(undefined, () =>
+      new Response(JSON.stringify({ code: 'appareil_non_enrole', message: 'Poste supprimé après reset' }), { status: 401 }));
+    await repo.refuse('ancienne-operation', 'v1', 'Essai');
+    await sync.sync();
+    expect(revoked).toHaveBeenCalledOnce(); // le helper de test relaie le nettoyage sans transmettre le motif
+    expect(sync.state.revoked).toBe(true);
+    expect(await vault.db.meta.count()).toBe(0);
+    expect(await vault.db.ops.count()).toBe(0);
+    expect(await vault.db.chunks.count()).toBe(0);
+  });
+
+  it('autorise un nouveau cycle de synchronisation après invalidation d’un ancien poste', async () => {
+    const { sync } = await setup(undefined, () =>
+      new Response(JSON.stringify({ code: 'appareil_non_enrole' }), { status: 401 }));
+    await sync.sync();
+    expect(sync.state.revoked).toBe(true);
+    sync.resetAfterEnrollment();
+    expect(sync.state.revoked).toBe(false);
+    expect(sync.state.needsLogin).toBe(false);
+    expect(sync.state.lastSyncAt).toBeNull();
+  });
+
   it('ne laisse aucune donnée personnelle ni jeton en clair dans IndexedDB', async () => {
     const { repo, vault } = await setup([visitor('v1', 'Koné Mariam', { organisation: 'Organisation Secrète fictive' })]);
     await repo.saveIdentity('i1', 'v1', new Blob(['PHOTO-IDENTIFIABLE'], { type: 'image/jpeg' }));
@@ -291,6 +314,20 @@ describe('runtime', () => {
     await runtime.db.ops.put({ id: 'o', seq: 1, type: 'refuser', status: 'pending', data: new Uint8Array([1]) });
     expect(await runtime.expired()).toBe(false);
   });
+});
+
+it('explique la différence entre badge libre et badge réservé à un autre poste dans la copie locale', () => {
+  const snap = snapshot([visitor('v1', 'Visiteur Test', { validated: true })]);
+  snap.badges[0].mine = false;
+  snap.badges[0].reservation = 'aucune';
+  const list = new LocalList(snap);
+  const op = { id: 'badge-test', seq: 1, type: 'badge' as const, agent_id: 'u1', client_time: new Date(now0).toISOString(), visitor_rev: null, payload: { visitor_id: 'v1', code: 'B-001' } };
+  expect(() => applyOp(list, op, now0)).toThrow('pas encore réservé');
+  snap.badges[0].reservation = 'autre_poste';
+  expect(() => applyOp(new LocalList(snap), op, now0)).toThrow('autre poste');
+  snap.badges[0].reservation = 'ce_poste';
+  snap.badges[0].mine = true;
+  expect(applyOp(new LocalList(snap), op, now0)).toEqual({ badge_code: 'B-001' });
 });
 
 it('refuse hors ligne la remise d’une carte nominative à une autre personne', () => {

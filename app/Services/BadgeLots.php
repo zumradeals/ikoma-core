@@ -56,6 +56,40 @@ final class BadgeLots
     }
 
     /**
+     * Réserve d'un coup les badges encore disponibles et non réservés d'un lot
+     * pour un poste précis. Le choix du poste est explicite dans l'administration.
+     * Les badges d'un groupe ou d'un autre poste restent intouchables.
+     */
+    public function reserveAvailable(string $batchId, Device $target, User $actor): int
+    {
+        return DB::transaction(function () use ($batchId, $target, $actor): int {
+            $batch = BadgeBatch::query()->lockForUpdate()->find($batchId)
+                ?? throw new BadgeRefused('lot', 'Lot de badges inconnu.');
+            EventAvailability::requireOpen($batch->event_id);
+            if ($target->event_id !== $batch->event_id || $target->revoked_at !== null) {
+                throw new BadgeRefused('autre_evenement', 'Le poste est inactif ou appartient à un autre événement.');
+            }
+            $ids = DB::table('badges')->where('badge_batch_id', $batch->id)
+                ->where('status', BadgeStatus::Available->value)
+                ->whereNull('reserved_device_id')->whereNull('reserved_group_id')
+                ->orderBy('id')->lockForUpdate()->pluck('id');
+            if ($ids->isEmpty()) {
+                throw new BadgeRefused('aucun_badge_libre', 'Aucun badge disponible sans réservation dans ce lot.');
+            }
+            DB::table('badges')->whereIn('id', $ids)->update([
+                'reserved_device_id' => $target->id, 'updated_at' => now(),
+            ]);
+            $this->audit->append('badge.reserve', $actor->id, [
+                'batch_id' => $batch->id, 'event_id' => $batch->event_id,
+                'nombre' => $ids->count(), 'cible' => 'poste', 'cible_id' => $target->id,
+                'mode' => 'tous_disponibles',
+            ]);
+
+            return $ids->count();
+        });
+    }
+
+    /**
      * Réserve les badges numérotés de $from à $to d’un lot à un poste ou à un groupe. Tout ou rien : un seul badge indisponible refuse la plage.
      * Retourne le nombre de badges réservés.
      */

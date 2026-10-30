@@ -58,9 +58,12 @@ function deskIdentity(string $visitor, ?string $operation = null)
     return test()->post('/poste/api/identite', ['visitor_id' => $visitor, 'identity_checked' => true, 'photo' => UploadedFile::fake()->createWithContent('photo.jpg', deskJpeg())], deskHeaders($operation));
 }
 
-function deskLot(int $expected = 6, int $category = 1): Badge
+function deskLot(int $expected = 6, int $category = 1, bool $reserveForDesk = true): Badge
 {
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category'.$category), $expected, deskUser('administrateur'));
+    if ($reserveForDesk) {
+        app(BadgeLots::class)->reserveAvailable($batch->id, Device::findOrFail(DemoSeeder::id('device')), deskUser('administrateur'));
+    }
 
     return Badge::where('badge_batch_id', $batch->id)->orderBy('code')->firstOrFail();
 }
@@ -203,7 +206,7 @@ it('exige l’avis de l’hôte ou du superviseur pour un visiteur hors période
 });
 
 it('associe le badge par code ou par QR et explique chaque refus avec l’action suivante', function () {
-    $lot = deskLot(8);
+    $lot = deskLot(8, 1, false);
     $badges = Badge::where('badge_batch_id', $lot->badge_batch_id)->orderBy('code')->get();
     $visitor = deskValidated(1);
     $this->postJson('/poste/api/badge', ['visitor_id' => deskVisitor(4), 'code' => $badges[0]->code], deskHeaders())->assertStatus(422)->assertJson(['code' => 'validation_requise']);
@@ -216,7 +219,9 @@ it('associe le badge par code ou par QR et explique chaque refus avec l’action
     DB::table('devices')->insert(['id' => $tablet, 'event_id' => DemoSeeder::id('event'), 'name' => 'Tablette fictive B', 'station' => 'Poste fictif B', 'created_at' => now(), 'updated_at' => now()]);
     $number = (int) substr($badges[1]->code, 2);
     app(BadgeLots::class)->reserve($lot->badge_batch_id, $number, $number, Device::findOrFail($tablet), deskUser('administrateur'));
-    $this->postJson('/poste/api/badge', ['visitor_id' => $visitor, 'code' => $badges[1]->code], deskHeaders())->assertStatus(422)->assertJson(['code' => 'autre_poste', 'action' => 'Prenez un badge réservé à ce poste ou non réservé.']);
+    $this->postJson('/poste/api/badge', ['visitor_id' => $visitor, 'code' => $badges[1]->code], deskHeaders())->assertStatus(422)->assertJson(['code' => 'autre_poste', 'action' => 'Prenez un badge réservé à ce poste : faites vérifier son affectation dans Administration → Badges.']);
+    // Les autres badges sont explicitement réservés au poste de l'agent.
+    app(BadgeLots::class)->reserveAvailable($lot->badge_batch_id, Device::findOrFail(DemoSeeder::id('device')), deskUser('administrateur'));
     // annulé
     app(BadgeService::class)->annuler($badges[2], deskUser('superviseur'), 'Abîmé');
     $this->postJson('/poste/api/badge', ['visitor_id' => $visitor, 'code' => $badges[2]->code], deskHeaders())->assertStatus(422)->assertJson(['code' => 'annule', 'action' => 'Prenez un autre badge.']);
@@ -232,6 +237,18 @@ it('associe le badge par code ou par QR et explique chaque refus avec l’action
     // le visiteur déjà badgé ne reçoit pas un deuxième badge
     $this->postJson('/poste/api/badge', ['visitor_id' => $visitor, 'code' => $badges[4]->code], deskHeaders())->assertStatus(422)->assertJson(['code' => 'visiteur_deja_badge']);
     $this->postJson('/poste/api/badge', ['visitor_id' => $visitor, 'code' => $badges[3]->code], deskHeaders())->assertOk();
+});
+
+it('refuse explicitement un badge manuel non réservé au poste puis accepte après affectation', function () {
+    $badge = deskLot(2, 1, false);
+    $visitor = deskValidated(1);
+    $this->postJson('/poste/api/badge', ['visitor_id' => $visitor, 'code' => $badge->code], deskHeaders())
+        ->assertStatus(422)->assertJson(['code' => 'sans_reservation']);
+    $device = Device::findOrFail(DemoSeeder::id('device'));
+    $count = app(BadgeLots::class)->reserveAvailable($badge->badge_batch_id, $device, deskUser('administrateur'));
+    expect($count)->toBeGreaterThan(0);
+    $this->postJson('/poste/api/badge', ['visitor_id' => $visitor, 'code' => $badge->code], deskHeaders())
+        ->assertOk()->assertJson(['badge_code' => $badge->code]);
 });
 
 it('enregistre l’entrée avec le chrono, passe le visiteur à présent et rappelle les zones', function () {

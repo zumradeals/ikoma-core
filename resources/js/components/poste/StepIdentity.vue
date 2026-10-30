@@ -10,12 +10,35 @@ const numberOk = computed(() => { const n = docNumber.value.replace(/[\s.]+/g, '
 const docOk = computed(() => !props.documentRequired || (docType.value !== '' && !!docPhoto.value && numberOk.value));
 const video = ref<HTMLVideoElement | null>(null);
 const checked = ref(false); const photo = ref<Blob | null>(null); const preview = ref(''); const cameraError = ref('');
+const cameraFacing = ref<'environment' | 'user'>('environment');
 let stream: MediaStream | null = null;
+let cameraRequest = 0;
+const cameraLoading = ref(false);
+const cameraReady = ref(false);
 const reason = computed(() => (!checked.value && !photo.value ? 'Cochez la pièce d’identité et prenez la photo.' : !checked.value ? 'Cochez « pièce d’identité contrôlée ».' : !photo.value ? 'Prenez la photo du visiteur.' : !docOk.value ? (!numberOk.value ? 'Le numéro de la pièce n’est pas valable : 4 à 30 lettres ou chiffres, ou laissez-le vide.' : 'Choisissez le type de la pièce et photographiez-la.') : ''));
 async function start() {
+  if (cameraLoading.value) return;
+  cameraLoading.value = true;
+  cameraReady.value = false;
   cameraError.value = '';
-  try { if (video.value) stream = await openCamera(video.value, 'user'); }
-  catch (e) { cameraError.value = e instanceof Error && e.message.includes('HTTPS') ? e.message : 'La caméra n’est pas accessible : autorisez-la dans le navigateur puis touchez « Réessayer ».'; }
+  const request = ++cameraRequest;
+  closeCamera(video.value, stream);
+  stream = null;
+  if (!video.value) { cameraLoading.value = false; return; }
+  try {
+    const opened = await openCamera(video.value, cameraFacing.value);
+    if (request !== cameraRequest) { closeCamera(video.value, opened); return; }
+    stream = opened;
+    cameraReady.value = true;
+  } catch (e) {
+    if (request === cameraRequest) cameraError.value = e instanceof Error && e.message.includes('HTTPS') ? e.message : 'Caméra indisponible : autorisez-la dans Chrome ou utilisez « Changer de caméra ».';
+  } finally {
+    cameraLoading.value = false;
+  }
+}
+async function toggleCamera() {
+  cameraFacing.value = cameraFacing.value === 'environment' ? 'user' : 'environment';
+  await start();
 }
 async function take() {
   if (!video.value) return;
@@ -30,7 +53,7 @@ async function takeDocument() {
 function retakeDocument() { docPhoto.value = null; if (docPreview.value) URL.revokeObjectURL(docPreview.value); docPreview.value = ''; }
 function retake() { photo.value = null; if (preview.value) URL.revokeObjectURL(preview.value); preview.value = ''; }
 onMounted(start);
-onBeforeUnmount(() => { closeCamera(video.value, stream); if (preview.value) URL.revokeObjectURL(preview.value); if (docPreview.value) URL.revokeObjectURL(docPreview.value); });
+onBeforeUnmount(() => { cameraRequest++; closeCamera(video.value, stream); if (preview.value) URL.revokeObjectURL(preview.value); if (docPreview.value) URL.revokeObjectURL(docPreview.value); });
 </script>
 <template>
   <section aria-labelledby="identite-titre" class="space-y-5">
@@ -42,7 +65,7 @@ onBeforeUnmount(() => { closeCamera(video.value, stream); if (preview.value) URL
 <h2 class="mb-3">Photo du visiteur</h2>
         <div class="agent-camera"><video v-show="!photo" ref="video" playsinline muted aria-label="Aperçu de la caméra"></video><img v-if="photo" :src="preview" alt="Photo prise du visiteur"></div>
         <p v-if="cameraError" role="alert" class="mt-3 font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ cameraError }}</p>
-        <div class="agent-photo-actions"><button v-if="!photo" type="button" class="btn-main" @click="take"><AdminIcon name="camera" /> Prendre la photo</button><button v-else type="button" class="btn-soft" @click="retake">Reprendre la photo</button><button v-if="cameraError" type="button" class="btn-soft" @click="start">Réessayer la caméra</button></div>
+        <div class="agent-photo-actions"><button v-if="!photo" type="button" class="btn-main" :disabled="cameraLoading || !cameraReady" @click="take"><AdminIcon name="camera" /> Prendre la photo</button><button v-else type="button" class="btn-soft" @click="retake">Reprendre la photo</button><button type="button" class="btn-soft" data-testid="changer-camera" :disabled="cameraLoading" @click="toggleCamera">Changer de caméra ({{ cameraFacing === 'environment' ? 'arrière demandée' : 'avant demandée' }})</button><button v-if="cameraError" type="button" class="btn-soft" @click="start">Réessayer la caméra</button></div>
       </div>
       <div v-if="documentRequired" class="agent-photo-panel space-y-4" data-testid="bloc-piece">
 <h2>Pièce d’identité</h2><p>Type et photo obligatoires selon le réglage administratif.</p>

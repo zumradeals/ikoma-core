@@ -75,6 +75,8 @@ beforeEach(function () {
     DB::table('devices')->where('id', $this->deviceB)->update(['token_hash' => hash('sha256', SYNC_TOKEN_B)]);
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 12, syncUser('administrateur'));
     $this->badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->get();
+    // La synchronisation de badges exige désormais une affectation explicite au poste.
+    app(BadgeLots::class)->reserveAvailable($batch->id, Device::findOrFail($this->deviceA), syncUser('administrateur'));
 });
 
 function syncAudit(): Builder
@@ -163,20 +165,18 @@ it('bloque les essais de code après cinq échecs', function () {
 });
 
 it('envoie la copie de travail sans jeton QR en clair, avec tous les badges de l’événement (L7) dont seuls les badges réservés au poste sont marqués « mine »', function () {
-    $number = (int) substr($this->badges[0]->code, 2);
-    app(BadgeLots::class)->reserve($this->badges[0]->badge_batch_id, $number, $number + 2, Device::findOrFail($this->deviceA), syncUser('administrateur'));
     $liste = $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->json();
     expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'identity_document' => false, 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
     expect(array_keys($liste['visitors'][0]))->toBe(['id', 'full_name', 'organisation', 'host_id', 'category_id', 'valid_from', 'valid_until', 'source', 'status', 'host_validation', 'access_note', 'group_id', 'a_rebadger', 'rev', 'identity_done', 'photo_done', 'validated', 'badge_code']);
     $codes = array_column($liste['badges'], 'code');
     expect($codes)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->toContain($this->badges[3]->code);
     $mine = collect($liste['badges'])->where('mine', true)->pluck('code');
-    expect($mine)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->not->toContain($this->badges[3]->code);
+    expect($mine)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->toContain($this->badges[3]->code);
     $token = DB::table('badges')->where('id', $this->badges[0]->id)->value('qr_token');
     $body = json_encode($liste);
     expect($body)->not->toContain($token)->and($liste['badges'][array_search($this->badges[0]->code, $codes, true)]['token_hash'])->toBe(hash('sha256', $token));
     // le lot réservé de démonstration (60 badges) reste attaché à ce poste
-    expect($mine->count())->toBe(60 + 3)->and(count($liste['badges']))->toBe(DB::table('badges')->where('event_id', DemoSeeder::id('event'))->count());
+    expect($mine->count())->toBe(60 + $this->badges->count())->and(count($liste['badges']))->toBe(DB::table('badges')->where('event_id', DemoSeeder::id('event'))->count());
     $version = $this->getJson('/poste/api/liste/version', syncHeaders())->assertOk()->json('version');
     expect($version)->toBe($liste['version'])->toMatch('/^[0-9a-f]{40}$/');
     DB::table('visitors')->where('id', syncVisitor(1))->update(['organisation' => 'Autre organisation fictive', 'updated_at' => now()->addSecond()]);
@@ -218,7 +218,7 @@ it('reprend correctement après une coupure en plein envoi', function () {
 });
 
 it('met en conflit, sans rien écraser, deux postes hors ligne qui associent le même badge', function () {
-    $badge = $this->badges[5]; // hors lot réservé : il n'est réservé à aucun poste
+    $badge = $this->badges[5]; // réservé au poste A : l'association depuis le poste B est interdite
     $seqA = 0;
     $seqB = 0;
     $opsA = [syncOp('identite', ['visitor_id' => syncVisitor(1), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seqA), syncOp('valider', ['visitor_id' => syncVisitor(1)], $this->agent, ++$seqA), syncOp('badge', ['visitor_id' => syncVisitor(1), 'code' => $badge->code], $this->agent, ++$seqA), syncOp('entree', ['visitor_id' => syncVisitor(1)], $this->agent, ++$seqA)];

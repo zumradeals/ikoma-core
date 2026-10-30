@@ -19,6 +19,7 @@ const message = ref<string | null>(null);
 const code = ref(''); const pin = ref(''); const pin2 = ref(''); const busy = ref(false);
 const lockedUntil = ref(0); const now = ref(Date.now()); const remaining = ref<number | null>(null);
 const conflicts = shallowRef<LocalOp[]>([]);
+const resetConfirm = ref(false); const resetPending = ref(0);
 const openKey = ref(0);
 let idleTimer: number | undefined; let tick: number | undefined; let loop: number | undefined;
 let idleMs = 300_000;
@@ -34,7 +35,9 @@ const wipeText: Record<WipeReason, string> = {
   echecs_pin: 'Trop de PIN incorrects : toutes les données de cette tablette ont été effacées par sécurité.',
   deconnexion: 'Cette tablette a été déconnectée par l’administrateur : ses données ont été effacées.',
   fin_evenement: 'L’événement est terminé depuis plus de 24 heures : les données de cette tablette ont été effacées.',
-  manuel: 'Les données de cette tablette ont été effacées.',
+  manuel: 'Les données locales de ce navigateur ont été effacées. Vous pouvez enrôler un nouveau poste.',
+  poste_supprime: 'Cet ancien poste n’existe plus sur le serveur : son enrôlement local a été effacé. Enrôlez le nouveau poste.',
+  compte_change: 'Le compte actuellement connecté n’est plus celui qui avait enrôlé cette tablette. Les anciennes données locales ont été effacées : enrôlez de nouveau ce poste.',
 };
 const conflictLabel: Record<string, string> = { identite: 'Pièce d’identité et photo', valider: 'Validation', refuser: 'Refus', badge: 'Badge', entree: 'Entrée', non_liste: 'Visiteur non listé', groupe_controle: 'Contrôle de correspondance (groupe)', groupe_badge: 'Badge remis à un stagiaire', groupe_depart: 'Fermeture du car', groupe_arrivee: 'Arrivée du car', groupe_arrivee_fin: 'Fin du contrôle d’arrivée' };
 
@@ -77,7 +80,7 @@ async function enrol() {
 async function unlock() {
   message.value = null; busy.value = true;
   try {
-    await runtime.unlock(pin.value); pin.value = '';
+    await runtime.unlock(pin.value, props.agent?.id); pin.value = '';
     if (runtime.vault.unlocked) await afterOpen();
   } catch (e) {
     pin.value = '';
@@ -88,6 +91,16 @@ async function unlock() {
   } finally { busy.value = false; }
 }
 
+async function requestLocalReset() {
+  resetPending.value = await runtime.store.count('pending');
+  resetConfirm.value = true;
+}
+async function resetThisBrowser() {
+  resetConfirm.value = false;
+  // Explicite : un reset du navigateur n'efface ni la base serveur ni le nouveau code de poste.
+  await runtime.wipe('manuel', true);
+  try { window.localStorage.removeItem('ikoma.poste'); } catch { /* préférence facultative */ }
+}
 async function syncNow() { await runtime.sync.sync(); }
 
 onMounted(async () => {
@@ -140,9 +153,11 @@ onBeforeUnmount(() => {
       <p v-if="message" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="erreur-gate"><span aria-hidden="true">⚠</span> {{ message }}<template v-if="waiting"> Réessayez dans {{ waiting }} s.</template><template v-if="remaining !== null && remaining <= 5"> Essais restants avant l’effacement : {{ remaining }}.</template></p>
       <button type="submit" class="btn-main" :disabled="busy || waiting > 0" data-testid="deverrouiller">Déverrouiller</button>
     </form>
+    <button v-if="agent" type="button" class="btn-soft" data-testid="reinitialiser-tablette-verrouillee" @click="requestLocalReset">Ancien poste ? Réinitialiser ce navigateur pour le réenrôler</button>
   </main>
 
   <template v-else>
+    <div v-if="agent" class="mx-auto max-w-4xl px-4 py-2"><button type="button" class="btn-soft" data-testid="reinitialiser-tablette-ouverte" @click="requestLocalReset">Réinitialiser ce navigateur et changer de poste</button></div>
     <GroupeApp v-if="app === 'groupe' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <ControleApp v-else-if="app === 'controle' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as SitePosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <PosteApp v-else :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
@@ -159,4 +174,16 @@ onBeforeUnmount(() => {
       </div>
     </section>
   </template>
+  <section v-if="resetConfirm" role="dialog" aria-modal="true" aria-label="Confirmer le réenrôlement" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+    <div class="w-full max-w-lg space-y-4 rounded-xl bg-white p-6 text-ikoma-navy">
+      <h2 class="text-xl font-bold">Effacer les données de cette tablette ?</h2>
+      <p>Seules les données enregistrées dans ce navigateur seront effacées. Les événements, agents et badges du serveur resteront inchangés.</p>
+      <p v-if="resetPending > 0" class="font-bold text-red-800" role="alert">Attention : {{ resetPending }} opération(s) non synchronisée(s) seront définitivement perdues.</p>
+      <p>Vous devrez utiliser un nouveau code d’enrôlement et choisir un nouveau PIN.</p>
+      <div class="flex flex-wrap gap-3">
+        <button type="button" class="btn-soft" @click="resetConfirm = false">Annuler</button>
+        <button type="button" class="btn-main" data-testid="confirmer-reset-tablette" @click="resetThisBrowser">Effacer ce navigateur</button>
+      </div>
+    </div>
+  </section>
 </template>

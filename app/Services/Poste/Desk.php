@@ -201,7 +201,7 @@ final class Desk
         if (str_starts_with($input, QrSvg::PREFIX)) {
             $input = substr($input, strlen(QrSvg::PREFIX));
         }
-        $query = DB::table('badges')->select('id', 'code');
+        $query = DB::table('badges')->select('id', 'code', 'status', 'reserved_device_id', 'reserved_group_id');
         if (preg_match('/^[0-9a-f]{64}$/i', $input) === 1) {
             $query->where('qr_token', strtolower($input));
         } else {
@@ -211,6 +211,17 @@ final class Desk
         $held = DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNull('returned_at')->whereNull('cancelled_at')->value('badge_id');
         if ($held === $badge->id) {
             return ['badge_code' => $badge->code];
+        }
+        // Contrat identique en ligne/hors ligne : seules les cartes réservées
+        // à CE poste peuvent être remises par une tablette d'accueil.
+        // Les autres statuts doivent rester diagnostiqués par BadgeService.
+        if ($badge->status === 'Disponible') {
+            if ($badge->reserved_device_id === null && $badge->reserved_group_id === null) {
+                throw new DeskRefused('sans_reservation', 'Badge disponible mais pas encore réservé à un poste : demandez à l’administrateur de lui affecter ce badge.', 422, 'Administration → Badges → Réserver les badges disponibles à ce poste, puis synchroniser.');
+            }
+            if ($badge->reserved_group_id !== null) {
+                throw new DeskRefused('lot_groupe', 'Ce badge est réservé à un groupe. Utilisez le circuit de remise des badges du groupe.', 422, 'Prenez un badge réservé au poste d’accueil.');
+            }
         }
         $avis = json_decode((string) $validation->details, true)['avis'] ?? null;
         try {
@@ -293,7 +304,7 @@ final class Desk
         return match ($reason) {
             'deja_associe', 'annule', 'indisponible' => 'Prenez un autre badge.',
             'categorie' => "Prenez un badge de catégorie {$category}.",
-            'autre_poste' => 'Prenez un badge réservé à ce poste ou non réservé.',
+            'autre_poste' => 'Prenez un badge réservé à ce poste : faites vérifier son affectation dans Administration → Badges.',
             'sans_categorie' => 'Prenez un badge d’un lot par catégorie.',
             'visiteur_deja_badge' => 'Ce visiteur a déjà son badge : passez à la remise.',
             'autre_evenement', 'poste_inconnu' => 'Prenez un badge de cet événement.',

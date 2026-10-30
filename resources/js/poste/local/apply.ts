@@ -95,7 +95,11 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
       const badge = list.badges.get(code);
       if (!badge) throw refuse('badge_inconnu', 'Badge inconnu : vérifiez le code imprimé ou prenez un autre badge.', 'Saisissez le code imprimé ou prenez un autre badge.');
       if (v.badge_code === badge.code) return { badge_code: badge.code };
-      if (!badge.mine) throw refuse('autre_poste', 'Ce badge n’est pas réservé à ce poste : il ne peut pas être associé depuis cette tablette.', 'Prenez un badge réservé à ce poste.');
+      if (!badge.mine) {
+        if (badge.reservation === 'aucune') throw refuse('sans_reservation', 'Badge disponible mais pas encore réservé à un poste : demandez son affectation à l’administrateur.', 'Administration → Badges → Réserver les badges disponibles à ce poste, puis synchroniser.');
+        if (badge.reservation === 'groupe') throw refuse('lot_groupe', 'Badge réservé à un groupe : utilisez le circuit des groupes.', 'Prenez un badge réservé au poste d’accueil.');
+        throw refuse('autre_poste', 'Ce badge est réservé à un autre poste : il ne peut pas être associé ici.', 'Prenez un badge réservé à ce poste ou demandez à l’administrateur de vérifier l’affectation.');
+      }
       if (badge.printed_for_visitor_id && badge.printed_for_visitor_id !== v.id) throw refuse('destination_nominative', 'Ce badge nominatif est réservé à une autre personne.');
       if (badge.status !== 'Disponible') {
         if (badge.status === 'Associé') {

@@ -24,7 +24,7 @@ export class SyncManager {
 
   constructor(
     private readonly vault: PosteVault, private readonly store: PosteStore,
-    private readonly hooks: { onState: (s: SyncState) => void; onSnapshot: (s: Snapshot) => Promise<void>; onRevoked: () => Promise<void>; now: () => number; fetcher?: typeof fetch },
+    private readonly hooks: { onState: (s: SyncState) => void; onSnapshot: (s: Snapshot) => Promise<void>; onRevoked: (reason: 'appareil_revoque' | 'appareil_non_enrole') => Promise<void>; now: () => number; fetcher?: typeof fetch },
   ) {}
 
   private emit(patch: Partial<SyncState>): void { this.state = { ...this.state, ...patch }; this.hooks.onState(this.state); }
@@ -40,6 +40,13 @@ export class SyncManager {
     this.timer = setTimeout(() => { void this.sync(); }, delay);
   }
   stop(): void { clearTimeout(this.timer); }
+  /** Un nouvel enrôlement repart d'une identité d'appareil distincte, après purge de l'ancienne copie. */
+  resetAfterEnrollment(): void {
+    this.stop();
+    this.failures = 0;
+    this.again = false;
+    this.emit({ revoked: false, needsLogin: false, pending: 0, conflicts: 0, lastSyncAt: null, stale: true, lastError: null, clockWarning: false });
+  }
 
   /** Un seul envoi à la fois ; une demande reçue pendant un envoi en provoque un second juste après (une opération arrivée en fin de course n'attend pas). */
   sync(): Promise<void> {
@@ -110,7 +117,11 @@ export class SyncManager {
       this.emit({ needsLogin: false });
     } catch (e) {
       const error = e instanceof ApiError ? e : new ApiError('erreur', 'Erreur inattendue pendant la synchronisation.');
-      if (error.code === 'appareil_revoque') { this.emit({ revoked: true, syncing: false }); await this.hooks.onRevoked(); return; }
+      if (error.code === 'appareil_revoque' || error.code === 'appareil_non_enrole') {
+        this.emit({ revoked: true, syncing: false, lastError: error.message });
+        await this.hooks.onRevoked(error.code);
+        return;
+      }
       if (error.code === 'session_expiree') this.emit({ needsLogin: true, lastError: 'Votre session a expiré : reconnectez-vous pour envoyer vos opérations.' });
       else {
         this.failures++;

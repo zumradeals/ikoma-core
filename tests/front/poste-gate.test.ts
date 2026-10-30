@@ -48,6 +48,33 @@ describe('écran de déverrouillage', () => {
     wrapper.unmount();
   });
 
+  it('refuse l’ancien coffre d’un agent recréé avec le même email mais un nouvel identifiant', async () => {
+    const runtime = await enrolled();
+    const wrapper = mount(PosteGate, { props: { agent: { id: 'u2', name: 'Nouvel agent' }, runtime } });
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="ecran-verrou"]').exists()).toBe(true));
+    await wrapper.get('[data-testid="pin-deverrouillage"]').setValue(PIN);
+    await wrapper.get('form').trigger('submit');
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="ecran-enrolement"]').exists()).toBe(true));
+    expect(wrapper.text()).toContain('Le compte actuellement connecté n’est plus celui');
+    expect(await runtime.db.meta.count()).toBe(0);
+    expect(await runtime.db.chunks.count()).toBe(0);
+    expect(runtime.vault.unlocked).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('propose une remise à zéro locale confirmée sans supprimer le nouveau poste sur le serveur', async () => {
+    const runtime = await enrolled();
+    const wrapper = mount(PosteGate, { props: { agent: { id: 'u1', name: 'Agent fictif' }, runtime } });
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="ecran-verrou"]').exists()).toBe(true));
+    await wrapper.get('[data-testid="reinitialiser-tablette-verrouillee"]').trigger('click');
+    await vi.waitFor(() => expect(wrapper.find('[role="dialog"]').exists()).toBe(true));
+    expect(wrapper.text()).toContain('Seules les données enregistrées dans ce navigateur');
+    await wrapper.get('[data-testid="confirmer-reset-tablette"]').trigger('click');
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="ecran-enrolement"]').exists()).toBe(true));
+    expect(await runtime.db.meta.count()).toBe(0);
+    wrapper.unmount();
+  });
+
   it('efface et redemande un enrôlement après trop de PIN faux (seuil réglé à 3)', async () => {
     const runtime = await enrolled();
     await runtime.db.meta.put({ key: 'settings', value: { ...snapshot.settings, pin_max_failures: 3 } });
