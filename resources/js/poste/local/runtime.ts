@@ -9,7 +9,7 @@ import { SyncManager, type SyncState } from './sync';
 import { PosteVault } from './vault';
 
 export const WIPE_AFTER_EVENT_MS = 24 * 3_600_000;
-export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel' | 'poste_supprime';
+export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel' | 'poste_supprime' | 'compte_change';
 type Enrolled = { device_token: string; device_secret: string; poste: { id: string; name: string; station: string | null; event_id: string; event_name: string } };
 
 /** Assemble le coffre, le magasin chiffré, la synchronisation et le dépôt local d'une tablette. Un seul exemplaire par page. */
@@ -61,13 +61,22 @@ export class PosteRuntime {
     await this.open();
   }
 
-  async unlock(pin: string): Promise<void> {
+  async unlock(pin: string, expectedAgentId?: string): Promise<void> {
     try { await this.vault.unlock(pin); }
     catch (e) { if (e instanceof Error && 'code' in e && (e as { code: string }).code === 'efface') this.handlers.onWiped('echecs_pin'); throw e; }
     if (await this.expired()) {
       this.vault.lock();
       await this.wipe('fin_evenement', true);
       return;
+    }
+    // Après un reset, un compte recréé avec le même email possède un nouvel UUID.
+    // Ne jamais utiliser l'ancien coffre avec l'identité d'une nouvelle session.
+    if (expectedAgentId) {
+      const formerAgent = await this.vault.getSecret<{ id: string; name: string }>('profile');
+      if (!formerAgent || formerAgent.id !== expectedAgentId) {
+        await this.wipe('compte_change', false);
+        return;
+      }
     }
     await this.open();
     // Audit global F2 : une tablette restée trop longtemps sans réseau (volée, oubliée) ne reprend le travail qu'après une synchronisation réussie.
