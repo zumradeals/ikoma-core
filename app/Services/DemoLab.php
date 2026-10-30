@@ -50,8 +50,8 @@ final class DemoLab
         return DB::transaction(function () use ($scenario, $quantity, $actor): string {
             DB::statement('SELECT pg_advisory_xact_lock(731903)');
             $event = (string) Str::uuid();
-            $start = now()->addDay();
-            $end = $start->copy()->addHours(12);
+            $start = now()->subHour();
+            $end = $start->copy()->addDays(7);
             $now = now();
             DB::table('events')->insert([
                 'id' => $event, 'name' => '[DÉMO] '.self::SCENARIOS[$scenario].' — '.($now->format('d/m H:i')),
@@ -105,10 +105,12 @@ final class DemoLab
 
             $people = [];
             $members = [];
+            $perCategory = array_fill(0, 4, 0);
             for ($i = 1; $i <= $quantity; $i++) {
                 $id = (string) Str::uuid();
                 $isTrainee = $scenario === 'formation' && $i > (int) floor($quantity / 2);
                 $categoryIndex = $isTrainee ? 3 : ($scenario === 'evenement' && $i % 10 === 0 ? 1 : 0);
+                $perCategory[$categoryIndex]++;
                 $people[] = ['id' => $id, 'event_id' => $event,
                     'full_name' => 'Personne fictive '.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
                     'organisation' => 'Organisation de démonstration',
@@ -128,23 +130,36 @@ final class DemoLab
                 DB::table('group_members')->insert($chunk);
             }
 
-            $number = $quantity + (int) ceil($quantity / 10);
-            $batchId = (string) Str::uuid();
-            DB::table('badge_batches')->insert([
-                'id' => $batchId, 'event_id' => $event, 'category_id' => $categoryIds[0],
-                'name' => 'Lot fictif de démonstration', 'quantity' => $number,
-                'margin' => $number - $quantity, 'created_at' => $now, 'updated_at' => $now,
-            ]);
-            $badges = [];
-            for ($i = 1; $i <= $number; $i++) {
-                $badges[] = ['id' => (string) Str::uuid(), 'event_id' => $event,
-                    'category_id' => $categoryIds[0], 'badge_batch_id' => $batchId,
-                    'code' => 'B-'.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
-                    'qr_token' => bin2hex(random_bytes(32)),
-                    'status' => 'Disponible', 'created_at' => $now, 'updated_at' => $now];
-            }
-            foreach (array_chunk($badges, 200) as $chunk) {
-                DB::table('badges')->insert($chunk);
+            $number = 0;
+            $badgeNumber = 0;
+            // Un lot par catégorie réellement utilisée, pour que les VIP et
+            // stagiaires puissent aussi parcourir le circuit d'accueil.
+            foreach ($perCategory as $categoryIndex => $expected) {
+                if ($expected === 0) {
+                    continue;
+                }
+                $manufactured = $expected + (int) ceil($expected / 10);
+                $batchId = (string) Str::uuid();
+                DB::table('badge_batches')->insert([
+                    'id' => $batchId, 'event_id' => $event,
+                    'category_id' => $categoryIds[$categoryIndex],
+                    'name' => 'Lot DÉMO — '.$categorySpecs[$categoryIndex][0],
+                    'quantity' => $manufactured, 'margin' => $manufactured - $expected,
+                    'created_at' => $now, 'updated_at' => $now,
+                ]);
+                $badges = [];
+                for ($i = 0; $i < $manufactured; $i++) {
+                    $badgeNumber++;
+                    $badges[] = ['id' => (string) Str::uuid(), 'event_id' => $event,
+                        'category_id' => $categoryIds[$categoryIndex], 'badge_batch_id' => $batchId,
+                        'code' => 'B-'.str_pad((string) $badgeNumber, 4, '0', STR_PAD_LEFT),
+                        'qr_token' => bin2hex(random_bytes(32)),
+                        'status' => 'Disponible', 'created_at' => $now, 'updated_at' => $now];
+                }
+                foreach (array_chunk($badges, 200) as $chunk) {
+                    DB::table('badges')->insert($chunk);
+                }
+                $number += $manufactured;
             }
             app(Audit::class)->append('demo.scenario_cree', $actor->id, [
                 'event_id' => $event, 'scenario' => $scenario, 'personnes' => $quantity, 'badges' => $number,
