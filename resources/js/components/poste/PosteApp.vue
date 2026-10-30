@@ -151,8 +151,9 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
           <StepTracker :current="stepNumber[ctx.step]" class="min-w-64 flex-1" />
           <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><AdminIcon name="clock" /> {{ clockLabel }}</p>
         </div>
+        <p v-if="ctx.step === 'recherche'" class="rounded-xl border border-slate-300 bg-white p-3 text-base" data-testid="poste-evenement-liste"><strong>Événement : {{ context.event.name }}</strong><span class="block">{{ context.visitor_count ?? '—' }} personne(s) dans la liste de cet événement sur ce poste.</span><span v-if="sync?.lastSyncAt" class="block text-sm">Copie actualisée lors de la dernière synchronisation.</span></p>
         <div v-if="ctx.step === 'recherche'" class="grid gap-6" :class="summary ? 'lg:grid-cols-[minmax(0,1fr)_21rem]' : ''">
-          <StepSearch :repository="repo" @select="onSelect" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
+          <StepSearch :repository="repo" :refresh-key="sync?.lastSyncAt ?? null" @select="onSelect" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
           <DeskPanel v-if="summary" :summary="summary" :online="online" :syncing="sync?.syncing" @sync="emit('sync')" @select="id => selectVisitor(id, 1)" />
         </div>
         <UnlistedForm v-else-if="ctx.step === 'non_liste'" :context="context" :busy="busy" @submit="onCreateUnlisted" @back="onBack" />
