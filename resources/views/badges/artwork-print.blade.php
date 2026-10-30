@@ -24,11 +24,22 @@ button { background: #0066B3; color: white; border: 0; cursor: pointer; }
 <p>Réglez l’échelle sur <strong>100 % / taille réelle</strong>, sans en-têtes ni pieds de page. Activez les arrière-plans. {{ $options['format'] === 'pvc' ? 'Choisissez le papier CR80 dans le pilote de votre imprimante PVC.' : 'Choisissez du papier A4.' }} Faites d’abord un essai avec un seul badge.</p>
 <p>Le navigateur ne confirme pas le tirage physique. Si rien ne sort, vérifiez l’imprimante sélectionnée, le papier et sa connexion, puis relancez. Réimprimer conserve le même QR et les mêmes règles d’accès.</p>
 @if ($options['side'] === 'verso')<p>Verso générique seul. Pour un recto-verso, imprimez le recto séparément et vérifiez le sens de réinsertion sur une feuille d’essai.</p>@endif
+<p id="layout-error" role="alert" hidden>Certains textes sont trop longs pour ce format. Revenez à l’atelier, choisissez le paysage ou masquez les champs facultatifs, puis vérifiez l’aperçu.</p>
 <p id="print-error" role="alert" hidden>La fenêtre d’impression n’a pas pu s’ouvrir. Utilisez le menu Imprimer du navigateur.</p>
 </div>
 @foreach ($sheets as $sheet)
 <section class="sheet" aria-label="Feuille {{ $loop->iteration }}"><div class="grid">@foreach ($sheet as $card){!! $card !!}@endforeach</div></section>
 @endforeach
-<script nonce="{{ $nonce }}">document.getElementById('print').addEventListener('click', function () { try { window.print(); } catch (e) { document.getElementById('print-error').hidden = false; } });</script>
+<script nonce="{{ $nonce }}">document.getElementById('print').addEventListener('click', function () { try {
+ var overlap = function (a, b) { return Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1; };
+ var invalid = Array.from(document.querySelectorAll('.access-card')).some(function (card) {
+   var qr = card.querySelector('.access-card__qr'), details = card.querySelector('.access-card__details'), footer = card.querySelector('.access-card__footer');
+   if (qr && (overlap(qr.getBoundingClientRect(), footer.getBoundingClientRect()) || (details && overlap(qr.getBoundingClientRect(), details.getBoundingClientRect())))) return true;
+   if (details && overlap(details.getBoundingClientRect(), footer.getBoundingClientRect())) return true;
+   return Array.from(card.querySelectorAll('.access-card__category, .access-card__identity p')).some(function (text) { return text.scrollHeight > text.clientHeight + 1; });
+ });
+ document.getElementById('layout-error').hidden = !invalid;
+ if (!invalid) window.print();
+ } catch (e) { document.getElementById('print-error').hidden = false; } });</script>
 </body>
 </html>

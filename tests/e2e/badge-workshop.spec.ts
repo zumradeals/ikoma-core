@@ -85,7 +85,16 @@ test('atelier : modèles, lot de 200, QR inchangé, CR80, A4 et tablette', async
   expect(await decodeBadge(print)).toBe(referencePayload);
   await print.emulateMedia({ media: 'print' }); await expect(print.locator('.toolbar')).toBeHidden();
   const a4Pdf = await print.pdf({ path: 'test-results/badges-200-a4.pdf', preferCSSPageSize: true, printBackground: true });
-  expect(a4Pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)).toHaveLength(20); await print.close();
+  expect(a4Pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)).toHaveLength(20);
+  await print.emulateMedia({ media: 'screen' });
+  await print.evaluate(() => { window.print = () => { document.documentElement.dataset.printCalled = 'yes'; }; });
+  await print.getByRole('button', { name: 'Imprimer les badges', exact: true }).click();
+  await expect(print.locator('html')).toHaveAttribute('data-print-called', 'yes');
+  await print.locator('.access-card__category').first().evaluate(node => { node.textContent = 'W'.repeat(400); document.documentElement.removeAttribute('data-print-called'); });
+  await print.getByRole('button', { name: 'Imprimer les badges', exact: true }).click();
+  await expect(print.locator('#layout-error')).toBeVisible();
+  await expect(print.locator('html')).not.toHaveAttribute('data-print-called');
+  await print.close();
   // Aucun débordement horizontal sur tablette, et les paramètres restent accessibles.
   await page.setViewportSize({ width: 820, height: 1180 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

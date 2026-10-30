@@ -54,3 +54,4 @@
 .access-card--portrait.access-card--photo .access-card__caption { display: none; }
 .access-card--portrait.access-card--photo .access-card__personal { font-size: 1.8mm; }
 .access-card .access-card__name-long { font-size: 1.8mm; }
+.access-card--nominatif .access-card__name.access-card__name-long { font-size: 1.6mm; }

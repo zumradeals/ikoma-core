@@ -15,7 +15,9 @@ const batch = computed(() => batches.value.find(b => b.id === form.batch));
 const result = ref<{ html: string; count: number; first: string; last: string; inactive: number } | null>(null);
 const errors = ref<string[]>([]);
 const people = ref<{ id: string; full_name: string; organisation: string | null; host: string | null }[]>([]);
-const selected = ref<string[]>([]); const personQuery = ref(props.person?.full_name ?? ''); const preparationMessage = ref('');
+const selected = ref<string[]>([]);
+const orderedSelected = computed(() => people.value.filter(person => selected.value.includes(person.id)));
+const plannedCode = (index: number) => 'B-' + String(Number(form.from) + index).padStart(3, '0'); const personQuery = ref(props.person?.full_name ?? ''); const preparationMessage = ref('');
 async function personalApi(path: string, body: object) {
   errors.value = [];
   try {
@@ -28,7 +30,7 @@ async function personalApi(path: string, body: object) {
 async function loadPeople() { const data = await personalApi('personnes', { event: form.event, batch: form.batch, q: personQuery.value }); if (data) { people.value = data.people; selected.value = []; preparationMessage.value = ''; } }
 async function preparePeople() {
   if (busy.value) return; busy.value = true;
-  const data = await personalApi('preparer', { event: form.event, batch: form.batch, from: form.from, to: form.to, visitor_ids: selected.value, personal_allowed: form.personal_allowed });
+  const data = await personalApi('preparer', { event: form.event, batch: form.batch, from: form.from, to: form.to, visitor_ids: orderedSelected.value.map(person => person.id), personal_allowed: form.personal_allowed });
   if (data) preparationMessage.value = data.prepared.length + ' destination(s) réservée(s). Aucun badge activé. Actualisez l’aperçu.';
   busy.value = false; result.value = null;
 }
@@ -116,8 +118,8 @@ onMounted(() => { chooseBatch(); if (form.batch) void preview(); });
 <template v-if="people.length">
 <div class="flex flex-wrap gap-3"><button type="button" class="btn-soft" @click="selected = people.map(p => p.id)">Tout sélectionner</button><button type="button" class="btn-soft" @click="selected = []">Tout désélectionner</button></div>
 <div class="max-h-80 overflow-auto rounded-lg border p-3"><label v-for="candidate in people" :key="candidate.id" class="flex min-h-14 items-center gap-3"><input v-model="selected" type="checkbox" :value="candidate.id"><span>{{ candidate.full_name }} · {{ candidate.organisation }} · {{ candidate.host }}</span></label></div>
-<p class="text-base">{{ selected.length }} personne(s). Les destinations suivent l’ordre des cases sélectionnées et les numéros croissants. La plage doit contenir exactement ce nombre de badges.</p>
-<button type="button" class="btn-soft" :disabled="!form.personal_allowed || !selected.length || busy" @click="preparePeople">Réserver {{ selected.length }} destination(s) nominative(s)</button>
+<p class="text-base">{{ selected.length }} personne(s). Les destinations suivent l’ordre affiché ci-dessous et les numéros croissants. La plage doit contenir exactement ce nombre de badges.</p>
+<ol class="max-h-64 overflow-auto rounded-lg bg-blue-50 p-3 text-base" aria-label="Destinations à confirmer"><li v-for="(destination, index) in orderedSelected" :key="destination.id"><strong>{{ plannedCode(index) }}</strong> → {{ destination.full_name }} · {{ destination.organisation }} · {{ destination.host }}</li></ol><button type="button" class="btn-soft" :disabled="!form.personal_allowed || !selected.length || busy" @click="preparePeople">Réserver {{ selected.length }} destination(s) nominative(s)</button>
 </template>
 <p v-if="preparationMessage" role="status">{{ preparationMessage }}</p>
 <label class="flex min-h-14 items-center gap-3"><input v-model="form.show_photo" type="checkbox">Afficher le portrait de profil autorisé, si disponible</label><label class="flex min-h-14 items-center gap-3"><input v-model="form.show_org" type="checkbox">Afficher la fonction ou l’organisation</label><label class="flex min-h-14 items-center gap-3"><input v-model="form.show_period" type="checkbox">Afficher la période de validité</label>
