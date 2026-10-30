@@ -51,7 +51,7 @@ final class BadgePreparation
                     throw ValidationException::withMessages(['visitor_ids' => 'Préparation refusée : badge indisponible, déjà utilisé, réservé à un groupe ou à un poste inactif, catégorie différente, ou personne ayant un autre badge. Aucune destination n’a été modifiée.']);
                 }
                 $badge->update(['printed_for_visitor_id' => $person->id]);
-                $result[] = ['visitor_id' => $person->id, 'code' => $badge->code];
+                $result[] = ['visitor_id' => $person->id, 'code' => $badge->code, 'poste_id' => $badge->reserved_device_id];
             }
             DB::table('events')->where('id', $event)->increment('list_revision');
             app(Audit::class)->append('badge.destination_preparee', $actor->id, ['event_id' => $event, 'batch_id' => $batch, 'destinations' => $result, 'mise_a_jour_poste_requise' => collect($result)->contains(fn (array $destination) => $destination['poste_id'] !== null)]);
