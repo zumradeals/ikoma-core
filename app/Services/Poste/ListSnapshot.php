@@ -14,7 +14,7 @@ final class ListSnapshot
         $e = $poste->event_id;
         $row = DB::selectOne("SELECT concat_ws('|',
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM visitors WHERE event_id = ?),
-            (SELECT count(*) || ':' || coalesce(md5(string_agg(code || status || coalesce(reserved_group_id::text, '') || coalesce(printed_for_visitor_id::text, ''), ',' ORDER BY code)), '') FROM badges WHERE event_id = ?),
+            (SELECT count(*) || ':' || coalesce(md5(string_agg(code || status || coalesce(reserved_device_id::text, '') || coalesce(reserved_group_id::text, '') || coalesce(printed_for_visitor_id::text, ''), ',' ORDER BY code)), '') FROM badges WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM badge_assignments WHERE event_id = ?),
             (SELECT count(*) FROM identity_checks i JOIN visitors v ON v.id = i.visitor_id WHERE v.event_id = ?),
             (SELECT count(*) FROM photos p JOIN visitors v ON v.id = p.visitor_id WHERE v.event_id = ?),
