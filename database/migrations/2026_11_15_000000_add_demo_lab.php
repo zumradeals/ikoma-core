@@ -74,7 +74,7 @@ REVOKE ALL ON FUNCTION public.ikoma_reset_demo_event(uuid) FROM PUBLIC;
 
 SQL);
         DB::unprepared(<<<'SQL'
-CREATE OR REPLACE FUNCTION public.ikoma_reset_demo_business(p_actor uuid)
+CREATE OR REPLACE FUNCTION public.ikoma_reset_demo_business(p_actor uuid, p_clear_accounts boolean DEFAULT false)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
@@ -106,17 +106,28 @@ BEGIN
         public.categories, public.zones, public.events,
         public.retired_badge_identifiers
     RESTART IDENTITY;
-    -- Sécurité, migrations, réglages, comptes, sessions et audit sont conservés.
+    -- Facultatif : ne garder que l'administrateur opérant la remise à zéro.
+    -- Une base vierge reste utilisable sans repasser par l'assistant d'installation.
+    IF p_clear_accounts THEN
+        DELETE FROM public.maintenance_requests WHERE actor_id <> p_actor;
+        DELETE FROM public.model_has_permissions
+            WHERE model_type = concat('App', chr(92), 'Models', chr(92), 'User') AND model_id <> p_actor;
+        DELETE FROM public.model_has_roles
+            WHERE model_type = concat('App', chr(92), 'Models', chr(92), 'User') AND model_id <> p_actor;
+        DELETE FROM public.sessions WHERE user_id IS NOT NULL AND user_id <> p_actor;
+        DELETE FROM public.users WHERE id <> p_actor;
+    END IF;
+    -- Migrations, réglages et audit sont conservés quel que soit le choix.
 END;
 $$;
-REVOKE ALL ON FUNCTION public.ikoma_reset_demo_business(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.ikoma_reset_demo_business(uuid, boolean) FROM PUBLIC;
 
 SQL);
         // Les fonctions sont toujours créées pour maintenir le schéma, mais jamais exposées
         // au compte web d'une installation productive.
         if (app()->environment('demo', 'local', 'testing')) {
             DB::statement('GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_event(uuid) TO ikoma_app');
-            DB::statement('GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_business(uuid) TO ikoma_app');
+            DB::statement('GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_business(uuid, boolean) TO ikoma_app');
         }
     }
 
