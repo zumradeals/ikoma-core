@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Event;
 use App\Models\Category;
+use App\Models\Event;
 use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\DataLifecycle;
