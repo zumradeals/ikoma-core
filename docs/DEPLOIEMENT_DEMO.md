@@ -37,7 +37,7 @@ Pour l'ancien événement « Exercice fictif IKOMA — démonstration », les 30
 ## Contrôles après mise à jour
 
 ```sh
-curl -sI https://ikoma.dgafrique.com/up | head -1
+curl -sI https://ikoma.dgafrique.com/sante | head -1
 cd /opt/ikoma
 docker compose -f docker-compose.yml -f deploy/demo/docker-compose.demo.yml ps
 ```
