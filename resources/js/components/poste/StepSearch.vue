@@ -12,7 +12,7 @@ let timer: number | undefined; let sequence = 0;
 /** Sans recherche : les dix premiers noms de la liste du poste, y compris hors ligne. */
 async function load(value: string): Promise<void> {
   const mine = ++sequence;
-  loading.value = true; searched.value = false;
+  loading.value = true; searched.value = false; results.value = [];
   try {
     const found = await props.repository.search(value.trim().length >= 2 ? value.trim() : '');
     if (mine === sequence) { results.value = found; searched.value = true; }
@@ -26,6 +26,7 @@ async function load(value: string): Promise<void> {
 watch(query, value => {
   window.clearTimeout(timer);
   ++sequence; // annule immédiatement une ancienne réponse asynchrone
+  results.value = [];
   if (value.length > 0) emit('started');
   if (value.trim().length < 2) { void load(''); return; }
   timer = window.setTimeout(() => { void load(value); }, 150);
