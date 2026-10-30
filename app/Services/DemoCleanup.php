@@ -54,7 +54,7 @@ final class DemoCleanup
                     sort($actual);
                     sort($ids);
                     if ($actual !== $ids) {
-                        throw new RuntimeException("Données ajoutées ou manquantes dans {$table} : vérification manuelle obligatoire.");
+                        throw new RuntimeException('La composition du jeu de démonstration a été modifiée : nettoyage automatique refusé.');
                     }
                 }
                 $expectedPivots = [];
@@ -83,7 +83,7 @@ final class DemoCleanup
                 // malencontreusement dans l'événement initialement fictif.
                 foreach (['import_batches', 'badge_assignments', 'access_events', 'alerts', 'notifications', 'sync_conflicts'] as $table) {
                     if (DB::table($table)->where('event_id', $eventId)->exists()) {
-                        throw new RuntimeException("Activité détectée dans {$table} : suppression refusée.");
+                        throw new RuntimeException('Des opérations de contrôle ou de gestion existent : nettoyage automatique refusé.');
                     }
                 }
                 if (DB::table('visitors')->where('event_id', $eventId)->whereNotNull('profile_photo_file')->exists() || DB::table('badges')->where('event_id', $eventId)->whereNotNull('printed_for_visitor_id')->exists()) {
@@ -92,7 +92,7 @@ final class DemoCleanup
                 $visitorIds = array_map($id, array_map(static fn ($i) => 'visitor'.$i, range(0, 299)));
                 foreach (['identity_checks', 'photos', 'refusals'] as $table) {
                     if (DB::table($table)->whereIn('visitor_id', $visitorIds)->exists()) {
-                        throw new RuntimeException("Activité détectée dans {$table} : suppression refusée.");
+                        throw new RuntimeException('Des opérations de contrôle ou de gestion existent : nettoyage automatique refusé.');
                     }
                 }
                 if (DB::table('sync_operations')->where('device_id', $id('device'))

@@ -6,6 +6,7 @@ use App\Services\FileDeletionQueue;
 use App\Services\Maintenance;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -89,4 +90,22 @@ it('ne laisse pas une file d’effacement détruire un fichier encore référenc
     DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->update(['profile_photo_file' => null]);
     expect(app(FileDeletionQueue::class)->drain())->toBe(0)
         ->and(Storage::disk('local')->exists($path))->toBeFalse();
+});
+
+it('annule un échec de base et ne divulgue aucun détail SQL dans le résultat utilisateur', function () {
+    DB::unprepared(<<<'SQL'
+CREATE FUNCTION public.ikoma_l33_test_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'SQL-SECRET-FICTIF';
+END $$;
+CREATE TRIGGER ikoma_l33_test_failure BEFORE DELETE ON visitors FOR EACH ROW EXECUTE FUNCTION public.ikoma_l33_test_failure();
+SQL);
+    $service = app(Maintenance::class);
+    $id = $service->request('demo', $this->actor, app(DataLifecycle::class)->fingerprint());
+    expect(fn () => $service->execute($id, $this->manifest))->toThrow(QueryException::class);
+    $request = DB::table('maintenance_requests')->where('id', $id)->first();
+    expect($request->status)->toBe('refusee')
+        ->and($request->result)->not->toContain('SQL-SECRET-FICTIF')
+        ->and($request->result)->not->toContain('SQLSTATE')
+        ->and(DB::table('visitors')->where('event_id', DemoSeeder::id('event'))->count())->toBe(300);
 });

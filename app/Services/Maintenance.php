@@ -110,7 +110,7 @@ final class Maintenance
                 app(Audit::class)->append($remaining ? 'gestion.fichiers_a_reprendre' : 'gestion.maintenance_terminee', null, ['id' => $id, 'fichiers_restants' => $remaining]);
             });
         } catch (\Throwable $e) {
-            DB::table('maintenance_requests')->where('id', $id)->where('status', 'en_attente')->update(['status' => 'refusee', 'result' => json_encode(['message' => $e instanceof RuntimeException ? $e->getMessage() : 'Échec de maintenance. Aucune modification de base validée.'], JSON_THROW_ON_ERROR), 'updated_at' => now()]);
+            DB::table('maintenance_requests')->where('id', $id)->where('status', 'en_attente')->update(['status' => 'refusee', 'result' => json_encode(['message' => $e::class === RuntimeException::class ? $e->getMessage() : 'Échec de maintenance. Aucune modification de base validée.'], JSON_THROW_ON_ERROR), 'updated_at' => now()]);
             app(Audit::class)->append('gestion.maintenance_refusee', null, ['id' => $id, 'resultat' => 'refus']);
             throw $e;
         }

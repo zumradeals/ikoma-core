@@ -100,7 +100,10 @@ final class DataManagementController
             });
         } catch (\RuntimeException $e) {
             app(Audit::class)->append('gestion.analyse_refusee', $r->user()->id, ['operation' => $data['operation']]);
-            throw ValidationException::withMessages(['operation' => $e->getMessage()]);
+            if ($e::class !== \RuntimeException::class) {
+                report($e);
+            }
+            throw ValidationException::withMessages(['operation' => $e::class === \RuntimeException::class ? $e->getMessage() : 'Analyse momentanément indisponible. Aucune donnée n’a été supprimée.']);
         }
         $r->session()->put('maintenance_preview', ['operation' => $data['operation'], 'actor' => $r->user()->id, 'fingerprint' => $report['fingerprint'], 'expires' => now()->addMinutes(10)->timestamp]);
 
