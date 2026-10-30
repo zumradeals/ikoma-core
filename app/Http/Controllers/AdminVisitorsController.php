@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Visitor;
+use App\Services\Audit;
 use App\Services\Groups;
 use App\Services\HostGuests;
 use App\Services\Poste\DeskRefused;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -82,7 +84,15 @@ final class AdminVisitorsController
     {
         Gate::authorize('listes.importer');
         $v = Visitor::findOrFail($visitor);
-        $guests->withdraw($request->user(), $visitor, true);
+        try {
+            $guests->withdraw($request->user(), $visitor, true);
+        } catch (DeskRefused $e) {
+            app(Audit::class)->append('gestion.retrait_refuse', $request->user()->id, ['visitor_id' => $visitor, 'raison' => $e->code_]);
+            if ($request->expectsJson()) {
+                throw $e;
+            }
+            throw ValidationException::withMessages(['operation' => $e->getMessage()]);
+        }
 
         return redirect('/administration/invites?event_id='.$v->event_id)->with('visitor_feedback', 'Fiche retirée de la liste.');
     }

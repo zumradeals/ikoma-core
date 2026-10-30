@@ -37,6 +37,7 @@ final class BadgesController
 
         return Inertia::render('Admin/Badges', [
             'badges' => $query->orderBy('b.code')->paginate(30, ['b.id', 'b.code', 'b.status', 'batch.name as batch_name', 'device.station as reserved_station', 'grp.name as reserved_group', 'cat.name as category_name', 'cat.color as category_color', 'cat.priority_circuit as category_priority'])->withQueryString(),
+            'batchCounts' => DB::table('badges')->selectRaw('badge_batch_id, status, count(*) as total, count(*) FILTER (WHERE reserved_device_id IS NOT NULL OR reserved_group_id IS NOT NULL) as reserved')->groupBy('badge_batch_id', 'status')->get()->groupBy('badge_batch_id'),
             'batches' => $batches,
             'statuses' => array_column(BadgeStatus::cases(), 'value'),
             'filters' => $filters,

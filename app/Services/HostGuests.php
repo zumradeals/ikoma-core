@@ -133,7 +133,7 @@ final class HostGuests
             abort_unless(! $administration || $actor->can('listes.importer'), 403);
             $v = $administration ? Visitor::whereNull('withdrawn_at')->lockForUpdate()->findOrFail($id) : $this->owned($actor, $id, true);
             if ($administration) {
-                if ($v->status === 'present' || DB::table('access_events')->where('visitor_id', $id)->where('type', 'entree')->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as later')->whereColumn('later.visitor_id', 'access_events.visitor_id')->where('later.type', 'sortie')->whereColumn('later.occurred_at', '>=', 'access_events.occurred_at'))->exists()) {
+                if ($v->status === 'present' || app(Presence::class)->visitorPresent($id)) {
                     throw new DeskRefused('personne_presente', 'Cette personne est encore présente. Enregistrez sa sortie avant de la retirer.', 409);
                 }
             } else {

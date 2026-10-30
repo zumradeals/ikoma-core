@@ -46,7 +46,7 @@ Le retrait conserve l'historique ; l'anonymisation reste collective à échéanc
 
 Un seul moteur analyse les dépendances et exécute les suppressions. Analyse avant confirmation et analyse identique sous verrou au moment de l'exécution. Aperçu lié à l'acteur, l'entité, l'état des dépendances et expirant après dix minutes. Saisie de la référence et du mot de passe courant, 2FA confirmée. Les refus et échecs sont journalisés après annulation de la transaction métier, sans données personnelles.
 
-Les opérations de gestion prennent des verrous de tables dans un ordre commun pour fermer les courses entre aperçu et écritures opérationnelles. Les contraintes RESTRICT restent le dernier rempart. Aucun DELETE sur audit/access_events/identity_checks n'est accordé au compte web.
+Les opérations de gestion prennent des verrous exclusifs sur les tables modifiables (les références étrangères empêchent les insertions concurrentes dans les journaux protégés), avec attente maximale de cinq secondes. Elles prennent ces verrous dans un ordre commun pour fermer les courses entre aperçu et écritures opérationnelles. Les contraintes RESTRICT restent le dernier rempart. Aucun DELETE sur audit/access_events/identity_checks n'est accordé au compte web.
 
 ## Maintenance privilégiée
 
@@ -55,3 +55,7 @@ Le web dépose une demande bornée à `demo` ou `conservation` avec l'empreinte 
 Les fichiers devenus sans référence sont inscrits dans une file durable dans la transaction ; leur effacement survient après commit, avec reprise idempotente et état observable. En cas d'échec fichier, ne pas déclarer le nettoyage complet. Le journal d'audit reste intact.
 
 Une preuve de sauvegarde doit couvrir les exports base et fichiers et leurs empreintes. Le simple indicateur BackupStatus ne prouve pas leur présence. En absence de preuve, l'opération privilégiée reste bloquée. L'installation du processus de maintenance relève de l'exploitation, sans déploiement automatique dans cette mission.
+
+## Compléments de revue
+
+La déclaration d’effacement est reçue après effacement local ; envoyer un ordre ne vaut pas accusé. Les anciens marqueurs des postes révoqués sont invalidés par migration. Une perte déclarée crée un conflit bloquant. Une politique approuvée ne peut plus être désapprouvée depuis cet écran. Les identifiants retirés sont en ajout seul pour le compte web. Les fichiers encore référencés sont protégés même si une entrée de file existe.

@@ -6,11 +6,11 @@ use App\Models\Event;
 use App\Models\Zone;
 use App\Services\Audit;
 use App\Services\DataLifecycle;
-use App\Services\EventAvailability;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,12 +37,20 @@ final class EventsController
         $data = $request->validate(['name' => 'required|string|max:160', 'site' => 'nullable|string|max:255', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at']);
         DB::transaction(function () use ($event, $data): void {
             app(DataLifecycle::class)->lock();
-            EventAvailability::requireOpen($event);
-            foreach (['access_events', 'badge_assignments', 'import_batches', 'sync_conflicts'] as $table) {
-                abort_if(DB::table($table)->where('event_id', $event)->exists(), 409, 'Cet événement possède une activité : modification de préparation interdite.');
+            if (in_array(DB::table('events')->where('id', $event)->value('status'), ['clos', 'archive'], true)) {
+                throw ValidationException::withMessages(['name' => 'Cet événement est clôturé ou archivé.']);
             }
-            abort_if(DB::table('devices')->where('event_id', $event)->whereNotNull('enrolled_at')->exists(), 409, 'Une tablette a déjà été enrôlée.');
-            abort_if(DB::table('identity_checks')->whereIn('visitor_id', DB::table('visitors')->where('event_id', $event)->select('id'))->exists(), 409, 'Des contrôles existent.');
+            foreach (['access_events', 'badge_assignments', 'import_batches', 'sync_conflicts'] as $table) {
+                if (DB::table($table)->where('event_id', $event)->exists()) {
+                    throw ValidationException::withMessages(['name' => 'Cet événement possède une activité : modification de préparation interdite.']);
+                }
+            }
+            if (DB::table('devices')->where('event_id', $event)->whereNotNull('enrolled_at')->exists()) {
+                throw ValidationException::withMessages(['name' => 'Une tablette a déjà été enrôlée.']);
+            }
+            if (DB::table('identity_checks')->whereIn('visitor_id', DB::table('visitors')->where('event_id', $event)->select('id'))->exists()) {
+                throw ValidationException::withMessages(['name' => 'Des contrôles existent.']);
+            }
             DB::table('events')->where('id', $event)->update([...$data, 'updated_at' => now(), 'list_revision' => DB::raw('list_revision + 1')]);
             app(Audit::class)->append('gestion.evenement_modifie', auth()->id(), ['event_id' => $event, 'fields' => array_keys($data)]);
         });

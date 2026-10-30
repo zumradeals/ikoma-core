@@ -20,7 +20,7 @@ return new class extends Migration
             $t->primary(['event_id', 'code']);
         });
         DB::unprepared(<<<'SQL'
-CREATE FUNCTION public.ikoma_retired_badge_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION public.ikoma_retired_badge_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         INSERT INTO retired_badge_identifiers(event_id, code, token_hash) VALUES (OLD.event_id, OLD.code, encode(sha256(OLD.qr_token::bytea), 'hex'));

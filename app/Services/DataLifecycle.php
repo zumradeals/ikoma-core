@@ -15,6 +15,7 @@ final class DataLifecycle
 
     public function lock(): void
     {
+        DB::statement("SET LOCAL lock_timeout = '5s'");
         DB::statement('LOCK TABLE '.implode(', ', array_diff(self::TABLES, ['access_events', 'identity_checks'])).' IN EXCLUSIVE MODE');
     }
 

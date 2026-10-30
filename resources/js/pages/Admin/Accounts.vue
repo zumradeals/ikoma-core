@@ -53,6 +53,7 @@ const hostSettings = useForm({ minutes: props.hostTimeout });
     </section>
     <section class="admin-card mt-4" aria-labelledby="comptes-existants">
       <div class="admin-section-heading"><div><h2 id="comptes-existants">Comptes existants</h2><p class="admin-muted">{{ users.length }} comptes · Gérez les accès, la sécurité et les rôles.</p></div><label class="account-search"><span class="sr-only">Rechercher un compte</span><input v-model="query" type="search" class="field" placeholder="Rechercher (nom, email, rôle…)" aria-controls="liste-comptes"></label></div>
+      <p v-if="users.filter(u => u.active && u.role === 'administrateur').length === 1" class="my-3">Le dernier administrateur actif est protégé : son rôle et son accès doivent être conservés.</p>
       <div class="account-table-scroll" tabindex="0" role="region" aria-label="Liste des comptes, défilement horizontal si nécessaire">
         <table id="liste-comptes" class="account-table">
 <caption class="sr-only">Comptes et actions disponibles</caption><thead><tr><th scope="col">Nom</th><th scope="col">Adresse électronique</th><th scope="col">Rôle</th><th scope="col">Statut</th><th scope="col">Actions</th></tr></thead><tbody>

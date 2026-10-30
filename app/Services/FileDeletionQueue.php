@@ -25,6 +25,9 @@ final class FileDeletionQueue
                 if (preg_match('~^(photos|identity-documents|profile-portraits)/[0-9a-f-]{36}\.enc$~', $file->path) !== 1) {
                     throw new \RuntimeException('Référence non conforme.');
                 }
+                if (DB::table('photos')->where('file_reference', $file->path)->exists() || DB::table('identity_checks')->where('document_file', $file->path)->exists() || DB::table('visitors')->where('profile_photo_file', $file->path)->exists()) {
+                    throw new \RuntimeException('Un fichier encore référencé ne peut pas être effacé.');
+                }
                 if (Storage::disk('local')->exists($file->path) && ! Storage::disk('local')->delete($file->path)) {
                     throw new \RuntimeException('Fichier inaccessible.');
                 }

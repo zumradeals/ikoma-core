@@ -30,6 +30,15 @@ final class Presence
         )->n;
     }
 
+    public function visitorPresent(string $visitorId): bool
+    {
+        $last = DB::table('access_events as e')->where('e.visitor_id', $visitorId)->whereIn('e.type', ['entree', 'sortie'])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.created_at')->orderByDesc('e.id')->value('e.type');
+
+        return $last === 'entree';
+    }
+
     /**
      * Corrige un événement d'entrée ou de sortie saisi par erreur. Le statut du visiteur est recalculé depuis les événements restants.
      * Le badge n'est pas touché : corriger une sortie ne le réassocie pas (le droit et l'écran de correction viendront avec le pilotage, lot L8).
