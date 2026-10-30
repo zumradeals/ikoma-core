@@ -35,7 +35,7 @@ final class DataManagementController
         }
 
         return Inertia::render('Admin/DataManagement', [
-            'preview' => $preview, 'maintenanceReport' => $r->session()->get('maintenance_report'),
+            'preview' => $preview, 'demoEnabled' => app()->environment('demo', 'local', 'testing'), 'maintenanceReport' => $r->session()->get('maintenance_report'),
             'events' => DB::table('events')->orderBy('name')->get(['id', 'name', 'status']),
             'counts' => ['evenements_ouverts' => DB::table('events')->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']))->count(), 'evenements_clos' => DB::table('events')->where('status', 'clos')->count(), 'evenements_archives' => DB::table('events')->where('status', 'archive')->count(), 'personnes_actives' => DB::table('visitors')->whereNull('withdrawn_at')->count(), 'personnes_retirees' => DB::table('visitors')->whereNotNull('withdrawn_at')->count()],
             'badges' => DB::table('badges')->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
