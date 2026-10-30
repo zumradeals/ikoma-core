@@ -20,10 +20,11 @@ final class Pilotage
     /** Événement affiché : celui demandé, sinon celui qui est en cours, sinon le plus récent. */
     public function event(?string $requested): ?object
     {
-        $events = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name', 'starts_at', 'ends_at']);
+        $events = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name', 'starts_at', 'ends_at', 'status']);
         if ($requested !== null && ($found = $events->firstWhere('id', $requested)) !== null) {
             return $found;
         }
+        $events = $events->reject(fn ($e) => $e->status === 'archive');
         $now = now()->toDateTimeString();
 
         return $events->first(fn ($e) => $e->starts_at <= $now && $e->ends_at >= $now) ?? $events->first();

@@ -5,6 +5,7 @@ use App\Models\Event;
 use App\Models\User;
 use App\Models\Visitor;
 use App\Models\Zone;
+use App\Services\BadgeArtwork;
 use App\Services\BadgeLots;
 use App\Services\DataLifecycle;
 use App\Services\DataRetention;
@@ -194,4 +195,31 @@ it('ne peut ni désapprouver ni raccourcir une politique de conservation approuv
     $this->actingAs($this->admin)->put('/administration/conservation', ['approved' => false, 'exportMaximum' => 10000, 'durations' => $durations])->assertSessionHasErrors('approved');
     $durations['photos'] = 1;
     $this->put('/administration/conservation', ['approved' => true, 'exportMaximum' => 10000, 'durations' => $durations])->assertSessionHasErrors('durations.photos');
+});
+
+it('modifie une préparation mais refuse une modification après contrôle', function () {
+    $event = Event::create(['name' => 'Préparation fictive à corriger', 'starts_at' => now(), 'ends_at' => now()->addDay()]);
+    $payload = ['name' => 'Préparation fictive corrigée', 'site' => 'Site fictif', 'starts_at' => now()->toIso8601String(), 'ends_at' => now()->addDay()->toIso8601String()];
+    $this->actingAs($this->admin)->put('/administration/evenements/'.$event->id, $payload)->assertRedirect();
+    expect($event->fresh()->name)->toBe($payload['name']);
+    DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $this->eventId, 'visitor_id' => $this->personId, 'type' => 'validation', 'occurred_at' => now()]);
+    $this->put('/administration/evenements/'.$this->eventId, $payload)->assertSessionHasErrors('name');
+});
+
+it('protège le dernier administrateur même contre un autre compte habilité à gérer les rôles', function () {
+    $otherAdmins = User::role('administrateur')->where('id', '<>', $this->admin->id)->get();
+    foreach ($otherAdmins as $other) {
+        $other->removeRole('administrateur');
+    }
+    $operator = User::create(['name' => 'Opérateur fictif habilité', 'email' => Str::uuid().'@exemple.test', 'password' => 'Fictif-L33!01234', 'two_factor_confirmed_at' => now()]);
+    $operator->givePermissionTo(['comptes.gerer', 'roles.attribuer']);
+    $this->actingAs($operator)->put('/administration/comptes/'.$this->admin->id, ['active' => false, 'role' => 'administrateur'])->assertSessionHasErrors('active');
+    expect($this->admin->fresh()->active)->toBeTrue();
+});
+
+it('protège un lot dès qu’un aperçu révèle ses véritables QR', function () {
+    $batch = app(BadgeLots::class)->generate($this->eventId, DemoSeeder::id('category0'), 1, $this->admin);
+    expect($this->engine->inspect('lot', $batch->id, $this->admin)['allowed'])->toBeTrue();
+    app(BadgeArtwork::class)->select(['event' => $this->eventId, 'batch' => $batch->id]);
+    expect($this->engine->inspect('lot', $batch->id, $this->admin)['allowed'])->toBeFalse();
 });

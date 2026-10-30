@@ -5,6 +5,10 @@ exec 9>"$DATA/maintenance.lock"
 flock -n 9 || exit 0
 pending=$(dc exec -T db psql -U ikoma -d ikoma -At -c "SELECT count(*) FROM maintenance_requests WHERE status IN ('en_attente','base_validee','fichiers_a_reprendre')")
 [ "$pending" -gt 0 ] || exit 0
+BACKUP_DIR="$DATA/backups"
+# shellcheck disable=SC1090
+[ ! -f "$DATA/backup.conf" ] || . "$DATA/backup.conf"
+export IKOMA_MAINTENANCE_BACKUPS="$BACKUP_DIR"
 # Nouvelle sauvegarde complète avant traitement, puis vérification matérielle de son manifeste dans le processus isolé.
 bash "$ROOT/deploy/prod/backup.sh"
 dc run --rm --no-deps maintenance

@@ -93,7 +93,7 @@ services:
     secrets: [app_key, db_app, db_owner]
     volumes:
       - storage:/var/www/html/storage
-      - ./prod-data/backups:/maintenance-backups:ro
+      - ${IKOMA_MAINTENANCE_BACKUPS:-./prod-data/backups}:/maintenance-backups:ro
     networks: [interne]
     read_only: true
     tmpfs: [/tmp]

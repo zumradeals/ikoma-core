@@ -22,7 +22,7 @@ final class AdminDashboard
     public function build(?string $requestedEvent): array
     {
         $event = $this->pilotage->event($requestedEvent);
-        $events = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->all();
+        $events = DB::table('events')->where(fn ($q) => $q->whereNull('status')->orWhere('status', '<>', 'archive'))->orderByDesc('starts_at')->get(['id', 'name'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->name])->all();
         if ($event === null) {
             return ['event' => null, 'events' => $events, 'steps' => [], 'summary' => ['done' => 0, 'total' => 0, 'next' => null], 'tiles' => null, 'watch' => [], 'recent' => $this->recent()];
         }

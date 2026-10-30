@@ -59,3 +59,16 @@ Une preuve de sauvegarde doit couvrir les exports base et fichiers et leurs empr
 ## Compléments de revue
 
 La déclaration d’effacement est reçue après effacement local ; envoyer un ordre ne vaut pas accusé. Les anciens marqueurs des postes révoqués sont invalidés par migration. Une perte déclarée crée un conflit bloquant. Une politique approuvée ne peut plus être désapprouvée depuis cet écran. Les identifiants retirés sont en ajout seul pour le compte web. Les fichiers encore référencés sont protégés même si une entrée de file existe.
+
+## Règles d’anonymisation conservées et sécurisées
+
+| Échéance approuvée | Traitement | Références conservées |
+|---|---|---|
+| Photos | détacher portraits, photographies d’accueil et fichiers de pièce ; effacer numéro de pièce ; inscrire les fichiers dans la file durable | contrôle d’identité jusqu’à son échéance, UUID des personnes |
+| Personnes | remplacer noms des personnes et hôtes par libellés anonymes avec UUID ; vider organisation, fonction, hôte, notes, décisions et motifs libres ; retirer les fiches et révoquer les postes | associations, destinations nominales immuables, mouvements et statistiques jusqu’à leurs échéances |
+| Notifications / alertes | effacer notifications échues et alertes résolues ; aucun incident ouvert n’est purgé par ce parcours | audit |
+| Synchronisations | après anonymisation uniquement, supprimer opérations et conflits échus et les alertes qui s’y rattachent | séquence des appareils et références statistiques |
+| Événements | figer le résumé des effectifs et mouvements, effacer mouvements et contrôles d’identité échus ; anonymiser intitulé, lieu, groupes et postes | UUID, résumé, historique d’associations et audit |
+| Audit | aucune purge depuis ce module | journal intégral ; procédure historique distincte avec reçu signé |
+
+Les délais proviennent exclusivement des réglages approuvés existants. Les refus et opérations en cours bloquent le parcours de conservation. Aucune photographie n’est effacée avant validation de la transaction qui détache sa référence. L’anonymisation informatique ne récupère pas une carte nominative physique ; sa destination reste immuable et aucun jeton n’est recyclé.

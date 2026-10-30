@@ -146,7 +146,7 @@ final class DataLifecycle
         if (DB::table('groups')->where('event_id', $id)->whereNotNull('opened_at')->whereNull('arrival_closed_at')->exists()) {
             $reasons[] = 'Un parcours de groupe reste ouvert. Terminez son arrivée et résolvez ses écarts.';
         }
-        if (DB::table('devices')->where('event_id', $id)->whereNotNull('enrollment_hash')->exists()
+        if (DB::table('devices')->where('event_id', $id)->whereNotNull('enrollment_hash')->where('enrollment_expires_at', '>', now())->exists()
             || DB::table('sync_conflicts')->where('event_id', $id)->whereNull('resolved_at')->exists()
             || DB::table('sync_operations')->whereIn('device_id', DB::table('devices')->where('event_id', $id)->select('id'))->whereNull('processed_at')->exists()
             || DB::table('badge_assignments')->where('event_id', $id)->whereNull('returned_at')->whereNull('cancelled_at')->exists()

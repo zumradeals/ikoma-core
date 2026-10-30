@@ -295,7 +295,6 @@ it('refuse hors ligne la remise d’une carte nominative à une autre personne',
 });
 
 it('déclare l’effacement après révocation seulement une fois les données locales effacées', async () => {
-  let runtime: PosteRuntime;
   const receipts: { motif: string; operations_perdues: number }[] = [];
   const fetcher: typeof fetch = async (input, init) => {
     if (String(input) === '/poste/api/efface') {
@@ -307,7 +306,7 @@ it('déclare l’effacement après révocation seulement une fois les données l
     }
     return new Response(JSON.stringify({ code: 'appareil_revoque', message: 'Révoquée' }), { status: 401 });
   };
-  runtime = new PosteRuntime(undefined, { dbName: dbName(), iterations: ITER, fetcher });
+  const runtime = new PosteRuntime(undefined, { dbName: dbName(), iterations: ITER, fetcher });
   await runtime.vault.enrol({ token: 'c'.repeat(64), secret: SECRET, pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste fictif' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
   await runtime.sync.sync();
   await vi.waitFor(() => expect(receipts).toEqual([{ motif: 'deconnexion', operations_perdues: 0 }]));
