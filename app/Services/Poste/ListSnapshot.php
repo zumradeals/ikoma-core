@@ -14,7 +14,7 @@ final class ListSnapshot
         $e = $poste->event_id;
         $row = DB::selectOne("SELECT concat_ws('|',
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM visitors WHERE event_id = ?),
-            (SELECT count(*) || ':' || coalesce(md5(string_agg(code || status || coalesce(reserved_group_id::text, ''), ',' ORDER BY code)), '') FROM badges WHERE event_id = ?),
+            (SELECT count(*) || ':' || coalesce(md5(string_agg(code || status || coalesce(reserved_device_id::text, '') || coalesce(reserved_group_id::text, '') || coalesce(printed_for_visitor_id::text, ''), ',' ORDER BY code)), '') FROM badges WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM badge_assignments WHERE event_id = ?),
             (SELECT count(*) FROM identity_checks i JOIN visitors v ON v.id = i.visitor_id WHERE v.event_id = ?),
             (SELECT count(*) FROM photos p JOIN visitors v ON v.id = p.visitor_id WHERE v.event_id = ?),
@@ -70,7 +70,7 @@ final class ListSnapshot
             'postes' => DB::table('devices')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'station'])->map(fn ($d) => ['id' => $d->id, 'name' => $d->station ?? $d->name])->all(),
             // Les jetons QR ne quittent jamais le serveur en clair : la tablette compare le hachage du jeton scanné. Tous les badges de l'événement
             // sont copiés pour le contrôle hors ligne ; `mine` indique ceux que ce poste peut associer (réservés à lui).
-            'badges' => DB::table('badges')->where('event_id', $e)->orderBy('code')->get(['code', 'qr_token', 'category_id', 'status', 'reserved_device_id', 'reserved_group_id'])->map(fn ($b) => ['code' => $b->code, 'token_hash' => hash('sha256', $b->qr_token), 'category_id' => $b->category_id, 'status' => $b->status, 'mine' => $b->reserved_device_id === $poste->id, 'group_id' => $b->reserved_group_id])->all(),
+            'badges' => DB::table('badges')->where('event_id', $e)->orderBy('code')->get(['code', 'qr_token', 'category_id', 'status', 'reserved_device_id', 'reserved_group_id', 'printed_for_visitor_id'])->map(fn ($b) => ['code' => $b->code, 'token_hash' => hash('sha256', $b->qr_token), 'category_id' => $b->category_id, 'status' => $b->status, 'mine' => $b->reserved_device_id === $poste->id, 'group_id' => $b->reserved_group_id, 'printed_for_visitor_id' => $b->printed_for_visitor_id])->all(),
             'groups' => DB::table('groups')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'bus_number', 'opened_at', 'departed_at', 'arrival_closed_at'])->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'bus_number' => $g->bus_number, 'opened' => $g->opened_at !== null, 'departed' => $g->departed_at !== null, 'arrival_closed' => $g->arrival_closed_at !== null])->all(),
             'members' => DB::table('group_members as m')->join('groups as g', 'g.id', '=', 'm.group_id')->join('visitors as mv', 'mv.id', '=', 'm.visitor_id')->whereNull('mv.withdrawn_at')->where('g.event_id', $e)->get(['m.group_id', 'm.visitor_id', 'm.called_at', 'm.checked_at', 'm.confirmed_at', 'm.absent_at', 'm.boarded_at', 'm.arrived_at'])->map(fn ($m) => ['group_id' => $m->group_id, 'visitor_id' => $m->visitor_id, 'checked' => $m->checked_at !== null, 'confirmed' => $m->confirmed_at !== null, 'absent' => $m->absent_at !== null, 'boarded' => $m->boarded_at !== null, 'arrived' => $m->arrived_at !== null])->all(),
         ];

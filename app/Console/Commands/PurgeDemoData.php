@@ -90,6 +90,9 @@ final class PurgeDemoData extends Command
                             throw new RuntimeException("Activité détectée dans {$table} : suppression refusée.");
                         }
                     }
+                    if (DB::table('visitors')->where('event_id', $eventId)->whereNotNull('profile_photo_file')->exists() || DB::table('badges')->where('event_id', $eventId)->whereNotNull('printed_for_visitor_id')->exists()) {
+                        throw new RuntimeException('Portrait ou destination nominative détecté : suppression de démonstration refusée.');
+                    }
                     $visitorIds = array_map($id, array_map(static fn ($i) => 'visitor'.$i, range(0, 299)));
                     foreach (['identity_checks', 'photos', 'refusals'] as $table) {
                         if (DB::table($table)->whereIn('visitor_id', $visitorIds)->exists()) {

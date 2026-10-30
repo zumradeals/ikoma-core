@@ -19,7 +19,7 @@ final class SecurityHeaders
 
     public static function apply(Request $request, Response $response): Response
     {
-        $camera = in_array($request->path(), ['poste', 'poste/shell', 'controle', 'controle/shell', 'groupe', 'groupe/shell'], true);
+        $camera = in_array($request->path(), ['poste', 'poste/shell', 'controle', 'controle/shell', 'groupe', 'groupe/shell', 'administration/invites'], true);
         // Les attributs de style Vue servent aux couleurs des catégories et à la progression. Aucun script en ligne n'est permis.
         $styleNonce = (string) $request->attributes->get('csp_style_nonce', '');
         $styleSrc = $styleNonce !== '' ? "'self' 'nonce-{$styleNonce}'" : "'self'";

@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminVisitorsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgeReservationsController;
 use App\Http\Controllers\BadgesController;
 use App\Http\Controllers\BadgeSettingsController;
+use App\Http\Controllers\BadgeWorkshopController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\ControleController;
 use App\Http\Controllers\EventsController;
@@ -68,6 +70,11 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/pilotage/groupes', [PilotageController::class, 'groupes'])->middleware(['can:groupes.suivre', 'can:cars.suivre']);
         Route::get('/pilotage/evacuation', [PilotageController::class, 'evacuation'])->middleware('can:presences.consulter');
         Route::get('/pilotage/api/evacuation', [PilotageController::class, 'evacuationData'])->middleware('can:presences.consulter');
+        Route::get('/administration/invites', [AdminVisitorsController::class, 'index'])->middleware('can:listes.importer');
+        Route::post('/administration/invites', [AdminVisitorsController::class, 'store'])->middleware('can:listes.importer');
+        Route::post('/administration/invites/{visitor}', [AdminVisitorsController::class, 'store'])->whereUuid('visitor')->middleware('can:listes.importer');
+        Route::delete('/administration/invites/{visitor}', [AdminVisitorsController::class, 'destroy'])->whereUuid('visitor')->middleware('can:listes.importer');
+        Route::get('/administration/invites/{visitor}/portrait', [AdminVisitorsController::class, 'portrait'])->whereUuid('visitor')->middleware('can:listes.importer');
         Route::get('/administration/imports', [ListImportsController::class, 'index'])->middleware('can:listes.importer');
         Route::get('/administration/imports/modele', [ListImportsController::class, 'template'])->middleware('can:listes.importer');
         Route::post('/administration/imports/apercu', [ListImportsController::class, 'preview'])->middleware('can:listes.importer');
@@ -80,6 +87,12 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
         Route::get('/administration/badges', BadgesController::class)->middleware('can:badges.gerer');
+        Route::get('/administration/badges/modeles', [BadgeWorkshopController::class, 'index'])->middleware('can:badges.gerer');
+        Route::post('/administration/badges/modeles/apercu', [BadgeWorkshopController::class, 'preview'])->middleware('can:badges.gerer');
+        Route::post('/administration/badges/modeles/personnes', [BadgeWorkshopController::class, 'people'])->middleware(['can:badges.gerer', 'can:listes.importer']);
+        Route::post('/administration/badges/modeles/preparer', [BadgeWorkshopController::class, 'prepare'])->middleware(['can:badges.gerer', 'can:listes.importer']);
+        Route::put('/administration/badges/modeles', [BadgeWorkshopController::class, 'save'])->middleware('can:badges.gerer');
+        Route::get('/administration/badges/modeles/imprimer', [BadgeWorkshopController::class, 'print'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/lots', [BadgeLotsController::class, 'store'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/reservations', [BadgeReservationsController::class, 'store'])->middleware('can:badges.gerer');
         Route::put('/administration/badges/reglages', [BadgeSettingsController::class, 'update'])->middleware('can:badges.gerer');

@@ -15,9 +15,11 @@ class Visitor extends Model
 
     protected $guarded = ['id'];
 
+    protected $hidden = ['profile_photo_file'];
+
     protected function casts(): array
     {
-        return ['withdrawn_at' => 'immutable_datetime', 'valid_from' => 'immutable_datetime', 'valid_until' => 'immutable_datetime'];
+        return ['profile_photo_print_allowed' => 'boolean', 'withdrawn_at' => 'immutable_datetime', 'valid_from' => 'immutable_datetime', 'valid_until' => 'immutable_datetime'];
     }
 
     /** @return BelongsTo<Event, $this> */

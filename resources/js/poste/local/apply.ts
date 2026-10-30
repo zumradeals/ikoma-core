@@ -93,6 +93,7 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
       if (!badge) throw refuse('badge_inconnu', 'Badge inconnu : vérifiez le code imprimé ou prenez un autre badge.', 'Saisissez le code imprimé ou prenez un autre badge.');
       if (v.badge_code === badge.code) return { badge_code: badge.code };
       if (!badge.mine) throw refuse('autre_poste', 'Ce badge n’est pas réservé à ce poste : il ne peut pas être associé depuis cette tablette.', 'Prenez un badge réservé à ce poste.');
+      if (badge.printed_for_visitor_id && badge.printed_for_visitor_id !== v.id) throw refuse('destination_nominative', 'Ce badge nominatif est réservé à une autre personne.');
       if (badge.status !== 'Disponible') {
         if (badge.status === 'Associé') {
           const holder = Array.from(list.visitors.values()).find(x => x.badge_code === badge.code)?.full_name;

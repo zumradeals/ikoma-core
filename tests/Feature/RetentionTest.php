@@ -87,6 +87,9 @@ it('refuse une purge non approuvée puis efface les identités, photos et répon
     DB::table('identity_checks')->insert(['id' => (string) Str::uuid(), 'visitor_id' => $visitor, 'checked_at' => now()]);
     DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'visitor_id' => $visitor, 'type' => 'entree', 'occurred_at' => now()->subMonth()]);
     DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'visitor_id' => $visitor, 'type' => 'sortie', 'occurred_at' => now()->subDay()]);
+    $portraitPath = 'profile-portraits/'.Str::uuid().'.enc';
+    Storage::disk('local')->put($portraitPath, 'portrait chiffré fictif à purger');
+    DB::table('visitors')->where('id', $visitor)->update(['profile_photo_file' => $portraitPath, 'profile_photo_print_allowed' => true]);
     $before = DB::table('visitors')->where('event_id', $event)->pluck('full_name')->all();
     $this->artisan('donnees:purger --confirmer')->assertFailed();
     DB::table('settings')->where('key', 'conservation_validee')->update(['value' => '1']);
@@ -95,6 +98,7 @@ it('refuse une purge non approuvée puis efface les identités, photos et répon
     $this->artisan('donnees:purger --confirmer')->assertSuccessful();
     expect(Storage::disk('local')->exists($path))->toBeFalse();
     expect(DB::table('photos')->where('visitor_id', $visitor)->count())->toBe(0);
+    expect(Storage::disk('local')->exists($portraitPath))->toBeFalse()->and(DB::table('visitors')->where('id', $visitor)->value('profile_photo_file'))->toBeNull();
     expect(DB::table('visitors')->where('event_id', $event)->count())->toBe(300);
     expect(DB::table('visitors')->where('event_id', $event)->whereNotNull('organisation')->count())->toBe(0);
     expect(DB::table('visitors')->where('event_id', $event)->whereIn('full_name', $before)->count())->toBe(0);

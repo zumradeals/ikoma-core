@@ -4,7 +4,7 @@ import { createDeviceKey, createVault, fromB64, openJson, openVault, PBKDF2_ITER
 import { PosteDb } from '../../resources/js/poste/local/db';
 import { PosteVault, PinError, pinProblem } from '../../resources/js/poste/local/vault';
 import { LocalList, type Snapshot, type SnapVisitor } from '../../resources/js/poste/local/list';
-import { searchOf } from '../../resources/js/poste/local/apply';
+import { applyOp, searchOf } from '../../resources/js/poste/local/apply';
 import { PosteStore } from '../../resources/js/poste/local/store';
 import { LocalPosteRepository } from '../../resources/js/poste/local/local';
 import { SyncManager } from '../../resources/js/poste/local/sync';
@@ -283,4 +283,13 @@ describe('runtime', () => {
     await runtime.db.ops.put({ id: 'o', seq: 1, type: 'refuser', status: 'pending', data: new Uint8Array([1]) });
     expect(await runtime.expired()).toBe(false);
   });
+});
+
+it('refuse hors ligne la remise d’une carte nominative à une autre personne', () => {
+  const snap = snapshot([visitor('v1', 'Personne A', { validated: true }), visitor('v2', 'Personne B', { validated: true })]);
+  snap.badges[0].printed_for_visitor_id = 'v1';
+  const list = new LocalList(snap);
+  const op = { id: 'nominal-op', seq: 1, type: 'badge' as const, agent_id: 'u1', client_time: new Date(now0).toISOString(), visitor_rev: null, payload: { visitor_id: 'v2', code: 'B-001' } };
+  expect(() => applyOp(list, op, now0)).toThrow('autre personne');
+  expect(applyOp(list, { ...op, payload: { visitor_id: 'v1', code: 'B-001' } }, now0)).toEqual({ badge_code: 'B-001' });
 });
