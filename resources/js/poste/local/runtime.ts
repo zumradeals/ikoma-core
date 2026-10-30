@@ -9,7 +9,7 @@ import { SyncManager, type SyncState } from './sync';
 import { PosteVault } from './vault';
 
 export const WIPE_AFTER_EVENT_MS = 24 * 3_600_000;
-export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel';
+export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel' | 'poste_supprime';
 type Enrolled = { device_token: string; device_secret: string; poste: { id: string; name: string; station: string | null; event_id: string; event_name: string } };
 
 /** Assemble le coffre, le magasin chiffré, la synchronisation et le dépôt local d'une tablette. Un seul exemplaire par page. */
@@ -30,7 +30,9 @@ export class PosteRuntime {
     this.sync = new SyncManager(this.vault, this.store, {
       onState: s => this.handlers.onState(s), now: () => Date.now(), fetcher: options.fetcher,
       onSnapshot: async snapshot => { await this.afterSnapshot(snapshot); },
-      onRevoked: async () => { await this.wipe('deconnexion', true); },
+      onRevoked: async reason => {
+        await this.wipe(reason === 'appareil_non_enrole' ? 'poste_supprime' : 'deconnexion', reason === 'appareil_revoque');
+      },
     });
     this.fetcher = options.fetcher ?? ((...args) => fetch(...args));
   }
