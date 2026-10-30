@@ -154,4 +154,4 @@ if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then ufw 
 
 say "Terminé"
 echo "Ouvrez https://$DOMAIN (le certificat peut demander une minute)."
-echo "Contrôle : curl -sI https://$DOMAIN/up | head -1   puis   cd $DIR && $COMPOSE ps"
+echo "Contrôle : curl -sI https://$DOMAIN/sante | head -1   puis   cd $DIR && $COMPOSE ps"
