@@ -42,8 +42,8 @@ test('atelier : modèles, lot de 200, QR inchangé, CR80, A4 et tablette', async
   const firstCode = await page.locator('.label .code').first().innerText();
   const first = Number(firstCode.slice(2));
   await page.goto('/administration/badges/modeles');
-  await page.getByLabel('Événement', { exact: true }).selectOption({ label: 'Exercice fictif IKOMA — démonstration' });
-  await page.getByLabel('Lot', { exact: true }).selectOption(batch);
+  await page.getByRole('combobox', { name: 'Événement', exact: true }).selectOption({ label: 'Exercice fictif IKOMA — démonstration' });
+  await page.getByRole('combobox', { name: 'Lot', exact: true }).selectOption(batch);
   await page.getByLabel('Du badge n°').fill(String(first)); await page.getByLabel('Au badge n°').fill(String(first + 199));
   await page.getByRole('button', { name: 'Actualiser l’aperçu' }).click();
   await expect(page.locator('.access-card')).toContainText(firstCode);
@@ -63,7 +63,7 @@ test('atelier : modèles, lot de 200, QR inchangé, CR80, A4 et tablette', async
   }
   // Un seul badge PVC en portrait : dimensions du DOM et du PDF contrôlables.
   await page.getByLabel('Au badge n°').fill(String(first));
-  await page.getByLabel('Orientation', { exact: true }).selectOption('portrait');
+  await page.getByRole('combobox', { name: 'Orientation', exact: true }).selectOption('portrait');
   await page.getByRole('button', { name: 'Actualiser l’aperçu' }).click();
   await expect(page.locator('.access-card--portrait')).toBeVisible();
   expect(await decodeBadge(page)).toBe(referencePayload);
@@ -76,8 +76,8 @@ test('atelier : modèles, lot de 200, QR inchangé, CR80, A4 et tablette', async
   expect(pvcPdf.toString('latin1').match(/\/Type\s*\/Page\b/g)).toHaveLength(1);
   // Les 200 badges A4 : 2 colonnes × 5 lignes, 20 pages, sans changement d’échelle.
   await page.getByLabel('Au badge n°').fill(String(first + 199));
-  await page.getByLabel('Orientation', { exact: true }).selectOption('paysage');
-  await page.getByLabel('Format', { exact: true }).selectOption('a4');
+  await page.getByRole('combobox', { name: 'Orientation', exact: true }).selectOption('paysage');
+  await page.getByRole('combobox', { name: 'Format', exact: true }).selectOption('a4');
   await page.getByRole('button', { name: 'Actualiser l’aperçu' }).click();
   await expect(page.getByTestId('preparer-impression')).toBeVisible();
   await print.goto((await page.getByTestId('preparer-impression').getAttribute('href'))!);
@@ -100,6 +100,6 @@ test('atelier : modèles, lot de 200, QR inchangé, CR80, A4 et tablette', async
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/atelier-badges-tablette.png', fullPage: true });
   // Le verso ne contient aucun QR ni fiche titulaire.
-  await page.getByLabel('Face à imprimer').selectOption('verso'); await page.getByRole('button', { name: 'Actualiser l’aperçu' }).click();
+  await page.getByRole('combobox', { name: 'Face à imprimer', exact: true }).selectOption('verso'); await page.getByRole('button', { name: 'Actualiser l’aperçu' }).click();
   await expect(page.locator('.access-card')).toContainText('Consignes de visite'); await expect(page.locator('.access-card__qr')).toHaveCount(0);
 });

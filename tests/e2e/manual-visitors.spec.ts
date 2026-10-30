@@ -8,10 +8,10 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   await page.setViewportSize({ width: 1440, height: 1100 });
   await loginWithSecondFactor(page, user.email, user.password, user.secret);
   await page.goto('/administration/invites');
-  await page.getByLabel('Événement', { exact: true }).selectOption({ label: 'Exercice fictif IKOMA — démonstration' });
+  await page.getByRole('combobox', { name: 'Événement', exact: true }).selectOption({ label: 'Exercice fictif IKOMA — démonstration' });
   const name = 'Portrait fictif atelier ' + Date.now();
   await page.getByLabel('Nom complet', { exact: true }).fill(name);
-  await page.getByLabel('Catégorie', { exact: true }).selectOption({ label: 'Visiteur' });
+  await page.getByRole('combobox', { name: 'Catégorie', exact: true }).selectOption({ label: 'Visiteur' });
   await page.getByLabel('Organisation (facultatif)', { exact: true }).fill('Organisation de recette');
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = 360; canvas.height = 480; const c = canvas.getContext('2d')!;
@@ -36,9 +36,9 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   const link = (await lots.getByRole('link', { name: 'Imprimer les étiquettes' }).evaluateAll(links => links.map(a => a.getAttribute('href')!))).find(href => !before.includes(href))!;
   const batch = new URL(link, 'http://localhost').searchParams.get('batch')!;
   await page.goto('/administration/badges/modeles?person=' + person);
-  await page.getByLabel('Lot', { exact: true }).selectOption(batch);
+  await page.getByRole('combobox', { name: 'Lot', exact: true }).selectOption(batch);
   await page.getByLabel('Au badge n°').fill(await page.getByLabel('Du badge n°').inputValue());
-  await page.getByLabel('Mode de badge').selectOption('nominatif');
+  await page.getByRole('combobox', { name: 'Mode de badge', exact: true }).selectOption('nominatif');
   await page.getByLabel('La politique du client autorise').check();
   await page.getByRole('button', { name: 'Charger les personnes de cette catégorie (200 max.)', exact: true }).click();
   await page.locator(`input[type="checkbox"][value="${person}"]`).check();
@@ -47,7 +47,7 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   for (const design of ['visiteur', 'vip', 'prestataire']) {
     await page.locator(`input[name="design"][value="${design}"]`).check();
     for (const orientation of ['paysage', 'portrait']) {
-    await page.getByLabel('Orientation', { exact: true }).selectOption(orientation);
+    await page.getByRole('combobox', { name: 'Orientation', exact: true }).selectOption(orientation);
     for (const photo of [false, true]) {
       await page.getByLabel('Afficher le portrait de profil autorisé, si disponible').setChecked(photo);
       await page.getByRole('button', { name: 'Actualiser l’aperçu', exact: true }).click();
@@ -60,7 +60,7 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
     }
   }
   await page.screenshot({ path: 'test-results/atelier-nominatif.png', fullPage: true });
-  await page.getByLabel('Mode de badge').selectOption('reutilisable');
+  await page.getByRole('combobox', { name: 'Mode de badge', exact: true }).selectOption('reutilisable');
   await page.getByRole('button', { name: 'Actualiser l’aperçu', exact: true }).click();
   await expect(page.locator('.access-card')).not.toContainText(name); await expect(page.locator('.access-card__portrait')).toHaveCount(0);
 });
