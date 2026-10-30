@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(DatabaseTransactions::class);
 
@@ -41,7 +42,7 @@ beforeEach(function () {
 
 it('affiche dès l’ouverture la liste paginée de l’événement choisi, sans mélanger les événements', function () {
     $this->get('/administration/invites?event_id='.DemoSeeder::id('event'))
-        ->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Visitors')->where('eventId', DemoSeeder::id('event'))
             ->has('list.data')->where('searchQuery', ''));
 
@@ -56,7 +57,7 @@ it('affiche dès l’ouverture la liste paginée de l’événement choisi, sans
     }
 
     $this->get('/administration/invites?event_id='.$event.'&page=2')
-        ->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Visitors')->where('eventId', $event)
             ->where('list.current_page', 2)->where('list.total', fn ($total) => $total > 20)
             ->has('list.data'));
