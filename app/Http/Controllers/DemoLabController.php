@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\DemoLab;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -21,7 +22,7 @@ final class DemoLabController
         return Inertia::render('Admin/DemoLab', [
             'scenarios' => DemoLab::SCENARIOS,
             'totals' => $lab->totals(),
-            'demoEvents' => \Illuminate\Support\Facades\DB::table('events')
+            'demoEvents' => DB::table('events')
                 ->where('is_demo', true)->orderByDesc('created_at')
                 ->get(['id', 'name', 'demo_scenario', 'created_at']),
         ]);
