@@ -18,6 +18,11 @@ const people = ref<{ id: string; full_name: string; organisation: string | null;
 const selected = ref<string[]>([]);
 const orderedSelected = computed(() => people.value.filter(person => selected.value.includes(person.id)));
 const plannedCode = (index: number) => 'B-' + String(Number(form.from) + index).padStart(3, '0'); const personQuery = ref(props.person?.full_name ?? ''); const preparationMessage = ref('');
+const syncPostes = ref<string[]>([]);
+const needsTabletSync = ref(false);
+const preparationDone = ref(false);
+const rangeCount = computed(() => Number(form.to) >= Number(form.from) && Number(form.from) > 0 ? Number(form.to) - Number(form.from) + 1 : 0);
+const exactlySelected = computed(() => rangeCount.value === selected.value.length && rangeCount.value > 0);
 async function personalApi(path: string, body: object) {
   errors.value = [];
   try {
@@ -27,11 +32,16 @@ async function personalApi(path: string, body: object) {
     return data;
   } catch { errors.value = ['Connexion interrompue. Réessayez une fois le réseau rétabli.']; return null; }
 }
-async function loadPeople() { const data = await personalApi('personnes', { event: form.event, batch: form.batch, q: personQuery.value }); if (data) { people.value = data.people; selected.value = []; preparationMessage.value = ''; } }
+async function loadPeople() { const data = await personalApi('personnes', { event: form.event, batch: form.batch, q: personQuery.value }); if (data) { people.value = data.people; selected.value = []; preparationMessage.value = ''; preparationDone.value = false; } }
 async function preparePeople() {
   if (busy.value) return; busy.value = true;
   const data = await personalApi('preparer', { event: form.event, batch: form.batch, from: form.from, to: form.to, visitor_ids: orderedSelected.value.map(person => person.id), personal_allowed: form.personal_allowed });
-  if (data) preparationMessage.value = data.prepared.length + ' destination(s) réservée(s). Aucun badge activé. Actualisez l’aperçu.';
+  if (data) {
+    preparationDone.value = true;
+    needsTabletSync.value = !!data.sync_required;
+    syncPostes.value = Array.isArray(data.postes_a_synchroniser) ? data.postes_a_synchroniser : [];
+    preparationMessage.value = data.prepared.length + ' destination(s) nominative(s) préparée(s) sans activation ni changement de QR. Vous pouvez actualiser l’aperçu.';
+  }
   busy.value = false; result.value = null;
 }
 const busy = ref(false);
@@ -57,8 +67,8 @@ watch(() => form.event, () => {
   Object.assign(form, props.preferences[form.event] ?? defaults);
   chooseBatch();
 });
-watch(() => form.batch, () => { range(); people.value = []; selected.value = []; });
-watch(() => form.mode, () => { form.personal_allowed = false; form.show_photo = false; form.show_org = false; form.show_period = false; people.value = []; selected.value = []; });
+watch(() => form.batch, () => { range(); people.value = []; selected.value = []; preparationDone.value = false; needsTabletSync.value = false; syncPostes.value = []; preparationMessage.value = ''; });
+watch(() => form.mode, () => { form.personal_allowed = false; form.show_photo = false; form.show_org = false; form.show_period = false; people.value = []; selected.value = []; preparationDone.value = false; needsTabletSync.value = false; syncPostes.value = []; preparationMessage.value = ''; });
 watch(() => form.orientation, () => { form.cols = form.orientation === 'portrait' ? 3 : 2; form.rows = form.orientation === 'portrait' ? 3 : 5; });
 watch(signature, () => { errors.value = []; });
 async function preview() {
@@ -111,17 +121,25 @@ onMounted(() => { chooseBatch(); if (form.batch) void preview(); });
         </section>
         <section class="workshop-panel">
 <div v-if="form.mode === 'nominatif'" class="mb-5 space-y-4 rounded-xl border-2 border-blue-200 p-4">
-<h2>Destinations nominatives</h2><p class="text-base">La préparation réserve chaque carte définitivement à une personne, sans contrôle d’identité ni activation. Utilisez des badges disponibles non réservés à un poste ou groupe ; réservez-les ensuite aux tablettes et synchronisez-les.</p>
+<h2>Destinations nominatives</h2><p class="text-base">Associez chaque badge disponible à une personne, sans l'activer. Un badge déjà réservé à un poste d'accueil actif peut devenir nominatif : son numéro, son QR et son poste restent inchangés. Les badges réservés à un groupe, déjà utilisés ou liés à un poste révoqué ne sont pas éligibles.</p>
+<p class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-base">Si la tablette avait déjà synchronisé ces badges, ses anciennes données ne connaissent pas encore les nouveaux noms. <strong>Après préparation, synchronisez impérativement chaque poste concerné avant de remettre ou d'utiliser les badges.</strong> Une tablette restée hors ligne peut présenter temporairement une attribution obsolète ; le serveur rejettera une attribution contraire lors de sa synchronisation.</p>
 <label class="flex min-h-14 items-center gap-3"><input v-model="form.personal_allowed" type="checkbox">La politique du client autorise l’impression nominative</label>
 <label>Rechercher une personne<input v-model="personQuery" class="field" maxlength="160" placeholder="Nom, ou vide pour la catégorie du lot"></label>
 <button type="button" class="btn-soft" :disabled="!form.batch || busy" @click="loadPeople">Charger les personnes de cette catégorie (200 max.)</button>
 <template v-if="people.length">
 <div class="flex flex-wrap gap-3"><button type="button" class="btn-soft" @click="selected = people.map(p => p.id)">Tout sélectionner</button><button type="button" class="btn-soft" @click="selected = []">Tout désélectionner</button></div>
 <div class="max-h-80 overflow-auto rounded-lg border p-3"><label v-for="candidate in people" :key="candidate.id" class="flex min-h-14 items-center gap-3"><input v-model="selected" type="checkbox" :value="candidate.id"><span>{{ candidate.full_name }} · {{ candidate.organisation }} · {{ candidate.host }}</span></label></div>
-<p class="text-base">{{ selected.length }} personne(s). Les destinations suivent l’ordre affiché ci-dessous et les numéros croissants. La plage doit contenir exactement ce nombre de badges.</p>
-<ol class="max-h-64 overflow-auto rounded-lg bg-blue-50 p-3 text-base" aria-label="Destinations à confirmer"><li v-for="(destination, index) in orderedSelected" :key="destination.id"><strong>{{ plannedCode(index) }}</strong> → {{ destination.full_name }} · {{ destination.organisation }} · {{ destination.host }}</li></ol><button type="button" class="btn-soft" :disabled="!form.personal_allowed || !selected.length || busy" @click="preparePeople">Réserver {{ selected.length }} destination(s) nominative(s)</button>
+<p class="text-base">{{ selected.length }} personne(s) sélectionnée(s) pour {{ rangeCount }} badge(s). Les destinations suivent l’ordre affiché ci-dessous et les numéros croissants.</p>
+<p v-if="!exactlySelected" class="text-base font-bold text-amber-900" role="status">Sélectionnez exactement {{ rangeCount }} personne(s), ou réduisez la plage à un seul numéro pour préparer un badge individuel.</p>
+<ol class="max-h-64 overflow-auto rounded-lg bg-blue-50 p-3 text-base" aria-label="Destinations à confirmer"><li v-for="(destination, index) in orderedSelected" :key="destination.id"><strong>{{ plannedCode(index) }}</strong> → {{ destination.full_name }} · {{ destination.organisation }} · {{ destination.host }}</li></ol><button type="button" class="btn-soft" :disabled="!form.personal_allowed || !exactlySelected || busy" @click="preparePeople">Préparer {{ selected.length }} destination(s) nominative(s)</button>
 </template>
-<p v-if="preparationMessage" role="status">{{ preparationMessage }}</p>
+<p v-if="preparationMessage" role="status" class="font-semibold">{{ preparationMessage }}</p>
+<div v-if="preparationDone && needsTabletSync" role="status" data-testid="synchronisation-nominative" class="rounded-lg border-2 border-amber-500 bg-amber-50 p-3">
+<strong>Synchronisation obligatoire avant remise physique</strong>
+<p>Poste(s) à synchroniser : {{ syncPostes.join(', ') }}.</p>
+<p>Sur chaque tablette : « Synchroniser maintenant ». Vérifiez ensuite que le badge correspond bien au nom imprimé. N'utilisez pas une ancienne copie hors ligne.</p>
+</div>
+<p v-else-if="preparationDone" class="text-base" role="status">Le badge n’était réservé à aucun poste. Affectez-le à un poste depuis Administration → Badges, puis synchronisez ce poste avant sa remise.</p>
 <label class="flex min-h-14 items-center gap-3"><input v-model="form.show_photo" type="checkbox">Afficher le portrait de profil autorisé, si disponible</label><label class="flex min-h-14 items-center gap-3"><input v-model="form.show_org" type="checkbox">Afficher la fonction ou l’organisation</label><label class="flex min-h-14 items-center gap-3"><input v-model="form.show_period" type="checkbox">Afficher la période de validité</label>
 <p class="text-base">Nom récupéré automatiquement. Sans portrait autorisé, le modèle sans photo est utilisé. Les photos du contrôle et des pièces ne sont jamais récupérées.</p>
 </div>
