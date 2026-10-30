@@ -165,7 +165,6 @@ it('refuse une préparation sur stock réservé ou sur une catégorie différent
     expect(Badge::whereNotNull('printed_for_visitor_id')->count())->toBe(0);
 });
 
-
 it('prépare un badge déjà réservé au poste sans toucher au QR, au statut ou à la réservation', function () {
     $this->post('/administration/invites', manualInput('Personne nominative du poste'))->assertRedirect();
     $person = Visitor::where('full_name', 'Personne nominative du poste')->firstOrFail();
