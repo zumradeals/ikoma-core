@@ -71,7 +71,7 @@ BEGIN
 END;
 $$;
 REVOKE ALL ON FUNCTION public.ikoma_reset_demo_event(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_event(uuid) TO ikoma_app;
+
 SQL);
         DB::unprepared(<<<'SQL'
 CREATE OR REPLACE FUNCTION public.ikoma_reset_demo_business(p_actor uuid)
@@ -110,8 +110,14 @@ BEGIN
 END;
 $;
 REVOKE ALL ON FUNCTION public.ikoma_reset_demo_business(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_business(uuid) TO ikoma_app;
+
 SQL);
+        // Les fonctions sont toujours créées pour maintenir le schéma, mais jamais exposées
+        // au compte web d'une installation productive.
+        if (app()->environment('demo', 'local', 'testing')) {
+            DB::statement('GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_event(uuid) TO ikoma_app');
+            DB::statement('GRANT EXECUTE ON FUNCTION public.ikoma_reset_demo_business(uuid) TO ikoma_app');
+        }
     }
 
     public function down(): void
