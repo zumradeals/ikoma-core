@@ -60,6 +60,18 @@ it('retrouve accents et fautes, trie les résultats et ne divulgue que le néces
     expect($indexes)->toHaveCount(1);
     expect($indexes[0]->indexdef)->toContain('gin');
 });
+it('applique un départage portable entre noms accentués après qualité, VIP et score', function () {
+    $event = DemoSeeder::id('event');
+    $names = ['A testtri', 'a testtri', 'À testtri', 'É testtri'];
+    foreach ($names as $i => $name) {
+        DB::table('visitors')->where('id', DemoSeeder::id('visitor'.$i))
+            ->update(['full_name' => $name, 'category_id' => DemoSeeder::id('category0')]);
+    }
+    $found = app(VisitorSearch::class)->searchDetailed($event, 'testtri');
+    expect(array_column($found, 'full_name'))->toBe($names);
+    expect(array_column($found, 'id'))->toHaveCount(4);
+});
+
 it('refuse en base une deuxième association active mais accepte une nouvelle après restitution ou annulation', function () {
     $badge = DB::table('badges')->where('event_id', DemoSeeder::id('event'))->first();
     $visitor = DemoSeeder::id('visitor0');
