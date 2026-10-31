@@ -1,0 +1,34 @@
+{
+  "lot": "R05",
+  "baseline_commit": "ace54da1a8a93855c7c246b7d1b1a22fcd2a5a8f",
+  "resolution_run": 41205835080,
+  "resolution_head": "4468cc99ad5c8d846547a9d332bf7442dff5c4a5",
+  "artifact": 13044139334,
+  "artifact_zip_sha256": "c6fd6b81e408bf5bd9829af3f41cef51424ef99a76bc14c932655ead07875927",
+  "composer_lock_sha256": "9ea7008e25680303b67e5c9660ef7b120069f8ec2bdf518aff551e10a6c4a0a2",
+  "changed_packages": [
+    {
+      "name": "symfony/mime",
+      "before": "v7.4.19",
+      "after": "v7.4.22",
+      "source_reference": "94a4c017435bc515f5ac80421a2c555fb9ca3676"
+    }
+  ],
+  "added_packages": [],
+  "removed_packages": [],
+  "metadata_changes": {
+    "stability-flags": {
+      "before": [],
+      "after": {}
+    },
+    "platform-dev": {
+      "before": [],
+      "after": {}
+    },
+    "plugin-api-version": {
+      "before": "2.6.0",
+      "after": "2.11.0"
+    }
+  },
+  "content_hash_unchanged": true
+}
