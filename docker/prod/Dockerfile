@@ -24,7 +24,8 @@ RUN set -eux; \
     docker-php-ext-configure gd --with-jpeg; \
     docker-php-ext-install pdo_pgsql mbstring zip xmlreader gd; \
     ldd /usr/local/lib/php/extensions/*/*.so | awk '/=>/ { print $(NF-1) }' | xargs -r realpath | sort -u | xargs -r dpkg-query --search | cut -d: -f1 | sort -u | xargs -r apt-mark manual; \
-    apt-get purge -y --auto-remove $PHPIZE_DEPS libpq-dev libonig-dev libxml2-dev libzip-dev libjpeg62-turbo-dev libpng-dev unzip git; \
+    # En-tetes du noyau uniquement necessaires a la compilation, pas au runtime.\
+    apt-get purge -y --auto-remove $PHPIZE_DEPS libpq-dev libonig-dev libxml2-dev libzip-dev libjpeg62-turbo-dev libpng-dev unzip git linux-libc-dev; \
     rm -rf /var/lib/apt/lists/*
 
 # 3) Dépendances PHP de production seulement (sans les outils de test).
