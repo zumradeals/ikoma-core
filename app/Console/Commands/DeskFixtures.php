@@ -32,6 +32,8 @@ class DeskFixtures extends Command
             return self::FAILURE;
         }
         $this->callSilent('db:seed', ['--class' => RoleSeeder::class, '--force' => true]);
+        // Recette L9 : la licence inclut F06, mais la recette doit l'activer explicitement.
+        DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
         $s = 'R'.Str::upper(Str::random(5));
         $now = now();
         $event = (string) Str::uuid();
