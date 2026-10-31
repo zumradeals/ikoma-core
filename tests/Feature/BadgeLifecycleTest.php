@@ -520,6 +520,8 @@ it('réserve une plage depuis l’écran et refuse proprement les plages impossi
     $admin = badgeAccount('administrateur');
     $lot = demoLot(10);
     $this->actingAs($admin);
+    // Ce scénario exerce la réservation collective : F06 est activé explicitement.
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $payload = ['batch_id' => $lot->badge_batch_id, 'from' => 401, 'to' => 405, 'target_type' => 'poste', 'target_id' => DemoSeeder::id('device')];
     $first = (int) substr($lot->code, 2);
     $this->post('/administration/badges/reservations', [...$payload, 'from' => $first, 'to' => $first + 4])->assertRedirect()->assertSessionHasNoErrors();
