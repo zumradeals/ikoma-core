@@ -6,6 +6,7 @@ import AdminLayout from '../../layouts/AdminLayout.vue';
 type DemoEvent = { id: string; name: string; demo_scenario: string; created_at: string };
 const props = defineProps<{
   scenarios: Record<string, string>;
+  f06Active: boolean;
   totals: { events: number; visitors: number; badges: number; groups: number; devices: number; demo_events: number };
   demoEvents: DemoEvent[];
 }>();
@@ -54,7 +55,7 @@ function resetAll() {
         <form class="space-y-4" @submit.prevent="generate">
           <label class="block font-semibold">Quel exemple veux-tu tester ?
             <select v-model="creator.scenario" class="field mt-2" data-testid="demo-scenario">
-              <option v-for="(name, key) in props.scenarios" :key="key" :value="key">{{ name }}</option>
+              <option v-for="(name, key) in props.scenarios" :key="key" :value="key" :disabled="key === 'formation' && !props.f06Active">{{ name }}{{ key === 'formation' && !props.f06Active ? ' — activer F06' : '' }}</option>
             </select>
           </label>
           <label class="block font-semibold">Nombre de personnes fictives
@@ -65,6 +66,7 @@ function resetAll() {
               <option :value="1000">1 000 personnes</option>
             </select>
           </label>
+          <p v-if="!props.f06Active" class="text-sm">Le scénario « Formation et groupes » nécessite d’abord l’activation de F06 dans <Link class="underline" href="/administration/modules">Administration → Modules</Link>.</p>
           <p class="admin-muted">Les badges sont créés avec une marge de 10 %. Aucun compte ni accès réel n'est inventé.</p>
           <p v-for="(error, key) in creator.errors" :key="key" class="text-red-800" role="alert">{{ error }}</p>
           <button class="btn-main" type="submit" :disabled="creator.processing" data-testid="demo-create">
