@@ -6,7 +6,6 @@ use App\Enums\BadgeStatus;
 use App\Models\BadgeBatch;
 use App\Models\Device;
 use App\Models\Group;
-use App\Services\FoundingModules;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
