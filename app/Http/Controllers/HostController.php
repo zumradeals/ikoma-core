@@ -25,7 +25,7 @@ final class HostController
         Gate::authorize('listes.mettre_a_jour');
         $hosts = $this->hosts($r);
 
-        return Inertia::render('Hote/Guests', ['hosts' => $hosts, 'guests' => fn () => DB::table('visitors as v')->join('hosts as h', 'h.id', '=', 'v.host_id')->join('categories as c', 'c.id', '=', 'v.category_id')->where('h.user_id', $r->user()->id)->whereNull('v.withdrawn_at')->orderBy('v.full_name')->paginate(30, ['v.id', 'v.full_name', 'v.organisation', 'v.category_id', 'v.host_id', 'v.valid_from', 'v.valid_until', 'v.status', 'c.name as category_name', 'h.event_id'])->withQueryString(), 'categories' => DB::table('categories')->whereIn('event_id', $hosts->pluck('event_id'))->whereRaw("public.ikoma_normalize(name)='visiteur'")->get(['id', 'name', 'event_id']), 'feedback' => $r->session()->get('host_feedback')]);
+        return Inertia::render('Hote/Guests', ['hosts' => $hosts, 'guests' => fn () => DB::table('visitors as v')->join('hosts as h', 'h.id', '=', 'v.host_id')->join('categories as c', 'c.id', '=', 'v.category_id')->where('h.user_id', $r->user()->id)->whereNull('v.withdrawn_at')->orderByRaw('v.full_name COLLATE "C" ASC')->orderBy('v.id')->paginate(30, ['v.id', 'v.full_name', 'v.organisation', 'v.category_id', 'v.host_id', 'v.valid_from', 'v.valid_until', 'v.status', 'c.name as category_name', 'h.event_id'])->withQueryString(), 'categories' => DB::table('categories')->whereIn('event_id', $hosts->pluck('event_id'))->whereRaw("public.ikoma_normalize(name)='visiteur'")->get(['id', 'name', 'event_id']), 'feedback' => $r->session()->get('host_feedback')]);
     }
 
     public function show(Request $r, string $visitor): Response
