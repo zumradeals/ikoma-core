@@ -6,6 +6,7 @@ use App\Enums\BadgeStatus;
 use App\Models\BadgeBatch;
 use App\Models\Device;
 use App\Models\Group;
+use App\Services\FoundingModules;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -95,6 +96,9 @@ final class BadgeLots
      */
     public function reserve(string $batchId, int $from, int $to, Device|Group $target, User $actor): int
     {
+        if ($target instanceof Group) {
+            app(FoundingModules::class)->requireF06();
+        }
         if ($from < 1 || $to < $from) {
             throw new BadgeRefused('plage', 'Plage invalide : le premier numéro doit être au moins 1 et ne pas dépasser le dernier.');
         }
