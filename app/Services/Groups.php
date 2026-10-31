@@ -158,6 +158,7 @@ final class Groups
     public function check(User $agent, string $groupId, string $visitorId, bool $identityChecked = false): array
     {
         app(FoundingModules::class)->requireF06();
+
         return DB::transaction(function () use ($agent, $groupId, $visitorId, $identityChecked): array {
             app(FoundingModules::class)->requireF06();
             $this->open($groupId, $agent);
