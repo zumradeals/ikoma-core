@@ -423,3 +423,24 @@ le registre CSV, l'état des contrôles et la matrice de remédiation. Les prior
 et recommandations de ces documents sont des propositions, pas des décisions
 techniques exécutées ni une acceptation des risques résiduels.
 
+## S0.1 ratifié et S0.2 R01–R02 autorisés (31 octobre 2026)
+
+Le dirigeant ratifie le diagnostic de #40 au commit 788b25d3, sans accepter ses
+vulnérabilités ni homologuer IKOMA ACCESS. Fusion squash autorisée et effectuée
+sur main : `19e972b3c14bc635a278e52f0d42b45b0f5c4b13`. Après relance complète,
+seul Trivy échoue ; aucun test ni seuil n'a été modifié pour cette fusion.
+
+La première phase S0.2 se limite à R01–R02 : labels OCI de source dans les deux
+images construites, relevé des trois images finales réellement démarrées en
+recette CI, scan par ID immuable, contrôles bloquants sur vulnérabilités et
+preuves absentes/invalides. Le scan dev existant est conservé. Les rapports
+finaux sont publiés par liste de champs autorisés, sans configuration privée.
+Les codes 0/1/2 distinguent absence d'alerte au seuil, vulnérabilité bloquante et
+échec technique. Voir [contrat R01–R02](security/S0.2-R01-R02.md).
+
+Aucune version de composant ni dépendance n'est changée. Aucun serveur réel,
+déploiement ou donnée client n'est utilisé. R03–R05 restent un
+[plan non exécuté](security/S0.2-PLAN-R03-R05.md), soumis à une nouvelle validation.
+La PR R01–R02 reste non fusionnée ; gel des nouvelles mises en service
+commerciales avec données réelles maintenu.
+
