@@ -37,7 +37,7 @@ try {
     try {
         foreach ($reader->getSheetIterator() as $sheet) {
             foreach ($sheet->getRowIterator() as $row) {
-                $values[] = (string) $row->getCells()[0]->getValue();
+                $values[] = (string) $row->cells[0]->getValue();
             }
             break;
         }
