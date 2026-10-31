@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\DemoLab;
+use App\Services\FoundingModules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ final class DemoLabController
 
         return Inertia::render('Admin/DemoLab', [
             'scenarios' => DemoLab::SCENARIOS,
+            'f06Active' => app(FoundingModules::class)->f06Active(),
             'totals' => $lab->totals(),
             'demoEvents' => DB::table('events')
                 ->where('is_demo', true)->orderByDesc('created_at')
