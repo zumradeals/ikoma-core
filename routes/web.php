@@ -23,6 +23,7 @@ use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalExportController;
 use App\Http\Controllers\ListImportsController;
 use App\Http\Controllers\MonGroupeController;
+use App\Http\Controllers\ModulesController;
 use App\Http\Controllers\PilotageController;
 use App\Http\Controllers\PosteApiController;
 use App\Http\Controllers\PosteController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\TwoFactorRecoveryController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
+use App\Http\Middleware\EnsureF06Active;
 use App\Http\Middleware\RequireTwoFactor;
 use App\Http\Middleware\ResolvePoste;
 use Illuminate\Http\Request;
@@ -70,7 +72,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/pilotage/badges/annuler', [PilotageController::class, 'annulerBadge'])->middleware('can:badges.annuler');
         Route::get('/pilotage/litiges', [PilotageController::class, 'litiges'])->middleware('can:litiges.decider');
         Route::post('/pilotage/litiges/{refusal}/decision', [PilotageController::class, 'decider'])->whereUuid('refusal')->middleware('can:litiges.decider');
-        Route::get('/pilotage/groupes', [PilotageController::class, 'groupes'])->middleware(['can:groupes.suivre', 'can:cars.suivre']);
+        Route::get('/pilotage/groupes', [PilotageController::class, 'groupes'])->middleware(['can:groupes.suivre', 'can:cars.suivre', EnsureF06Active::class]);
         Route::get('/pilotage/evacuation', [PilotageController::class, 'evacuation'])->middleware('can:presences.consulter');
         Route::get('/pilotage/api/evacuation', [PilotageController::class, 'evacuationData'])->middleware('can:presences.consulter');
         Route::get('/administration/invites', [AdminVisitorsController::class, 'index'])->middleware('can:listes.importer');
@@ -105,7 +107,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::middleware(EnsureAgentAccueil::class)->group(function (): void {
             Route::get('/poste', PosteController::class)->middleware('can:visiteurs.rechercher');
             Route::get('/controle', ControleController::class)->middleware('can:badges.controler');
-            Route::get('/groupe', fn () => Inertia::render('Groupe'))->middleware('can:groupes.appel_nominal');
+            Route::get('/groupe', fn () => Inertia::render('Groupe'))->middleware(['can:groupes.appel_nominal', EnsureF06Active::class]);
             Route::get('/poste/api/postes', [PosteApiController::class, 'postes'])->middleware('can:visiteurs.rechercher');
             Route::post('/poste/api/enroler', [PosteSyncController::class, 'enroler'])->middleware('can:visiteurs.rechercher');
             Route::middleware(ResolvePoste::class)->group(function (): void {
@@ -149,6 +151,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/demonstration/generer', [DemoLabController::class, 'generate'])->middleware(['can:comptes.gerer', 'throttle:5,1']);
         Route::post('/administration/demonstration/remettre-a-zero', [DemoLabController::class, 'reset'])->middleware(['can:comptes.gerer', 'throttle:3,1']);
         Route::post('/administration/demonstration/{event}/nettoyer', [DemoLabController::class, 'clear'])->whereUuid('event')->middleware(['can:comptes.gerer', 'throttle:3,1']);
+        Route::get('/administration/modules', [ModulesController::class, 'index'])->middleware('can:comptes.gerer');
+        Route::put('/administration/modules/F06', [ModulesController::class, 'update'])->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
         Route::get('/administration/evenements', [EventsController::class, 'index'])->middleware('can:evenements.gerer');
         Route::post('/administration/evenements', [EventsController::class, 'store'])->middleware('can:evenements.gerer');
@@ -169,13 +173,13 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/conservation', [RetentionController::class, 'update'])->middleware('can:comptes.gerer');
         Route::get('/administration/journal/exporter', JournalExportController::class)->middleware(['can:journal.exporter', 'throttle:exports']);
         Route::get('/administration/journal', JournalController::class)->middleware('can:journal.consulter');
-        Route::get('/administration/groupes', [GroupesController::class, 'index'])->middleware('can:groupes.gerer');
-        Route::post('/administration/groupes', [GroupesController::class, 'store'])->middleware('can:groupes.gerer');
-        Route::put('/administration/groupes/reglage', [GroupesController::class, 'mode'])->middleware('can:groupes.gerer');
-        Route::put('/administration/groupes/{group}/encadreur', [GroupesController::class, 'designate'])->whereUuid('group')->middleware('can:groupes.gerer');
-        Route::post('/administration/groupes/{group}/stagiaires', [GroupesController::class, 'attach'])->whereUuid('group')->middleware('can:groupes.gerer');
-        Route::delete('/administration/groupes/{group}/stagiaires/{visitor}', [GroupesController::class, 'detach'])->whereUuid(['group', 'visitor'])->middleware('can:groupes.gerer');
-        Route::get('/mon-groupe', [MonGroupeController::class, 'index'])->middleware('can:groupes.confirmer_presence');
-        Route::post('/mon-groupe/{visitor}/confirmer', [MonGroupeController::class, 'confirm'])->whereUuid('visitor')->middleware('can:groupes.confirmer_presence');
+        Route::get('/administration/groupes', [GroupesController::class, 'index'])->middleware(['can:groupes.gerer', EnsureF06Active::class]);
+        Route::post('/administration/groupes', [GroupesController::class, 'store'])->middleware(['can:groupes.gerer', EnsureF06Active::class]);
+        Route::put('/administration/groupes/reglage', [GroupesController::class, 'mode'])->middleware(['can:groupes.gerer', EnsureF06Active::class]);
+        Route::put('/administration/groupes/{group}/encadreur', [GroupesController::class, 'designate'])->whereUuid('group')->middleware(['can:groupes.gerer', EnsureF06Active::class]);
+        Route::post('/administration/groupes/{group}/stagiaires', [GroupesController::class, 'attach'])->whereUuid('group')->middleware(['can:groupes.gerer', EnsureF06Active::class]);
+        Route::delete('/administration/groupes/{group}/stagiaires/{visitor}', [GroupesController::class, 'detach'])->whereUuid(['group', 'visitor'])->middleware(['can:groupes.gerer', EnsureF06Active::class]);
+        Route::get('/mon-groupe', [MonGroupeController::class, 'index'])->middleware(['can:groupes.confirmer_presence', EnsureF06Active::class]);
+        Route::post('/mon-groupe/{visitor}/confirmer', [MonGroupeController::class, 'confirm'])->whereUuid('visitor')->middleware(['can:groupes.confirmer_presence', EnsureF06Active::class]);
     });
 });
