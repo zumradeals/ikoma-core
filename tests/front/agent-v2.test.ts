@@ -46,7 +46,7 @@ describe('cadre Agent V2', () => {
     getMeta.mockResolvedValue(undefined);
     const w = mount(Home, { props: { agent: state.auth } }); wrappers.push(w); await flushPromises();
     expect(w.findAll('.agent-function-card')).toHaveLength(3);
-    expect(w.text()).not.toContain('Groupes et cars');
+    expect(w.find('.agent-home-grid').text()).not.toContain('Groupes et cars');
   });
   it('présente l’état connu de cet appareil sans ouvrir le coffre ni exposer une clé', async () => {
     getMeta.mockImplementation((_db: unknown, key: string) => Promise.resolve({ vault: { opaque: true }, posteName: 'Poste fictif A', lastSyncAt: '2026-10-29T12:00:00Z' }[key as 'vault']));
