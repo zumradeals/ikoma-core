@@ -18,7 +18,9 @@ final class Groups
 {
     public const MODES = ['identite', 'encadreur'];
 
-    public function __construct(private readonly Audit $audit, private readonly BadgeService $badges, private readonly Alerts $alerts) {}
+    public function __construct(private readonly Audit $audit, private readonly BadgeService $badges, private readonly Alerts $alerts)
+    {
+    }
 
     public function mode(): string
     {
@@ -54,7 +56,7 @@ final class Groups
 
     private function assertSupervisor(?string $userId): void
     {
-        if ($userId !== null && ! User::query()->where('id', $userId)->where('active', true)->get()->contains(fn (User $u) => $u->hasRole('encadreur'))) {
+        if ($userId !== null && User::query()->where('id', $userId)->where('active', true)->get()->contains(fn (User $u) => $u->hasRole('encadreur')) === false) {
             throw new DeskRefused('encadreur_invalide', 'Le compte désigné doit être un encadreur actif.');
         }
     }
@@ -171,7 +173,7 @@ final class Groups
                 return ['checked' => true, 'mode' => (string) ($member->check_mode ?? $mode)];
             }
             if ($mode === 'identite') {
-                if (! $identityChecked) {
+                if ($identityChecked === false) {
                     throw new DeskRefused('identite_non_cochee', 'Cochez « pièce d’identité contrôlée » après avoir vérifié la pièce.');
                 }
                 DB::table('identity_checks')->insert(['id' => (string) Str::uuid(), 'visitor_id' => $visitorId, 'actor_id' => $agent->id, 'checked_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
