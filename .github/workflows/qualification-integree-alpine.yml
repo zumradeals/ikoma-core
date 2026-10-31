@@ -1,0 +1,126 @@
+name: S0.2 — Recette intégrée Alpine (isolée)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-integree-alpine.yml'
+      - 'docker/qualification/postgres-integrated-alpine.Dockerfile'
+      - 'scripts/security/prepare-integrated-alpine.py'
+      - 'scripts/security/qualify-integrated-alpine.py'
+      - 'scripts/security/verify-integrated-php.php'
+      - 'docs/security/S0.2-QUALIFICATION-INTEGREE-ALPINE.md'
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-alpine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+      - name: Préparer un espace Git totalement indépendant
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/ikoma-alpine-integrated"
+          mkdir -p "$RUNNER_TEMP/critical-integrated"
+          git worktree add --detach "$dir" HEAD
+          python3 scripts/security/prepare-integrated-alpine.py "$dir"
+          echo "IKOMA_QUALIFICATION_DIR=$dir" >> "$GITHUB_ENV"
+      - name: Construire PostgreSQL 18.6 Alpine avec mises à jour officielles
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_QUALIFICATION_DIR"
+          docker build --pull -f docker/qualification/postgres-integrated-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
+      - name: Générer des clés fictives de sauvegarde, hors des artefacts
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/ikoma-alpine-gnupg"
+          mkdir -m 0700 "$GNUPGHOME"
+          gpg --batch --passphrase '' --quick-generate-key 'Recette fictive Alpine <test@exemple.test>' rsa3072 encrypt never
+          gpg --armor --export > "$RUNNER_TEMP/ikoma-alpine-public.asc"
+          gpg --batch --pinentry-mode loopback --passphrase '' --armor --export-secret-keys > "$RUNNER_TEMP/ikoma-alpine-private.asc"
+      - name: Installer la version complète IKOMA ACCESS sur Alpine
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_QUALIFICATION_DIR"
+          if ! bash deploy/prod/install.sh --domaine localhost --tls autosigne --cle-sauvegarde "$RUNNER_TEMP/ikoma-alpine-public.asc" --ports 18080:18443 --sans-planification > "$RUNNER_TEMP/alpine-install-private.log" 2>&1; then
+            echo 'ÉCHEC installation; seules les étapes de recette sont publiées.'
+            grep '^==>' "$RUNNER_TEMP/alpine-install-private.log" | tail -20 || true
+            exit 1
+          fi
+          echo 'Installation, migrations et démarrage : réussis.'
+      - name: Recette métier production (installation, F06, sauvegarde, restauration, rollback)
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_QUALIFICATION_DIR"
+          if ! bash deploy/prod/ci-recette.sh "$RUNNER_TEMP/ikoma-alpine-private.asc" > "$RUNNER_TEMP/alpine-recette-private.log" 2>&1; then
+            echo 'ÉCHEC recette; seules les étapes de recette sont publiées.'
+            grep '^==>' "$RUNNER_TEMP/alpine-recette-private.log" | tail -25 || true
+            exit 1
+          fi
+          dc=(docker compose --project-directory "$PWD" --env-file "$PWD/prod-data/env" -f "$PWD/docker-compose.prod.yml")
+          test "$("${dc[@]}" exec -T db psql -U ikoma -d ikoma -Atqc "SELECT value FROM settings WHERE key='module_f06_active'")" = 0
+          "${dc[@]}" exec -T db psql -U ikoma -d ikoma -Atqc "SHOW lc_collate; SHOW lc_ctype; SHOW server_encoding;" > "$RUNNER_TEMP/critical-integrated/collation.txt"
+          "${dc[@]}" exec -T db psql -U ikoma -d ikoma -Atqc "SELECT extname FROM pg_extension ORDER BY extname;" > "$RUNNER_TEMP/critical-integrated/pg-extensions.txt"
+          test "$("${dc[@]}" exec -T php id -u)" = 10001
+          echo 'Recette, restauration, rollback, F06 désactivé : réussis.'
+      - name: Vérifier OpenSpout XLSX, CSV, libxml, MIME et extensions sur PHP final
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_QUALIFICATION_DIR"
+          dc=(docker compose --project-directory "$PWD" --env-file "$PWD/prod-data/env" -f "$PWD/docker-compose.prod.yml")
+          image=$(docker inspect --format '{{.Image}}' "$("${dc[@]}" ps -q php)")
+          docker run --rm -i --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,size=32m --entrypoint php "$image" /dev/stdin < scripts/security/verify-integrated-php.php > "$RUNNER_TEMP/critical-integrated/php-fixtures.json"
+      - name: Installer Trivy vérifié
+        run: sh scripts/security/install-tools.sh
+      - name: Scanner les trois images réellement exécutées
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_QUALIFICATION_DIR"
+          dc=(docker compose --project-directory "$PWD" --env-file "$PWD/prod-data/env" -f "$PWD/docker-compose.prod.yml")
+          dir="$RUNNER_TEMP/ikoma-alpine-private-scan"
+          mkdir -p "$dir"
+          echo '{}' > "$dir/empty-config.yaml"
+          : > "$dir/empty-ignore"
+          for service in php db nginx; do
+            container=$("${dc[@]}" ps -q "$service")
+            test -n "$container"
+            image=$(docker inspect --format '{{.Image}}' "$container")
+            echo "$image" > "$dir/image-$service-id.txt"
+            /tmp/ikoma-security-tools/trivy image --config "$dir/empty-config.yaml" \
+              --image-src docker --ignorefile "$dir/empty-ignore" --scanners vuln \
+              --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --format json --exit-code 0 \
+              --output "$dir/trivy-$service.json" "$image"
+          done
+      - name: Qualifier les symboles du gosu réellement exécuté sur Alpine
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_QUALIFICATION_DIR"
+          dc=(docker compose --project-directory "$PWD" --env-file "$PWD/prod-data/env" -f "$PWD/docker-compose.prod.yml")
+          container=$("${dc[@]}" ps -q db)
+          dir="$RUNNER_TEMP/ikoma-alpine-private-scan"
+          docker cp "$container:/usr/local/bin/gosu" "$dir/alpine-gosu"
+          go version -m "$dir/alpine-gosu" > "$dir/alpine-gosu-version.txt"
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          curl -fsSL --retry 3 https://vuln.go.dev/ID/GO-2026-4337.json -o "$dir/GO-2026-4337.json"
+          "$(go env GOPATH)/bin/govulncheck" -mode=binary -json "$dir/alpine-gosu" > "$dir/govulncheck.json"
+          python3 scripts/security/qualify-integrated-alpine.py "$dir" "$RUNNER_TEMP/critical-integrated/resultats.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-integree-alpine
+          path: ${{ runner.temp }}/critical-integrated/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Détruire les seuls conteneurs et volumes fictifs
+        if: always()
+        run: |
+          if [ -n "${IKOMA_QUALIFICATION_DIR:-}" ] && [ -f "$IKOMA_QUALIFICATION_DIR/prod-data/env" ]; then
+            docker compose --project-directory "$IKOMA_QUALIFICATION_DIR" --env-file "$IKOMA_QUALIFICATION_DIR/prod-data/env" -f "$IKOMA_QUALIFICATION_DIR/docker-compose.prod.yml" down -v || true
+          fi
