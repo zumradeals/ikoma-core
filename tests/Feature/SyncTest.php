@@ -84,6 +84,20 @@ function syncAudit(): Builder
     return DB::table('audit_logs')->where('id', '>', test()->auditStart);
 }
 
+it('met en conflit une opération F06 issue d’une ancienne tablette sans effacer son historique', function () {
+    $old = syncOp('groupe_controle', [
+        'group_id' => DemoSeeder::id('group'),
+        'visitor_id' => DemoSeeder::id('visitor2'),
+        'identity_checked' => true,
+    ], $this->agent, 1);
+    $this->postJson('/poste/api/sync', ['operations' => [$old]], syncHeaders())
+        ->assertOk()->assertJsonPath('summary.conflicts', 1)
+        ->assertJsonPath('results.0.code', 'module_f06_inactif');
+    expect(DB::table('sync_conflicts')->where('reason', 'module_f06_inactif')->count())->toBe(1)
+        ->and(DB::table('sync_operations')->where('id', $old['id'])->exists())->toBeTrue();
+    $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->assertJsonPath('settings.f06_active', false);
+});
+
 it('refuse un appareil sans jeton, non enrôlé ou révoqué, sur la liste comme sur la synchronisation', function () {
     $this->getJson('/poste/api/liste')->assertStatus(422)->assertJson(['code' => 'poste_requis']);
     $this->postJson('/poste/api/sync', ['operations' => []], [])->assertStatus(422);
