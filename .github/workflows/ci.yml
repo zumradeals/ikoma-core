@@ -125,6 +125,17 @@ jobs:
         run: bash deploy/prod/install.sh --domaine localhost --tls autosigne --cle-sauvegarde "$RUNNER_TEMP/cle-publique.asc" --ports 8080:8443 --sans-planification
       - name: Recette de production
         run: bash deploy/prod/ci-recette.sh "$RUNNER_TEMP/cle-privee.asc"
+      - name: R03 — Vérifier PHP, ses extensions et les traitements de fichiers sur l'image finale
+        run: |
+          mkdir -p security-r03
+          image=$(docker inspect --format '{{.Image}}' "$(docker compose --env-file prod-data/env -f docker-compose.prod.yml ps -q php)")
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m,mode=1777 -v "$PWD/scripts/security/php-runtime-probe.php:/probe.php:ro" --entrypoint php "$image" /probe.php "$image" > security-r03/php-runtime.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r03-runtime
+          path: security-r03/
+          if-no-files-found: error
       - name: Installer les outils d’analyse vérifiés
         if: ${{ !cancelled() }}
         run: sh scripts/security/install-tools.sh
