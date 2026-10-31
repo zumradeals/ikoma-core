@@ -29,6 +29,7 @@ final class Groups
 
     public function create(string $eventId, string $name, ?string $bus, ?string $supervisorId, User $actor): string
     {
+        app(FoundingModules::class)->requireF06();
         $this->assertSupervisor($supervisorId);
         $id = (string) Str::uuid();
         DB::transaction(function () use ($id, $eventId, $name, $bus, $supervisorId, $actor): void {
@@ -41,6 +42,7 @@ final class Groups
 
     public function designate(string $groupId, ?string $supervisorId, User $actor): void
     {
+        app(FoundingModules::class)->requireF06();
         $this->assertSupervisor($supervisorId);
         DB::table('groups')->where('id', $groupId)->update(['supervisor_id' => $supervisorId, 'updated_at' => now()]);
         $this->audit->append('groupe.encadreur_designe', $actor->id, ['group_id' => $groupId, 'encadreur_id' => $supervisorId]);
@@ -56,6 +58,7 @@ final class Groups
     /** Rattache un stagiaire au groupe : refusé s'il appartient déjà à un groupe (le même ou un autre). */
     public function attach(string $groupId, string $visitorId, User $actor): void
     {
+        app(FoundingModules::class)->requireF06();
         DB::transaction(function () use ($groupId, $visitorId, $actor): void {
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
             $visitor = DB::table('visitors')->where('id', $visitorId)->where('event_id', $group->event_id)->lockForUpdate()->first() ?? throw new DeskRefused('visiteur_inconnu', 'Visiteur introuvable pour cet événement.', 404);
@@ -71,6 +74,7 @@ final class Groups
     /** Retire un stagiaire d'un groupe, tant qu'aucun badge ne lui a été remis. */
     public function detach(string $groupId, string $visitorId, User $actor): void
     {
+        app(FoundingModules::class)->requireF06();
         DB::transaction(function () use ($groupId, $visitorId, $actor): void {
             if (DB::table('badge_assignments')->where('visitor_id', $visitorId)->whereNull('returned_at')->whereNull('cancelled_at')->exists()) {
                 throw new DeskRefused('badge_remis', 'Un badge a déjà été remis à cette personne : elle ne peut plus être retirée du groupe.', 409);
@@ -84,6 +88,7 @@ final class Groups
     /** Crée les lignes de suivi manquantes (stagiaires rattachés par une importation, par exemple). */
     public function ensureMembers(string $groupId): void
     {
+        app(FoundingModules::class)->requireF06();
         DB::statement('INSERT INTO group_members (id, group_id, visitor_id, created_at, updated_at) SELECT gen_random_uuid(), v.group_id, v.id, now(), now() FROM visitors v WHERE v.group_id = ? AND v.withdrawn_at IS NULL AND NOT EXISTS (SELECT 1 FROM group_members m WHERE m.visitor_id = v.id) ON CONFLICT DO NOTHING', [$groupId]);
     }
 
@@ -94,6 +99,7 @@ final class Groups
      */
     public function state(string $groupId): array
     {
+        app(FoundingModules::class)->requireF06();
         $this->ensureMembers($groupId);
         $group = DB::table('groups')->where('id', $groupId)->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
         $members = DB::select(
@@ -145,6 +151,7 @@ final class Groups
      */
     public function check(User $agent, string $groupId, string $visitorId, bool $identityChecked = false): array
     {
+        app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($agent, $groupId, $visitorId, $identityChecked): array {
             $this->open($groupId, $agent);
             $member = $this->member($groupId, $visitorId);
@@ -172,6 +179,7 @@ final class Groups
     /** Confirmation de présence par l'encadreur de ce groupe (contrôle d'accès par objet : jamais un autre groupe). */
     public function confirm(User $encadreur, string $groupId, string $visitorId): void
     {
+        app(FoundingModules::class)->requireF06();
         DB::transaction(function () use ($encadreur, $groupId, $visitorId): void {
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first();
             if ($group === null || $group->supervisor_id !== $encadreur->id) {
@@ -196,6 +204,7 @@ final class Groups
      */
     public function deliver(?Device $device, User $agent, string $groupId, string $visitorId, string $code): array
     {
+        app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($device, $agent, $groupId, $visitorId, $code): array {
             $group = $this->open($groupId, $agent);
             $member = $this->member($groupId, $visitorId);
@@ -237,6 +246,7 @@ final class Groups
      */
     public function depart(User $agent, string $groupId): array
     {
+        app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($agent, $groupId): array {
             $group = $this->open($groupId, $agent);
             $this->ensureMembers($groupId);
@@ -268,6 +278,7 @@ final class Groups
      */
     public function arrive(Device $device, User $agent, string $code, ?string $declaredAt = null): array
     {
+        app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($device, $agent, $code, $declaredAt): array {
             $input = trim($code);
             if (str_starts_with($input, QrSvg::PREFIX)) {
@@ -311,6 +322,7 @@ final class Groups
      */
     public function finishArrival(User $agent, string $groupId): array
     {
+        app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($groupId): array {
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
             $arrived = (int) $this->activeMembers($groupId)->whereNotNull('arrived_at')->count();
