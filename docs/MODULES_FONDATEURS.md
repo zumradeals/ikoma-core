@@ -61,11 +61,12 @@ Deux états différents ne doivent **jamais être confondus** :
    d'achat de F06 ou de retrait à la carte de son droit d'utilisation.
 2. **État d'exploitation (activation)** : F06 peut être **actif** ou
    **inactif** sur l'installation cliente, suivant la décision d'un
-   administrateur dûment autorisé. Son état initial pour une nouvelle
-   installation reste **à valider** ; la ratification présente n'invente
-   pas une valeur par défaut.
+   administrateur dûment autorisé. **L'état initial d'une installation neuve
+   est INACTIF, selon la décision complémentaire du dirigeant du 31/10/2026.**
+   Une mise à niveau d'une installation possédant déjà des groupes conserve
+   F06 actif, afin d'éviter d'interrompre une exploitation en cours.
 
-### 3.1. Exigences futures de conception, pas une fonctionnalité annoncée comme déjà livrée
+### 3.1. Contrat d'exploitation de l'activation F06
 
 - Le contrôle est administrable par une interface explicite « Modules »,
   sans accès technique ou modification de configuration serveur.
@@ -94,12 +95,21 @@ Deux états différents ne doivent **jamais être confondus** :
   licence standard reste valide et que les conditions de sécurité le
   permettent.
 
-**Ce contrat n'est pas l'implémentation** du mécanisme d'activation.
-L'inventaire des dépendances (groupes, cars, agents, alertes, tableaux de bord,
-synchronisation) et les tests d'acceptation feront l'objet d'un lot
-d'implémentation séparé et autorisé.
+**Implémentation dans la présente PR :** un réglage persistant côté serveur
+`module_f06_active` (installation neuve : `0`), un écran
+`Administration → Modules`, une confirmation textuelle, un audit,
+les protections des parcours HTTP et métier et une version de
+snapshot tablette intégrant l'état de F06. Si des opérations collectives
+ont déjà commencé et ne sont pas clôturées, la désactivation est
+refusée. Une tablette ayant une ancienne copie non synchronisée
+peut produire un conflit : le serveur le conserve et le journalise
+au lieu d'accepter une opération pourtant désactivée.
 
-### 3.2. Critères d'acceptation du futur mécanisme
+L'activation n'est **pas** un mécanisme de licence payante ou
+de permission individuelle. Le passage en production requiert
+la vérification CI et une recette avec des appareils réels.
+
+### 3.2. Critères d'acceptation
 
 - Une installation valide comporte F01–F09 comme droits contractuels,
   quel que soit l'état d'activation de F06.
