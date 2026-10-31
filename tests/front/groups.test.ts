@@ -21,7 +21,7 @@ async function snapshot(mode: 'identite' | 'encadreur' = 'encadreur'): Promise<S
   const token = (n: number) => `${n}`.repeat(64).slice(0, 64);
   return {
     version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette cars', station: 'Poste cars', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
-    settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, controle_stagiaires: mode }, categories: [stagiaire], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }], category_zone: [{ category_id: 'c2', zone_id: 'z1' }],
+    settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, controle_stagiaires: mode, f06_active: true }, categories: [stagiaire], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }], category_zone: [{ category_id: 'c2', zone_id: 'z1' }],
     hosts: [], postes: [{ id: 'p1', name: 'Poste cars' }], visitors, members,
     groups: [{ id: 'g1', name: 'Groupe fictif', bus_number: 'Car 1', opened: false, departed: false, arrival_closed: false }],
     badges: [
