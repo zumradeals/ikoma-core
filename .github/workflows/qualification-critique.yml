@@ -30,14 +30,15 @@ jobs:
       - name: Démarrer PostgreSQL 18.6 Alpine en recette entièrement isolée
         run: |
           set -euo pipefail
-          docker pull postgres:18.6-alpine3.24
-          docker image inspect postgres:18.6-alpine3.24 --format '{{.Id}}' > critical-alpine/postgres-image-id.txt
-          docker run -d --rm --name ikoma-qualif-db --network none --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m -e POSTGRES_PASSWORD=donnees-fictives-uniquement postgres:18.6-alpine3.24
+          docker build --pull --file docker/qualification/postgres-alpine.Dockerfile --tag ikoma-qualification-postgres:alpine3.24 .
+          docker image inspect ikoma-qualification-postgres:alpine3.24 --format '{{.Id}}' > critical-alpine/postgres-image-id.txt
+          docker run -d --rm --name ikoma-qualif-db --network none --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m -e POSTGRES_PASSWORD=donnees-fictives-uniquement ikoma-qualification-postgres:alpine3.24
           for n in $(seq 1 45); do
             if docker exec ikoma-qualif-db pg_isready -U postgres -d postgres >/dev/null 2>&1; then break; fi
             sleep 2
           done
           docker exec ikoma-qualif-db pg_isready -U postgres -d postgres
+          docker exec ikoma-qualif-db postgres --version | grep -F 'PostgreSQL) 18.6'
           docker exec ikoma-qualif-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE TABLE ikoma_fixture (id integer PRIMARY KEY, label text);'
           docker exec ikoma-qualif-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "INSERT INTO ikoma_fixture VALUES (1, 'fictif');"
           docker exec ikoma-qualif-db pg_dump -U postgres -d postgres -Fc > "$RUNNER_TEMP/ikoma-fixture.dump"
@@ -58,7 +59,7 @@ jobs:
           printf '{}\n' > "$RUNNER_TEMP/trivy-empty.yaml"
           : > "$RUNNER_TEMP/trivy-empty-ignore"
           for service in php postgres; do
-            if [ "$service" = php ]; then image=ikoma-qualification-php:alpine3.24; else image=postgres:18.6-alpine3.24; fi
+            if [ "$service" = php ]; then image=ikoma-qualification-php:alpine3.24; else image=ikoma-qualification-postgres:alpine3.24; fi
             /tmp/ikoma-security-tools/trivy image --config "$RUNNER_TEMP/trivy-empty.yaml" --image-src docker --ignorefile "$RUNNER_TEMP/trivy-empty-ignore" --ignore-unfixed=false --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --format json --exit-code 0 --output "$RUNNER_TEMP/trivy-$service.json" "$image"
           done
           python3 scripts/security/qualify-critical.py alpine --php "$RUNNER_TEMP/trivy-php.json" --postgres "$RUNNER_TEMP/trivy-postgres.json" --output critical-alpine/candidate-summary.json
