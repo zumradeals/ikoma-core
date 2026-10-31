@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\Pilotage;
 use App\Services\FoundingModules;
+use App\Services\Pilotage;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
