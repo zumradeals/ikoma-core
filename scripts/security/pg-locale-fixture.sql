@@ -10,7 +10,7 @@ CREATE INDEX fixture_btree_idx ON ikoma_name_fixture(name);
 CREATE INDEX fixture_trgm_idx ON ikoma_name_fixture USING gin(name gin_trgm_ops);
 SELECT 'server_version|' || current_setting('server_version');
 SELECT 'locale|' || datcollate || ';' || datctype FROM pg_database WHERE datname=current_database();
-SELECT 'provider|' || datlocprovider FROM pg_database WHERE datname=current_database();
+SELECT 'provider|' || datlocprovider::text FROM pg_database WHERE datname=current_database();
 SELECT 'encoding|' || current_setting('server_encoding');
 SELECT 'sort|' || string_agg(name,';' ORDER BY name) FROM ikoma_name_fixture;
 SELECT 'unaccent|' || string_agg(unaccent(name),';' ORDER BY name) FROM ikoma_name_fixture;
