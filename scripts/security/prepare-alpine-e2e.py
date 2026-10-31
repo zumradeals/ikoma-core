@@ -40,7 +40,14 @@ text=compose.read_text()
 old="image: postgres:18.6-trixie"
 if text.count(old)!=1:raise SystemExit("STOP: PostgreSQL dev base contract changed")
 compose.write_text(text.replace(old,"image: ikoma-qualification-postgres:18.6-alpine3.24"))
-git("add","docker/php/Dockerfile","docker-compose.yml")
+# Première passe de diagnostic : arrêt au premier échec réel, sans 40 minutes de retries supplémentaires.
+# Le passage complet sera relancé après correction ; modification limitée au worktree éphémère.
+playwright=root/"playwright.config.ts"
+config=playwright.read_text()
+if config.count("workers: 1,")!=1:
+    raise SystemExit("STOP: Playwright configuration contract changed")
+playwright.write_text(config.replace("workers: 1,","workers: 1, maxFailures: 1,",1))
+git("add","docker/php/Dockerfile","docker-compose.yml","playwright.config.ts")
 subprocess.check_call(("git","-C",str(root),"-c","user.name=IKOMA Qualification",
     "-c","user.email=ci@invalid.example","commit","-m","Temporary Alpine E2E fixture - not deliverable"),
     stdout=subprocess.DEVNULL)
