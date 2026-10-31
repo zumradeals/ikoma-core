@@ -20,6 +20,7 @@ final class Groups
 
     public function __construct(private readonly Audit $audit, private readonly BadgeService $badges, private readonly Alerts $alerts)
     {
+        // Dépendances métier injectées à la construction, sans effet de bord.
     }
 
     public function mode(): string
@@ -216,6 +217,7 @@ final class Groups
     public function deliver(?Device $device, User $agent, string $groupId, string $visitorId, string $code): array
     {
         app(FoundingModules::class)->requireF06();
+
         return DB::transaction(function () use ($device, $agent, $groupId, $visitorId, $code): array {
             app(FoundingModules::class)->requireF06();
             $group = $this->open($groupId, $agent);
@@ -259,6 +261,7 @@ final class Groups
     public function depart(User $agent, string $groupId): array
     {
         app(FoundingModules::class)->requireF06();
+
         return DB::transaction(function () use ($agent, $groupId): array {
             app(FoundingModules::class)->requireF06();
             $group = $this->open($groupId, $agent);
@@ -292,6 +295,7 @@ final class Groups
     public function arrive(Device $device, User $agent, string $code, ?string $declaredAt = null): array
     {
         app(FoundingModules::class)->requireF06();
+
         return DB::transaction(function () use ($device, $agent, $code, $declaredAt): array {
             app(FoundingModules::class)->requireF06();
             $input = trim($code);
@@ -337,6 +341,7 @@ final class Groups
     public function finishArrival(User $agent, string $groupId): array
     {
         app(FoundingModules::class)->requireF06();
+
         return DB::transaction(function () use ($groupId): array {
             app(FoundingModules::class)->requireF06();
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
