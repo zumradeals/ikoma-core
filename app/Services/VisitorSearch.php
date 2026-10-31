@@ -101,7 +101,7 @@ final class VisitorSearch
             ."(SELECT count(*) FROM visitors o WHERE o.event_id = v.event_id AND o.withdrawn_at IS NULL AND public.ikoma_normalize(o.full_name) = $name) AS homonyms "
             .'FROM visitors v JOIN categories c ON c.id = v.category_id LEFT JOIN hosts h ON h.id = v.host_id '
             .'WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND '.implode(' AND ', $where)
-            .' ORDER BY round((('.implode(' + ', $score).') / ?)::numeric, 1) DESC, c.priority_circuit DESC, ('.implode(' + ', $score)') DESC, v.full_name COLLATE "C", v.id LIMIT 10';
+            .' ORDER BY round((('.implode(' + ', $score).') / ?)::numeric, 1) DESC, c.priority_circuit DESC, ('.implode(' + ', $score).') DESC, v.full_name COLLATE "C", v.id LIMIT 10';
         // Le seuil ne vaut que pour cette transaction ; paramètres toujours liés.
         $rows = DB::transaction(function () use ($sql, $eventId, $bindings, $scoreBindings, $tokens) {
             DB::statement("SELECT set_config('pg_trgm.word_similarity_threshold', ?, true)", [self::FUZZY_THRESHOLD]);
