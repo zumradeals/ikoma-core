@@ -75,4 +75,15 @@ export function searchIndex(entries: Indexed[], query: string, limit = 10): Inde
   return scored.slice(0, limit).map(s => s.entry);
 }
 
-function compare(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }
+/** Même ordre de points de code Unicode que PostgreSQL UTF-8 COLLATE "C".
+ * Comparer des unités UTF-16 (<, >) inverse l'ordre des caractères hors BMP face à U+E000-U+FFFF. */
+function compare(a: string, b: string): number {
+  const left = Array.from(a);
+  const right = Array.from(b);
+  for (let i = 0; i < Math.min(left.length, right.length); i++) {
+    const x = left[i].codePointAt(0)!;
+    const y = right[i].codePointAt(0)!;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return Math.sign(left.length - right.length);
+}
