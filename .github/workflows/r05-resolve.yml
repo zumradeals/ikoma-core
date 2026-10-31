@@ -11,8 +11,8 @@ jobs:
       - name: Résoudre Mime avec le runtime et Composer déjà utilisés par le projet
         run: |
           docker compose build php
-          docker compose run --rm --no-deps php composer update symfony/mime:7.4.22 --no-install --no-scripts --no-interaction
-          docker compose run --rm --no-deps php composer validate --strict --no-check-publish
+          docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer php composer update symfony/mime:7.4.22 --no-install --no-scripts --no-interaction
+          docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer php composer validate --no-check-publish
           sha256sum composer.lock > composer-lock.sha256
       - uses: actions/upload-artifact@v4
         with:
