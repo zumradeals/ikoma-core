@@ -1,0 +1,66 @@
+name: S0.2 - Contrat portable de tri des noms PostgreSQL (laboratoire)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-tri-postgres.yml'
+      - 'scripts/security/pg-sort-contract-setup.sql'
+      - 'scripts/security/pg-sort-contract-query.sql'
+      - 'scripts/security/compare-sort-contract.py'
+      - 'docs/security/S0.2-CONTRAT-TRI-RECHERCHE-POSTGRES.md'
+
+permissions:
+  contents: read
+
+jobs:
+  sort-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Charger les bases officielles de recette PostgreSQL 18.6
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/portable-names" "$RUNNER_TEMP/private-dumps"
+          docker pull postgres:18.6-trixie
+          docker build --pull -f docker/qualification/postgres-integrated-alpine.Dockerfile -t ikoma-pg-qualification:18.6-alpine3.24 .
+      - name: Comparer les ordres puis reconstruire les index et restaurer sur bases fictives
+        run: |
+          set -euo pipefail
+          for base in debian alpine; do
+            if [ "$base" = debian ]; then image=postgres:18.6-trixie; else image=ikoma-pg-qualification:18.6-alpine3.24; fi
+            docker image inspect "$image" --format '{{.Id}}' > "$RUNNER_TEMP/portable-names/$base-image-id.txt"
+            docker run -d --rm --name "ikoma-portable-$base" --network none \
+              --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m \
+              -e POSTGRES_PASSWORD=uniquement-fictif -e POSTGRES_DB=ikoma_sort_test "$image" >/dev/null
+            ready=0
+            for i in $(seq 1 40); do
+              if docker exec "ikoma-portable-$base" pg_isready -U postgres -d ikoma_sort_test >/dev/null 2>&1; then ready=1; break; fi
+              sleep 2
+            done
+            test "$ready" = 1
+            docker exec -i "ikoma-portable-$base" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_sort_test -q -f - < scripts/security/pg-sort-contract-setup.sql
+            docker exec -i "ikoma-portable-$base" psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d ikoma_sort_test -q -f - \
+              < scripts/security/pg-sort-contract-query.sql > "$RUNNER_TEMP/portable-names/$base-before.json"
+            docker exec "ikoma-portable-$base" pg_dump -U postgres -d ikoma_sort_test -Fc > "$RUNNER_TEMP/private-dumps/$base.dump"
+            test -s "$RUNNER_TEMP/private-dumps/$base.dump"
+            docker exec "ikoma-portable-$base" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_sort_test -c 'REINDEX TABLE public.ikoma_sort_fixture'
+            docker exec -i "ikoma-portable-$base" psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d ikoma_sort_test -q -f - \
+              < scripts/security/pg-sort-contract-query.sql > "$RUNNER_TEMP/portable-names/$base-reindexed.json"
+            docker exec "ikoma-portable-$base" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_sort_test -c 'DROP TABLE public.ikoma_sort_fixture'
+            docker exec -i "ikoma-portable-$base" pg_restore --clean --if-exists --no-owner -U postgres -d ikoma_sort_test \
+              < "$RUNNER_TEMP/private-dumps/$base.dump"
+            docker exec -i "ikoma-portable-$base" psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d ikoma_sort_test -q -f - \
+              < scripts/security/pg-sort-contract-query.sql > "$RUNNER_TEMP/portable-names/$base-restored.json"
+          done
+          python3 scripts/security/compare-sort-contract.py "$RUNNER_TEMP/portable-names"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contrat-tri-noms-debian-alpine
+          path: ${{ runner.temp }}/portable-names/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Nettoyer uniquement les conteneurs de la recette
+        if: always()
+        run: docker rm -f ikoma-portable-debian ikoma-portable-alpine >/dev/null 2>&1 || true
