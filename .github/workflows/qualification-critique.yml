@@ -42,7 +42,7 @@ jobs:
           docker exec ikoma-qualif-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "INSERT INTO ikoma_fixture VALUES (1, 'fictif');"
           docker exec ikoma-qualif-db pg_dump -U postgres -d postgres -Fc > "$RUNNER_TEMP/ikoma-fixture.dump"
           docker exec ikoma-qualif-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'TRUNCATE TABLE ikoma_fixture;'
-          docker exec -i ikoma-qualif-db pg_restore -U postgres -d postgres < "$RUNNER_TEMP/ikoma-fixture.dump"
+          docker exec -i ikoma-qualif-db pg_restore -U postgres -d postgres --clean --if-exists < "$RUNNER_TEMP/ikoma-fixture.dump"
           value=$(docker exec ikoma-qualif-db psql -U postgres -d postgres -Atqc 'SELECT count(*) FROM ikoma_fixture')
           test "$value" = 1
           docker exec ikoma-qualif-db psql -U postgres -d postgres -Atqc "SELECT current_setting('server_version'), current_setting('server_encoding');" | tee critical-alpine/postgres-version.txt
