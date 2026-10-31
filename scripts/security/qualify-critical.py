@@ -25,6 +25,14 @@ def trivy(path):
         "os": doc.get("Metadata", {}).get("OS"),
         "high": sum(x[3] == "HIGH" for x in items),
         "critical": sum(x[3] == "CRITICAL" for x in items),
+        "critical_findings": sorted([
+            {"cve": x[0], "package": x[1], "version": x[2]}
+            for x in items if x[3] == "CRITICAL"
+        ], key=lambda row: (row["cve"], row["package"])),
+        "high_findings": sorted([
+            {"cve": x[0], "package": x[1], "version": x[2]}
+            for x in items if x[3] == "HIGH"
+        ], key=lambda row: (row["cve"], row["package"])),
         "cve_2026_6653": sorted(set((v[1], v[2]) for v in items if v[0] == "CVE-2026-6653")),
         "cve_2025_68121": sorted(set((v[1], v[2]) for v in items if v[0] == "CVE-2025-68121")),
         "report_sha256": sha(path),
