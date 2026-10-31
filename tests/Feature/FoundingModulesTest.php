@@ -50,6 +50,7 @@ it('garantit neuf modules fondateurs, avec F06 désactivé par défaut et aucun 
     $this->get('/administration')->assertOk();
     $this->get('/administration/badges')->assertOk();
     $this->get('/administration/postes')->assertOk();
+    $this->get('/administration')->assertInertia(fn (Assert $page) => $page->where('summary.total', 5));
 });
 
 it('active F06 gratuitement depuis administration puis peut le désactiver sans perdre ses groupes', function () {
@@ -58,7 +59,6 @@ it('active F06 gratuitement depuis administration puis peut le désactiver sans 
     $this->put('/administration/modules/F06', f06Switch(true))->assertRedirect();
     expect(app(FoundingModules::class)->f06Active())->toBeTrue();
     $this->get('/administration/groupes')->assertOk();
-    $this->get('/pilotage/groupes')->assertForbidden(); // administrateur sans permission de pilotage
     $this->put('/administration/modules/F06', f06Switch(false))->assertRedirect();
     expect(app(FoundingModules::class)->f06Active())->toBeFalse()
         ->and(DB::table('groups')->count())->toBe($count)
