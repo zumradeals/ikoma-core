@@ -1,5 +1,11 @@
 <?php
 // Isolated final-PHP image fixture: NO app data, no email/network/credentials.
+use Composer\InstalledVersions;
+use OpenSpout\Reader\XLSX\Options as XLSXOptions;
+use OpenSpout\Reader\XLSX\Reader as XLSXReader;
+use RuntimeException;
+use ZipArchive;
+
 require '/var/www/html/vendor/autoload.php';
 
 foreach (['pdo_pgsql', 'mbstring', 'zip', 'xmlreader', 'gd', 'libxml'] as $name) {
@@ -10,7 +16,7 @@ foreach (['pdo_pgsql', 'mbstring', 'zip', 'xmlreader', 'gd', 'libxml'] as $name)
 if (version_compare(LIBXML_DOTTED_VERSION, '2.11.0', '<') || LIBXML_LOADED_VERSION < 21100) {
     throw new RuntimeException('libxml2 build/runtime not qualified for the tested CVE');
 }
-if (Composer\InstalledVersions::getPrettyVersion('symfony/mime') !== 'v7.4.22') {
+if (InstalledVersions::getPrettyVersion('symfony/mime') !== 'v7.4.22') {
     throw new RuntimeException('R05 Symfony Mime version no longer matches tested lock');
 }
 
@@ -31,7 +37,7 @@ foreach ($files as $name => $value) {
 }
 $zip->close();
 try {
-    $reader = new OpenSpout\Reader\XLSX\Reader(new OpenSpout\Reader\XLSX\Options());
+    $reader = new XLSXReader(new XLSXOptions());
     $reader->open($path);
     $values = [];
     try {
