@@ -1,0 +1,37 @@
+[
+  {
+    "alertRef": "10010",
+    "name": "Cookie No HttpOnly Flag",
+    "riskcode": "1",
+    "confidence": "2",
+    "count": "1"
+  },
+  {
+    "alertRef": "10109",
+    "name": "Modern Web Application",
+    "riskcode": "0",
+    "confidence": "2",
+    "count": "1"
+  },
+  {
+    "alertRef": "10049-1",
+    "name": "Non-Storable Content",
+    "riskcode": "0",
+    "confidence": "2",
+    "count": "2"
+  },
+  {
+    "alertRef": "10112",
+    "name": "Session Management Response Identified",
+    "riskcode": "0",
+    "confidence": "2",
+    "count": "3"
+  },
+  {
+    "alertRef": "10049-3",
+    "name": "Storable and Cacheable Content",
+    "riskcode": "0",
+    "confidence": "2",
+    "count": "5"
+  }
+]

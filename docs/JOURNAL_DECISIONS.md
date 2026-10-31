@@ -408,3 +408,18 @@ actuellement `"license": "MIT"` ; ce marqueur et les accords de contribution
 doivent être audités avant de prétendre concéder des droits exclusifs
 ou d'imposer des restrictions à des droits déjà consentis.
 
+## S0.1 — Diagnostic de sécurité uniquement (31 octobre 2026)
+
+Mission explicite du dirigeant après la PR #39 : gel des évolutions fonctionnelles,
+diagnostic documentaire depuis `c987326601133dac2233dab19c384d969cdfb335`,
+inventaire des rapports Actions 41196020670 et 41196943748 et préparation de S0.2.
+Aucun changement applicatif, Docker, dépendance, scanner ou CI ; aucune migration,
+livraison ou fusion autorisée dans S0.1. La PR documentaire et son diagnostic
+restent soumis à validation officielle avant toute remédiation.
+
+Les preuves distinguent les scans dev et finaux de recette production. Leurs
+résultats et limites sont consignés dans [le diagnostic](security/S0.1-DIAGNOSTIC.md),
+le registre CSV, l'état des contrôles et la matrice de remédiation. Les priorités
+et recommandations de ces documents sont des propositions, pas des décisions
+techniques exécutées ni une acceptation des risques résiduels.
+

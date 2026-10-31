@@ -1,0 +1,162 @@
+{
+  "date": "2026-10-31",
+  "reference": "c987326601133dac2233dab19c384d969cdfb335",
+  "runs": [
+    {
+      "contexte": "main",
+      "run": 41196943748,
+      "artefact": 13040383813,
+      "head_sha": "c987326601133dac2233dab19c384d969cdfb335",
+      "checkout_sha": "c987326601133dac2233dab19c384d969cdfb335",
+      "archive_sha256": "0b01ae5fe54b0edaa899ddbf5ffd2b6fd2909bb935c8240278aee56f0359f742",
+      "url": "https://github.com/zumradeals/ikoma-core/actions/runs/41196943748"
+    },
+    {
+      "contexte": "pr",
+      "run": 41196020670,
+      "artefact": 13040379314,
+      "head_sha": "9a0ec43f2d128c0555e6138f3c71de44117061fc",
+      "checkout_sha": "fa13a147597e6ee6f7d828bd778710608f6b12cc",
+      "archive_sha256": "6b9878aec7653041a51027c4b5d03283df79a7e5214ec0d0011820bc2bb5c324",
+      "url": "https://github.com/zumradeals/ikoma-core/actions/runs/41196020670"
+    }
+  ],
+  "fichiers_sources": [
+    {
+      "source": "main/composer.json",
+      "sha256": "67e029a60a382b6abf9b446989ae8f1400f3bebaba7e906e3d2df5a1c5848ca2",
+      "taille": 1379
+    },
+    {
+      "source": "main/image-db.json",
+      "sha256": "8f7737345cff607c463e61eb260a91717a2a88348ca4f545904bf5614e1dfcdb",
+      "taille": 1180462
+    },
+    {
+      "source": "main/image-nginx.json",
+      "sha256": "5209c34466e8844de9657fac0100d98cf1dbd77d9c0b6e312d582af52e3a0a32",
+      "taille": 69717
+    },
+    {
+      "source": "main/image-php.json",
+      "sha256": "2443f48721e3a8211b13ec13cdd0e307289c817ad05ea6d36a10d0272effa13d",
+      "taille": 1264148
+    },
+    {
+      "source": "main/npm.json",
+      "sha256": "dd45f502a91b9fb0d8bfe84890712fa2375cd44b1094c1f023f097c702c867cd",
+      "taille": 14387
+    },
+    {
+      "source": "main/secrets.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "taille": 3
+    },
+    {
+      "source": "main/zap.html",
+      "sha256": "e76a9f4c3fecccb141926d680f41d3cc498e351cda83b001567d2b58c4437249",
+      "taille": 45500
+    },
+    {
+      "source": "main/zap.json",
+      "sha256": "55b8d2585c747f07fa54a9400dbf01fe539a703e1076c544819176c75562220b",
+      "taille": 14128
+    },
+    {
+      "source": "main/zap.yaml",
+      "sha256": "801c327c7b9ec71d55cf219a8106ef3b0bb31a2d4ef5657944233b1e9caed1fc",
+      "taille": 831
+    },
+    {
+      "source": "pr/composer.json",
+      "sha256": "67e029a60a382b6abf9b446989ae8f1400f3bebaba7e906e3d2df5a1c5848ca2",
+      "taille": 1379
+    },
+    {
+      "source": "pr/image-db.json",
+      "sha256": "7cea69b691fec5e2c7dacc878bb8ffc4dd7b701c8995db5050feff94ef597fa4",
+      "taille": 1180462
+    },
+    {
+      "source": "pr/image-nginx.json",
+      "sha256": "d701b7ea7e3a6945621b07fa90329090e8ef147fc2acee67f2289439b461b0fa",
+      "taille": 69717
+    },
+    {
+      "source": "pr/image-php.json",
+      "sha256": "8c1932427a16931235c568a59bf512a1335ace20751e39a0d317e7c2751b9790",
+      "taille": 1264148
+    },
+    {
+      "source": "pr/npm.json",
+      "sha256": "0f163f7ff3d1dd2699e0efc162be8ac170c405165c07c0af64bef08552ef76d9",
+      "taille": 14388
+    },
+    {
+      "source": "pr/secrets.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "taille": 3
+    },
+    {
+      "source": "pr/zap.html",
+      "sha256": "77daed7c072e3c7403e998c7fae71a31c697d70069ae0ded98e2ee80733eabbe",
+      "taille": 44607
+    },
+    {
+      "source": "pr/zap.json",
+      "sha256": "87f3583da7c9536fc3432abfc6b0fc04d15b27eab3c924be55081ce74565890f",
+      "taille": 13871
+    },
+    {
+      "source": "pr/zap.yaml",
+      "sha256": "801c327c7b9ec71d55cf219a8106ef3b0bb31a2d4ef5657944233b1e9caed1fc",
+      "taille": 831
+    },
+    {
+      "source": "composer.lock",
+      "sha256": "5832cffc48604594101ea2eaf0f733a01a8916e17bf394d6525264838693874a"
+    },
+    {
+      "source": "package-lock.json",
+      "sha256": "2e29b6f0670e235addf19ed1e48762b8a6b1286a80747d1962580496e3292f57"
+    },
+    {
+      "source": "docker-compose.yml",
+      "sha256": "fc6e5843fa5ce6d03110edaac676829f3495fb52824eab683a49352ca5a92b75"
+    },
+    {
+      "source": "docker-compose.prod.yml",
+      "sha256": "c7f8412cec3739eccd214d4e5cced31ea81f044d8404b68f1be81ec3519e9b1e"
+    },
+    {
+      "source": "docker/php/Dockerfile",
+      "sha256": "68179a909bf60d4eb124d11c43456578d6efe2765ea9e5f07a843defece4f3af"
+    },
+    {
+      "source": "docker/prod/Dockerfile",
+      "sha256": "d2fb8c57d3b191d1a7f8b44efe521cf295cea0e67c469d8028ac6a6d41090f2a"
+    },
+    {
+      "source": ".github/workflows/ci.yml",
+      "sha256": "cb128c0e9d9738f5a5f6e3d094a4a3b33ea9a128ed95809dfabede48e45df17b"
+    }
+  ],
+  "comparaison_pr_main": {
+    "php": {
+      "constats_identiques": true,
+      "image_pr": "sha256:10fa95658748dc41c6c21e8ea83a9110ae0fad7aebad327c663191c602797a0a",
+      "image_main": "sha256:3e28bdc51d26cf74e399744d8fb758ca197b98720d1869e5b15541fe23614ded"
+    },
+    "db": {
+      "constats_identiques": true,
+      "image_pr": "sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4",
+      "image_main": "sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4"
+    },
+    "nginx": {
+      "constats_identiques": true,
+      "image_pr": "sha256:dede8895648b461178c3bc604f7eed4423efe5220b2c4d839f5eb3d34ac3f8f7",
+      "image_main": "sha256:dede8895648b461178c3bc604f7eed4423efe5220b2c4d839f5eb3d34ac3f8f7"
+    }
+  },
+  "difference_npm": "Seul fixAvailable de glob diffère : main propose vite-plugin-pwa 1.1.0; PR propose @vue/test-utils 2.4.11. Avis, versions et compteurs identiques; suggestions non validées."
+}
