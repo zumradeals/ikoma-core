@@ -51,6 +51,7 @@ function supEnter(int $i, Badge $badge, ?int $second = null): string
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
     $this->seed(DemoSeeder::class);
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $this->travelTo('2027-01-10 10:00:00');
     $this->auditStart = (int) DB::table('audit_logs')->max('id');
     $this->agent = supUser('agent_accueil');

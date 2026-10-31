@@ -26,6 +26,7 @@ it('génère depuis l’interface un scénario identifiable sans comptes fictifs
     $this->actingAs($this->admin)->get('/administration/demonstration')->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('Admin/DemoLab')
             ->has('totals')->has('scenarios'));
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $this->post('/administration/demonstration/generer', [
         'scenario' => 'formation', 'quantity' => 20,
     ])->assertRedirect('/administration/demonstration');
@@ -37,6 +38,17 @@ it('génère depuis l’interface un scénario identifiable sans comptes fictifs
         ->and(DB::table('groups')->where('event_id', $event->id)->count())->toBe(1)
         ->and(DB::table('group_members')->whereIn('group_id', DB::table('groups')->where('event_id', $event->id)->select('id'))->count())->toBe(10)
         ->and(DB::table('users')->count())->toBe($beforeUsers);
+});
+
+it('refuse la démonstration de groupes si F06 est inactif sans modifier les données', function () {
+    $before = DB::table('groups')->count();
+    $this->actingAs($this->admin)->post('/administration/demonstration/generer', [
+        'scenario' => 'formation', 'quantity' => 20,
+    ])->assertSessionHasErrors('scenario');
+    expect(DB::table('groups')->count())->toBe($before);
+    $this->post('/administration/demonstration/generer', [
+        'scenario' => 'entreprise', 'quantity' => 20,
+    ])->assertRedirect('/administration/demonstration');
 });
 
 it('efface un scénario utilisé sans toucher aux événements ordinaires', function () {

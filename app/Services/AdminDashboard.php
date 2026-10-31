@@ -27,10 +27,11 @@ final class AdminDashboard
             return ['event' => null, 'events' => $events, 'steps' => [], 'summary' => ['done' => 0, 'total' => 0, 'next' => null], 'tiles' => null, 'watch' => [], 'recent' => $this->recent()];
         }
         $e = $event->id;
+        $f06Active = app(FoundingModules::class)->f06Active();
         $zones = (int) DB::table('zones')->where('event_id', $e)->count();
         $categories = (int) DB::table('categories')->where('event_id', $e)->count();
         $visitors = (int) DB::table('visitors')->where('event_id', $e)->where(fn ($q) => $q->whereNull('status')->orWhere('status', '<>', 'refuse'))->count();
-        $inCars = (int) DB::table('visitors')->where('event_id', $e)->whereNotNull('group_id')->count();
+        $inCars = $f06Active ? (int) DB::table('visitors')->where('event_id', $e)->whereNotNull('group_id')->count() : 0;
         $badges = DB::selectOne("SELECT count(*) AS total,
             count(*) FILTER (WHERE status = 'Disponible' AND reserved_device_id IS NULL AND reserved_group_id IS NULL) AS free,
             count(*) FILTER (WHERE reserved_device_id IS NOT NULL) AS for_devices,
@@ -44,7 +45,7 @@ final class AdminDashboard
             count(*) FILTER (WHERE supervisor_id IS NULL) AS no_supervisor,
             count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM badges b WHERE b.reserved_group_id = groups.id)) AS no_badges
             FROM groups WHERE event_id = ?', [$e]);
-        $missingRoles = array_keys(array_filter(self::ROLES, fn (string $label, string $role) => ! User::query()->role($role)->where('active', true)->exists(), ARRAY_FILTER_USE_BOTH));
+        $missingRoles = array_keys(array_filter(self::ROLES, fn (string $label, string $role) => ($f06Active || $role !== 'encadreur') && ! User::query()->role($role)->where('active', true)->exists(), ARRAY_FILTER_USE_BOTH));
         $activeUsers = (int) User::query()->where('active', true)->count();
 
         $steps = [
@@ -52,14 +53,18 @@ final class AdminDashboard
                 $zones.' zone'.($zones > 1 ? 's' : '').' · '.$categories.' catégorie'.($categories > 1 ? 's' : ''), '/administration/zones'),
             $this->step('liste', 'Liste d’invités', $visitors > 0 ? 'fait' : 'a_faire',
                 $visitors > 0 ? $visitors.' invité'.($visitors > 1 ? 's' : '').' dans la liste' : 'Aucun invité pour le moment', '/administration/imports'),
-            $this->badgeStep((int) $badges->total, (int) $groups->total, (int) $groups->no_badges, (int) $badges->for_devices),
+            $this->badgeStep((int) $badges->total, $f06Active ? (int) $groups->total : 0, $f06Active ? (int) $groups->no_badges : 0, (int) $badges->for_devices),
             $this->step('tablettes', 'Tablettes', (int) $devices->total > 0 && (int) $devices->enrolled === (int) $devices->total ? 'fait' : 'a_faire',
                 (int) $devices->total === 0 ? 'Aucune tablette créée' : (int) $devices->enrolled.' branchée'.((int) $devices->enrolled > 1 ? 's' : '').' sur '.(int) $devices->total.((int) $devices->total - (int) $devices->enrolled > 0 ? ' · il manque un code d’enrôlement' : ''), '/administration/postes'),
             $this->step('groupes', 'Groupes et cars', (int) $groups->total === 0 ? 'a_faire' : ((int) $groups->no_supervisor > 0 ? 'en_cours' : 'fait'),
                 (int) $groups->total === 0 ? 'Aucun groupe (à créer s’il y a des cars)' : (int) $groups->total.' car'.((int) $groups->total > 1 ? 's' : '').((int) $groups->no_supervisor > 0 ? ' · '.(int) $groups->no_supervisor.' sans encadreur' : ' · un encadreur par car'), '/administration/groupes'),
-            $this->step('comptes', 'Comptes', $missingRoles === [] ? 'fait' : (count($missingRoles) < count(self::ROLES) ? 'en_cours' : 'a_faire'),
+            $this->step('comptes', 'Comptes', $missingRoles === [] ? 'fait' : (count($missingRoles) < ($f06Active ? count(self::ROLES) : count(self::ROLES) - 1) ? 'en_cours' : 'a_faire'),
                 $missingRoles === [] ? $activeUsers.' comptes actifs, un par rôle' : 'Il manque : '.implode(', ', array_map(fn (string $r) => self::ROLES[$r], $missingRoles)), '/administration/comptes'),
         ];
+        if (! $f06Active) {
+            // Un module fondateur inclus mais volontairement inactif n'est pas une étape manquante.
+            $steps = array_values(array_filter($steps, fn (array $step) => $step['key'] !== 'groupes'));
+        }
         $done = count(array_filter($steps, fn (array $s) => $s['status'] === 'fait'));
         $next = collect($steps)->first(fn (array $s) => $s['status'] !== 'fait');
 

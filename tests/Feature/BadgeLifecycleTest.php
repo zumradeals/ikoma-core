@@ -116,6 +116,7 @@ it('réserve une plage à un poste ou à un groupe, tout ou rien, et journalise'
     expect($lots->reserve($batch, $base, $base + 4, $device, $admin))->toBe(5);
     expect(DB::table('badges')->where('badge_batch_id', $batch)->where('reserved_device_id', $device->id)->count())->toBe(5);
     expect(refusalOf(fn () => $lots->reserve($batch, $base + 3, $base + 7, $device, $admin))?->reason)->toBe('indisponible');
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $group = Group::findOrFail(DemoSeeder::id('group'));
     $start = $base + 3;
     expect(refusalOf(fn () => $lots->reserve($batch, $start, $start + 3, $group, $admin))?->reason)->toBe('indisponible');
@@ -519,6 +520,8 @@ it('réserve une plage depuis l’écran et refuse proprement les plages impossi
     $admin = badgeAccount('administrateur');
     $lot = demoLot(10);
     $this->actingAs($admin);
+    // Ce scénario exerce la réservation collective : F06 est activé explicitement.
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $payload = ['batch_id' => $lot->badge_batch_id, 'from' => 401, 'to' => 405, 'target_type' => 'poste', 'target_id' => DemoSeeder::id('device')];
     $first = (int) substr($lot->code, 2);
     $this->post('/administration/badges/reservations', [...$payload, 'from' => $first, 'to' => $first + 4])->assertRedirect()->assertSessionHasNoErrors();

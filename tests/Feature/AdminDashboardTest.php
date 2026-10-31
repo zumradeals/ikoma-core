@@ -20,6 +20,7 @@ function dashUser(string $role): User
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
     $this->seed(DemoSeeder::class);
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $this->admin = dashUser('administrateur');
     $this->event = DemoSeeder::id('event');
     // Les comptes laissés par d'autres exécutions de la base de test ne comptent pas : seul l'administrateur de ce test est actif.

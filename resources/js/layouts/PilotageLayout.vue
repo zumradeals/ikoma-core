@@ -10,7 +10,7 @@ defineOptions({ inheritAttrs: false });
 type EventRef = { id: string; name: string };
 type Context = { event: EventRef | null; events: EventRef[]; openAlerts: number; criticalAlerts: number };
 const props = withDefaults(defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'litiges' | 'evacuation' | 'plus' | 'journal'; event?: EventRef | null; events?: EventRef[]; openAlerts?: number; title?: string; bare?: boolean }>(), { event: null, events: () => [], openAlerts: 0, title: '', bare: false });
-const page = usePage<{ auth?: { name: string; permissions: string[] } | null; criticalAlerts?: number; pilotageContext?: Context | null }>();
+const page = usePage<{ auth?: { name: string; permissions: string[] } | null; criticalAlerts?: number; f06Active?: boolean; pilotageContext?: Context | null }>();
 const currentEvent = computed(() => props.event ?? page.props.pilotageContext?.event ?? null);
 const events = computed(() => props.events.length ? props.events : page.props.pilotageContext?.events ?? []);
 const openAlerts = computed(() => page.props.pilotageContext?.openAlerts ?? props.openAlerts);
@@ -26,7 +26,7 @@ const items = [
   { key: 'evacuation', label: 'Évacuation', short: 'Évacuation', icon: 'arrow', href: '/pilotage/evacuation', permission: 'presences.consulter' },
   { key: 'journal', label: 'Journal', short: 'Journal', icon: 'book', href: '/administration/journal', permission: 'journal.consulter' },
 ] as const;
-const allowed = computed(() => items.filter(item => can(item.permission) && (item.key !== 'plus' || can('cars.suivre'))));
+const allowed = computed(() => items.filter(item => can(item.permission) && (item.key !== 'plus' || (can('cars.suivre') && page.props.f06Active === true))));
 const bottom = computed(() => allowed.value.filter(item => !['plus', 'journal'].includes(item.key)));
 const href = (path: string) => pilotageHref(path, currentEvent.value?.id);
 function change(event: Event) {

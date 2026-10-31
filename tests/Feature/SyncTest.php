@@ -84,6 +84,20 @@ function syncAudit(): Builder
     return DB::table('audit_logs')->where('id', '>', test()->auditStart);
 }
 
+it('met en conflit une opération F06 issue d’une ancienne tablette sans effacer son historique', function () {
+    $old = syncOp('groupe_controle', [
+        'group_id' => DemoSeeder::id('group'),
+        'visitor_id' => DemoSeeder::id('visitor2'),
+        'identity_checked' => true,
+    ], $this->agent, 1);
+    $this->postJson('/poste/api/sync', ['operations' => [$old]], syncHeaders())
+        ->assertOk()->assertJsonPath('summary.conflicts', 1)
+        ->assertJsonPath('results.0.code', 'module_f06_inactif');
+    expect(DB::table('sync_conflicts')->where('reason', 'module_f06_inactif')->count())->toBe(1)
+        ->and(DB::table('sync_operations')->where('id', $old['id'])->exists())->toBeTrue();
+    $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->assertJsonPath('settings.f06_active', false);
+});
+
 it('refuse un appareil sans jeton, non enrôlé ou révoqué, sur la liste comme sur la synchronisation', function () {
     $this->getJson('/poste/api/liste')->assertStatus(422)->assertJson(['code' => 'poste_requis']);
     $this->postJson('/poste/api/sync', ['operations' => []], [])->assertStatus(422);
@@ -166,7 +180,7 @@ it('bloque les essais de code après cinq échecs', function () {
 
 it('envoie la copie de travail sans jeton QR en clair, avec tous les badges de l’événement (L7) dont seuls les badges réservés au poste sont marqués « mine »', function () {
     $liste = $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->json();
-    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'identity_document' => false, 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
+    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'f06_active' => false, 'identity_document' => false, 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
     expect(array_keys($liste['visitors'][0]))->toBe(['id', 'full_name', 'organisation', 'host_id', 'category_id', 'valid_from', 'valid_until', 'source', 'status', 'host_validation', 'access_note', 'group_id', 'a_rebadger', 'rev', 'identity_done', 'photo_done', 'validated', 'badge_code']);
     $codes = array_column($liste['badges'], 'code');
     expect($codes)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->toContain($this->badges[3]->code);

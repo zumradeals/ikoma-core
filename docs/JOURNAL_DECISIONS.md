@@ -6,6 +6,8 @@
 |---|---|---|---|
 | 2026-10-27 | Pile technique : Laravel + Inertia.js + Vue 3 (TypeScript) + PostgreSQL + Tailwind CSS. Livewire écarté. Poste d'accueil en PWA hors ligne. | Le cahier des charges exige un poste d'accueil fonctionnel sans internet. | Koné Djakaridja (dirigeant) |
 | 2026-10-27 | Matrice L1 validée ; ajout de `categories.gerer` au rôle `administrateur` uniquement. | Document de fonctionnement v1.0, section 10 : « gestion des badges, zones et catégories ». | Dirigeant — validation explicite |
+| 2026-10-31 | **ACCESS-FOUNDATION-001** : 9 modules fondateurs F01–F09 garantis et indissociables dans la licence standard de 12 mois. **F06 est inclus de droit mais son activation d'exploitation est contrôlable par l'administrateur client, sans supplément ni retrait de licence.** | Préserver le socle garanti tout en permettant à un client n'utilisant pas les groupes/cars de désactiver ce parcours. Voir `docs/MODULES_FONDATEURS.md`. | Dirigeant — validation explicite, précisée pour F06 |
+| 2026-10-31 | **ACCESS-FOUNDATION-001/F06-DEFAULT** : F06 est **désactivé par défaut** sur toute installation neuve. Une installation déjà exploitée avec des groupes conserve l'activation au moment de la mise à niveau. | Éviter d'imposer le circuit de groupes, sans interruption des opérations existantes. | Dirigeant — validation explicite |
 
 ## Décisions en attente (voir section 12 du plan)
 
@@ -372,3 +374,37 @@ La préparation nominative explicite inscrit une destination immuable printed_fo
 ## L33 — Contrats de cycle de vie (30 octobre 2026)
 
 Mission du dirigeant : actions administratives, archivage et centre de gestion. Voir LOT33_CONTRATS.md : réutiliser les états existants, préserver les permissions du superviseur, refuser une clôture tant que des tablettes pourraient encore détenir des opérations locales, conserver les traces et séparer web/maintenance privilégiée. Aucun nouveau composant externe.
+
+
+## ACCESS-FOUNDATION-001 — Socle fondateur ratifié (31 octobre 2026)
+
+Le dirigeant valide **F01 Administration et configuration, F02 Personnes et listes,
+F03 Badges, F04 Poste d'accueil, F05 Contrôle des accès et sorties,
+F06 Groupes et cars, F07 Pilotage et supervision, F08 Espace hôte,
+F09 Audit, conservation et traçabilité**, comme **socle indissociable**
+de toute licence IKOMA ACCESS standard valide pendant **12 mois**.
+
+**Précision ratifiée sur F06 :** le droit contractuel de l'utiliser reste inclus
+pour tous les clients. L'administrateur du client doit pouvoir en
+activer ou désactiver **l'exploitation**, de manière réversible, gratuite,
+auditée et sans perte de données, selon les contraintes de sécurité
+du parcours groupe. **Décision complémentaire ratifiée : F06 inactif par défaut pour toute
+installation neuve.** La PR #39 implémente l'interface de gestion et
+les garde-fous métier ; leur effectivité en production dépend de la
+validation CI, de la fusion puis d'un déploiement contrôlé.
+
+**Aucun autre module n'est défini.** Les outils de démonstration ne sont pas
+des modules vendables. Le statut de cette décision est **RATIFIÉ** ;
+voir `docs/MODULES_FONDATEURS.md`.
+
+**ACCESS-LICENCE-STANDARD-001** reste au statut **PROJET, NON RATIFIÉ**.
+Seuls le socle F01–F09 et la durée de 12 mois sont ratifiés ; le périmètre
+commercial, les responsabilités, les conditions d'échéance, les prix,
+les garanties, la titularité des droits sur le code et les clauses
+juridiques restent à arbitrer. Voir `docs/LICENCE_STANDARD_12_MOIS_PROJET.md`.
+
+**Réserve à traiter avant commercialisation :** `composer.json` déclare
+actuellement `"license": "MIT"` ; ce marqueur et les accords de contribution
+doivent être audités avant de prétendre concéder des droits exclusifs
+ou d'imposer des restrictions à des droits déjà consentis.
+

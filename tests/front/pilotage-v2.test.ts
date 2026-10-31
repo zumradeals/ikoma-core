@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import { reactive } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { get, permissions } = vi.hoisted(() => ({ get: vi.fn(), permissions: ['pilotage.consulter', 'presences.consulter', 'alertes.consulter', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'journal.consulter', 'badges.annuler'] }));
-const state = reactive({ auth: { name: 'Superviseur fictif', permissions: [...permissions] }, errors: {}, criticalAlerts: 0 });
+const state = reactive({ f06Active: true, auth: { name: 'Superviseur fictif', permissions: [...permissions] }, errors: {}, criticalAlerts: 0 });
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => ({ props: state }),
   router: { get, reload: vi.fn(), post: vi.fn() },
@@ -14,7 +14,7 @@ import { pilotageHref } from '../../resources/js/pilotage/navigation';
 const event = { id: 'e1', name: 'Événement fictif' };
 const wrappers: ReturnType<typeof mount>[] = [];
 const layout = () => { const w = mount(Layout, { props: { active: 'plus', event, events: [event, { id: 'e2', name: 'Autre événement fictif' }], openAlerts: 2, title: 'Groupes et cars' } }); wrappers.push(w); return w; };
-beforeEach(() => { state.auth.permissions = [...permissions]; get.mockClear(); window.localStorage.removeItem('ikoma.son-alertes'); });
+beforeEach(() => { state.f06Active = true; state.auth.permissions = [...permissions]; get.mockClear(); window.localStorage.removeItem('ikoma.son-alertes'); });
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); });
 describe('navigation commune du superviseur V2', () => {
   it('replie le menu par défaut puis le ferme après une navigation, sans perdre l’événement', async () => {
@@ -34,6 +34,12 @@ describe('navigation commune du superviseur V2', () => {
     const w = layout();
     expect(w.find('[data-testid=menu-tableau]').exists()).toBe(true);
     for (const key of ['plus', 'journal', 'litiges', 'presents', 'alertes', 'evacuation']) expect(w.find(`[data-testid=menu-${key}]`).exists()).toBe(false);
+  });
+  it('masque les groupes si F06 est désactivé même lorsque les droits sont présents', () => {
+    state.f06Active = false;
+    const w = layout();
+    expect(w.find('[data-testid=menu-plus]').exists()).toBe(false);
+    expect(w.find('[data-testid=menu-tableau]').exists()).toBe(true);
   });
   it('conserve les filtres du lien et remplace uniquement l’événement', () => {
     expect(pilotageHref('/pilotage/alertes?etat=prises&event=ancien', 'nouveau')).toBe('/pilotage/alertes?etat=prises&event=nouveau');

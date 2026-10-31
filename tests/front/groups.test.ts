@@ -21,7 +21,7 @@ async function snapshot(mode: 'identite' | 'encadreur' = 'encadreur'): Promise<S
   const token = (n: number) => `${n}`.repeat(64).slice(0, 64);
   return {
     version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette cars', station: 'Poste cars', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
-    settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, controle_stagiaires: mode }, categories: [stagiaire], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }], category_zone: [{ category_id: 'c2', zone_id: 'z1' }],
+    settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, controle_stagiaires: mode, f06_active: true }, categories: [stagiaire], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }], category_zone: [{ category_id: 'c2', zone_id: 'z1' }],
     hosts: [], postes: [{ id: 'p1', name: 'Poste cars' }], visitors, members,
     groups: [{ id: 'g1', name: 'Groupe fictif', bus_number: 'Car 1', opened: false, departed: false, arrival_closed: false }],
     badges: [
@@ -34,6 +34,18 @@ const op = (list: LocalList, type: string, payload: Record<string, unknown>) => 
 const refused = (fn: () => unknown): string | null => { try { fn(); } catch (e) { return e instanceof ApiError ? e.code : 'autre'; } return null; };
 
 describe('règles des groupes sur la copie locale', () => {
+  it('refuse hors ligne les actions F06 désactivées ou provenant d’une copie sans indicateur', async () => {
+    const inactive = await snapshot();
+    inactive.settings.f06_active = false;
+    const list = new LocalList(inactive);
+    expect(groupSummaries(list)).toEqual([]);
+    expect(() => groupView(list, 'g1')).toThrow('désactivé');
+    expect(() => applyGroupOp(list, 'groupe_depart', { group_id: 'g1' })).toThrow('désactivé');
+    delete inactive.settings.f06_active;
+    expect(() => applyGroupOp(new LocalList(inactive), 'groupe_depart', { group_id: 'g1' })).toThrow('désactivé');
+  });
+
+
   it('mode encadreur : le contrôle exige la confirmation, puis la remise exige le contrôle et un badge du lot', async () => {
     const list = new LocalList(await snapshot());
     expect(refused(() => op(list, 'groupe_controle', { group_id: 'g1', visitor_id: 's3' }))).toBe('confirmation_encadreur_requise');

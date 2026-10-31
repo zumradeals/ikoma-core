@@ -25,6 +25,7 @@ const icons: Record<string, string[]> = {
   info: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v6', 'M12 7h.01'],
   arrow: ['M5 12h14', 'M13 6l6 6-6 6'],
   check: ['M5 12l5 5L20 7'],
+  settings: ['M12 4v3', 'M12 17v3', 'M4 12h3', 'M17 12h3', 'M6.3 6.3l2.1 2.1', 'M15.6 15.6l2.1 2.1', 'M17.7 6.3l-2.1 2.1', 'M8.4 15.6l-2.1 2.1', 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
   menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
 };
 const paths = computed(() => icons[props.name] ?? []);

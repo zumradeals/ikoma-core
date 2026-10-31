@@ -6,7 +6,7 @@ import { wipePilotageLocal } from '../pilotage/evacuation';
 
 type EventRef = { id: string; name: string };
 const props = withDefaults(defineProps<{ active: string; event?: EventRef | null; events?: EventRef[] }>(), { event: null, events: () => [] });
-const page = usePage<{ auth: { name: string; permissions: string[] }; adminContext?: { event: EventRef } | null; demoLabAvailable?: boolean; flash?: { status?: string } }>();
+const page = usePage<{ auth: { name: string; permissions: string[] }; adminContext?: { event: EventRef } | null; demoLabAvailable?: boolean; f06Active?: boolean; flash?: { status?: string } }>();
 const eventRef = computed(() => props.event ?? page.props.adminContext?.event ?? null);
 const can = (permission: string) => page.props.auth.permissions.includes(permission);
 const open = ref(false);
@@ -18,6 +18,7 @@ const items = [
   { key: 'imports', label: 'Liste d’invités', icon: 'list', href: '/administration/imports', permission: 'listes.importer' },
   { key: 'badges', label: 'Badges', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
+  { key: 'modules', label: 'Modules', icon: 'settings', href: '/administration/modules', permission: 'comptes.gerer' },
   { key: 'postes', label: 'Postes et tablettes', icon: 'monitor', href: '/administration/postes', permission: 'postes.gerer' },
   { key: 'comptes', label: 'Comptes', icon: 'users', href: '/administration/comptes', permission: 'comptes.gerer' },
   { key: 'journal', label: 'Journal', icon: 'book', href: '/administration/journal', permission: 'journal.consulter' },
@@ -50,7 +51,7 @@ function change(e: Event) { router.get('/administration', { event: (e.target as 
       <aside class="admin-sidebar">
         <button type="button" class="admin-menu-toggle" :aria-expanded="open" aria-controls="menu-admin" data-testid="ouvrir-menu" @click="open = !open"><span>Menu administrateur</span><AdminIcon name="menu" /></button>
         <nav id="menu-admin" aria-label="Menu administrateur" :class="{ 'is-open': open }">
-          <template v-for="item in items" :key="item.key"><Link v-if="(!item.permission || can(item.permission)) && (item.key !== 'demonstration' || page.props.demoLabAvailable)" :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="admin-nav-link" :data-testid="'menu-' + item.key" @click="open = false"><AdminIcon :name="item.icon" :size="24" /><span>{{ item.label }}</span></Link></template>
+          <template v-for="item in items" :key="item.key"><Link v-if="(!item.permission || can(item.permission)) && (item.key !== 'demonstration' || page.props.demoLabAvailable) && (item.key !== 'groupes' || page.props.f06Active)" :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="admin-nav-link" :data-testid="'menu-' + item.key" @click="open = false"><AdminIcon :name="item.icon" :size="24" /><span>{{ item.label }}</span></Link></template>
         </nav>
       </aside>
       <main id="contenu" class="admin-main" tabindex="-1">

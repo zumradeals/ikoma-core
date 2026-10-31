@@ -23,6 +23,7 @@ function membersOf(list: LocalList, groupId: string): SnapMember[] {
 }
 
 export function groupSummaries(list: LocalList): GroupSummary[] {
+  if (list.snapshot.settings.f06_active !== true) return [];
   return Array.from(list.groups.values()).map(g => {
     const members = membersOf(list, g.id);
     return { id: g.id, name: g.name, bus_number: g.bus_number, total: members.length, badged: members.filter(m => list.visitors.get(m.visitor_id)?.badge_code).length, departed: g.departed, arrival_closed: g.arrival_closed };
@@ -30,6 +31,7 @@ export function groupSummaries(list: LocalList): GroupSummary[] {
 }
 
 export function groupView(list: LocalList, groupId: string): GroupView {
+  if (list.snapshot.settings.f06_active !== true) throw new ApiError('module_f06_inactif', 'Groupes et cars est désactivé.', null, 403);
   const group = list.groups.get(groupId);
   if (!group) throw new ApiError('groupe_inconnu', 'Groupe introuvable pour ce poste.', null, 404);
   const members = membersOf(list, groupId).map(m => {
@@ -55,6 +57,7 @@ function holderOf(list: LocalList, code: string): SnapVisitor | undefined {
 }
 
 export function applyGroupOp(list: LocalList, type: string, p: Record<string, unknown>): GroupDelta {
+  if (list.snapshot.settings.f06_active !== true) throw new ApiError('module_f06_inactif', 'Groupes et cars est désactivé. Synchronisez ce poste avant de poursuivre.', null, 403);
   switch (type) {
     case 'groupe_controle': {
       const { group, member } = memberOf(list, p.group_id, p.visitor_id);

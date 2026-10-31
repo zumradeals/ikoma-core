@@ -183,6 +183,8 @@ it('remonte aussi un non listé sans compte hôte lié puis notifie après ratta
 });
 
 it('retire aussi un stagiaire de la copie et des compteurs sans effacer son historique', function () {
+    // Le suivi collectif n'est disponible qu'après activation F06 sur cette installation de test.
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $id = DB::table('visitors')->where('host_id', DemoSeeder::id('host0'))->where('group_id', DemoSeeder::id('group'))->value('id');
     $before = app(Groups::class)->state(DemoSeeder::id('group'))['progress']['total'];
     $this->delete('/hote/invites/'.$id)->assertRedirect();

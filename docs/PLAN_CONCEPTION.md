@@ -84,6 +84,17 @@ Deux tablettes hors ligne pourraient attribuer le même badge. Parade : **chaque
 
 ## 5. Modules applicatifs
 
+> **Nomenclature fondatrice ratifiée le 31/10/2026 :**
+> [ACCESS-FOUNDATION-001 — F01 à F09](MODULES_FONDATEURS.md).
+> La liste ci-dessous reste une présentation historique du plan initial.
+> La disponibilité contractuelle des neuf modules et l'exception
+> d'activation opérationnelle F06 par l'administrateur client sont
+> définies dans le document normatif. Aucun module additionnel
+> n'est actuellement défini.
+>
+> Le [projet de contrat de 12 mois](LICENCE_STANDARD_12_MOIS_PROJET.md)
+> est **non ratifié**, sauf sur le socle F01–F09 et la durée.
+>
 1. **Administration** : événements, sites, zones, catégories, comptes, rôles, appareils, réglages, journaux
 2. **Listes** : import tableur, contrôle qualité, fiches visiteurs
 3. **Badges** : génération de lots, QR, codes lisibles, statuts, annulation

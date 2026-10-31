@@ -46,6 +46,9 @@ final class DemoLab
         if (! isset(self::SCENARIOS[$scenario]) || ! in_array($quantity, [20, 100, 300, 1000], true)) {
             throw ValidationException::withMessages(['scenario' => 'Choisissez un scénario et 20, 100, 300 ou 1 000 personnes.']);
         }
+        if ($scenario === 'formation' && ! app(FoundingModules::class)->f06Active()) {
+            throw ValidationException::withMessages(['scenario' => 'Activez d’abord F06 dans Administration → Modules pour créer une démonstration de groupes et de cars.']);
+        }
 
         return DB::transaction(function () use ($scenario, $quantity, $actor): string {
             DB::statement('SELECT pg_advisory_xact_lock(731903)');
