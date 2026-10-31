@@ -210,7 +210,8 @@ def scan(root, directory, trivy):
         manifest['ci'] = {key: os.environ[key] for key in ('GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_SHA') if key in os.environ}
         compose = ['docker', 'compose', '--project-directory', str(root), '--env-file',
                    str(root / 'prod-data/env'), '-f', str(root / 'docker-compose.prod.yml')]
-        config = parsed(compose + ['config', '--format', 'json'])
+        # Inclure les services sous profil pour contrôler leurs références, sans les démarrer.
+        config = parsed(compose + ['--profile', '*', 'config', '--format', 'json'])
         if not all(s in config.get('services', {}) for s in SERVICES):
             raise EvidenceError('service_final_absent')
         for service in ('migrator', 'scheduler', 'maintenance'):

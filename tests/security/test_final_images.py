@@ -36,6 +36,9 @@ class Runtime:
                 if 'config' in args:
                     services = {s: {'image': r, 'environment': {'SECRET': SECRET}} for s, r in self.references.items()}
                     services.update({s: {'image': self.references['php']} for s in ('migrator', 'scheduler', 'maintenance')})
+                    # Comme Compose réel : le service de maintenance est hors du profil par défaut.
+                    if '--profile' not in args:
+                        services.pop('maintenance')
                     if self.problem == 'alias':
                         services['maintenance']['image'] = 'autre:version'
                     return done(json.dumps({'services': services, 'secrets': {'private': SECRET}}))
