@@ -70,6 +70,8 @@ it('applique un départage portable entre noms accentués après qualité, VIP e
     $found = app(VisitorSearch::class)->searchDetailed($event, 'testtri');
     expect(array_column($found, 'full_name'))->toBe($names);
     expect(array_column($found, 'id'))->toHaveCount(4);
+    $index = DB::table('pg_indexes')->where('schemaname', 'public')->where('indexname', 'visitors_active_name_c_idx')->value('indexdef');
+    expect($index)->toContain('COLLATE "C"')->toContain('withdrawn_at IS NULL');
 });
 
 it('refuse en base une deuxième association active mais accepte une nouvelle après restitution ou annulation', function () {
