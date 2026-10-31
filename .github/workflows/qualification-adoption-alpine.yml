@@ -10,6 +10,12 @@ on:
       - 'scripts/security/prepare-alpine-e2e.py'
       - 'scripts/security/summarize-e2e-alpine.py'
       - 'docs/security/S0.2-QUALIFICATION-ADOPTION-ALPINE.md'
+      - 'app/Services/VisitorSearch.php'
+      - 'app/Http/Controllers/**'
+      - 'resources/js/poste/local/search.ts'
+      - 'database/migrations/**'
+      - 'tests/Feature/BusinessModelTest.php'
+      - 'tests/front/portable-name-sort.test.ts'
 
 permissions:
   contents: read
@@ -128,7 +134,8 @@ jobs:
           cd "$IKOMA_E2E_DIR"
           make migrate-fresh-seed > "$RUNNER_TEMP/alpine-seed-private.log" 2>&1 || { echo 'STOP: migrations'; exit 1; }
           make test > "$RUNNER_TEMP/alpine-php-private.log" 2>&1 || { echo 'STOP: PHP'; exit 1; }
-          echo 'migrations_php=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
+          make test-front > "$RUNNER_TEMP/alpine-front-private.log" 2>&1 || { echo 'STOP: tests front'; exit 1; }
+          echo 'migrations_php_front=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
       - name: Tests navigateurs E2E, contrôle accueil et agent V2
         run: |
           set -euo pipefail
