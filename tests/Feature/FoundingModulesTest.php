@@ -74,7 +74,8 @@ it('refuse de désactiver pendant les opérations collectives ouvertes et protè
     $this->put('/administration/modules/F06', f06Switch(false))->assertSessionHasErrors('module');
     expect(app(FoundingModules::class)->f06Active())->toBeTrue();
     DB::table('groups')->where('id', $id)->update(['opened_at' => null]);
-    DB::table('group_members')->where('group_id', $id)->limit(1)->update(['confirmed_at' => now(), 'confirmed_by' => $this->admin->id]);
+    $member = DB::table('group_members')->where('group_id', $id)->value('visitor_id');
+    DB::table('group_members')->where('group_id', $id)->where('visitor_id', $member)->update(['confirmed_at' => now(), 'confirmed_by' => $this->admin->id]);
     $this->put('/administration/modules/F06', f06Switch(false))->assertSessionHasErrors('module');
     expect(app(FoundingModules::class)->f06Active())->toBeTrue();
     DB::table('group_members')->where('group_id', $id)->update(['confirmed_at' => null, 'confirmed_by' => null]);
