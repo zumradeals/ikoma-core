@@ -63,9 +63,15 @@ en activer ou désactiver **l'utilisation opérationnelle**. La
 désactivation volontaire n'enlève pas F06 de la licence, ne modifie
 pas sa durée, ne crée pas de facturation et ne détruit pas ses données.
 
-La mise en œuvre technique du commutateur F06 reste un travail
-de conception/implémentation distinct. Il ne peut être promis
-opérationnel au client tant que sa recette n'est pas validée.
+Le mode initial de toute **nouvelle installation** est « F06 inactif »,
+par décision du dirigeant du 31 octobre 2026. L'administrateur peut
+l'activer sans souscription supplémentaire. Une installation existante
+comportant déjà des groupes conserve le mode actif lors de sa
+migration de compatibilité ; une nouvelle installation démarre
+invariablement avec F06 inactif. L'interface et les contrôles
+métier sont développés dans la PR documentaire devenue PR
+de réalisation ; la disponibilité commerciale reste conditionnée
+à la recette de déploiement.
 
 ## Article 3 — Durée de la licence — PRINCIPLE RATIFIÉ / DÉTAILS À DÉCIDER
 
@@ -293,7 +299,7 @@ introduction dans le code ou sa présence dans une interface.
 |---|---|
 | Neuf modules fondateurs F01–F09 | **RATIFIÉ** |
 | Durée de licence standard : 12 mois | **RATIFIÉ** |
-| F06 inclus, activable/désactivable par le Client sans supplément | **RATIFIÉ**, réalisation technique à planifier |
+| F06 inclus, activable/désactivable par le Client sans supplément | **RATIFIÉ**, interface et contrôles en cours de validation CI |
 | Périmètre commercial (sites, comptes, tablettes, événements) | À décider |
 | Début du délai de 12 mois et règles de renouvellement | À décider |
 | Expiration, grâce, lecture seule, export et réversibilité | À décider |
@@ -302,7 +308,7 @@ introduction dans le code ou sa présence dans une interface.
 | Droit sur le logiciel et marqueur MIT du code | **À AUDITER EN PRIORITÉ** |
 | Traitement de données personnelles et obligations légales | À valider juridiquement |
 | Droit applicable, responsabilité et litiges | À valider juridiquement |
-| État initial de F06 pour les nouvelles installations | À décider |
+| État initial de F06 pour les nouvelles installations | **RATIFIÉ : désactivé par défaut** |
 | Catalogue de futures extensions | **Aucune décision — hors périmètre** |
 
 **Interdiction de traitement comme licence définitive :** tant que ces
