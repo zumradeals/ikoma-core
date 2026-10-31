@@ -15,7 +15,7 @@ def read(name):
         if not sep or not key or key in result:
             raise SystemExit("invalid-or-duplicate-fixture-key-"+name)
         result[key]=value
-    needed={"server_version","locale","provider","encoding","sort","unaccent","search","trigram","indexes"}
+    needed={"server_version","locale","provider","encoding","implicit_sort","sort","unaccent","search","trigram","indexes"}
     if not needed.issubset(result):
         raise SystemExit("incomplete-database-evidence-"+name)
     if not result["server_version"].startswith("18."):
@@ -32,12 +32,14 @@ metadata={k:{"debian":debian[k],"alpine":alpine[k]}
 differences=[k for k,v in comparisons.items() if not v["equal"]]
 summary={"decision":"BLOCK_ADOPTION_REVIEW_REQUIRED" if differences else "MATCH_ON_FIXTURE_ONLY",
          "fixture_only":True,"diff_keys":differences,
+         "historical_implicit_sort_diverges":debian["implicit_sort"]!=alpine["implicit_sort"],
+         "historical_implicit_sort":{"debian":debian["implicit_sort"],"alpine":alpine["implicit_sort"]},
          "metadata":metadata,"comparisons":comparisons,
          "limitations":["A limited fixture cannot establish compatibility of existing customer databases.",
                         "Never reuse a PostgreSQL data directory across base distributions.",
                         "Index/collation versions and REINDEX risk require separate migration rehearsal."]}
 (folder/"comparison.json").write_text(json.dumps(summary,indent=2,ensure_ascii=False)+"\n")
 print("PostgreSQL synthetic-fixture parity verdict:",summary["decision"],"different:",",".join(differences) or "none")
-# A mismatch is a meaningful red gate, not a tool malfunction to be ignored.
+# The historical implicit sort remains recorded; only the adopted explicit contract is gated.
 if differences:
     raise SystemExit(1)
