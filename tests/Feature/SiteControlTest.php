@@ -298,8 +298,13 @@ it('rejoue les contrôles et sorties faits hors ligne, une seule fois, et met en
     expect(DB::table('sync_conflicts')->where('kind', 'conflit')->orderBy('reason')->pluck('reason')->all())->toBe(['annule_entre_temps', 'deja_sorti', 'sortie_sans_entree']);
     // l'événement porte l'heure déclarée par la tablette ; la sortie est appliquée une seule fois ; un renvoi ne change rien
     expect(DB::table('access_events')->where('type', 'sortie')->count())->toBe(1);
-    $declared = json_decode((string) DB::table('access_events')->where('type', 'controle')->orderBy('created_at')->value('details'), true);
+    // Horloge figée : les trois contrôles ont le même created_at ; cibler le badge, pas un ordre SQL indéfini.
+    $declaredRows = DB::table('access_events')->where('type', 'controle')->where('badge_id', $this->batch1[0]->id)->get();
+    expect($declaredRows)->toHaveCount(1);
+    $declared = json_decode((string) $declaredRows->sole()->details, true);
     expect($declared)->toHaveKey('heure_declaree')->and($declared['differe'])->toBeTrue()->and($declared['verdict_tablette'])->toBe('valide');
+    $refused = json_decode((string) DB::table('access_events')->where('type', 'controle')->where('badge_id', $this->batch1[5]->id)->value('details'), true);
+    expect($refused['verdict_tablette'])->toBe('refuse');
     $events = DB::table('access_events')->count();
     $replay = siteSync($ops)->assertOk()->json();
     expect(collect($replay['results'])->pluck('replayed')->filter()->count())->toBe(6)->and(DB::table('access_events')->count())->toBe($events)->and(DB::table('sync_conflicts')->where('kind', 'conflit')->count())->toBe(3);

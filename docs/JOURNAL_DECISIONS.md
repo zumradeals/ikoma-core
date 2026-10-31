@@ -444,3 +444,13 @@ déploiement ou donnée client n'est utilisé. R03–R05 restent un
 La PR R01–R02 reste non fusionnée ; gel des nouvelles mises en service
 commerciales avec données réelles maintenu.
 
+
+## R05 — Correction ciblée de Symfony Mime (31 octobre 2026)
+
+Le dirigeant autorise ce lot séparé après validation R01–R02. Composer résout
+uniquement symfony/mime 7.4.19 vers 7.4.22, version corrigée selon l'avis officiel.
+Aucun autre paquet ou contrainte racine modifié ; les métadonnées générées du
+verrou sont expliquées dans [le rapport R05](security/S0.2-R05-SYMFONY-MIME.md).
+Les tests portent sur les noms MIME invalides et la sérialisation valide, sans
+envoi de courriel. Les alertes système restent visibles et bloquantes ; aucune
+fusion de remédiation, livraison ou intervention serveur n'est autorisée.
