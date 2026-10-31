@@ -125,6 +125,20 @@ jobs:
         run: bash deploy/prod/install.sh --domaine localhost --tls autosigne --cle-sauvegarde "$RUNNER_TEMP/cle-publique.asc" --ports 8080:8443 --sans-planification
       - name: Recette de production
         run: bash deploy/prod/ci-recette.sh "$RUNNER_TEMP/cle-privee.asc"
+      - name: R06 — Vérifier la surface de paquets PHP dans l'image finale
+        run: |
+          set -euo pipefail
+          mkdir -p security-r06
+          image=$(docker inspect --format '{{.Image}}' "$(docker compose --env-file prod-data/env -f docker-compose.prod.yml ps -q php)")
+          docker run --rm -i --network none --read-only --entrypoint sh "$image" -s < scripts/security/r06-runtime-verify.sh | tee security-r06/verification.txt
+          docker run --rm --network none --read-only --entrypoint dpkg-query "$image" -W -f='${binary:Package}\t${Version}\n' | LC_ALL=C sort > security-r06/paquets-php-final.txt
+          test -s security-r06/paquets-php-final.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r06-paquets-runtime
+          path: security-r06/
+          if-no-files-found: error
       - name: R05 — Vérifier la version et le comportement MIME dans l'image finale
         run: |
           mkdir -p security-r05
