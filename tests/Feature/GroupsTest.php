@@ -51,6 +51,7 @@ function refusal(callable $fn): ?DeskRefused
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
     $this->seed(DemoSeeder::class);
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $this->travelTo('2027-01-10 10:00:00');
     $this->admin = groupUser('administrateur');
     $this->agent = groupUser('agent_accueil');
