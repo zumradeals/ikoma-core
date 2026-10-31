@@ -1,11 +1,12 @@
 <?php
-// Isolated final-PHP image fixture: NO app data, no email/network/credentials.
+
 use Composer\InstalledVersions;
 use OpenSpout\Reader\XLSX\Options as XLSXOptions;
 use OpenSpout\Reader\XLSX\Reader as XLSXReader;
 use RuntimeException;
 use ZipArchive;
 
+// Isolated final-PHP image fixture: NO app data, no email/network/credentials.
 require '/var/www/html/vendor/autoload.php';
 
 foreach (['pdo_pgsql', 'mbstring', 'zip', 'xmlreader', 'gd', 'libxml'] as $name) {
