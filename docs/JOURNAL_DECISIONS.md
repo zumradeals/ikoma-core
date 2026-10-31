@@ -444,3 +444,11 @@ déploiement ou donnée client n'est utilisé. R03–R05 restent un
 La PR R01–R02 reste non fusionnée ; gel des nouvelles mises en service
 commerciales avec données réelles maintenu.
 
+
+## R04 — Recherche compatible et qualification (31 octobre 2026)
+
+La mission autorise ce lot séparément depuis ace54da1, sans fusion ni déploiement.
+Les sources officielles ne démontrent pas de candidat corrigé compatible adopté ;
+aucun changement de version, distribution ou binaire privé n’est effectué.
+Les tests et mesures sont ajoutés sur les seuls runners CI fictifs. Les alertes
+restent bloquantes, sans acceptation implicite. Voir [rapport R04](security/S0.2-R04-POSTGRES-GOSU.md).
