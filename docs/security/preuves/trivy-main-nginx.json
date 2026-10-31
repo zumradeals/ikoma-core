@@ -1,0 +1,21 @@
+{
+  "CreatedAt": "2026-10-31T11:38:22.209466369Z",
+  "Trivy": {
+    "Version": "0.76.1"
+  },
+  "ImageID": "sha256:dede8895648b461178c3bc604f7eed4423efe5220b2c4d839f5eb3d34ac3f8f7",
+  "OS": {
+    "Family": "alpine",
+    "Name": "3.24.3"
+  },
+  "RepoDigests": [
+    "nginx@sha256:dede8895648b461178c3bc604f7eed4423efe5220b2c4d839f5eb3d34ac3f8f7"
+  ],
+  "Results": [
+    {
+      "Target": "sha256:dede8895648b461178c3bc604f7eed4423efe5220b2c4d839f5eb3d34ac3f8f7 (alpine 3.24.3)",
+      "Class": "os-pkgs",
+      "Type": "alpine"
+    }
+  ]
+}

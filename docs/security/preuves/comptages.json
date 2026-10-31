@@ -1,0 +1,12 @@
+{
+  "lignes_registre": 374,
+  "par_outil_et_environnement": {
+    "Trivy 0.76.1 / CI développement (main; constats identiques PR39)": 213,
+    "Trivy 0.76.1 / recette image finale production (CI main; identique PR39)": 120,
+    "Composer audit --locked / verrou applicatif main/PR39": 1,
+    "npm audit / chaîne de build/test main/PR39": 35,
+    "OWASP ZAP baseline 2.17.0 / HTTP localhost CI, non authentifié": 5
+  },
+  "npm_paires_paquet_avis": 35,
+  "distinct_identifiants_vulnerabilites": 114
+}
