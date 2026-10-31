@@ -52,7 +52,20 @@ def gosu(ns):
     if advisory.get("id") != "GO-2026-4337" or "CVE-2025-68121" not in advisory.get("aliases", []):
         raise RuntimeError("Avis officiel Go absent ou divergent")
     # JSON par événements, pas un unique objet JSON.
-    events = [json.loads(line) for line in Path(ns.govulncheck).read_text().splitlines() if line.strip()]
+    # Govulncheck émet un flux JSON (objets successifs, parfois indentés sur plusieurs lignes).
+    raw_stream = Path(ns.govulncheck).read_text()
+    events, pos, decoder = [], 0, json.JSONDecoder()
+    while pos < len(raw_stream):
+        while pos < len(raw_stream) and raw_stream[pos].isspace():
+            pos += 1
+        if pos >= len(raw_stream):
+            break
+        event, pos = decoder.raw_decode(raw_stream, pos)
+        if not isinstance(event, dict):
+            raise RuntimeError("Événement govulncheck non conforme")
+        events.append(event)
+    if not events:
+        raise RuntimeError("Flux govulncheck vide")
     config = next((event.get("config") for event in events if isinstance(event.get("config"), dict)), None)
     if not config or config.get("scan_mode") != "binary" or config.get("scan_level") != "symbol":
         raise RuntimeError("Govulncheck n'atteste pas d'une analyse binaire au niveau symbole")
