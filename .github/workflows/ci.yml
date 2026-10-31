@@ -52,7 +52,7 @@ jobs:
       - name: Rechercher les secrets dans tout l’historique Git
         if: ${{ !cancelled() }}
         run: /tmp/ikoma-security-tools/gitleaks git . --redact=100 --report-format=json --report-path=security-results/secrets.json
-      - name: Analyser les images de production (blocage élevé et critique)
+      - name: Analyser les images de développement (blocage élevé et critique)
         if: ${{ !cancelled() }}
         run: |
           result=0
@@ -113,6 +113,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Vérifier les contrats de refus du contrôle des images finales
+        run: python3 -m unittest discover -s tests/security
       - name: Clé de sauvegarde de test (la clé privée n'est jamais donnée au serveur de recette)
         run: |
           export GNUPGHOME="$(mktemp -d)"
@@ -126,13 +128,19 @@ jobs:
       - name: Installer les outils d’analyse vérifiés
         if: ${{ !cancelled() }}
         run: sh scripts/security/install-tools.sh
-      - name: "Analyse des images de production (information, tous les niveaux élevés et critiques, avec ou sans correctif publié)"
+      - name: Analyser les trois images finales (blocage élevé et critique)
         if: ${{ !cancelled() }}
-        run: |
-          version="$(grep '^IKOMA_VERSION=' prod-data/env | cut -d= -f2)"
-          for image in "ikoma-php:$version" "ikoma-nginx:$version"; do
-            /tmp/ikoma-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --format table "$image" || true
-          done
+        run: python3 scripts/security/final-images.py scan --output security-production
+      - name: Refuser une preuve finale manquante ou incohérente
+        if: ${{ !cancelled() }}
+        run: python3 scripts/security/final-images.py verify --output security-production
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: analyses-images-finales
+          path: security-production/
+          if-no-files-found: error
+          retention-days: 90
       - if: failure()
         run: docker compose --project-directory "$PWD" --env-file prod-data/env -f docker-compose.prod.yml logs --tail=80
       - if: always()

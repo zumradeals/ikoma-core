@@ -68,6 +68,11 @@ RUN set -eux; \
     mkdir -p storage/app/private storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache; \
     chown -R ikoma:ikoma storage bootstrap/cache; \
     chmod 0755 /usr/local/bin/ikoma-entrypoint
+ARG IKOMA_REVISION
+ARG IKOMA_BUILD_VERSION
+LABEL org.opencontainers.image.source="https://github.com/zumradeals/ikoma-core" \
+      org.opencontainers.image.revision="$IKOMA_REVISION" \
+      org.opencontainers.image.version="$IKOMA_BUILD_VERSION"
 USER ikoma
 ENTRYPOINT ["ikoma-entrypoint"]
 CMD ["php-fpm"]
@@ -79,3 +84,8 @@ COPY public/favicon.ico public/icon.svg public/robots.txt /var/www/html/public/
 COPY public/brand /var/www/html/public/brand
 COPY public/badges /var/www/html/public/badges
 COPY docker/security-common-headers.conf /etc/nginx/ikoma-headers.conf
+ARG IKOMA_REVISION
+ARG IKOMA_BUILD_VERSION
+LABEL org.opencontainers.image.source="https://github.com/zumradeals/ikoma-core" \
+      org.opencontainers.image.revision="$IKOMA_REVISION" \
+      org.opencontainers.image.version="$IKOMA_BUILD_VERSION"
