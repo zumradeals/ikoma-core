@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\Pilotage;
+use App\Services\FoundingModules;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -12,7 +13,7 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        return [...parent::share($request), 'flash' => ['status' => $request->session()->get('status')], 'demoLabAvailable' => app()->environment('demo', 'local', 'testing'), 'auth' => ! in_array($request->path(), ['/', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'], true) && $request->user() ? ['id' => $request->user()->id, 'name' => $request->user()->name, 'isAdmin' => $request->user()->hasRole('administrateur'), 'permissions' => $request->user()->getAllPermissions()->pluck('name')] : null, 'adminContext' => fn () => $request->user()?->hasRole('administrateur') && ($request->is('administration', 'administration/*', 'securite', 'user/confirm-password'))
+        return [...parent::share($request), 'flash' => ['status' => $request->session()->get('status')], 'demoLabAvailable' => app()->environment('demo', 'local', 'testing'), 'f06Active' => fn () => app(FoundingModules::class)->f06Active(), 'auth' => ! in_array($request->path(), ['/', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'], true) && $request->user() ? ['id' => $request->user()->id, 'name' => $request->user()->name, 'isAdmin' => $request->user()->hasRole('administrateur'), 'permissions' => $request->user()->getAllPermissions()->pluck('name')] : null, 'adminContext' => fn () => $request->user()?->hasRole('administrateur') && ($request->is('administration', 'administration/*', 'securite', 'user/confirm-password'))
             ? $this->adminContext($request) : null];
     }
 
