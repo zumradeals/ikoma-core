@@ -10,7 +10,7 @@ use ZipArchive;
 require '/var/www/html/vendor/autoload.php';
 
 foreach (['pdo_pgsql', 'mbstring', 'zip', 'xmlreader', 'gd', 'libxml'] as $name) {
-    if (!extension_loaded($name)) {
+    if (! extension_loaded($name)) {
         throw new RuntimeException('Missing extension: '.$name);
     }
 }
@@ -22,7 +22,7 @@ if (InstalledVersions::getPrettyVersion('symfony/mime') !== 'v7.4.22') {
 }
 
 $path = tempnam(sys_get_temp_dir(), 'ikoma-xlsx-fixture-');
-$zip = new ZipArchive();
+$zip = new ZipArchive;
 if ($zip->open($path, ZipArchive::OVERWRITE) !== true) {
     throw new RuntimeException('Cannot create fixture');
 }
@@ -38,7 +38,7 @@ foreach ($files as $name => $value) {
 }
 $zip->close();
 try {
-    $reader = new XLSXReader(new XLSXOptions());
+    $reader = new XLSXReader(new XLSXOptions);
     $reader->open($path);
     $values = [];
     try {
