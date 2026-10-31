@@ -1,0 +1,111 @@
+name: S0.2 — Qualification isolée des CVE critiques
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-critique.yml'
+      - 'docker/qualification/**'
+      - 'scripts/security/qualify-alpine.php'
+      - 'scripts/security/qualify-critical.py'
+      - 'docs/security/S0.2-QUALIFICATION-CRITIQUES.md'
+
+permissions:
+  contents: read
+
+jobs:
+  libxml2-alpine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Préparer les preuves non sensibles
+        run: mkdir -p critical-alpine
+      - name: Compiler un runtime PHP Alpine expérimental (sans code IKOMA)
+        run: docker build --pull --file docker/qualification/php-alpine.Dockerfile --tag ikoma-qualification-php:alpine3.24 .
+      - name: Vérifier extensions PHP, version libxml, XML/CSV/ZIP/GD fictifs
+        run: |
+          set -euo pipefail
+          docker image inspect ikoma-qualification-php:alpine3.24 --format '{{.Id}}' > critical-alpine/php-image-id.txt
+          docker run --rm -i --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,size=32m --entrypoint php ikoma-qualification-php:alpine3.24 /dev/stdin < scripts/security/qualify-alpine.php | tee critical-alpine/php-runtime.json
+      - name: Démarrer PostgreSQL 18.6 Alpine en recette entièrement isolée
+        run: |
+          set -euo pipefail
+          docker build --pull --file docker/qualification/postgres-alpine.Dockerfile --tag ikoma-qualification-postgres:alpine3.24 .
+          docker image inspect ikoma-qualification-postgres:alpine3.24 --format '{{.Id}}' > critical-alpine/postgres-image-id.txt
+          docker run -d --rm --name ikoma-qualif-db --network none --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m -e POSTGRES_PASSWORD=donnees-fictives-uniquement ikoma-qualification-postgres:alpine3.24
+          for n in $(seq 1 45); do
+            if docker exec ikoma-qualif-db pg_isready -U postgres -d postgres >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          docker exec ikoma-qualif-db pg_isready -U postgres -d postgres
+          docker exec ikoma-qualif-db postgres --version | grep -F 'PostgreSQL) 18.6'
+          docker exec ikoma-qualif-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE TABLE ikoma_fixture (id integer PRIMARY KEY, label text);'
+          docker exec ikoma-qualif-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "INSERT INTO ikoma_fixture VALUES (1, 'fictif');"
+          docker exec ikoma-qualif-db pg_dump -U postgres -d postgres -Fc > "$RUNNER_TEMP/ikoma-fixture.dump"
+          docker exec ikoma-qualif-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'TRUNCATE TABLE ikoma_fixture;'
+          docker exec -i ikoma-qualif-db pg_restore -U postgres -d postgres --clean --if-exists < "$RUNNER_TEMP/ikoma-fixture.dump"
+          value=$(docker exec ikoma-qualif-db psql -U postgres -d postgres -Atqc 'SELECT count(*) FROM ikoma_fixture')
+          test "$value" = 1
+          docker exec ikoma-qualif-db psql -U postgres -d postgres -Atqc "SELECT current_setting('server_version'), current_setting('server_encoding');" | tee critical-alpine/postgres-version.txt
+          docker exec ikoma-qualif-db sh -c 'id postgres; cat /etc/os-release | grep -E "^(ID|VERSION_ID)="; apk info -v libxml2 || true' | tee critical-alpine/postgres-os.txt
+          echo "fixture_backup_restore=passed" > critical-alpine/postgres-fixture.txt
+      - name: Arrêter le conteneur de recette
+        if: always()
+        run: docker rm -f ikoma-qualif-db 2>/dev/null || true
+      - name: Scanner les deux images candidates (sans ignorer les CVE non corrigées)
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh
+          printf '{}\n' > "$RUNNER_TEMP/trivy-empty.yaml"
+          : > "$RUNNER_TEMP/trivy-empty-ignore"
+          for service in php postgres; do
+            if [ "$service" = php ]; then image=ikoma-qualification-php:alpine3.24; else image=ikoma-qualification-postgres:alpine3.24; fi
+            /tmp/ikoma-security-tools/trivy image --config "$RUNNER_TEMP/trivy-empty.yaml" --image-src docker --ignorefile "$RUNNER_TEMP/trivy-empty-ignore" --ignore-unfixed=false --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL --format json --exit-code 0 --output "$RUNNER_TEMP/trivy-$service.json" "$image"
+          done
+          python3 scripts/security/qualify-critical.py alpine --php "$RUNNER_TEMP/trivy-php.json" --postgres "$RUNNER_TEMP/trivy-postgres.json" --output critical-alpine/candidate-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-libxml2-alpine
+          path: critical-alpine/
+          if-no-files-found: warn
+          retention-days: 90
+
+  gosu-reachability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+      - name: Extraire le gosu de PostgreSQL 18.6 Trixie et vérifier son SHA-256 historique
+        run: |
+          set -euo pipefail
+          mkdir -p critical-gosu
+          docker pull postgres:18.6-trixie
+          container=$(docker create postgres:18.6-trixie)
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container:/usr/local/bin/gosu" "$RUNNER_TEMP/gosu"
+          test "$(sha256sum "$RUNNER_TEMP/gosu" | cut -d' ' -f1)" = '52c8749d0142edd234e9d6bd5237dff2d81e71f43537e2f4f66f75dd4b243dd0'
+          docker image inspect postgres:18.6-trixie --format '{{.Id}}' > critical-gosu/postgres-image-id.txt
+          go version -m "$RUNNER_TEMP/gosu" > critical-gosu/gosu-build-information.txt
+          sha256sum "$RUNNER_TEMP/gosu" > critical-gosu/gosu-sha256.txt
+      - name: Installer l'outil Go officiel à version fixée (CI uniquement)
+        run: |
+          set -euo pipefail
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          "$(go env GOPATH)/bin/govulncheck" -version > critical-gosu/govulncheck-version.txt
+      - name: Analyser les symboles du binaire exact et enregistrer l'avis Go officiel
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 https://vuln.go.dev/ID/GO-2026-4337.json -o "$RUNNER_TEMP/GO-2026-4337.json"
+          "$(go env GOPATH)/bin/govulncheck" -mode=binary -json "$RUNNER_TEMP/gosu" > "$RUNNER_TEMP/govu-events.jsonl"
+          python3 scripts/security/qualify-critical.py gosu --binary "$RUNNER_TEMP/gosu" --advisory "$RUNNER_TEMP/GO-2026-4337.json" --govulncheck "$RUNNER_TEMP/govu-events.jsonl" --output critical-gosu/reachability-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qualification-gosu-go
+          path: critical-gosu/
+          if-no-files-found: warn
+          retention-days: 90
