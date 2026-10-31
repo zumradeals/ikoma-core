@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Alerts;
 use App\Services\Audit;
 use App\Services\Groups;
+use App\Services\FoundingModules;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -139,6 +140,9 @@ final class SyncProcessor
                 }
                 if (! $agent->can(self::PERMISSIONS[$type])) {
                     throw new DeskRefused('non_autorise', 'Action non autorisée pour ce compte.', 403);
+                }
+                if (str_starts_with($type, 'groupe_')) {
+                    app(FoundingModules::class)->requireF06();
                 }
                 $this->checkRevision($device, $id, $visitorId, $op);
                 $result = DB::transaction(fn () => $this->execute($device, $agent, $type, $payload, $clientTime));
