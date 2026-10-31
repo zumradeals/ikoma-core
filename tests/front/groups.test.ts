@@ -34,6 +34,18 @@ const op = (list: LocalList, type: string, payload: Record<string, unknown>) => 
 const refused = (fn: () => unknown): string | null => { try { fn(); } catch (e) { return e instanceof ApiError ? e.code : 'autre'; } return null; };
 
 describe('règles des groupes sur la copie locale', () => {
+  it('refuse hors ligne les actions F06 désactivées ou provenant d’une copie sans indicateur', async () => {
+    const inactive = await snapshot();
+    inactive.settings.f06_active = false;
+    const list = new LocalList(inactive);
+    expect(groupSummaries(list)).toEqual([]);
+    expect(() => groupView(list, 'g1')).toThrow('désactivé');
+    expect(() => applyGroupOp(list, 'groupe_depart', { group_id: 'g1' })).toThrow('désactivé');
+    delete inactive.settings.f06_active;
+    expect(() => applyGroupOp(new LocalList(inactive), 'groupe_depart', { group_id: 'g1' })).toThrow('désactivé');
+  });
+
+
   it('mode encadreur : le contrôle exige la confirmation, puis la remise exige le contrôle et un badge du lot', async () => {
     const list = new LocalList(await snapshot());
     expect(refused(() => op(list, 'groupe_controle', { group_id: 'g1', visitor_id: 's3' }))).toBe('confirmation_encadreur_requise');
