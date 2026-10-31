@@ -33,6 +33,7 @@ final class Groups
         $this->assertSupervisor($supervisorId);
         $id = (string) Str::uuid();
         DB::transaction(function () use ($id, $eventId, $name, $bus, $supervisorId, $actor): void {
+            app(FoundingModules::class)->requireF06();
             DB::table('groups')->insert(['id' => $id, 'event_id' => $eventId, 'name' => mb_substr(trim($name), 0, 120), 'bus_number' => $bus !== null && trim($bus) !== '' ? mb_substr(trim($bus), 0, 60) : null, 'supervisor_id' => $supervisorId, 'created_at' => now(), 'updated_at' => now()]);
             $this->audit->append('groupe.cree', $actor->id, ['group_id' => $id, 'event_id' => $eventId, 'encadreur_id' => $supervisorId]);
         });
@@ -44,8 +45,11 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         $this->assertSupervisor($supervisorId);
-        DB::table('groups')->where('id', $groupId)->update(['supervisor_id' => $supervisorId, 'updated_at' => now()]);
-        $this->audit->append('groupe.encadreur_designe', $actor->id, ['group_id' => $groupId, 'encadreur_id' => $supervisorId]);
+        DB::transaction(function () use ($groupId, $supervisorId, $actor): void {
+            app(FoundingModules::class)->requireF06();
+            DB::table('groups')->where('id', $groupId)->update(['supervisor_id' => $supervisorId, 'updated_at' => now()]);
+            $this->audit->append('groupe.encadreur_designe', $actor->id, ['group_id' => $groupId, 'encadreur_id' => $supervisorId]);
+        });
     }
 
     private function assertSupervisor(?string $userId): void
@@ -60,6 +64,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         DB::transaction(function () use ($groupId, $visitorId, $actor): void {
+            app(FoundingModules::class)->requireF06();
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
             $visitor = DB::table('visitors')->where('id', $visitorId)->where('event_id', $group->event_id)->lockForUpdate()->first() ?? throw new DeskRefused('visiteur_inconnu', 'Visiteur introuvable pour cet événement.', 404);
             if ($visitor->group_id !== null) {
@@ -76,6 +81,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         DB::transaction(function () use ($groupId, $visitorId, $actor): void {
+            app(FoundingModules::class)->requireF06();
             if (DB::table('badge_assignments')->where('visitor_id', $visitorId)->whereNull('returned_at')->whereNull('cancelled_at')->exists()) {
                 throw new DeskRefused('badge_remis', 'Un badge a déjà été remis à cette personne : elle ne peut plus être retirée du groupe.', 409);
             }
@@ -153,6 +159,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($agent, $groupId, $visitorId, $identityChecked): array {
+            app(FoundingModules::class)->requireF06();
             $this->open($groupId, $agent);
             $member = $this->member($groupId, $visitorId);
             $mode = $this->mode();
@@ -181,6 +188,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         DB::transaction(function () use ($encadreur, $groupId, $visitorId): void {
+            app(FoundingModules::class)->requireF06();
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first();
             if ($group === null || $group->supervisor_id !== $encadreur->id) {
                 throw new DeskRefused('groupe_interdit', 'Ce groupe n’est pas le vôtre.', 403);
@@ -206,6 +214,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($device, $agent, $groupId, $visitorId, $code): array {
+            app(FoundingModules::class)->requireF06();
             $group = $this->open($groupId, $agent);
             $member = $this->member($groupId, $visitorId);
             if ($group->departed_at !== null) {
@@ -248,6 +257,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($agent, $groupId): array {
+            app(FoundingModules::class)->requireF06();
             $group = $this->open($groupId, $agent);
             $this->ensureMembers($groupId);
             if ($group->departed_at !== null) {
@@ -280,6 +290,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($device, $agent, $code, $declaredAt): array {
+            app(FoundingModules::class)->requireF06();
             $input = trim($code);
             if (str_starts_with($input, QrSvg::PREFIX)) {
                 $input = substr($input, strlen(QrSvg::PREFIX));
@@ -324,6 +335,7 @@ final class Groups
     {
         app(FoundingModules::class)->requireF06();
         return DB::transaction(function () use ($groupId): array {
+            app(FoundingModules::class)->requireF06();
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
             $arrived = (int) $this->activeMembers($groupId)->whereNotNull('arrived_at')->count();
             $missing = (int) $this->activeMembers($groupId)->whereNotNull('boarded_at')->whereNull('arrived_at')->count();
