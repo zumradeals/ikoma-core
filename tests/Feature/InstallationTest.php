@@ -25,6 +25,8 @@ beforeEach(function () {
     DB::table('users')->delete();
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     DB::table('settings')->where('key', 'installation_terminee')->update(['value' => '0']);
+    // La recette CI peut contenir un événement de démonstration antérieur : mémoriser la référence.
+    $this->initialEventCount = DB::table('events')->count();
     $this->audit = (int) DB::table('audit_logs')->max('id');
 });
 
@@ -47,7 +49,8 @@ it('affiche les vérifications puis crée l’administrateur, l’événement et
     $admin = User::where('email', 'admin-install@exemple.test')->firstOrFail();
     expect($admin->hasRole('administrateur'))->toBeTrue()->and($admin->two_factor_confirmed_at)->toBeNull()->and($admin->password)->not->toContain('Fictif')
         ->and($admin->requiresTwoFactor())->toBeTrue();
-    $event = DB::table('events')->first();
+    $event = DB::table('events')->where('name', 'Événement fictif')->first();
+    expect($event)->not->toBeNull();
     expect($event->name)->toBe('Événement fictif')->and(DB::table('zones')->where('event_id', $event->id)->where('est_accueil', true)->where('name', 'Accueil')->exists())->toBeTrue();
     expect(DB::table('settings')->where('key', 'installation_terminee')->value('value'))->toBe('1');
     $log = DB::table('audit_logs')->where('id', '>', $this->audit)->whereIn('action', ['installation.terminee', 'compte.cree'])->get()->map(fn ($l) => json_encode($l))->implode('');
@@ -73,7 +76,7 @@ it('refuse un mauvais jeton, un mot de passe faible et une date de fin avant le 
     $this->post('/installation', installationPayload(['password' => 'faible', 'password_confirmation' => 'faible']))->assertSessionHasErrors('password');
     $this->post('/installation', installationPayload(['password_confirmation' => 'autre-chose']))->assertSessionHasErrors('password');
     $this->post('/installation', installationPayload(['ends_at' => '2027-02-01 08:00']))->assertSessionHasErrors('ends_at');
-    expect(User::count())->toBe(0)->and(DB::table('events')->count())->toBe(0);
+    expect(User::count())->toBe(0)->and(DB::table('events')->count())->toBe($this->initialEventCount);
     expect(DB::table('settings')->where('key', 'installation_terminee')->value('value'))->toBe('0');
 });
 
