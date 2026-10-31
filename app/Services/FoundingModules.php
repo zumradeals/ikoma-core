@@ -37,7 +37,10 @@ final class FoundingModules
 
     public function requireF06(): void
     {
-        if (! $this->f06Active()) {
+        // Un verrou partagé tenu par la transaction en cours empêche une bascule
+        // simultanée pendant l'application des mouvements collectifs.
+        $active = DB::table('settings')->where('key', self::F06_KEY)->sharedLock()->value('value') === '1';
+        if (! $active) {
             throw new DeskRefused('module_f06_inactif', 'Groupes et cars (F06) est désactivé par l’administrateur. Les autres modules restent accessibles.', 403);
         }
     }
@@ -71,8 +74,14 @@ final class FoundingModules
             }
             if (! $active) {
                 $ongoing = DB::table('groups')
-                    ->whereNotNull('opened_at')->whereNull('arrival_closed_at')
-                    ->exists();
+                    ->whereNull('arrival_closed_at')
+                    ->where(function ($query): void {
+                        $query->whereNotNull('opened_at')
+                            ->orWhereExists(fn ($members) => $members->selectRaw('1')->from('group_members as gm')
+                                ->whereColumn('gm.group_id', 'groups.id')
+                                ->where(fn ($activity) => $activity->whereNotNull('confirmed_at')->orWhereNotNull('checked_at')
+                                    ->orWhereNotNull('boarded_at')->orWhereNotNull('arrived_at')));
+                    })->exists();
                 if ($ongoing) {
                     throw ValidationException::withMessages(['module' => 'Impossible de désactiver F06 : des groupes sont engagés et leur arrivée n’est pas clôturée. Terminez les opérations et synchronisez les tablettes.']);
                 }
