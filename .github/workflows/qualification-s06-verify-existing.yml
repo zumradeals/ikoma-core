@@ -1,0 +1,197 @@
+name: S0.6 - Verification du candidat GHCR deja publie, sans republication
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-s06-verify-existing.yml'
+      - 'scripts/security/s06-attestation-gate.py'
+      - 'tests/security/test_s06_attestation_gate.py'
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Numero du workflow S0.6 ayant publie le candidat'
+        required: true
+        type: string
+      expected_commit:
+        description: 'SHA complet du commit qui a publie le candidat'
+        required: true
+        type: string
+      expected_digest:
+        description: 'Digest OCI du candidat deja publie'
+        required: true
+        type: string
+      confirmation:
+        description: 'Saisir VERIFY_EXISTING_ONLY'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests/security -p 'test_s06_attestation_gate.py' -v
+
+  verify-existing:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+      attestations: read
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      EXPECTED_DIGEST: ${{ inputs.expected_digest }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      IMAGE_NAME: ghcr.io/zumradeals/ikoma-access-postgres-candidate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Valider la requete et la publication GitHub origine
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "zumradeals/ikoma-core"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRMATION" = "VERIFY_EXISTING_ONLY"
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]{8,15}$ ]]
+          [[ "$EXPECTED_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$EXPECTED_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          mkdir -p "$RUNNER_TEMP/s06-private" "$RUNNER_TEMP/s06-evidence"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" \
+            > "$RUNNER_TEMP/s06-private/original-run.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          x=json.loads((Path(os.environ['RUNNER_TEMP'])/'s06-private/original-run.json').read_text())
+          if not (x.get('event')=='workflow_dispatch' and x.get('head_branch')=='main'
+                  and x.get('head_sha')==os.environ['EXPECTED_COMMIT']
+                  and 'qualification-s06-ghcr.yml' in (x.get('path') or '')):
+              raise SystemExit('STOP: candidate run identity mismatch')
+          print('Original publication run: PASS')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: s06-ghcr-release-preuve
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: s06-release
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Verifier les metadonnees de l'image deja publiee
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads(Path('s06-release/release.json').read_text())
+          image=os.environ['IMAGE_NAME']; commit=os.environ['EXPECTED_COMMIT']; digest=os.environ['EXPECTED_DIGEST']
+          checks=(r.get('schema')==1,
+             r.get('status')=='PUBLISHED_CANDIDATE_UNVERIFIED_ON_SECOND_RUNNER',
+             r.get('source_repository')=='zumradeals/ikoma-core',
+             r.get('source_commit')==commit,r.get('registry_name')==image,
+             r.get('tag')==image+':rc-'+commit,
+             r.get('digest')==digest,r.get('immutable_ref')==image+'@'+digest,
+             r.get('production_deployment_authorized') is False,
+             r.get('real_data_migration_authorized') is False)
+          if not all(checks):raise SystemExit('STOP: release manifest differs from original approved reference')
+          print('Existing release record: PASS')
+          PY
+      - name: Charger la meme image par digest OCI sur runner independant
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="$IMAGE_NAME@$EXPECTED_DIGEST"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
+          docker pull "$ref"
+          docker image inspect "$ref" --format '{{.Id}}' > "$RUNNER_TEMP/s06-private/image.id"
+          docker image inspect "$ref" --format '{{range .RepoDigests}}{{println .}}{{end}}' > "$RUNNER_TEMP/s06-private/refs.txt"
+          cid="$(docker create "$ref")"
+          docker cp "$cid:/usr/local/bin/gosu" "$RUNNER_TEMP/s06-private/gosu"
+          docker rm "$cid" > /dev/null
+          go version -m "$RUNNER_TEMP/s06-private/gosu" > "$RUNNER_TEMP/s06-private/gosu.version"
+      - name: Verifier la signature GitHub, le SLSA et le digest du manifeste
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="$IMAGE_NAME@$EXPECTED_DIGEST"
+          gh attestation verify "oci://$ref" -R "$GITHUB_REPOSITORY" \
+            --format json --source-ref refs/heads/main \
+            --source-digest "$EXPECTED_COMMIT" \
+            > "$RUNNER_TEMP/s06-private/verified-attestation.json"
+          python3 scripts/security/s06-attestation-gate.py \
+            --release-record s06-release/release.json \
+            --verified-json "$RUNNER_TEMP/s06-private/verified-attestation.json" \
+            --commit "$EXPECTED_COMMIT" --digest "$EXPECTED_DIGEST" \
+            --repository "$GITHUB_REPOSITORY" \
+            --output "$RUNNER_TEMP/s06-evidence/attestation-check.json"
+      - name: Rescanner strictement le candidat GHCR reimporte
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s06-private/tools.log" 2>&1
+          printf '{}\n' > "$RUNNER_TEMP/s06-private/config.yaml"
+          : > "$RUNNER_TEMP/s06-private/ignore"
+          image="$(cat "$RUNNER_TEMP/s06-private/image.id")"
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/s06-private/config.yaml" \
+            --ignorefile "$RUNNER_TEMP/s06-private/ignore" \
+            --image-src docker --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --ignore-unfixed=false --exit-code 0 --format json \
+            --output "$RUNNER_TEMP/s06-private/trivy.json" "$image"
+          python3 scripts/security/s03-pg-scan-gate.py \
+            "$RUNNER_TEMP/s06-private/trivy.json" "$RUNNER_TEMP/s06-private/image.id" \
+            "$RUNNER_TEMP/s06-private/scan-gate.json"
+          python3 scripts/security/s06-oci-gate.py consumer \
+            --lock docs/security/S0.4-IMAGE-LOCK.json \
+            --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_NAME" \
+            --commit "$EXPECTED_COMMIT" \
+            --gosu "$RUNNER_TEMP/s06-private/gosu" \
+            --metadata "$RUNNER_TEMP/s06-private/gosu.version" \
+            --release-record s06-release/release.json \
+            --image-id "$(cat "$RUNNER_TEMP/s06-private/image.id")" \
+            --repo-digests "$RUNNER_TEMP/s06-private/refs.txt" \
+            --scan-gate "$RUNNER_TEMP/s06-private/scan-gate.json" \
+            --output "$RUNNER_TEMP/s06-evidence/consumed.json"
+      - name: Verifier PostgreSQL sur base relationnelle fictive et jetable
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="$IMAGE_NAME@$EXPECTED_DIGEST"
+          docker run -d --rm --name s06-pg-verification --network none \
+            --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m \
+            -e POSTGRES_PASSWORD=fictif -e POSTGRES_DB=ikoma_fixture "$ref" >/dev/null
+          ready=0
+          for attempt in $(seq 1 45); do
+            if docker exec s06-pg-verification pg_isready -U postgres -d ikoma_fixture >/dev/null 2>&1; then
+              ready=1; break
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo 'STOP: published PostgreSQL candidate did not start'; exit 1; }
+          docker exec -i s06-pg-verification psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture \
+            < scripts/security/s03-pg-migration-fixture.sql > /dev/null
+          actual="$(docker exec s06-pg-verification psql -X -At -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture \
+            -c 'SELECT (SELECT count(*) FROM s03_visiteurs_fictifs), (SELECT count(*) FROM s03_badges_fictifs), (SELECT count(*) FROM s03_passages_fictifs);')"
+          test "$actual" = '1000|1000|2000' || { echo 'STOP: published fixture mismatch'; exit 1; }
+          echo 'published_fixture=PASS' > "$RUNNER_TEMP/s06-evidence/fixture.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s06-existing-candidate-consumer-preuves
+          path: ${{ runner.temp }}/s06-evidence/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Nettoyer la base fictive
+        if: always()
+        run: docker rm -f s06-pg-verification >/dev/null 2>&1 || true
