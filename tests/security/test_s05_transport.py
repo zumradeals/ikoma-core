@@ -112,6 +112,18 @@ class TransportContract(unittest.TestCase):
         with open(self.p/"image.tar","ab") as fp: fp.write(b"altered")
         self.assertNotEqual(self.verify().returncode,0)
 
+    def test_index_and_exported_config_id_are_distinct_but_attested(self):
+        # Docker's containerd-backed store may identify an OCI index rather than
+        # the config digest serialized by docker save.
+        (self.p/"source.id").write_text("sha256:"+"c"*64)
+        result=self.create()
+        self.assertEqual(result.returncode,0,result.stderr)
+        details=json.loads((self.p/"transport.json").read_text())
+        self.assertTrue(details["source_and_archive_ids_differ"])
+        self.assertEqual(details["source_docker_image_id"],"sha256:"+"c"*64)
+        verified=self.verify()
+        self.assertEqual(verified.returncode,0,verified.stderr)
+
     def test_loaded_image_digest_mismatch_rejected(self):
         self.assertEqual(self.create().returncode,0)
         (self.p/"loaded.id").write_text("sha256:"+"f"*64)
