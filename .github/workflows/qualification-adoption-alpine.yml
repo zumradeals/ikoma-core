@@ -127,6 +127,9 @@ jobs:
           cd "$IKOMA_E2E_DIR"
           make install > "$RUNNER_TEMP/alpine-install-private.log" 2>&1 || { echo 'STOP: installation E2E'; exit 1; }
           make up > "$RUNNER_TEMP/alpine-up-private.log" 2>&1 || { echo 'STOP: démarrage E2E'; exit 1; }
+          # La CLI des tests s'exécute en root ; le serveur web, lui, s'exécute
+          # en www-data. Vérifier les accès du vrai worker avant le navigateur.
+          docker compose exec -T --user www-data php sh -c 'test -r .env && test -r public/index.php' || { echo 'STOP: accès fichiers du worker PHP non-root'; exit 1; }
           echo 'installation=PASS' > "$RUNNER_TEMP/adoption-e2e/checks.txt"
       - name: Migrations et tests PHP du logiciel sur Alpine
         run: |
@@ -135,6 +138,15 @@ jobs:
           make migrate-fresh-seed > "$RUNNER_TEMP/alpine-seed-private.log" 2>&1 || { echo 'STOP: migrations'; exit 1; }
           make test > "$RUNNER_TEMP/alpine-php-private.log" 2>&1 || { echo 'STOP: PHP'; exit 1; }
           make test-front > "$RUNNER_TEMP/alpine-front-private.log" 2>&1 || { echo 'STOP: tests front'; exit 1; }
+          # Ne pas masquer un HTTP 500 sous un timeout Playwright : sonder le vrai
+          # serveur après les migrations (sans journaliser de contenu ou d'URL privée).
+          login_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:8080/login || true)
+          echo "login_http_status=$login_status" >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
+          if [ "$login_status" != 200 ]; then
+            echo "STOP: GET /login HTTP $login_status sur Alpine"
+            python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log
+            exit 1
+          fi
           echo 'migrations_php_front=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
       - name: Tests navigateurs E2E, contrôle accueil et agent V2
         run: |
