@@ -111,7 +111,6 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
           "$(go env GOPATH)/bin/govulncheck" -mode=binary -json \
             "$RUNNER_TEMP/s03-pg-private/gosu" > "$RUNNER_TEMP/s03-pg-private/govulncheck.json"
-          cp "$RUNNER_TEMP/s03-pg-private/trivy-postgres.json" "$RUNNER_TEMP/s03-pg-private/trivy-postgres.json"
           python3 scripts/security/audit-gosu-highs.py \
             "$RUNNER_TEMP/s03-pg-private" \
             "$RUNNER_TEMP/s03-pg-evidence/gosu-cve-audit.json"
