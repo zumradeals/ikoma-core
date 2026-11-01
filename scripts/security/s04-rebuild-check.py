@@ -17,6 +17,25 @@ PARENTS = {
 }
 REVISION = "vcs.revision=" + UPSTREAM_COMMIT
 
+def read_lock(path):
+    try:
+        record = json.loads(Path(path).read_text())
+        assert record.get("schema_version") == 1
+        assert record.get("gosu_upstream_commit") == UPSTREAM_COMMIT
+        assert record.get("go_compiler") == GO_VERSION
+        assert record.get("production_adoption_authorized") is False
+        assert record.get("real_data_migration_authorized") is False
+        assert re.fullmatch(r"[0-9a-f]{64}", record["qualified_dockerfile_sha256"])
+        assert re.fullmatch(r"[0-9a-f]{64}", record["reproducible_gosu_binary_sha256"])
+        for repo in ("golang", "postgres"):
+            assert record["parents"][repo]["source_tag"] in PARENTS
+            assert re.fullmatch(repo + r"@sha256:[0-9a-f]{64}",
+                                record["parents"][repo]["locked_ref"])
+        return record
+    except (OSError, KeyError, ValueError, TypeError, AssertionError):
+        stop("missing, invalid or incomplete immutable image lock")
+
+
 def stop(why):
     raise SystemExit("STOP S0.4: " + why)
 
@@ -25,9 +44,12 @@ def sha256(p):
 
 def pin(args):
     source = Path(args.source).read_text()
+    locked = read_lock(args.lock)
     resolved = {}
     for base, repo in PARENTS.items():
         digest = getattr(args, repo)
+        if digest != locked["parents"][repo]["locked_ref"]:
+            stop("parent digest deviates from Git lock for " + repo)
         if not re.fullmatch(re.escape(repo) + r"@sha256:[0-9a-f]{64}", digest):
             stop("expected immutable digest reference for " + repo)
         if source.count("FROM " + base) != 1:
@@ -38,6 +60,8 @@ def pin(args):
         stop("upstream source commit changed")
     if "CGO_ENABLED=0 go build -trimpath -buildvcs=true" not in source:
         stop("qualified build flags changed")
+    if hashlib.sha256(source.encode()).hexdigest() != locked["qualified_dockerfile_sha256"]:
+        stop("pinned Dockerfile differs from approved Git lock")
     target = Path(args.output)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(source)
@@ -50,6 +74,7 @@ def pin(args):
     }, indent=2) + "\n")
 
 def verify(args):
+    locked = read_lock(args.lock)
     binaries = [Path(args.a), Path(args.b)]
     details = [Path(args.a_metadata), Path(args.b_metadata)]
     ids = [Path(args.a_imageid).read_text().strip(),
@@ -59,6 +84,8 @@ def verify(args):
         stop("invalid final image IDs")
     if digests[0] != digests[1]:
         stop("gosu output is not bit-for-bit reproducible")
+    if digests[0] != locked["reproducible_gosu_binary_sha256"]:
+        stop("gosu output differs from approved Git lock")
     for i, meta_path in enumerate(details):
         info = meta_path.read_text()
         if not (GO_VERSION in info and
@@ -93,11 +120,13 @@ if __name__ == "__main__":
     x = sub.add_parser("pin")
     for arg in ("source", "output", "evidence", "golang", "postgres"):
         x.add_argument("--" + arg.replace("_", "-"), required=True)
+    x.add_argument("--lock", required=True)
     x.set_defaults(action=pin)
     y = sub.add_parser("verify")
     for arg in ("a", "b", "a_metadata", "b_metadata", "a_imageid",
                 "b_imageid", "scan_a", "scan_b", "evidence"):
         y.add_argument("--" + arg.replace("_", "-"), required=True)
+    y.add_argument("--lock", required=True)
     y.set_defaults(action=verify)
     args = parser.parse_args()
     args.action(args)
