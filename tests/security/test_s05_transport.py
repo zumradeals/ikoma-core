@@ -124,6 +124,17 @@ class TransportContract(unittest.TestCase):
         verified=self.verify()
         self.assertEqual(verified.returncode,0,verified.stderr)
 
+    def test_loaded_index_scan_bound_to_actual_loaded_id(self):
+        (self.p/"source.id").write_text("sha256:"+"c"*64)
+        (self.p/"loaded.id").write_text("sha256:"+"c"*64)
+        (self.p/"scan.json").write_text(json.dumps({
+            "image_id": "sha256:"+"c"*64,
+            "high":0, "critical":0, "decision":"READY_FOR_ADDITIONAL_REVIEW"
+        }))
+        self.assertEqual(self.create().returncode,0)
+        result=self.verify()
+        self.assertEqual(result.returncode,0,result.stderr)
+
     def test_loaded_image_digest_mismatch_rejected(self):
         self.assertEqual(self.create().returncode,0)
         (self.p/"loaded.id").write_text("sha256:"+"f"*64)
