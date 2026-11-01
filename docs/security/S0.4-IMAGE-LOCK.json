@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "purpose": "S0.4 lab image source lock; not production release",
+  "gosu_upstream_commit": "6456aaa0f3c854d199d0f037f068eb97515b7513",
+  "go_compiler": "go1.27.3",
+  "parents": {
+    "golang": {
+      "source_tag": "golang:1.27.3-alpine3.24",
+      "locked_ref": "golang@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb"
+    },
+    "postgres": {
+      "source_tag": "postgres:18.6-alpine3.24",
+      "locked_ref": "postgres@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5"
+    }
+  },
+  "qualified_dockerfile_sha256": "ad75135bb7ac70899140652b9d12febeb592b1d166703838e4deb3ceb20ec257",
+  "reproducible_gosu_binary_sha256": "640ea04eed4ba9f2dad0535e7f68e4f4480689c61dc5a8cbd2065bc396dc6cf4",
+  "evidence_workflow_run": "41305397846",
+  "production_adoption_authorized": false,
+  "real_data_migration_authorized": false
+}
