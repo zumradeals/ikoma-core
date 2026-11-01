@@ -66,7 +66,8 @@ const setQr = (page: Page, code: string | null, car?: Car) => page.evaluate(svg 
 
 /** Ouvre l'écran des groupes de la tablette (enrôlement la première fois, PIN ensuite). */
 async function openCars(page: Page): Promise<void> {
-  await page.goto('/groupe');
+  const response = await page.goto('/groupe');
+  expect(response?.status(), `Réponse HTTP /groupe : ${await page.locator('body').innerText().catch(() => 'page indisponible')}`).toBe(200);
   const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou'); const ready = page.getByTestId('choix-groupe');
   await enrol.or(lock).or(ready).first().waitFor();
   if (await enrol.isVisible()) { await page.getByTestId('code-enrolement').fill(fx.enrolCode4); await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN); await page.getByTestId('enroler').click(); }
