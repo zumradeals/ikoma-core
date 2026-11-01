@@ -34,7 +34,8 @@ test.beforeAll(async ({ browser }, info) => {
 test.afterAll(async () => { await phone.close(); await tablet.close(); });
 
 async function openDesk(page: Page): Promise<void> {
-  await page.goto('/poste');
+  const response = await page.goto('/poste');
+  expect(response?.status(), `Réponse HTTP /poste : ${await page.locator('body').innerText().catch(() => 'page indisponible')}`).toBe(200);
   const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou'); const ready = page.getByText('Étape 1 sur 7');
   await enrol.or(lock).or(ready).first().waitFor();
   if (await enrol.isVisible()) { await page.getByTestId('code-enrolement').fill(fx.enrolCode3); await page.getByTestId('pin').fill(TABLET_PIN); await page.getByTestId('pin-confirmation').fill(TABLET_PIN); await page.getByTestId('enroler').click(); }
