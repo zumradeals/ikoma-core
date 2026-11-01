@@ -152,8 +152,8 @@ jobs:
         run: |
           set -euo pipefail
           cd "$IKOMA_E2E_DIR"
-          make e2e > "$RUNNER_TEMP/alpine-browser-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-browser-private.log" "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; echo 'STOP: E2E navigateur'; cat "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log; exit 1; }
-          make e2e-agent > "$RUNNER_TEMP/alpine-agent-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-agent-private.log" "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; echo 'STOP: E2E agent'; cat "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; exit 1; }
+          make --trace e2e > "$RUNNER_TEMP/alpine-browser-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-browser-private.log" "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; echo 'STOP: E2E navigateur'; cat "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log; exit 1; }
+          make --trace e2e-agent > "$RUNNER_TEMP/alpine-agent-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-agent-private.log" "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; echo 'STOP: E2E agent'; cat "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; exit 1; }
           echo 'e2e_browser_agent=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
       - uses: actions/upload-artifact@v4
         if: always()
