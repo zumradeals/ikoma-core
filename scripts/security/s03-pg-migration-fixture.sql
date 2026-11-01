@@ -21,7 +21,7 @@ CREATE INDEX s03_visiteurs_recherche_idx
 -- Elles complètent les accents de l'échantillon initial, sans représenter une base client.
 INSERT INTO s03_visiteurs_fictifs (id, full_name)
 SELECT n, 'Visiteur fictif ' || lpad(n::text, 5, '0')
-FROM generate_series(23, 1000) AS n;
+FROM generate_series(23, 1000) AS seq(n);
 CREATE TABLE s03_badges_fictifs (
     id integer PRIMARY KEY,
     visitor_id integer NOT NULL REFERENCES s03_visiteurs_fictifs (id),
@@ -42,6 +42,6 @@ INSERT INTO s03_passages_fictifs (id, badge_id, direction, recorded_at)
 SELECT n, ((n - 1) % 1000) + 1,
        CASE WHEN n % 2 = 1 THEN 'entree' ELSE 'sortie' END,
        timestamptz '2026-01-01 00:00:00+00' + n * interval '1 second'
-FROM generate_series(1, 2000) AS n;
+FROM generate_series(1, 2000) AS seq(n);
 CREATE INDEX s03_passages_badge_time_idx
     ON s03_passages_fictifs (badge_id, recorded_at);
