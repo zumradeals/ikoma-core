@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/qualification-s04-postgresql.yml'
       - 'scripts/security/s04-rebuild-check.py'
+      - 'tests/security/test_s04_rebuild.py'
       - 'scripts/security/s03-pg-scan-gate.py'
       - 'docker/qualification/postgres-gosu-go127-alpine.Dockerfile'
       - 'docs/security/S0.4-ADOPTION-CANDIDAT.md'
@@ -18,6 +19,8 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+      - name: Tests du contrat de refus S0.4
+        run: python3 -m unittest discover -s tests/security -p 'test_s04_rebuild.py' -v
       - name: Figer les deux images parentes par digest pour cette qualification
         shell: bash
         run: |
