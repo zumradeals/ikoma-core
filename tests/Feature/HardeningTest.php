@@ -59,41 +59,16 @@ it('journalise exactement un refus, même si middleware et rendu d’exception l
     expect(json_decode(DB::table('audit_logs')->orderByDesc('id')->value('details'), true))->toBe(['route' => 'administration/comptes', 'statut' => 403]);
 });
 
-it('exige les droits, la préparation, le secret administrateur et un jeton à usage unique pour réinitialiser le 2FA', function () {
+it('ne permet plus de réinitialiser la 2FA depuis les routes administratives', function () {
     $admin = hardeningUser();
-    $password = Str::password(24).'aA1!';
-    $admin->update(['password' => $password]);
     $target = hardeningUser('superviseur');
-    $target->update(['two_factor_secret' => encrypt('SECRET_FICTIF'), 'two_factor_recovery_codes' => encrypt('[]'), 'remember_token' => 'ancien-jeton-fictif']);
-    DB::table('sessions')->insert(['id' => Str::random(40), 'user_id' => $target->id, 'payload' => '', 'last_activity' => now()->timestamp]);
+    $target->update(['two_factor_secret' => encrypt('SECRET_FICTIF'), 'two_factor_recovery_codes' => encrypt('[]')]);
+    $secret = $target->fresh()->two_factor_secret;
     $url = '/administration/comptes/'.$target->id.'/2fa/';
-    $this->actingAs(hardeningUser('agent_accueil'))->post($url.'preparer')->assertForbidden();
-    $this->actingAs($admin)->post('/administration/comptes/'.$admin->id.'/2fa/preparer')->assertForbidden();
-    $this->post($url.'confirmer', ['token' => str_repeat('a', 64), 'password' => $password, 'confirmation' => true])->assertStatus(409);
-    $this->post($url.'preparer')->assertRedirect()->assertSessionHas('twoFactorReset');
-    $token = session('twoFactorReset.token');
-    $this->post($url.'confirmer', ['token' => $token, 'password' => 'incorrect', 'confirmation' => true])->assertSessionHasErrors('password');
-    expect($target->fresh()->two_factor_secret)->not->toBeNull();
-    $this->post($url.'preparer')->assertRedirect();
-    $token = session('twoFactorReset.token');
-    $this->post($url.'confirmer', ['token' => $token, 'password' => $password, 'confirmation' => true])->assertRedirect();
-    expect($target->fresh()->two_factor_secret)->toBeNull()->and($target->fresh()->two_factor_recovery_codes)->toBeNull()->and($target->fresh()->two_factor_confirmed_at)->toBeNull()->and($target->fresh()->remember_token)->toBeNull();
-    expect(DB::table('sessions')->where('user_id', $target->id)->exists())->toBeFalse();
-    expect(DB::table('audit_logs')->where('action', 'compte.2fa_reinitialisee')->where('actor_id', $admin->id)->count())->toBe(1);
-    $this->travel(61)->seconds();
-    $this->post($url.'confirmer', ['token' => $token, 'password' => $password, 'confirmation' => true])->assertStatus(409);
-    $this->actingAs($target->fresh())->get('/espace')->assertRedirect('/pilotage');
+    $this->actingAs($admin)->post($url.'preparer')->assertNotFound();
+    $this->post($url.'confirmer', ['token' => str_repeat('a', 64), 'password' => 'test', 'confirmation' => true])->assertNotFound();
+    expect($target->fresh()->two_factor_secret)->toBe($secret);
 });
-
-it('expire une préparation de réinitialisation et refuse un autre destinataire', function () {
-    $admin = hardeningUser();
-    $target = hardeningUser('superviseur');
-    $this->actingAs($admin)->post('/administration/comptes/'.$target->id.'/2fa/preparer');
-    $token = session('twoFactorReset.token');
-    $this->travel(301)->seconds();
-    $this->post('/administration/comptes/'.$target->id.'/2fa/confirmer', ['token' => $token, 'password' => 'incorrect', 'confirmation' => true])->assertStatus(409);
-});
-
 it('invalide toutes les sessions et les jetons persistants après mot de passe, rôle et statut', function () {
     $admin = hardeningUser();
     $target = hardeningUser('agent_accueil');
