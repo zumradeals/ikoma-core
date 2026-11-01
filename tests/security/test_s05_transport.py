@@ -82,6 +82,31 @@ class TransportContract(unittest.TestCase):
         self.assertIsNone(evidence["registry_manifest_digest"])
         self.assertFalse(evidence["production_deployment_authorized"])
 
+    def test_modern_content_addressed_archive(self):
+        archive = self.p / "image.tar"
+        config = b'{"created":"2026-11-01","config":{"User":"postgres"}}'
+        image_hex = hashlib.sha256(config).hexdigest()
+        layer = b"layer-dummy"
+        layer_hex = hashlib.sha256(layer).hexdigest()
+        manifest = json.dumps([{
+            "Config": "blobs/sha256/" + image_hex,
+            "RepoTags": ["ikoma-s05:rc"],
+            "Layers": ["blobs/sha256/" + layer_hex],
+        }]).encode()
+        with tarfile.open(archive, "w") as out:
+            for name, data in [
+                ("blobs/sha256/" + image_hex, config),
+                ("blobs/sha256/" + layer_hex, layer),
+                ("manifest.json", manifest)
+            ]:
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                out.addfile(info, io.BytesIO(data))
+        r = self.create()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        verified = self.verify()
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+
     def test_tampered_archive_is_rejected(self):
         self.assertEqual(self.create().returncode,0)
         with open(self.p/"image.tar","ab") as fp: fp.write(b"altered")
