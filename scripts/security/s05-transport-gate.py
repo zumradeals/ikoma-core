@@ -161,7 +161,7 @@ def verify(args):
         stop("source commit malformed")
     ensure_binary(args.gosu, args.metadata, lock)
     scan = json.loads(Path(args.scan_gate).read_text())
-    if (scan.get("image_id") != details["config_image_id"] or scan.get("high") != 0
+    if (scan.get("image_id") != loaded_id or scan.get("high") != 0
             or scan.get("critical") != 0 or scan.get("decision") != "READY_FOR_ADDITIONAL_REVIEW"):
         stop("transported image scan incomplete or unsafe")
     Path(args.output).write_text(json.dumps({
