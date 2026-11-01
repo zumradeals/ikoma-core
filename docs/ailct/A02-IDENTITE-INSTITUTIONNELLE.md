@@ -1,6 +1,6 @@
 # A02 — Identité institutionnelle AILCT : spécification et inventaire des surfaces
 
-Statut : **proposition de conception, documentaire**. Aucun fichier applicatif, aucune migration, aucune donnée ni permission n'est modifié par ce lot. Elle attend la validation du dirigeant avant toute implémentation.
+Statut : **proposition de conception, documentaire — révision R01** (section 12 ajoutée ; aucune autre exigence d'identité modifiée). Aucun fichier applicatif, aucune migration, aucune donnée ni permission n'est modifié par ce lot. Elle attend la validation du dirigeant avant toute implémentation.
 Base de code étudiée : `main` au commit `9a7729f`.
 Documents de référence (sur la PR n° 61, non fusionnée au moment de la rédaction) : `docs/ailct/AILCT-IDENTITY-001.md`, `docs/ailct/AILCT-BADGE-001.md`, `docs/ailct/A01-ARCHITECTURE-ET-COMPATIBILITE.md`. Contrat des modules : `docs/MODULES_FONDATEURS.md` (ACCESS-FOUNDATION-001).
 Documents frères : [A02-BADGES-INSTITUTIONNELS.md](A02-BADGES-INSTITUTIONNELS.md), [A02-PLAN-IMPLEMENTATION.md](A02-PLAN-IMPLEMENTATION.md).
@@ -245,3 +245,13 @@ Registre complet : `A02-PLAN-IMPLEMENTATION.md`, section 8.
 - **[D-17]** Langues (français seul ou bilingue).
 - **[D-19]** Préfixe `IKOMA1:` du QR : le conserver et en informer le client.
 - **[D-20]** Mention de confidentialité sur les documents imprimés.
+
+## 12. Compléments de la révision R01 : compatibilité avec les contrats permanents et hors ligne
+
+Les contrats des sections 15 et 16 du document badges sont **indépendants de l'identité visuelle**. Points de compatibilité à respecter :
+
+1. **Aucune lecture du profil par le contrôle** (V-ID-08, V-ID-10) : les décisions de confiance hors ligne (âge des données, zones sensibles, motifs de refus) ne dépendent ni du logo, ni du nom, ni de la palette. Le test d'architecture TA-I04 couvre aussi les nouveaux services.
+2. **Messages de refus hors ligne** (`donnees_perimees`, `horloge_anormale`, `zone_sensible_en_ligne`…) : leur libellé est du **texte d'interface** soumis à l'anti-fuite de marque (TA-I01) ; aucun libellé n'emploie « IKOMA ».
+3. **Coquille hors ligne et PWA** : le profil d'identité est une donnée de **mise en forme** mise en cache avec la coquille ; un profil périmé ne change jamais un droit. La limite d'âge des données de **contrôle** (section 16) est indépendante de celle de la coquille.
+4. **Libellés des catégories institutionnelles** (huit catégories) : portés par le profil ; ils ne servent qu'à l'affichage (INV-G02).
+5. **Impact sur F01–F09** : aucun changement par rapport à la section 9 ; l'impact des permanents et du hors ligne est dans les sections 15.6 et 16.12 du document badges.
