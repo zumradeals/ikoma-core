@@ -36,10 +36,32 @@ export async function freshOtp(secret: string): Promise<string> {
 export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string, onChallenge?: () => Promise<void>, onStage?: (stage: string) => void): Promise<void> {
   for (let attempt = 0; attempt < 2; attempt++) {
     onStage?.('login.open');
-    await page.goto('/login');
-    onStage?.('login.rendered');
-    await page.getByLabel('Adresse électronique').fill(email);
+    const loginResponse = await page.goto('/login');
+    onStage?.('login.navigated');
+    const currentPath = new URL(page.url()).pathname;
+    onStage?.(currentPath === '/login' ? 'login.path.login' : 'login.path.other');
+    if (loginResponse?.status() === 200) onStage?.('login.http.ok');
+    else if ((loginResponse?.status() ?? 0) >= 500) onStage?.('login.http.servererror');
+    else onStage?.('login.http.unexpected');
+    const mount = page.locator('#app');
+    onStage?.(await mount.count() ? 'login.mount.present' : 'login.mount.absent');
+    const emailInput = page.getByLabel('Adresse électronique');
+    const loginHeading = page.getByRole('heading', { name: 'Se connecter', exact: true });
+    try {
+      await expect(loginHeading).toBeVisible({ timeout: 12_000 });
+      onStage?.('login.heading.visible');
+      await expect(emailInput).toBeVisible({ timeout: 8_000 });
+      onStage?.('login.email.visible');
+    } catch {
+      onStage?.(await page.locator('input[type="email"]').count() ? 'login.email.exists' : 'login.email.absent');
+      onStage?.(await page.locator('script[type="module"]').count() ? 'login.scripts.present' : 'login.scripts.absent');
+      onStage?.(await page.locator('h1').count() ? 'login.headings.present' : 'login.headings.absent');
+      throw new Error('Le formulaire de connexion ne s’affiche pas dans le navigateur E2E (voir les jalons non sensibles).');
+    }
+    await emailInput.fill(email);
+    onStage?.('login.email.filled');
     await page.getByLabel('Mot de passe', { exact: true }).fill(password);
+    onStage?.('login.password.filled');
     onStage?.('login.submit');
     const [response] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === '/login' && r.request().method() === 'POST'),
