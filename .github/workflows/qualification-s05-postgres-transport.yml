@@ -1,0 +1,182 @@
+name: S0.5 - Archive transportable PostgreSQL corrigé (sans publication)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-s05-postgres-transport.yml'
+      - 'scripts/security/s05-transport-gate.py'
+      - 'tests/security/test_s05_transport.py'
+      - 'docs/security/S0.5-CANDIDAT-TRANSPORTABLE.md'
+      - 'docs/security/S0.4-IMAGE-LOCK.json'
+      - 'scripts/security/s04-rebuild-check.py'
+      - 'docker/qualification/postgres-gosu-go127-alpine.Dockerfile'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier le contrat de transport sans vraie image
+        run: python3 -m unittest discover -s tests/security -p 'test_s05_transport.py' -v
+      - name: Construire à partir des parents strictement verrouillés dans Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/s05-private" "$RUNNER_TEMP/s05-bundle"
+          go_ref="$(python3 -c 'import json; print(json.load(open("docs/security/S0.4-IMAGE-LOCK.json"))["parents"]["golang"]["locked_ref"])')"
+          pg_ref="$(python3 -c 'import json; print(json.load(open("docs/security/S0.4-IMAGE-LOCK.json"))["parents"]["postgres"]["locked_ref"])')"
+          docker pull "$go_ref"
+          docker pull "$pg_ref"
+          python3 scripts/security/s04-rebuild-check.py pin \
+            --lock docs/security/S0.4-IMAGE-LOCK.json \
+            --source docker/qualification/postgres-gosu-go127-alpine.Dockerfile \
+            --golang "$go_ref" --postgres "$pg_ref" \
+            --output "$RUNNER_TEMP/s05-private/pinned.Dockerfile" \
+            --evidence "$RUNNER_TEMP/s05-private/parents.json"
+          docker build --no-cache --pull -f "$RUNNER_TEMP/s05-private/pinned.Dockerfile" \
+            -t ikoma-s05:rc .
+          docker image inspect ikoma-s05:rc --format '{{.Id}}' \
+            > "$RUNNER_TEMP/s05-private/original-image.id"
+          cid="$(docker create ikoma-s05:rc)"
+          docker cp "$cid:/usr/local/bin/gosu" "$RUNNER_TEMP/s05-private/gosu"
+          docker rm "$cid" >/dev/null
+          go version -m "$RUNNER_TEMP/s05-private/gosu" > "$RUNNER_TEMP/s05-private/gosu.version"
+      - name: Exiger un scan intégral de l'image EXACTEMENT exportée
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s05-private/tools.log" 2>&1
+          printf '{}\n' > "$RUNNER_TEMP/s05-private/config.yaml"
+          : > "$RUNNER_TEMP/s05-private/ignore"
+          image="$(cat "$RUNNER_TEMP/s05-private/original-image.id")"
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/s05-private/config.yaml" \
+            --ignorefile "$RUNNER_TEMP/s05-private/ignore" \
+            --image-src docker --scanners vuln \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --ignore-unfixed=false --exit-code 0 --format json \
+            --output "$RUNNER_TEMP/s05-private/trivy.json" "$image"
+          python3 scripts/security/s03-pg-scan-gate.py \
+            "$RUNNER_TEMP/s05-private/trivy.json" \
+            "$RUNNER_TEMP/s05-private/original-image.id" \
+            "$RUNNER_TEMP/s05-private/scan-gate.json"
+      - name: Exporter l'image locale et attester le hash du transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker save -o "$RUNNER_TEMP/s05-bundle/ikoma-s05-rc.tar" ikoma-s05:rc
+          python3 scripts/security/s05-transport-gate.py create \
+            --archive "$RUNNER_TEMP/s05-bundle/ikoma-s05-rc.tar" \
+            --lock docs/security/S0.4-IMAGE-LOCK.json \
+            --gosu "$RUNNER_TEMP/s05-private/gosu" \
+            --metadata "$RUNNER_TEMP/s05-private/gosu.version" \
+            --image-id "$RUNNER_TEMP/s05-private/original-image.id" \
+            --source-commit "$(git rev-parse HEAD)" \
+            --run-id "$GITHUB_RUN_ID" \
+            --output "$RUNNER_TEMP/s05-bundle/transport.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s05-candidat-transportable-fictif
+          path: ${{ runner.temp }}/s05-bundle/
+          if-no-files-found: error
+          retention-days: 30
+
+  import-and-check:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: s05-candidat-transportable-fictif
+          path: s05-import
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+      - name: Charger sur un nouveau runner sans images ni volumes partagés
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/s05-private" "$RUNNER_TEMP/s05-evidence"
+          python3 - <<'PY'
+          import json, hashlib
+          from pathlib import Path
+          manifest=json.loads(Path('s05-import/transport.json').read_text())
+          h=hashlib.sha256()
+          with open('s05-import/ikoma-s05-rc.tar','rb') as fp:
+              for block in iter(lambda:fp.read(1048576),b''):h.update(block)
+          if h.hexdigest()!=manifest.get('archive_sha256'):
+              raise SystemExit('STOP: uploaded transport archive checksum mismatch')
+          PY
+          docker load -i s05-import/ikoma-s05-rc.tar > "$RUNNER_TEMP/s05-private/docker-load.log"
+          docker image inspect ikoma-s05:rc --format '{{.Id}}' > "$RUNNER_TEMP/s05-private/loaded-image.id"
+          cid="$(docker create ikoma-s05:rc)"
+          docker cp "$cid:/usr/local/bin/gosu" "$RUNNER_TEMP/s05-private/gosu"
+          docker rm "$cid" > /dev/null
+          go version -m "$RUNNER_TEMP/s05-private/gosu" > "$RUNNER_TEMP/s05-private/gosu.version"
+          docker run --rm --network none --entrypoint gosu ikoma-s05:rc nobody true
+      - name: Scanner INDÉPENDAMMENT l'image chargée depuis l'archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s05-private/tools.log" 2>&1
+          printf '{}\n' > "$RUNNER_TEMP/s05-private/config.yaml"
+          : > "$RUNNER_TEMP/s05-private/ignore"
+          image="$(cat "$RUNNER_TEMP/s05-private/loaded-image.id")"
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/s05-private/config.yaml" \
+            --ignorefile "$RUNNER_TEMP/s05-private/ignore" \
+            --image-src docker --scanners vuln \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --ignore-unfixed=false --exit-code 0 --format json \
+            --output "$RUNNER_TEMP/s05-private/trivy.json" "$image"
+          python3 scripts/security/s03-pg-scan-gate.py \
+            "$RUNNER_TEMP/s05-private/trivy.json" \
+            "$RUNNER_TEMP/s05-private/loaded-image.id" \
+            "$RUNNER_TEMP/s05-private/scan-gate.json"
+          python3 scripts/security/s05-transport-gate.py verify \
+            --archive s05-import/ikoma-s05-rc.tar \
+            --manifest s05-import/transport.json \
+            --lock docs/security/S0.4-IMAGE-LOCK.json \
+            --gosu "$RUNNER_TEMP/s05-private/gosu" \
+            --metadata "$RUNNER_TEMP/s05-private/gosu.version" \
+            --loaded-image-id "$RUNNER_TEMP/s05-private/loaded-image.id" \
+            --scan-gate "$RUNNER_TEMP/s05-private/scan-gate.json" \
+            --output "$RUNNER_TEMP/s05-evidence/import-check.json"
+      - name: Exercices PostgreSQL sur la seule image importée, base fictive et jetable
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name ikoma-s05-fictif --network none \
+            --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m \
+            -e POSTGRES_PASSWORD=uniquement-fictif -e POSTGRES_DB=ikoma_fixture \
+            ikoma-s05:rc >/dev/null
+          ready=0
+          for attempt in $(seq 1 45); do
+            if docker exec ikoma-s05-fictif pg_isready -U postgres -d ikoma_fixture >/dev/null 2>&1; then
+              ready=1; break
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo "STOP: reloaded PostgreSQL did not start"; exit 1; }
+          docker exec -i ikoma-s05-fictif psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture \
+            < scripts/security/s03-pg-migration-fixture.sql > /dev/null
+          check="$(docker exec ikoma-s05-fictif psql -X -At -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture \
+            -c 'SELECT (SELECT count(*) FROM s03_visiteurs_fictifs), (SELECT count(*) FROM s03_badges_fictifs), (SELECT count(*) FROM s03_passages_fictifs);')"
+          test "$check" = '1000|1000|2000' || { echo "STOP: imported-image synthetic fixture mismatch"; exit 1; }
+          echo 'imported_image_postgresql_fixture=PASS' >> "$RUNNER_TEMP/s05-evidence/fixture.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s05-preuves-transport-et-restauration-fictives
+          path: ${{ runner.temp }}/s05-evidence/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Nettoyer la seule base fictive
+        if: always()
+        run: docker rm -f ikoma-s05-fictif >/dev/null 2>&1 || true
