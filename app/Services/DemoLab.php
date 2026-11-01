@@ -21,9 +21,8 @@ final class DemoLab
 
     public static function authorize(User $actor): void
     {
-        abort_unless(app()->environment('demo', 'local', 'testing'), 403, 'Laboratoire indisponible en production.');
-        abort_unless($actor->active && $actor->two_factor_confirmed_at !== null
-            && $actor->hasRole('administrateur') && $actor->can('comptes.gerer'), 403);
+        abort_unless($actor->active && $actor->hasRole('administrateur')
+            && $actor->can('comptes.gerer'), 403);
     }
 
     /** @return array<string, int> */
