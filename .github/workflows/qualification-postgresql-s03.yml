@@ -9,6 +9,7 @@ on:
       - 'scripts/security/s03-pg-scan-gate.py'
       - 'scripts/security/audit-gosu-highs.py'
       - 'docs/security/S0.3-POSTGRESQL-GOSU-QUALIFICATION.md'
+      - 'docs/security/S0.3-REGISTRE-26-CVE-GOSU.md'
 
 permissions:
   contents: read
