@@ -33,7 +33,7 @@ export async function freshOtp(secret: string): Promise<string> {
  * Le serveur impose une limite aux connexions. Les recettes E2E ne désactivent
  * jamais cette limite : elles retentent une seule fois si elle est signalée.
  */
-export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string): Promise<void> {
+export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string, onChallenge?: () => Promise<void>): Promise<void> {
   for (let attempt = 0; attempt < 2; attempt++) {
     await page.goto('/login');
     await page.getByLabel('Adresse électronique').fill(email);
@@ -71,6 +71,7 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
         throw new Error(`Écran 2FA absent après deux tentatives normales au maximum (POST HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}, contrôle direct du challenge : ${challengeStatus}). Aucun identifiant ou secret journalisé.`);
       }
       if (await challenge.isVisible()) {
+        await onChallenge?.();
         await challenge.fill(await freshOtp(secret));
         await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
         await expect(page).toHaveURL(/\/(administration|espace|pilotage)$/, { timeout: 15_000 });
