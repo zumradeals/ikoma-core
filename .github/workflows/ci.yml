@@ -42,6 +42,12 @@ jobs:
       - name: Recette et captures Agent V2 sur données fictives isolées
         if: ${{ !cancelled() }}
         run: make e2e-agent
+      - name: Diagnostic des échecs E2E (contexte de page de chaque test en échec, données fictives)
+        if: ${{ failure() }}
+        run: |
+          find test-results -name error-context.md 2>/dev/null | sort | head -12 | while read -r f; do
+            echo "::group::$f"; sed -n '1,70p' "$f" | cut -c1-240; echo "::endgroup::"
+          done || true
       - name: Vérifier le contrôle des exceptions de sécurité
         run: python3 -m unittest discover -s tests/security
       - name: Auditer les dépendances applicatives (blocage élevé et critique)
