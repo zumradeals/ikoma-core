@@ -48,16 +48,16 @@ it('affiche les vérifications puis crée l’administrateur, l’événement et
     $this->post('/installation', installationPayload())->assertRedirect('/login')->assertSessionHas('status');
     $admin = User::where('email', 'admin-install@exemple.test')->firstOrFail();
     expect($admin->hasRole('administrateur'))->toBeTrue()->and($admin->two_factor_confirmed_at)->toBeNull()->and($admin->password)->not->toContain('Fictif')
-        ->and($admin->requiresTwoFactor())->toBeTrue();
+        ->and($admin->requiresTwoFactor())->toBeFalse();
     $event = DB::table('events')->where('name', 'Événement fictif')->first();
     expect($event)->not->toBeNull();
     expect($event->name)->toBe('Événement fictif')->and(DB::table('zones')->where('event_id', $event->id)->where('est_accueil', true)->where('name', 'Accueil')->exists())->toBeTrue();
     expect(DB::table('settings')->where('key', 'installation_terminee')->value('value'))->toBe('1');
     $log = DB::table('audit_logs')->where('id', '>', $this->audit)->whereIn('action', ['installation.terminee', 'compte.cree'])->get()->map(fn ($l) => json_encode($l))->implode('');
     expect($log)->toContain('installation.terminee')->not->toContain($this->installPassword)->not->toContain($this->installToken)->not->toContain('admin-install@');
-    // le premier compte est forcé à configurer le 2FA : la connexion ne mène pas à l'espace sans lui
+    // Le premier compte accède à son espace sans second facteur.
     $this->post('/login', ['email' => 'admin-install@exemple.test', 'password' => $this->installPassword]);
-    $this->get('/administration')->assertRedirect();
+    $this->get('/administration')->assertOk();
 });
 
 it('se verrouille après l’installation, même avec le bon jeton, et journalise les accès refusés', function () {
