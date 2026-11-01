@@ -21,7 +21,6 @@ const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, 
 const filtered = computed(() => props.users.filter(u => normalize([u.name, u.email, roleLabels[u.role] ?? u.role, u.active ? 'actif' : 'désactivé'].join(' ')).includes(normalize(query.value.trim()))));
 const activeCount = computed(() => props.users.filter(u => u.active).length);
 const supervisors = computed(() => props.users.filter(u => u.role === 'superviseur' && u.active));
-const protectedCount = computed(() => supervisors.value.filter(u => u.two_factor_confirmed).length);
 const hostUsers = computed(() => props.users.filter(u => u.role === 'hote'));
 const selectedHost = ref(hostUsers.value[0]?.id ?? '');
 const hostUser = computed(() => hostUsers.value.find(u => u.id === selectedHost.value) ?? hostUsers.value[0]);
@@ -36,7 +35,7 @@ const hostSettings = useForm({ minutes: props.hostTimeout });
     <header class="mb-5"><h1>Administration · Comptes</h1><p class="admin-muted mt-1">Gérez les utilisateurs, les rattachements et les réglages communs sans quitter l’espace administrateur.</p></header>
     <section aria-label="Synthèse des comptes" class="account-summary">
       <div class="admin-card account-summary-tile"><span class="account-metric-icon"><AdminIcon name="users" :size="30" /></span><strong>{{ activeCount }}</strong><div><b>comptes actifs</b><p class="admin-muted">sur {{ users.length }} au total</p></div></div>
-      <div class="admin-card account-summary-tile"><span class="account-metric-icon green"><AdminIcon name="shield" :size="30" /></span><strong>{{ supervisors.length }}</strong><div><b>superviseurs actifs</b><p class="admin-muted">{{ protectedCount }} avec 2FA confirmé</p></div></div>
+      <div class="admin-card account-summary-tile"><span class="account-metric-icon green"><AdminIcon name="shield" :size="30" /></span><strong>{{ supervisors.length }}</strong><div><b>superviseurs actifs</b><p class="admin-muted">Double authentification désactivée</p></div></div>
       <div class="admin-card account-summary-tile"><span class="account-metric-icon orange"><AdminIcon name="users" :size="30" /></span><strong>{{ linkedHosts }}</strong><div><b>fiches hôte rattachées</b><p class="admin-muted">sur {{ hosts.length }} fiches</p></div></div>
     </section>
     <section v-if="canChangeRoles" class="admin-card mt-4" aria-labelledby="creer-compte">
@@ -57,7 +56,7 @@ const hostSettings = useForm({ minutes: props.hostTimeout });
       <div class="account-table-scroll" tabindex="0" role="region" aria-label="Liste des comptes, défilement horizontal si nécessaire">
         <table id="liste-comptes" class="account-table">
 <caption class="sr-only">Comptes et actions disponibles</caption><thead><tr><th scope="col">Nom</th><th scope="col">Adresse électronique</th><th scope="col">Rôle</th><th scope="col">Statut</th><th scope="col">Actions</th></tr></thead><tbody>
-          <AccountRow v-for="user in filtered" :key="user.id" :user="user" :roles="roles" :can-change-roles="canChangeRoles" :can-reset-two-factor="['administrateur', 'superviseur'].includes(user.role) && user.id !== page.props.auth.id" :challenge="twoFactorReset" />
+          <AccountRow v-for="user in filtered" :key="user.id" :user="user" :roles="roles" :can-change-roles="canChangeRoles" :can-reset-two-factor="false" :challenge="twoFactorReset" />
           <tr v-if="!filtered.length"><td colspan="5" role="status">{{ users.length ? 'Aucun compte ne correspond à cette recherche.' : 'Aucun compte enregistré.' }}</td></tr>
         </tbody>
 </table>
