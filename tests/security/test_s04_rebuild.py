@@ -1,5 +1,6 @@
 """S0.4 unit guards: synthetic inputs only; never substitute for image scans."""
 import json
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,11 @@ class S04GateTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.p = Path(self.temp.name)
+        lock = json.loads((ROOT / "docs/security/S0.4-IMAGE-LOCK.json").read_text())
+        lock["reproducible_gosu_binary_sha256"] = hashlib.sha256(
+            b"reconstructed-upstream-binary").hexdigest()
+        self.lock = self.p / "lock.json"
+        self.lock.write_text(json.dumps(lock))
 
     def call(self, *args):
         return subprocess.run([sys.executable, str(SCRIPT), *map(str, args)],
@@ -25,7 +31,7 @@ class S04GateTest(unittest.TestCase):
     def test_pin_two_parent_digests(self):
         output = self.p / "locked.Dockerfile"
         evidence = self.p / "parents.json"
-        r = self.call("pin", "--source", SOURCE, "--output", output,
+        r = self.call("pin", "--lock", self.lock, "--source", SOURCE, "--output", output,
                       "--evidence", evidence,
                       "--golang", "golang@sha256:" + "a" * 64,
                       "--postgres", "postgres@sha256:" + "b" * 64)
@@ -36,7 +42,7 @@ class S04GateTest(unittest.TestCase):
         self.assertFalse(json.loads(evidence.read_text())["production_compose_modified"])
 
     def test_reject_ambiguous_parent(self):
-        r = self.call("pin", "--source", SOURCE,
+        r = self.call("pin", "--lock", self.lock, "--source", SOURCE,
                       "--output", self.p / "candidate", "--evidence", self.p / "proof",
                       "--golang", "golang:1.27.3-alpine3.24",
                       "--postgres", "postgres@sha256:" + "b" * 64)
@@ -54,7 +60,7 @@ class S04GateTest(unittest.TestCase):
             (self.p / f"gate-{name}.json").write_text(json.dumps({
                 "image_id": ids[i], "high": 0, "critical": 0,
                 "decision": "READY_FOR_ADDITIONAL_REVIEW"}))
-        return ["verify", "--a", self.p / "gosu-a", "--b", self.p / "gosu-b",
+        return ["verify", "--lock", self.lock, "--a", self.p / "gosu-a", "--b", self.p / "gosu-b",
                 "--a-metadata", self.p / "gosu-a.version",
                 "--b-metadata", self.p / "gosu-b.version",
                 "--a-imageid", self.p / "image-a.id",
