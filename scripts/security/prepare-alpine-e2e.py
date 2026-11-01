@@ -23,7 +23,11 @@ dockerfile=root/"docker/php/Dockerfile"
 old=dockerfile.read_text()
 start="FROM php:8.5.12-fpm-trixie\n"
 end="COPY --from=composer:2 /usr/bin/composer /usr/bin/composer"
-if not old.startswith(start) or old.count(end)!=1:
+already_alpine=("FROM php:8.5.12-fpm-alpine3.24" in old
+                and old.count("FROM php:8.5.12-fpm-alpine3.24")==1
+                and "addgroup www-data" in old
+                and "id -G www-data | grep -Eq" in old)
+if old.count(end)!=1 or (not old.startswith(start) and not already_alpine):
     raise SystemExit("STOP: development image contract changed")
 # Le worker Alpine www-data (82:82) doit lire les volumes de test groupés 33 comme Debian.
 # Pas de chmod global ni exécution du worker en root.
@@ -40,7 +44,8 @@ RUN set -eux; \
     addgroup www-data "$env_group"; \
     id -G www-data | grep -Eq '(^| )33( |$)'
 """
-dockerfile.write_text(alpine+old[old.index(end):])
+if not already_alpine:
+    dockerfile.write_text(alpine+old[old.index(end):])
 compose=root/"docker-compose.yml"
 text=compose.read_text()
 old="image: postgres:18.6-trixie"
