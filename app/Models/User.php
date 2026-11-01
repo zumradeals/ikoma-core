@@ -24,6 +24,7 @@ class User extends Authenticatable
 
     public function requiresTwoFactor(): bool
     {
-        return $this->hasAnyRole(['administrateur', 'superviseur']);
+        return \Laravel\Fortify\Features::enabled(\Laravel\Fortify\Features::twoFactorAuthentication())
+            && $this->hasAnyRole(['administrateur', 'superviseur']);
     }
 }
