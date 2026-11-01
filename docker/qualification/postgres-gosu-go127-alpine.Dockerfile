@@ -15,11 +15,15 @@ RUN set -eux; \
     grep -Fx 'const Version = "1.19"' version.go; \
     go mod download; \
     go mod verify; \
-    CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="-d -w" -o /out/gosu .; \
+    CGO_ENABLED=0 go build -trimpath -buildvcs=true -ldflags="-d -w" -o /out/gosu .; \
     go version -m /out/gosu; \
     /out/gosu --version
 
 FROM postgres:18.6-alpine3.24
+ARG GOSU_SOURCE_SHA=6456aaa0f3c854d199d0f037f068eb97515b7513
+LABEL org.ikoma.qualifier.gosu-source-sha="$GOSU_SOURCE_SHA" \
+      org.ikoma.qualifier.gosu-compiler="go1.27.3" \
+      org.ikoma.qualifier.scope="isolated-ci-not-production"
 RUN apk upgrade --no-cache
 COPY --from=gosu-build --chmod=0755 /out/gosu /usr/local/bin/gosu
 RUN set -eux; \
