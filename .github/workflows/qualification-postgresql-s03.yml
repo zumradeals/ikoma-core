@@ -6,6 +6,7 @@ on:
       - '.github/workflows/qualification-postgresql-s03.yml'
       - 'docker/qualification/postgres-gosu-go127-alpine.Dockerfile'
       - 'scripts/security/s03-pg-migration-fixture.sql'
+      - 'scripts/security/s03-pg-recovery-rehearsal.sh'
       - 'scripts/security/s03-pg-scan-gate.py'
       - 'scripts/security/audit-gosu-highs.py'
       - 'docs/security/S0.3-POSTGRESQL-GOSU-QUALIFICATION.md'
@@ -78,7 +79,7 @@ jobs:
             docker exec "$db" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture -At \
               -c "SELECT id FROM s03_visiteurs_fictifs WHERE lower(unaccent(full_name)) LIKE '%ecole%' ORDER BY full_name COLLATE \"C\",id;" \
               > "$RUNNER_TEMP/s03-pg-private/$short-search.txt"
-            test "$(wc -l < "$RUNNER_TEMP/s03-pg-private/$short-order.txt")" -eq 22
+            test "$(wc -l < "$RUNNER_TEMP/s03-pg-private/$short-order.txt")" -eq 1000
             test "$(wc -l < "$RUNNER_TEMP/s03-pg-private/$short-indexes.txt")" -eq 3
             test "$(wc -l < "$RUNNER_TEMP/s03-pg-private/$short-extensions.txt")" -eq 2
           done
@@ -89,6 +90,8 @@ jobs:
           done
           printf 'logical_restore=PASS\nexplicit_C_sort=PASS\nindexes=PASS\nextensions=PASS\nsearch=PASS\nno_shared_volume=TRUE\n' \
             > "$RUNNER_TEMP/s03-pg-evidence/restore-checks.txt"
+      - name: Vérifier sauvegarde, restauration, REINDEX et retour arrière fictif
+        run: sh scripts/security/s03-pg-recovery-rehearsal.sh
       - name: Scanner la candidate PostgreSQL (aucune exclusion Trivy)
         run: |
           set -euo pipefail
@@ -133,4 +136,4 @@ jobs:
           retention-days: 90
       - name: Nettoyer les deux bases fictives
         if: always()
-        run: docker rm -f s03-pg-debian s03-pg-alpine >/dev/null 2>&1 || true
+        run: docker rm -f s03-pg-debian s03-pg-alpine s03-pg-rollback >/dev/null 2>&1 || true
