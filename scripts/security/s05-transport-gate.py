@@ -12,6 +12,7 @@ import re
 import tarfile
 
 HEX64 = r"[a-f0-9]{64}"
+HEX40 = r"[a-f0-9]{40}"
 TAG = "ikoma-s05:rc"
 
 def stop(msg):
@@ -84,7 +85,7 @@ def load_lock(p):
         assert data["real_data_migration_authorized"] is False
         assert re.fullmatch(HEX64, data["reproducible_gosu_binary_sha256"])
         assert re.fullmatch(HEX64, data["qualified_dockerfile_sha256"])
-        assert re.fullmatch(HEX64, data["gosu_upstream_commit"][:64])
+        assert re.fullmatch(HEX40, data["gosu_upstream_commit"])
         return data
     except (OSError, ValueError, TypeError, KeyError, AssertionError):
         stop("invalid S0.4 source lock")
@@ -116,7 +117,7 @@ def create(args):
         "real_data_migration_authorized": False,
         "registry_manifest_digest": None
     }
-    if not re.fullmatch(HEX64, data["source_commit"]):
+    if not re.fullmatch(HEX40, data["source_commit"]):
         stop("invalid source commit SHA")
     Path(args.output).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
     print("S0.5: transport archive content and gosu provenance verified")
@@ -142,7 +143,7 @@ def verify(args):
         stop("upstream lock mismatch")
     if data.get("parent_refs") != {k: v["locked_ref"] for k,v in lock["parents"].items()}:
         stop("parents lock mismatch")
-    if not re.fullmatch(HEX64, str(data.get("source_commit", ""))):
+    if not re.fullmatch(HEX40, str(data.get("source_commit", ""))):
         stop("source commit malformed")
     ensure_binary(args.gosu, args.metadata, lock)
     scan = json.loads(Path(args.scan_gate).read_text())
