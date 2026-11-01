@@ -20,13 +20,24 @@ categories={
   "browser":bool(re.search(r"Target closed|browserType\.launch|Browser closed",raw)),
   "http_500":bool(re.search(r"HTTP (?:500|502|503)|Internal Server Error",raw,re.I)),
 }
-match=re.findall(r"\b(\d+)\s+(?:failed|passed|skipped)\b",raw)
+match=re.findall(r"\\b(\\d+)\\s+(?:failed|passed|skipped)\\b",raw)
+# Only explicit static milestones. This never forwards URL parameters, accounts, DOM, secret or raw logs.
+allowed_steps={
+ "auth.start","auth.login.page","auth.login.open","auth.login.rendered",
+ "auth.login.submit","auth.login.responded","auth.login.throttled",
+ "auth.challenge.visible","auth.challenge.screenshot","auth.otp.submit",
+ "auth.authenticated","auth.login.done","auth.accounts.menu","auth.accounts.click",
+ "auth.accounts.visible","auth.journal.navigate","auth.journal.visible",
+}
+steps=[step for step in re.findall(r"IKOMA_E2E_STEP:(auth\\.[a-z.]+)",raw) if step in allowed_steps]
 result={
  "scope":"sandbox-e2e-diagnostic-only",
  "raw_logs_uploaded":False,
  "failure_spec_paths_only":files,
  "error_categories":categories,
  "numeric_counts_reported":match[-8:],
+ "last_safe_stage":steps[-1] if steps else None,
+ "safe_stage_trace":steps[-20:],
  "limits":["No raw assertions, test data, screenshots, traces, environment variables or credentials published",
            "If no failed spec can be distinguished, a narrower diagnostic run is required",
            "Failing E2E status is preserved and never waived"]
