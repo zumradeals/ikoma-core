@@ -107,12 +107,15 @@ def create(args):
     lock = load_lock(args.lock)
     img_id = image_id(args.image_id)
     details = inspect_archive(args.archive)
-    if details["config_image_id"] != img_id:
-        stop("archive config vs Docker source image ID: " + details["config_image_id"] + " != " + img_id)
+    # Modern Docker/BuildKit may expose an OCI index ID while 'docker save'
+    # exports the referenced image configuration. These digests serve different
+    # purposes; never mislabel one as the other or silently treat them as equal.
     ensure_binary(args.gosu, args.metadata, lock)
     data = {
         "schema": 1, "kind": "temporary-audited-laboratory-archive",
         "tag": TAG, **details,
+        "source_docker_image_id": img_id,
+        "source_and_archive_ids_differ": img_id != details["config_image_id"],
         "upstream_commit": lock["gosu_upstream_commit"],
         "gosu_sha256": lock["reproducible_gosu_binary_sha256"],
         "parent_refs": {k: v["locked_ref"] for k,v in lock["parents"].items()},
@@ -140,8 +143,14 @@ def verify(args):
     for key, val in details.items():
         if data.get(key) != val:
             stop("archive digest / config mismatch: " + key)
-    if details["config_image_id"] != image_id(args.loaded_image_id):
-        stop("fresh runner loaded a different image")
+    loaded_id = image_id(args.loaded_image_id)
+    original_id = data.get("source_docker_image_id")
+    if not isinstance(original_id, str) or not re.fullmatch("sha256:" + HEX64, original_id):
+        stop("missing source Docker image identity")
+    if data.get("source_and_archive_ids_differ") != (original_id != details["config_image_id"]):
+        stop("incorrect source/archive identity relation")
+    if loaded_id not in (original_id, details["config_image_id"]):
+        stop("loaded image matches neither original Docker index nor archive config digest")
     if data.get("gosu_sha256") != lock["reproducible_gosu_binary_sha256"]:
         stop("binary lock mismatch")
     if data.get("upstream_commit") != lock["gosu_upstream_commit"]:
@@ -159,6 +168,8 @@ def verify(args):
         "scope": "fresh-runner-transport-qualification",
         "archive_sha256": details["archive_sha256"],
         "config_image_id": details["config_image_id"],
+        "source_docker_image_id": original_id,
+        "loaded_docker_image_id": loaded_id,
         "gosu_sha256": lock["reproducible_gosu_binary_sha256"],
         "fresh_runner_load": "PASS",
         "independent_full_trivy": "PASS",
