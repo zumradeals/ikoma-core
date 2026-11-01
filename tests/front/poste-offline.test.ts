@@ -193,7 +193,7 @@ describe('file hors ligne, règles locales et envoi', () => {
   });
 
   it('refuse un visiteur hors période sans avis et rejoue une même opération sans la doubler', async () => {
-    const { repo } = await setup([visitor('v1', 'Koné Mariam', { valid_from: '2026-11-01T00:00:00.000000Z', valid_until: '2026-11-02T00:00:00.000000Z', identity_done: true, photo_done: true })]);
+    const { repo } = await setup([visitor('v1', 'Koné Mariam', { valid_from: iso(86_400_000), valid_until: iso(172_800_000), identity_done: true, photo_done: true })]);
     expect((await repo.visitor('v1')).hors_periode).toBe(true);
     await expect(repo.validate('o1', 'v1')).rejects.toMatchObject({ code: 'hors_periode' });
     await repo.validate('o1', 'v1', 'superviseur');
