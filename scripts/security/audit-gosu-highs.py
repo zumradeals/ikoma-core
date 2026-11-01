@@ -29,8 +29,11 @@ if not rows:
     if not version_file.is_file():
         raise SystemExit("STOP: clean Go scan without extracted-binary metadata")
     version_text=version_file.read_text()
-    if "\\tgo1.27.3" not in version_text and "go1.27.3" not in version_text:
-        raise SystemExit("STOP: gosu binary has unqualified Go toolchain")
+    if ("go1.27.3" not in version_text
+            or "path\\tgithub.com/tianon/gosu" not in version_text
+            or "vcs.revision\\t6456aaa0f3c854d199d0f037f068eb97515b7513" not in version_text
+            or "vcs.modified=false" not in version_text):
+        raise SystemExit("STOP: no source-pinned, clean Go 1.27.3 gosu binary provenance")
 if len(set(v.get("VulnerabilityID") for v in rows))!=len(rows):
     raise SystemExit("STOP: duplicate Go stdlib CVE; requires separate target accounting")
 for v in rows:
