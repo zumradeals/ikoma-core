@@ -1,0 +1,262 @@
+name: S0.6 - Candidat OCI GHCR atteste et relu sur runner independant
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-s06-ghcr.yml'
+      - 'scripts/security/s06-oci-gate.py'
+      - 'tests/security/test_s06_oci_gate.py'
+      - 'docs/security/S0.6-OCI-RELEASE-CONTRACT.md'
+      - 'docs/security/S0.4-IMAGE-LOCK.json'
+      - 'scripts/security/s04-rebuild-check.py'
+      - 'docker/qualification/postgres-gosu-go127-alpine.Dockerfile'
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: 'SHA Git main complet de 40 caracteres, valide explicitement'
+        required: true
+        type: string
+      confirmation:
+        description: 'Taper RELEASE_CANDIDATE_ONLY, jamais production'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s06-ghcr-candidate-release
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/zumradeals/ikoma-access-postgres-candidate
+
+jobs:
+  contract:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contrats Git, manifests OCI et verrous de refus
+        run: |
+          python3 -m unittest discover -s tests/security -p 'test_s06_oci_gate.py' -v
+          python3 -m unittest discover -s tests/security -p 'test_s04_rebuild.py' -v
+
+  publish-candidate:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+      artifact-metadata: write
+    env:
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Refuser toute publication hors main ou sans autorisation exacte
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "zumradeals/ikoma-core"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRMATION" = "RELEASE_CANDIDATE_ONLY"
+          test "$EXPECTED_COMMIT" = "$(git rev-parse HEAD)"
+          [[ "$EXPECTED_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          mkdir -p "$RUNNER_TEMP/s06-private" "$RUNNER_TEMP/s06-evidence"
+          python3 -m unittest discover -s tests/security -p 'test_s06_oci_gate.py' -v
+          python3 -m unittest discover -s tests/security -p 'test_s04_rebuild.py' -v
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+      - name: Construire image candidate linux/amd64 depuis les digests Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          go_ref="$(python3 -c 'import json; print(json.load(open("docs/security/S0.4-IMAGE-LOCK.json"))["parents"]["golang"]["locked_ref"])')"
+          pg_ref="$(python3 -c 'import json; print(json.load(open("docs/security/S0.4-IMAGE-LOCK.json"))["parents"]["postgres"]["locked_ref"])')"
+          docker pull "$go_ref"
+          docker pull "$pg_ref"
+          python3 scripts/security/s04-rebuild-check.py pin \
+            --lock docs/security/S0.4-IMAGE-LOCK.json \
+            --source docker/qualification/postgres-gosu-go127-alpine.Dockerfile \
+            --golang "$go_ref" --postgres "$pg_ref" \
+            --output "$RUNNER_TEMP/s06-private/pinned.Dockerfile" \
+            --evidence "$RUNNER_TEMP/s06-evidence/parents.json"
+          docker buildx build --load --no-cache --pull --platform linux/amd64 \
+            --provenance=false -f "$RUNNER_TEMP/s06-private/pinned.Dockerfile" \
+            -t "$IMAGE_NAME:rc-$EXPECTED_COMMIT" .
+          docker image inspect "$IMAGE_NAME:rc-$EXPECTED_COMMIT" \
+            --format '{{.Id}}' > "$RUNNER_TEMP/s06-private/image.id"
+          cid="$(docker create "$IMAGE_NAME:rc-$EXPECTED_COMMIT")"
+          docker cp "$cid:/usr/local/bin/gosu" "$RUNNER_TEMP/s06-private/gosu"
+          docker rm "$cid" > /dev/null
+          go version -m "$RUNNER_TEMP/s06-private/gosu" > "$RUNNER_TEMP/s06-private/gosu.version"
+      - name: Scanner exactement l'image avant publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s06-private/tools.log" 2>&1
+          printf '{}\n' > "$RUNNER_TEMP/s06-private/config.yaml"
+          : > "$RUNNER_TEMP/s06-private/ignore"
+          image="$(cat "$RUNNER_TEMP/s06-private/image.id")"
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/s06-private/config.yaml" \
+            --ignorefile "$RUNNER_TEMP/s06-private/ignore" \
+            --image-src docker --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --ignore-unfixed=false --exit-code 0 --format json \
+            --output "$RUNNER_TEMP/s06-private/trivy.json" "$image"
+          python3 scripts/security/s03-pg-scan-gate.py \
+            "$RUNNER_TEMP/s06-private/trivy.json" \
+            "$RUNNER_TEMP/s06-private/image.id" \
+            "$RUNNER_TEMP/s06-private/scan-gate.json"
+      - name: Publier candidat versionne, sans tag latest, seulement sur autorisation manuelle
+        id: push
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
+          tag="$IMAGE_NAME:rc-$EXPECTED_COMMIT"
+          if docker manifest inspect "$tag" >/dev/null 2>&1; then
+            echo "STOP: release candidate tag already present; refuse overwrite"
+            exit 1
+          fi
+          docker push "$tag" > "$RUNNER_TEMP/s06-private/push.log"
+          digest="$(grep -Eo 'digest: sha256:[a-f0-9]{64}' "$RUNNER_TEMP/s06-private/push.log" | tail -1 | cut -d' ' -f2)"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "STOP: registry digest missing"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          python3 scripts/security/s06-oci-gate.py publish \
+            --lock docs/security/S0.4-IMAGE-LOCK.json \
+            --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_NAME" \
+            --commit "$EXPECTED_COMMIT" --confirmation "$CONFIRMATION" \
+            --gosu "$RUNNER_TEMP/s06-private/gosu" \
+            --metadata "$RUNNER_TEMP/s06-private/gosu.version" \
+            --local-image-id "$(cat "$RUNNER_TEMP/s06-private/image.id")" \
+            --digest "$digest" --output "$RUNNER_TEMP/s06-evidence/release.json"
+      - name: Attester dans GHCR la provenance du digest de manifeste OCI reel
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s06-ghcr-release-preuve
+          path: ${{ runner.temp }}/s06-evidence/
+          retention-days: 90
+          if-no-files-found: warn
+
+  independent-consumer:
+    needs: publish-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: s06-ghcr-release-preuve
+          path: s06-release
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+      - name: Recharger par digest de registre, jamais par tag mutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/s06-private" "$RUNNER_TEMP/s06-evidence"
+          ref="$(python3 -c 'import json;print(json.load(open("s06-release/release.json"))["immutable_ref"])')"
+          test "$GITHUB_REPOSITORY" = "zumradeals/ikoma-core"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
+          docker pull "$ref"
+          docker image inspect "$ref" --format '{{.Id}}' > "$RUNNER_TEMP/s06-private/image.id"
+          docker image inspect "$ref" --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+            > "$RUNNER_TEMP/s06-private/refs.txt"
+          cid="$(docker create "$ref")"
+          docker cp "$cid:/usr/local/bin/gosu" "$RUNNER_TEMP/s06-private/gosu"
+          docker rm "$cid" > /dev/null
+          go version -m "$RUNNER_TEMP/s06-private/gosu" > "$RUNNER_TEMP/s06-private/gosu.version"
+          echo "$ref" > "$RUNNER_TEMP/s06-private/immutable-ref.txt"
+      - name: Verifier l'attestation GitHub signee du manifest publie
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="$(cat "$RUNNER_TEMP/s06-private/immutable-ref.txt")"
+          gh attestation verify "oci://$ref" -R "$GITHUB_REPOSITORY" \
+            > "$RUNNER_TEMP/s06-private/attestation-private.json"
+          test -s "$RUNNER_TEMP/s06-private/attestation-private.json"
+      - name: Refaire Trivy sur le digest distribue et verifier les contrats
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s06-private/tools.log" 2>&1
+          printf '{}\n' > "$RUNNER_TEMP/s06-private/config.yaml"
+          : > "$RUNNER_TEMP/s06-private/ignore"
+          image="$(cat "$RUNNER_TEMP/s06-private/image.id")"
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/s06-private/config.yaml" \
+            --ignorefile "$RUNNER_TEMP/s06-private/ignore" \
+            --image-src docker --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --ignore-unfixed=false --exit-code 0 --format json \
+            --output "$RUNNER_TEMP/s06-private/trivy.json" "$image"
+          python3 scripts/security/s03-pg-scan-gate.py \
+            "$RUNNER_TEMP/s06-private/trivy.json" "$RUNNER_TEMP/s06-private/image.id" \
+            "$RUNNER_TEMP/s06-private/scan-gate.json"
+          python3 scripts/security/s06-oci-gate.py consumer \
+            --lock docs/security/S0.4-IMAGE-LOCK.json \
+            --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_NAME" \
+            --commit "$EXPECTED_COMMIT" \
+            --gosu "$RUNNER_TEMP/s06-private/gosu" \
+            --metadata "$RUNNER_TEMP/s06-private/gosu.version" \
+            --release-record s06-release/release.json \
+            --image-id "$(cat "$RUNNER_TEMP/s06-private/image.id")" \
+            --repo-digests "$RUNNER_TEMP/s06-private/refs.txt" \
+            --scan-gate "$RUNNER_TEMP/s06-private/scan-gate.json" \
+            --output "$RUNNER_TEMP/s06-evidence/consumed.json"
+      - name: Test PostgreSQL fictif sur l'image reellement distribuee
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="$(cat "$RUNNER_TEMP/s06-private/immutable-ref.txt")"
+          docker run -d --rm --name s06-pg-fictif --network none \
+            --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m \
+            -e POSTGRES_PASSWORD=uniquement-fictif -e POSTGRES_DB=ikoma_fixture "$ref" >/dev/null
+          ready=0
+          for attempt in $(seq 1 45); do
+            if docker exec s06-pg-fictif pg_isready -U postgres -d ikoma_fixture >/dev/null 2>&1; then
+              ready=1; break
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo 'STOP: distributed PostgreSQL did not start'; exit 1; }
+          docker exec -i s06-pg-fictif psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture \
+            < scripts/security/s03-pg-migration-fixture.sql > /dev/null
+          actual="$(docker exec s06-pg-fictif psql -X -At -v ON_ERROR_STOP=1 \
+            -U postgres -d ikoma_fixture \
+            -c 'SELECT (SELECT count(*) FROM s03_visiteurs_fictifs), (SELECT count(*) FROM s03_badges_fictifs), (SELECT count(*) FROM s03_passages_fictifs);')"
+          test "$actual" = "1000|1000|2000" || { echo 'STOP: distributed fixture mismatch'; exit 1; }
+          echo "distributed_fixture=PASS" > "$RUNNER_TEMP/s06-evidence/postgres-fixture.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s06-ghcr-consumer-preuve
+          path: ${{ runner.temp }}/s06-evidence/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Supprimer la base fictive jetable
+        if: always()
+        run: docker rm -f s06-pg-fictif >/dev/null 2>&1 || true
