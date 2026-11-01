@@ -33,15 +33,19 @@ export async function freshOtp(secret: string): Promise<string> {
  * Le serveur impose une limite aux connexions. Les recettes E2E ne désactivent
  * jamais cette limite : elles retentent une seule fois si elle est signalée.
  */
-export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string, onChallenge?: () => Promise<void>): Promise<void> {
+export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string, onChallenge?: () => Promise<void>, onStage?: (stage: string) => void): Promise<void> {
   for (let attempt = 0; attempt < 2; attempt++) {
+    onStage?.('login.open');
     await page.goto('/login');
+    onStage?.('login.rendered');
     await page.getByLabel('Adresse électronique').fill(email);
     await page.getByLabel('Mot de passe', { exact: true }).fill(password);
+    onStage?.('login.submit');
     const [response] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === '/login' && r.request().method() === 'POST'),
       page.getByRole('button', { name: 'Se connecter' }).click(),
     ]);
+    onStage?.('login.responded');
     const challenge = page.getByLabel('Code à six chiffres');
     const throttled = page.getByRole('alert').filter({ hasText: /Trop de tentatives/i }).first();
     if (response.status() !== 429) {
@@ -71,13 +75,17 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
         throw new Error(`Écran 2FA absent après deux tentatives normales au maximum (POST HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}, contrôle direct du challenge : ${challengeStatus}). Aucun identifiant ou secret journalisé.`);
       }
       if (await challenge.isVisible()) {
+        onStage?.('challenge.visible');
         await onChallenge?.();
         await challenge.fill(await freshOtp(secret));
+        onStage?.('otp.submit');
         await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
         await expect(page).toHaveURL(/\/(administration|espace|pilotage)$/, { timeout: 15_000 });
+        onStage?.('authenticated');
         return;
       }
     }
+    onStage?.('login.throttled');
     if (attempt === 1) throw new Error('La connexion de recette reste limitée après le délai serveur.');
     const message = await throttled.isVisible() ? await throttled.innerText() : '';
     const secondsInMessage = message.match(/(\d+)\s*secondes?/i);
