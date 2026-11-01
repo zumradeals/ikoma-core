@@ -7,7 +7,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use PragmaRX\Google2FA\Google2FA;
 
 function account(string $role): User
 {
@@ -29,8 +28,8 @@ it('journalise aussi un accès protégé sans connexion', function () {
     $this->get('/administration/comptes')->assertRedirect('/login');
     expect(DB::table('audit_logs')->where('action', 'acces.refuse')->count())->toBe($before + 1);
 });
-it('force le superviseur à activer la double authentification', function () {
-    $this->actingAs(account('superviseur'))->get('/espace')->assertRedirect('/securite');
+it('laisse le superviseur accéder à son espace sans 2FA', function () {
+    $this->actingAs(account('superviseur'))->get('/espace')->assertRedirect('/pilotage');
 });
 it('bloque après cinq échecs puis autorise une nouvelle tentative après le délai', function () {
     $email = Str::uuid().'@exemple.test';
@@ -51,22 +50,21 @@ it('expulse une session inactive et un compte désactivé', function () {
     $user->update(['active' => false]);
     $this->actingAs($user)->get('/espace')->assertRedirect('/login');
 });
-it('demande le code TOTP après le mot de passe et accepte un code valide', function () {
-    $password = Str::password(24);
-    $totp = new Google2FA;
-    $secret = $totp->generateSecretKey();
+it('ne demande plus de challenge même si un secret OTP historique existe', function () {
+    $password = Str::password(24).'aA1!';
     $user = account('superviseur');
-    $user->update(['password' => $password, 'two_factor_secret' => encrypt($secret), 'two_factor_recovery_codes' => encrypt(json_encode([])), 'two_factor_confirmed_at' => now()]);
-    $this->post('/login', ['email' => $user->email, 'password' => $password])->assertRedirect('/two-factor-challenge');
-    $this->assertGuest();
-    $this->post('/two-factor-challenge', ['code' => '0000000'])->assertSessionHasErrors('code');
-    expect(DB::table('audit_logs')->where('actor_id', $user->id)->where('action', 'connexion.echec')->exists())->toBeTrue();
-    $this->post('/two-factor-challenge', ['code' => $totp->getCurrentOtp($secret)])->assertRedirect('/espace');
+    $secret = 'JBSWY3DPEHPK3PXP';
+    $user->update(['password' => $password, 'two_factor_secret' => encrypt($secret),
+        'two_factor_recovery_codes' => encrypt(json_encode([])), 'two_factor_confirmed_at' => now()]);
+    $this->post('/login', ['email' => $user->email, 'password' => $password])->assertRedirect('/espace');
     $this->assertAuthenticatedAs($user);
     $this->get('/espace')->assertRedirect('/pilotage');
+    expect($user->fresh()->two_factor_secret)->not->toBeNull();
 });
-it('interdit de désactiver la 2FA obligatoire', function () {
-    $this->actingAs(account('administrateur'))->delete('/user/two-factor-authentication')->assertForbidden();
+
+it('retire les routes Fortify pour activer ou confirmer le second facteur', function () {
+    $this->actingAs(account('administrateur'))->post('/user/two-factor-authentication')->assertNotFound();
+    $this->get('/two-factor-challenge')->assertNotFound();
 });
 it('applique la matrice exacte sans héritage implicite', function () {
     foreach (config('roles') as $role => $permissions) {
@@ -141,11 +139,8 @@ it('refuse UPDATE DELETE TRUNCATE avec le compte applicatif et détecte une alt�
     $this->artisan('audit:verify')->assertSuccessful();
 });
 
-it('ne laisse jamais la redirection superviseur contourner la 2FA', function () {
+it('oriente le superviseur selon son rôle sans facteur additionnel', function () {
     $user = account('superviseur');
-    $this->actingAs($user)->get('/espace')->assertRedirect('/securite');
-    $this->get('/pilotage')->assertRedirect('/securite');
-    $user->update(['two_factor_confirmed_at' => now()]);
     $this->actingAs($user)->get('/espace')->assertRedirect('/pilotage');
     $this->get('/pilotage')->assertOk();
 });
