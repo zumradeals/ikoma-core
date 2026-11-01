@@ -108,7 +108,7 @@ def create(args):
     img_id = image_id(args.image_id)
     details = inspect_archive(args.archive)
     if details["config_image_id"] != img_id:
-        stop("archive does not contain inspected candidate image")
+        stop("archive config vs Docker source image ID: " + details["config_image_id"] + " != " + img_id)
     ensure_binary(args.gosu, args.metadata, lock)
     data = {
         "schema": 1, "kind": "temporary-audited-laboratory-archive",
