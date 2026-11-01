@@ -37,6 +37,34 @@ allowed_steps={
  "auth.accounts.visible","auth.journal.navigate","auth.journal.visible",
 }
 steps=[step for step in re.findall(r"IKOMA_E2E_STEP:(auth\.[a-z.]+)",raw) if step in allowed_steps]
+# GNU Make --trace is retained only in the runner-private log. Identify a
+# fixed recipe stage without disclosing shell output, account details or URLs.
+# Each marker below is a *constant source-controlled recipe*, never raw text.
+recipe_stages=[
+ ("screen-account", "php artisan test:screen-account > .secrets/screen-account.json"),
+ ("screen-business", "php artisan test:screen-account > .secrets/screen-business.json"),
+ ("screen-import", "php artisan test:screen-account > .secrets/screen-import.json"),
+ ("screen-badges", "php artisan test:screen-account > .secrets/screen-badges.json"),
+ ("desk-fixtures", "php artisan test:desk-fixtures > .secrets/desk-fixtures.json"),
+ ("host-fixtures", "php artisan test:host-fixtures > .secrets/host-fixtures.json"),
+ ("playwright-container", "docker compose run --rm e2e"),
+]
+last_recipe=None
+last_position=-1
+for label, marker in recipe_stages:
+    pos=raw.rfind(marker)
+    if pos>last_position:
+        last_position=pos
+        last_recipe=label
+
+# Only broad, non-sensitive failure classes; no raw exception/messages copied.
+runner_categories={
+  "docker_runtime":bool(re.search(r"(?:OCI runtime create failed|Error response from daemon|Cannot connect to the Docker daemon)",raw,re.I)),
+  "php_cli":bool(re.search(r"(?:Command .* returned non-zero exit status|PHP Fatal error|artisan.+(?:Exception|ERROR))",raw,re.I)),
+  "browser_dependency":bool(re.search(r"(?:Executable doesn't exist|Failed to download|browserType\.launch|playwright install)",raw,re.I)),
+  "node_dependency":bool(re.search(r"(?:npm ERR!|npm error|Cannot find module|MODULE_NOT_FOUND)",raw,re.I)),
+  "make_failed":bool(re.search(r"make(?:\[[0-9]+\])?: \*\*\* .*Error [0-9]+",raw)),
+}
 result={
  "scope":"sandbox-e2e-diagnostic-only",
  "raw_logs_uploaded":False,
@@ -44,6 +72,8 @@ result={
  "error_categories":categories,
  "numeric_counts_reported":match[-8:],
  "last_safe_stage":steps[-1] if steps else None,
+ "last_recipe_stage":last_recipe,
+ "runner_failure_categories":runner_categories,
  "safe_stage_trace":steps[-20:],
  "limits":["No raw assertions, test data, screenshots, traces, environment variables or credentials published",
            "If no failed spec can be distinguished, a narrower diagnostic run is required",

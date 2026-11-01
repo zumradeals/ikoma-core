@@ -8,6 +8,7 @@ on:
       - 'scripts/security/compare-pg-locales.py'
       - 'scripts/security/pg-locale-fixture.sql'
       - 'scripts/security/prepare-alpine-e2e.py'
+      - 'docker/qualification/postgres-gosu-go127-alpine.Dockerfile'
       - 'scripts/security/summarize-e2e-alpine.py'
       - 'docs/security/S0.2-QUALIFICATION-ADOPTION-ALPINE.md'
       - 'app/Services/VisitorSearch.php'
@@ -116,7 +117,7 @@ jobs:
       - name: Construire PostgreSQL et créer le laboratoire Git isolé
         run: |
           set -euo pipefail
-          docker build --pull -f docker/qualification/postgres-integrated-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
+          docker build --pull -f docker/qualification/postgres-gosu-go127-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
           dir="$RUNNER_TEMP/ikoma-e2e-alpine"
           git worktree add --detach "$dir" HEAD
           python3 scripts/security/prepare-alpine-e2e.py "$dir"
@@ -152,9 +153,33 @@ jobs:
         run: |
           set -euo pipefail
           cd "$IKOMA_E2E_DIR"
-          make e2e > "$RUNNER_TEMP/alpine-browser-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-browser-private.log" "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; echo 'STOP: E2E navigateur'; cat "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log; exit 1; }
-          make e2e-agent > "$RUNNER_TEMP/alpine-agent-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-agent-private.log" "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; echo 'STOP: E2E agent'; cat "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; exit 1; }
+          make --trace e2e > "$RUNNER_TEMP/alpine-browser-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-browser-private.log" "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; echo 'STOP: E2E navigateur'; cat "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log; exit 1; }
+          make --trace e2e-agent > "$RUNNER_TEMP/alpine-agent-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-agent-private.log" "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; echo 'STOP: E2E agent'; cat "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; exit 1; }
           echo 'e2e_browser_agent=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
+      - name: Répéter E2E navigateur et agent sur base fictive réinitialisée
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_E2E_DIR"
+          # Deuxième passage indépendant : reconstruire les données de test depuis zéro.
+          make migrate-fresh-seed > "$RUNNER_TEMP/alpine-repeat-seed-private.log" 2>&1 || {
+            echo 'STOP: second seed E2E'; exit 1;
+          }
+          second_login=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:8080/login || true)
+          if [ "$second_login" != 200 ]; then
+            echo "STOP: second E2E HTTP $second_login"
+            python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log
+            exit 1
+          fi
+          make --trace e2e > "$RUNNER_TEMP/alpine-repeat-browser-private.log" 2>&1 || {
+            python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-repeat-browser-private.log" "$RUNNER_TEMP/adoption-e2e/repeat-browser-diagnostic.json"
+            echo 'STOP: second browser E2E'; cat "$RUNNER_TEMP/adoption-e2e/repeat-browser-diagnostic.json"; exit 1;
+          }
+          make --trace e2e-agent > "$RUNNER_TEMP/alpine-repeat-agent-private.log" 2>&1 || {
+            python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-repeat-agent-private.log" "$RUNNER_TEMP/adoption-e2e/repeat-agent-diagnostic.json"
+            echo 'STOP: second agent E2E'; cat "$RUNNER_TEMP/adoption-e2e/repeat-agent-diagnostic.json"; exit 1;
+          }
+          echo 'fresh_seed_second_pass=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
+          echo 'e2e_browser_agent_second_pass=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

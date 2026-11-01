@@ -21,8 +21,19 @@ if not any(r.get("Class")=="os-pkgs" for r in data.get("Results",[])):
     raise SystemExit("STOP: OS packages missing from Trivy")
 rows=[v for r in data["Results"] for v in (r.get("Vulnerabilities") or [])
       if v.get("PkgName")=="stdlib" and v.get("Severity") in ("HIGH","CRITICAL")]
+# No HIGH/CRITICAL Go findings is acceptable only when the **same extracted**
+# gosu binary proves it was compiled with the independently qualified toolchain.
+# The final independent Trivy gate still examines ALL packages and severities.
 if not rows:
-    raise SystemExit("STOP: Go stdlib HIGH/CRITICAL inventory missing")
+    version_file=work/"gosu-version.txt"
+    if not version_file.is_file():
+        raise SystemExit("STOP: clean Go scan without extracted-binary metadata")
+    version_text=version_file.read_text()
+    if ("go1.27.3" not in version_text
+            or "path\tgithub.com/tianon/gosu" not in version_text
+            or "vcs.revision=6456aaa0f3c854d199d0f037f068eb97515b7513" not in version_text
+            or "vcs.modified=false" not in version_text):
+        raise SystemExit("STOP: no source-pinned, clean Go 1.27.3 gosu binary provenance")
 if len(set(v.get("VulnerabilityID") for v in rows))!=len(rows):
     raise SystemExit("STOP: duplicate Go stdlib CVE; requires separate target accounting")
 for v in rows:
@@ -62,10 +73,11 @@ for v in sorted(rows,key=lambda x:(x["Severity"]!="CRITICAL",x["VulnerabilityID"
     })
 candidate=work/"gosu"
 report={
-    "decision":"STOP_REVIEW_REQUIRED",
+    "decision":"STOP_REVIEW_REQUIRED" if rows else "NO_STDLIB_HIGH_CRITICAL_FINDINGS",
     "scope":"PostgreSQL Alpine gosu binary - CI fixture only",
     "image_id":image_id,
     "binary_sha256":digest(candidate),
+    "go_binary_version_evidence":(work/"gosu-version.txt").read_text().strip() if (work/"gosu-version.txt").is_file() else None,
     "govulncheck_sha256":digest(work/"govulncheck.json"),
     "trivy_sha256":digest(trivyfile),
     "trivy_high":sum(x["severity"]=="HIGH" for x in detail),
