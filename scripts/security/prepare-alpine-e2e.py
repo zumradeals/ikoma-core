@@ -32,7 +32,14 @@ RUN set -eux; \
     apk add --no-cache --virtual .ikoma-compile $PHPIZE_DEPS postgresql-dev oniguruma-dev libxml2-dev libzip-dev libjpeg-turbo-dev libpng-dev; \
     docker-php-ext-configure gd --with-jpeg; \
     docker-php-ext-install pdo_pgsql mbstring zip xmlreader gd; \
-    apk del .ikoma-compile
+    apk del .ikoma-compile; \
+    # Alpine FPM utilise www-data (82:82), mais les fichiers de l'installation \
+    # fictive sont lisibles par le groupe 33 attendu par l'image Debian. \
+    # Donner le groupe 33 au worker non-root, sans ouvrir les secrets au monde. \
+    env_group="$(awk -F: '$3 == 33 {print $1; exit}' /etc/group)"; \
+    if [ -z "$env_group" ]; then addgroup -S -g 33 ikoma-fpm-files; env_group=ikoma-fpm-files; fi; \
+    addgroup www-data "$env_group"; \
+    id -G www-data | tr ' ' '\\n' | grep -qx 33
 """
 dockerfile.write_text(alpine+old[old.index(end):])
 compose=root/"docker-compose.yml"
