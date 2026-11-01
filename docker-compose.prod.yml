@@ -16,14 +16,17 @@ x-durci: &durci
 services:
   db:
     <<: *durci
-    image: postgres:18.6-trixie
+    image: ghcr.io/zumradeals/ikoma-access-postgres-candidate@sha256:972db7acac7096fe75a5918b8d4692f2199bdb07599d055082b0b2a5b88c731d
     command: [postgres, -c, log_error_verbosity=terse, -c, log_parameter_max_length_on_error=0, -c, log_connections=on, -c, ssl=off]
+    secrets: [db_owner]
+    # S0.7 fail-closed: a fresh installation or separately approved migration must set this explicitly.
+    # Never use the old Debian PGDATA in Alpine.
     environment:
       POSTGRES_DB: ikoma
       POSTGRES_USER: ikoma
       POSTGRES_PASSWORD_FILE: /run/secrets/db_owner
-    secrets: [db_owner]
-    volumes: [postgres:/var/lib/postgresql]
+      IKOMA_S07_GUARD: ${IKOMA_S07_GUARD:?S0.7 exige un précontrôle de migration ; STOP}
+    volumes: [postgres_s07_alpine:/var/lib/postgresql]
     networks: [interne]
     # Capacités strictement nécessaires au démarrage de PostgreSQL (il abandonne ensuite les droits de root pour l'utilisateur postgres).
     cap_add: [CHOWN, FOWNER, DAC_READ_SEARCH, SETUID, SETGID]
@@ -122,7 +125,8 @@ networks:
   exterieur: {}
 
 volumes:
-  postgres:
+  # The prior 'postgres' named volume is intentionally retained, never removed.
+  postgres_s07_alpine:
   storage:
 
 secrets:

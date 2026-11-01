@@ -34,6 +34,8 @@ say "1/9 Prérequis"
 command -v docker >/dev/null || fail "Docker n'est pas installé (https://docs.docker.com/engine/install/)."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 est introuvable."
 docker info >/dev/null 2>&1 || fail "Docker ne répond pas : démarrez-le, ou ajoutez votre utilisateur au groupe docker."
+# S0.7 refuse un volume Debian existant AVANT toute génération de secret ou réécriture de configuration.
+sh "$ROOT/scripts/security/s07-adoption-preflight.sh" fresh "$DATA/env"
 for tool in openssl gpg curl; do command -v "$tool" >/dev/null || fail "l'outil « $tool » est requis (apt install $tool)."; done
 FREE_KB="$(df -Pk "$ROOT" | awk 'NR==2{print $4}')"
 [ "$FREE_KB" -gt 5000000 ] || fail "moins de 5 Go libres dans $ROOT : libérez de la place."
@@ -49,7 +51,7 @@ umask 077
 mkdir -p "$DATA/secrets" "$DATA/tls" "$DATA/acme" "$DATA/backups"
 chmod 0700 "$DATA" "$DATA/secrets"
 chmod 0755 "$DATA/tls" "$DATA/acme"
-printf 'IKOMA_VERSION=%s\nIKOMA_DOMAIN=%s\nIKOMA_HTTP_PORT=%s\nIKOMA_HTTPS_PORT=%s\n' "$VERSION" "$DOMAIN" "$HTTP_PORT" "$HTTPS_PORT" > "$DATA/env"
+printf 'IKOMA_S07_GUARD=FRESH_EMPTY_INSTALLATION_ONLY\nIKOMA_VERSION=%s\nIKOMA_DOMAIN=%s\nIKOMA_HTTP_PORT=%s\nIKOMA_HTTPS_PORT=%s\n' "$VERSION" "$DOMAIN" "$HTTP_PORT" "$HTTPS_PORT" > "$DATA/env"
 
 say "3/9 Secrets (générés ici, jamais dans Git ni dans les images)"
 generate() { # nom, contenu

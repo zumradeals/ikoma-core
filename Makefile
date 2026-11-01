@@ -2,6 +2,7 @@
 install:
 	sh scripts/install.sh
 up:
+	sh scripts/security/s07-dev-preflight.sh
 	docker compose up -d --build --wait
 down:
 	docker compose down

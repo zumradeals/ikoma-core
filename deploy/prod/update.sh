@@ -5,6 +5,8 @@
 . "$(dirname "$0")/lib.sh"
 REF="${1:?indiquez la version à installer : étiquette ou branche Git}"
 PREVIOUS="$(env_value IKOMA_VERSION)"
+# Never treat an application update as a Debian -> Alpine data migration.
+sh "$ROOT/scripts/security/s07-adoption-preflight.sh" update "$DATA/env"
 [ -z "$(git -C "$ROOT" status --porcelain)" ] || fail "le dossier $ROOT contient des modifications locales : elles seraient perdues. Annulez-les d'abord."
 
 say "1/6 Sauvegarde préalable (obligatoire : pas de migration sans sauvegarde vérifiée)"

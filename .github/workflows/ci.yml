@@ -5,6 +5,7 @@ on:
     branches: [main]
 permissions:
   contents: read
+  packages: read
 jobs:
   verification:
     runs-on: ubuntu-latest
@@ -12,6 +13,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Authentifier la lecture du candidat GHCR par digest exact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
       - run: make install
       - run: make up
       - run: make lint
@@ -113,6 +121,13 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Authentifier la lecture du candidat GHCR par digest exact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
       - name: Vérifier les contrats de refus du contrôle des images finales
         run: python3 -m unittest discover -s tests/security
       - name: Clé de sauvegarde de test (la clé privée n'est jamais donnée au serveur de recette)
