@@ -35,7 +35,6 @@ use App\Http\Controllers\TwoFactorRecoveryController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\EnsureF06Active;
-use App\Http\Middleware\RequireTwoFactor;
 use App\Http\Middleware\ResolvePoste;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -51,8 +50,9 @@ Route::get('/controle/shell', fn () => Inertia::render('Controle'));
 Route::get('/groupe/shell', fn () => Inertia::render('Groupe'));
 Route::get('/pilotage/evacuation/shell', fn () => Inertia::render('Pilotage/Evacuation'));
 Route::middleware(['auth'])->group(function (): void {
-    Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => (bool) auth()->user()->two_factor_confirmed_at]))->middleware('password.confirm')->name('security');
-    Route::middleware(RequireTwoFactor::class)->group(function (): void {
+    // 2FA disabled: old security entry redirects to normal authenticated space.
+    Route::get('/securite', fn () => redirect('/espace'))->name('security');
+    Route::group([], function (): void {
         Route::get('/hote/invites', [HostController::class, 'index'])->middleware('can:listes.mettre_a_jour');
         Route::post('/hote/invites', [HostController::class, 'store'])->middleware('can:listes.mettre_a_jour');
         Route::get('/hote/invites/{visitor}', [HostController::class, 'show'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
