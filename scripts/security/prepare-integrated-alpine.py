@@ -32,8 +32,18 @@ if run("git", "-C", str(root), "status", "--porcelain"):
 
 file = root / "docker/prod/Dockerfile"
 content = file.read_text()
-start = content.index("FROM php:8.5.12-fpm-trixie AS base")
-end = content.index("# 3) Dépendances PHP de production", start)
+original_debian_base = "FROM php:8.5.12-fpm-trixie AS base"
+current_alpine_base = "FROM php:8.5.12-fpm-alpine3.24 AS base"
+if content.count(original_debian_base) == 1:
+    start = content.index(original_debian_base)
+    end = content.index("# 3) Dépendances PHP de production", start)
+    base_was_debian = True
+elif content.count(current_alpine_base) == 1:
+    start = content.index(current_alpine_base)
+    end = content.index("# 3) Dépendances PHP de production", start)
+    base_was_debian = False
+else:
+    raise SystemExit("STOP: unsupported production PHP base")
 new_base = r"""FROM php:8.5.12-fpm-alpine3.24 AS base
 RUN set -eux; \
     apk upgrade --no-cache; \
@@ -44,13 +54,18 @@ RUN set -eux; \
     apk del .ikoma-compile
 
 """
-content = content[:start] + new_base + content[end:]
-content = single(
-    content,
-    "RUN useradd --uid 10001 --user-group --no-create-home --shell /usr/sbin/nologin ikoma",
-    "RUN addgroup -S -g 10001 ikoma && adduser -S -D -H -u 10001 -G ikoma -s /sbin/nologin ikoma",
-    "user creation",
-)
+if base_was_debian:
+    content = content[:start] + new_base + content[end:]
+    content = single(
+        content,
+        "RUN useradd --uid 10001 --user-group --no-create-home --shell /usr/sbin/nologin ikoma",
+        "RUN addgroup -S -g 10001 ikoma && adduser -S -D -H -u 10001 -G ikoma -s /sbin/nologin ikoma",
+        "user creation",
+    )
+else:
+    expected_user = "RUN addgroup -S -g 10001 ikoma && adduser -S -D -H -u 10001 -G ikoma -s /sbin/nologin ikoma"
+    if content.count(expected_user) != 1 or not ("apk del .ikoma-compile" in content[start:end]):
+        raise SystemExit("STOP: PHP Alpine runtime or non-root identity contract changed")
 file.write_text(content)
 
 compose = root / "docker-compose.prod.yml"
