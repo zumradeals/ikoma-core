@@ -50,8 +50,7 @@ Route::get('/controle/shell', fn () => Inertia::render('Controle'));
 Route::get('/groupe/shell', fn () => Inertia::render('Groupe'));
 Route::get('/pilotage/evacuation/shell', fn () => Inertia::render('Pilotage/Evacuation'));
 Route::middleware(['auth'])->group(function (): void {
-    // 2FA disabled: old security entry redirects to normal authenticated space.
-    Route::get('/securite', fn () => redirect('/espace'))->name('security');
+    Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => false]))->middleware('password.confirm')->name('security');
     Route::group([], function (): void {
         Route::get('/hote/invites', [HostController::class, 'index'])->middleware('can:listes.mettre_a_jour');
         Route::post('/hote/invites', [HostController::class, 'store'])->middleware('can:listes.mettre_a_jour');
