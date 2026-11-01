@@ -20,7 +20,7 @@ categories={
   "browser":bool(re.search(r"Target closed|browserType\.launch|Browser closed",raw)),
   "http_500":bool(re.search(r"HTTP (?:500|502|503)|Internal Server Error",raw,re.I)),
 }
-match=re.findall(r"\\b(\\d+)\\s+(?:failed|passed|skipped)\\b",raw)
+match=re.findall(r"\b(\d+)\s+(?:failed|passed|skipped)\b",raw)
 # Only explicit static milestones. This never forwards URL parameters, accounts, DOM, secret or raw logs.
 allowed_steps={
  "auth.start","auth.login.page","auth.login.open","auth.login.rendered",
@@ -29,7 +29,7 @@ allowed_steps={
  "auth.authenticated","auth.login.done","auth.accounts.menu","auth.accounts.click",
  "auth.accounts.visible","auth.journal.navigate","auth.journal.visible",
 }
-steps=[step for step in re.findall(r"IKOMA_E2E_STEP:(auth\\.[a-z.]+)",raw) if step in allowed_steps]
+steps=[step for step in re.findall(r"IKOMA_E2E_STEP:(auth\.[a-z.]+)",raw) if step in allowed_steps]
 result={
  "scope":"sandbox-e2e-diagnostic-only",
  "raw_logs_uploaded":False,
