@@ -42,8 +42,29 @@ jobs:
           python3 -m unittest discover -s tests/security -p 'test_s06_oci_gate.py' -v
           python3 -m unittest discover -s tests/security -p 'test_s04_rebuild.py' -v
 
+  authorize:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: STOP explicite hors main, sha different ou confirmation absente
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "zumradeals/ikoma-core"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRMATION" = "RELEASE_CANDIDATE_ONLY"
+          [[ "$EXPECTED_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          test "$EXPECTED_COMMIT" = "$(git rev-parse HEAD)"
+
   publish-candidate:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
+    needs: authorize
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -124,8 +145,13 @@ jobs:
           set -euo pipefail
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
           tag="$IMAGE_NAME:rc-$EXPECTED_COMMIT"
-          if docker manifest inspect "$tag" >/dev/null 2>&1; then
+          # Ne jamais supposer qu'un echec reseau/permissions signifie tag absent.
+          if docker manifest inspect "$tag" > "$RUNNER_TEMP/s06-private/remote-manifest.log"             2> "$RUNNER_TEMP/s06-private/remote-manifest-error.log"; then
             echo "STOP: release candidate tag already present; refuse overwrite"
+            exit 1
+          fi
+          if ! grep -Eiq '(no such manifest|manifest unknown|not found|404)'             "$RUNNER_TEMP/s06-private/remote-manifest-error.log"; then
+            echo "STOP: inconclusive registry check; refusing potential tag overwrite"
             exit 1
           fi
           docker push "$tag" > "$RUNNER_TEMP/s06-private/push.log"
