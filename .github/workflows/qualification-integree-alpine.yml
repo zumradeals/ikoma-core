@@ -1,10 +1,10 @@
-name: S0.2 — Recette intégrée Alpine (isolée)
+name: S0.3-B — Recette intégrée PostgreSQL gosu corrigé
 
 on:
   pull_request:
     paths:
       - '.github/workflows/qualification-integree-alpine.yml'
-      - 'docker/qualification/postgres-integrated-alpine.Dockerfile'
+      - 'docker/qualification/postgres-gosu-go127-alpine.Dockerfile'
       - 'scripts/security/prepare-integrated-alpine.py'
       - 'scripts/security/qualify-integrated-alpine.py'
       - 'scripts/security/verify-integrated-php.php'
@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.13'
+          go-version: '1.27.3'
       - name: Préparer un espace Git totalement indépendant
         run: |
           set -euo pipefail
@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$IKOMA_QUALIFICATION_DIR"
-          docker build --pull -f docker/qualification/postgres-integrated-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
+          docker build --pull -f docker/qualification/postgres-gosu-go127-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
       - name: Générer des clés fictives de sauvegarde, hors des artefacts
         run: |
           set -euo pipefail
@@ -111,6 +111,21 @@ jobs:
           curl -fsSL --retry 3 https://vuln.go.dev/ID/GO-2026-4337.json -o "$dir/GO-2026-4337.json"
           "$(go env GOPATH)/bin/govulncheck" -mode=binary -json "$dir/alpine-gosu" > "$dir/govulncheck.json"
           python3 scripts/security/qualify-integrated-alpine.py "$dir" "$RUNNER_TEMP/critical-integrated/resultats.json"
+          # La recette S0.3 sur le candidat corrigé ne tolère aucune HIGH/CRITICAL.
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          p = Path(os.environ["RUNNER_TEMP"]) / "critical-integrated/resultats.json"
+          results = json.loads(p.read_text())
+          images = results.get("images", {})
+          if set(images) != {"php", "db", "nginx"}:
+              raise SystemExit("STOP: incomplete final image set")
+          for name, entry in images.items():
+              if not entry.get("image_id") or entry.get("high_count") != 0 or entry.get("critical_count") != 0:
+                  raise SystemExit("STOP: unresolved HIGH/CRITICAL in final candidate image " + name)
+          print("S0.3-B final 3 candidate images: 0 HIGH, 0 CRITICAL")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
