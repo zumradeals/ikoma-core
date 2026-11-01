@@ -1,0 +1,92 @@
+name: S0.4 - Provenance et reproductibilite PostgreSQL gosu
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-s04-postgresql.yml'
+      - 'scripts/security/s04-rebuild-check.py'
+      - 'scripts/security/s03-pg-scan-gate.py'
+      - 'docker/qualification/postgres-gosu-go127-alpine.Dockerfile'
+      - 'docs/security/S0.4-ADOPTION-CANDIDAT.md'
+
+permissions:
+  contents: read
+
+jobs:
+  reproducibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Figer les deux images parentes par digest pour cette qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/s04-private" "$RUNNER_TEMP/s04-evidence"
+          docker pull golang:1.27.3-alpine3.24
+          docker pull postgres:18.6-alpine3.24
+          go_digest="$(docker image inspect golang:1.27.3-alpine3.24 --format '{{index .RepoDigests 0}}' | cut -d@ -f2)"
+          pg_digest="$(docker image inspect postgres:18.6-alpine3.24 --format '{{index .RepoDigests 0}}' | cut -d@ -f2)"
+          python3 scripts/security/s04-rebuild-check.py pin \
+            --source docker/qualification/postgres-gosu-go127-alpine.Dockerfile \
+            --golang "golang@$go_digest" --postgres "postgres@$pg_digest" \
+            --output "$RUNNER_TEMP/s04-private/pinned.Dockerfile" \
+            --evidence "$RUNNER_TEMP/s04-evidence/parents.json"
+      - name: Construire deux fois sans cache le candidat aux memes parents immuables
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variant in a b; do
+            docker build --no-cache --pull \
+              -f "$RUNNER_TEMP/s04-private/pinned.Dockerfile" \
+              -t "ikoma-s04:$variant" .
+            cid="$(docker create "ikoma-s04:$variant")"
+            docker cp "$cid:/usr/local/bin/gosu" "$RUNNER_TEMP/s04-private/gosu-$variant"
+            docker rm "$cid" >/dev/null
+            docker image inspect "ikoma-s04:$variant" --format '{{.Id}}' \
+              > "$RUNNER_TEMP/s04-private/image-$variant.id"
+            go version -m "$RUNNER_TEMP/s04-private/gosu-$variant" \
+              > "$RUNNER_TEMP/s04-private/gosu-$variant.version"
+          done
+      - name: Scanner les deux images distinctes et refuser chaque HIGH ou CRITICAL
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s04-private/tools.log" 2>&1
+          printf '{}\n' > "$RUNNER_TEMP/s04-private/config.yaml"
+          : > "$RUNNER_TEMP/s04-private/ignore"
+          for variant in a b; do
+            image="$(cat "$RUNNER_TEMP/s04-private/image-$variant.id")"
+            /tmp/ikoma-security-tools/trivy image \
+              --config "$RUNNER_TEMP/s04-private/config.yaml" \
+              --ignorefile "$RUNNER_TEMP/s04-private/ignore" \
+              --image-src docker --scanners vuln \
+              --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+              --ignore-unfixed=false --exit-code 0 --format json \
+              --output "$RUNNER_TEMP/s04-private/trivy-$variant.json" "$image"
+            python3 scripts/security/s03-pg-scan-gate.py \
+              "$RUNNER_TEMP/s04-private/trivy-$variant.json" \
+              "$RUNNER_TEMP/s04-private/image-$variant.id" \
+              "$RUNNER_TEMP/s04-private/gate-$variant.json"
+          done
+      - name: Refuser toute difference binaire ou rupture de provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/security/s04-rebuild-check.py verify \
+            --a "$RUNNER_TEMP/s04-private/gosu-a" \
+            --b "$RUNNER_TEMP/s04-private/gosu-b" \
+            --a-metadata "$RUNNER_TEMP/s04-private/gosu-a.version" \
+            --b-metadata "$RUNNER_TEMP/s04-private/gosu-b.version" \
+            --a-imageid "$RUNNER_TEMP/s04-private/image-a.id" \
+            --b-imageid "$RUNNER_TEMP/s04-private/image-b.id" \
+            --scan-a "$RUNNER_TEMP/s04-private/gate-a.json" \
+            --scan-b "$RUNNER_TEMP/s04-private/gate-b.json" \
+            --evidence "$RUNNER_TEMP/s04-evidence/reproducibility.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s04-postgresql-provenance-sans-donnees
+          path: ${{ runner.temp }}/s04-evidence/
+          if-no-files-found: error
+          retention-days: 90
