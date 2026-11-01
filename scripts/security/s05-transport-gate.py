@@ -59,15 +59,20 @@ def inspect_archive(path):
             if item.get("RepoTags") != [TAG]:
                 stop("unexpected tag in exported candidate")
             conf = item.get("Config")
-            if not isinstance(conf, str) or not re.fullmatch(HEX64 + r"\.json", conf):
+            if not isinstance(conf, str):
                 stop("unexpected image config filename")
+            legacy = re.fullmatch(HEX64 + r"\.json", conf)
+            modern = re.fullmatch(r"blobs/sha256/" + HEX64, conf)
+            if not legacy and not modern:
+                stop("unknown Docker archive configuration path")
             if conf not in names:
                 stop("referenced image config absent")
             cfg = archive.extractfile(conf)
             if cfg is None:
                 stop("cannot read image configuration")
             digest = hashlib.sha256(cfg.read()).hexdigest()
-            if conf != digest + ".json":
+            if (legacy and conf != digest + ".json") or (
+                    modern and conf != "blobs/sha256/" + digest):
                 stop("image config content differs from filename")
             layers = item.get("Layers")
             if not isinstance(layers, list) or not layers or not all(isinstance(l, str) and l in names for l in layers):
