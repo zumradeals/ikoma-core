@@ -223,8 +223,15 @@ jobs:
           set -euo pipefail
           ref="$(cat "$RUNNER_TEMP/s06-private/immutable-ref.txt")"
           gh attestation verify "oci://$ref" -R "$GITHUB_REPOSITORY" \
-            > "$RUNNER_TEMP/s06-private/attestation-private.json"
-          test -s "$RUNNER_TEMP/s06-private/attestation-private.json"
+            --format json --source-ref refs/heads/main \
+            --source-digest "$EXPECTED_COMMIT" \
+            > "$RUNNER_TEMP/s06-private/verified-attestation.json"
+          python3 scripts/security/s06-attestation-gate.py \
+            --release-record s06-release/release.json \
+            --verified-json "$RUNNER_TEMP/s06-private/verified-attestation.json" \
+            --commit "$EXPECTED_COMMIT" --digest "$(python3 -c 'import json;print(json.load(open("s06-release/release.json"))["digest"])')" \
+            --repository "$GITHUB_REPOSITORY" \
+            --output "$RUNNER_TEMP/s06-evidence/attestation-check.json"
       - name: Refaire Trivy sur le digest distribue et verifier les contrats
         shell: bash
         run: |
