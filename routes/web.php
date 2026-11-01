@@ -31,11 +31,9 @@ use App\Http\Controllers\PostesController;
 use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\RetentionController;
-use App\Http\Controllers\TwoFactorRecoveryController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\EnsureF06Active;
-use App\Http\Middleware\RequireTwoFactor;
 use App\Http\Middleware\ResolvePoste;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -51,8 +49,8 @@ Route::get('/controle/shell', fn () => Inertia::render('Controle'));
 Route::get('/groupe/shell', fn () => Inertia::render('Groupe'));
 Route::get('/pilotage/evacuation/shell', fn () => Inertia::render('Pilotage/Evacuation'));
 Route::middleware(['auth'])->group(function (): void {
-    Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => (bool) auth()->user()->two_factor_confirmed_at]))->middleware('password.confirm')->name('security');
-    Route::middleware(RequireTwoFactor::class)->group(function (): void {
+    Route::get('/securite', fn () => Inertia::render('Auth/Security', ['confirmed' => false]))->middleware('password.confirm')->name('security');
+    Route::group([], function (): void {
         Route::get('/hote/invites', [HostController::class, 'index'])->middleware('can:listes.mettre_a_jour');
         Route::post('/hote/invites', [HostController::class, 'store'])->middleware('can:listes.mettre_a_jour');
         Route::get('/hote/invites/{visitor}', [HostController::class, 'show'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
@@ -156,8 +154,6 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
         Route::get('/administration/evenements', [EventsController::class, 'index'])->middleware('can:evenements.gerer');
         Route::post('/administration/evenements', [EventsController::class, 'store'])->middleware('can:evenements.gerer');
-        Route::post('/administration/comptes/{user}/2fa/preparer', [TwoFactorRecoveryController::class, 'prepare'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);
-        Route::post('/administration/comptes/{user}/2fa/confirmer', [TwoFactorRecoveryController::class, 'confirm'])->whereUuid('user')->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::get('/administration/comptes', [AccountsController::class, 'index'])->middleware('can:comptes.gerer');
         Route::post('/administration/comptes', [AccountsController::class, 'store'])->middleware(['can:comptes.gerer', 'can:roles.attribuer']);
         Route::put('/administration/comptes/inactivite', [AccountsController::class, 'inactivity'])->middleware('can:comptes.gerer');

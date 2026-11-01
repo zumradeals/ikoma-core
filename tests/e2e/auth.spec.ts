@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 
-test('connexion, double authentification, comptes et journal', async ({ page }) => {
-  // Inclut les délais de limitation/rejeu TOTP imposés par le serveur, sans les contourner.
+test('connexion par mot de passe, comptes et journal', async ({ page }) => {
+  // Conserve la limitation des connexions sans utiliser de second facteur.
   test.setTimeout(180_000);
   const mark = (step: string) => console.info(`IKOMA_E2E_STEP:${step}`);
   mark('auth.start');
@@ -13,11 +13,8 @@ test('connexion, double authentification, comptes et journal', async ({ page }) 
   mark('auth.login.page');
   await page.goto('/login');
   await page.screenshot({ path: 'test-results/connexion.png', fullPage: true });
-  await test.step('connexion et validation du second facteur', async () => {
-    await loginWithSecondFactor(page, user.email, user.password, user.secret, async () => {
-      mark('auth.challenge.screenshot');
-      await page.screenshot({ path: 'test-results/double-authentification.png', fullPage: true });
-    }, step => mark(`auth.${step}`));
+  await test.step('connexion sans code OTP', async () => {
+    await loginWithSecondFactor(page, user.email, user.password, user.secret, undefined, step => mark(`auth.${step}`));
     mark('auth.login.done');
   });
 

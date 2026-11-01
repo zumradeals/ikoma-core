@@ -41,7 +41,7 @@ function submit() {
     <div class="mt-7 border-t border-[#E3EBF5] pt-6">
       <div class="flex items-start gap-3 rounded-lg bg-[#F1F6FC] p-4 text-sm leading-relaxed text-[#456381]">
         <svg class="mt-0.5 h-5 w-5 shrink-0 text-[#0066B3]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-        <p><strong class="text-[#0B3C6B]">Accès nominatif et sécurisé.</strong> Les comptes sont fournis par votre administrateur. La double authentification reste obligatoire pour les administrateurs et superviseurs.</p>
+        <p><strong class="text-[#0B3C6B]">Accès nominatif et sécurisé.</strong> Les comptes sont fournis par votre administrateur. Les comptes utilisent leur mot de passe personnel et des autorisations propres à chaque rôle.</p>
       </div>
       <p class="mt-5 text-center text-sm text-[#506D94]">Besoin d'aide pour votre compte ? Contactez l'administrateur de votre organisation.</p>
     </div>

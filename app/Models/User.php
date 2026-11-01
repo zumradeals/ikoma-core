@@ -24,6 +24,6 @@ class User extends Authenticatable
 
     public function requiresTwoFactor(): bool
     {
-        return $this->hasAnyRole(['administrateur', 'superviseur']);
+        return false;
     }
 }
