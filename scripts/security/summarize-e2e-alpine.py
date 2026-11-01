@@ -24,6 +24,13 @@ match=re.findall(r"\b(\d+)\s+(?:failed|passed|skipped)\b",raw)
 # Only explicit static milestones. This never forwards URL parameters, accounts, DOM, secret or raw logs.
 allowed_steps={
  "auth.start","auth.login.page","auth.login.open","auth.login.rendered",
+ "auth.login.navigated","auth.login.path.login","auth.login.path.other",
+ "auth.login.http.ok","auth.login.http.servererror","auth.login.http.unexpected",
+ "auth.login.mount.present","auth.login.mount.absent",
+ "auth.login.heading.visible","auth.login.email.visible","auth.login.email.exists",
+ "auth.login.email.absent","auth.login.email.filled","auth.login.password.filled",
+ "auth.login.scripts.present","auth.login.scripts.absent",
+ "auth.login.headings.present","auth.login.headings.absent",
  "auth.login.submit","auth.login.responded","auth.login.throttled",
  "auth.challenge.visible","auth.challenge.screenshot","auth.otp.submit",
  "auth.authenticated","auth.login.done","auth.accounts.menu","auth.accounts.click",
