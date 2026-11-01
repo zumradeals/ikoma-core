@@ -1,0 +1,175 @@
+name: S0.7 - OCI image officielle, garde et rollback fictif
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-s07-oci-adoption.yml'
+      - 'docker-compose.yml'
+      - 'docker-compose.prod.yml'
+      - 'deploy/prod/install.sh'
+      - 'deploy/prod/update.sh'
+      - 'deploy/prod/rollback.sh'
+      - 'scripts/security/s07-adoption-preflight.sh'
+      - 'scripts/security/s07-dev-preflight.sh'
+      - 'tests/security/test_s07_adoption.py'
+      - 'docs/security/S0.7-OCI-ADOPTION-GUARDED.md'
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  OCI_REF: ghcr.io/zumradeals/ikoma-access-postgres-candidate@sha256:972db7acac7096fe75a5918b8d4692f2199bdb07599d055082b0b2a5b88c731d
+
+jobs:
+  pg-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contrats de garde et de Compose S0.7
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/security -p 'test_s07_adoption.py' -v
+          mkdir -p "$RUNNER_TEMP/s03-pg-private" "$RUNNER_TEMP/s03-pg-evidence"
+          if env -u IKOMA_S07_GUARD IKOMA_VERSION=ci IKOMA_DOMAIN=localhost             docker compose --env-file /dev/null -f docker-compose.prod.yml config             > "$RUNNER_TEMP/s03-pg-private/forbidden.log" 2>&1; then
+            echo 'STOP S0.7: missing guard accepted'; exit 1
+          fi
+          grep -F 'S0.7 exige' "$RUNNER_TEMP/s03-pg-private/forbidden.log" > /dev/null
+          IKOMA_S07_GUARD=FRESH_EMPTY_INSTALLATION_ONLY IKOMA_VERSION=ci IKOMA_DOMAIN=localhost             docker compose --env-file /dev/null -f docker-compose.prod.yml config --format json             > "$RUNNER_TEMP/s03-pg-private/approved.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads((Path(os.environ["RUNNER_TEMP"])/"s03-pg-private/approved.json").read_text())
+          assert d["services"]["db"]["image"]==os.environ["OCI_REF"]
+          vs=d["services"]["db"]["volumes"]
+          assert len(vs)==1 and vs[0]["source"]=="postgres_s07_alpine" and vs[0]["target"]=="/var/lib/postgresql"
+          assert "postgres" not in d["volumes"]
+          print("S0.7 guard and isolated volumes: PASS")
+          PY
+          echo 'compose_prod_guard=PASS' > "$RUNNER_TEMP/s03-pg-evidence/s07-guard.txt"
+      - name: Authentifier GHCR en lecture seule
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+      - name: Pinner le digest OCI distribue et identifier la source Debian fictive
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/s03-pg-private" "$RUNNER_TEMP/s03-pg-evidence"
+          docker pull postgres:18.6-trixie
+          # Use S0.6 attested OCI manifest, never a tag or local rebuild.
+          docker pull "$OCI_REF"
+          docker image inspect "$OCI_REF" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -Fx "$OCI_REF"
+          docker image inspect $OCI_REF \
+            --format '{{.Id}}' > "$RUNNER_TEMP/s03-pg-private/postgres-image-id.txt"
+          docker image inspect postgres:18.6-trixie --format '{{.Id}}' \
+            > "$RUNNER_TEMP/s03-pg-evidence/debian-id.txt"
+          cp "$RUNNER_TEMP/s03-pg-private/postgres-image-id.txt" \
+            "$RUNNER_TEMP/s03-pg-evidence/alpine-id.txt"
+      - name: Restaurer une sauvegarde fictive Debian vers le digest OCI distribue
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name s03-pg-debian --network none \
+            --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m \
+            -e POSTGRES_PASSWORD=uniquement-fictif -e POSTGRES_DB=ikoma_fixture \
+            postgres:18.6-trixie >/dev/null
+          docker run -d --rm --name s03-pg-alpine --network none \
+            --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m \
+            -e POSTGRES_PASSWORD=uniquement-fictif -e POSTGRES_DB=ikoma_fixture \
+            $OCI_REF >/dev/null
+          for db in s03-pg-debian s03-pg-alpine; do
+            ready=0
+            for i in $(seq 1 45); do
+              if docker exec "$db" pg_isready -U postgres -d ikoma_fixture >/dev/null 2>&1; then ready=1; break; fi
+              sleep 2
+            done
+            test "$ready" = 1 || { echo 'STOP: PostgreSQL instance not ready'; exit 1; }
+            docker exec "$db" postgres --version | grep -F 'PostgreSQL) 18.6'
+          done
+          docker exec -i s03-pg-debian psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture \
+            < scripts/security/s03-pg-migration-fixture.sql >/dev/null
+          docker exec s03-pg-debian pg_dump -U postgres -Fc -d ikoma_fixture \
+            > "$RUNNER_TEMP/s03-pg-private/fixture.dump"
+          test -s "$RUNNER_TEMP/s03-pg-private/fixture.dump"
+          docker exec -i s03-pg-alpine pg_restore -U postgres -d ikoma_fixture \
+            --exit-on-error --no-owner --no-privileges \
+            < "$RUNNER_TEMP/s03-pg-private/fixture.dump" >/dev/null
+          for db in s03-pg-debian s03-pg-alpine; do
+            short=$(echo "$db" | sed 's/s03-pg-//')
+            docker exec "$db" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture -At \
+              -c 'SELECT id || '"'"'|'"'"' || full_name FROM s03_visiteurs_fictifs ORDER BY full_name COLLATE "C", id;' \
+              > "$RUNNER_TEMP/s03-pg-private/$short-order.txt"
+            docker exec "$db" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture -At \
+              -c "SELECT indexname FROM pg_indexes WHERE tablename = 's03_visiteurs_fictifs' ORDER BY indexname;" \
+              > "$RUNNER_TEMP/s03-pg-private/$short-indexes.txt"
+            docker exec "$db" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture -At \
+              -c "SELECT extname FROM pg_extension WHERE extname IN ('unaccent','pg_trgm') ORDER BY extname;" \
+              > "$RUNNER_TEMP/s03-pg-private/$short-extensions.txt"
+            docker exec "$db" psql -X -v ON_ERROR_STOP=1 -U postgres -d ikoma_fixture -At \
+              -c "SELECT id FROM s03_visiteurs_fictifs WHERE lower(unaccent(full_name)) LIKE '%ecole%' ORDER BY full_name COLLATE \"C\",id;" \
+              > "$RUNNER_TEMP/s03-pg-private/$short-search.txt"
+            test "$(wc -l < "$RUNNER_TEMP/s03-pg-private/$short-order.txt")" -eq 1000
+            test "$(wc -l < "$RUNNER_TEMP/s03-pg-private/$short-indexes.txt")" -eq 3
+            test "$(wc -l < "$RUNNER_TEMP/s03-pg-private/$short-extensions.txt")" -eq 2
+          done
+          for part in order indexes extensions search; do
+            diff -u "$RUNNER_TEMP/s03-pg-private/debian-$part.txt" \
+              "$RUNNER_TEMP/s03-pg-private/alpine-$part.txt" \
+              || { echo "STOP: Debian/Alpine $part mismatch"; exit 1; }
+          done
+          printf 'logical_restore=PASS\nexplicit_C_sort=PASS\nindexes=PASS\nextensions=PASS\nsearch=PASS\nno_shared_volume=TRUE\n' \
+            > "$RUNNER_TEMP/s03-pg-evidence/restore-checks.txt"
+      - name: Vérifier sauvegarde, restauration, REINDEX et retour arrière fictif
+        run: sh scripts/security/s03-pg-recovery-rehearsal.sh
+      - name: Scanner la candidate PostgreSQL (aucune exclusion Trivy)
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s03-pg-private/tool-install.log" 2>&1
+          echo '{}' > "$RUNNER_TEMP/s03-pg-private/config.yaml"
+          : > "$RUNNER_TEMP/s03-pg-private/ignore"
+          image=$(cat "$RUNNER_TEMP/s03-pg-private/postgres-image-id.txt")
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/s03-pg-private/config.yaml" \
+            --ignorefile "$RUNNER_TEMP/s03-pg-private/ignore" \
+            --image-src docker --scanners vuln \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --ignore-unfixed=false --exit-code 0 --format json \
+            --output "$RUNNER_TEMP/s03-pg-private/trivy-postgres.json" "$image"
+      - name: Auditer gosu par CVE et symbole du binaire scanné
+        run: |
+          set -euo pipefail
+          docker cp s03-pg-alpine:/usr/local/bin/gosu "$RUNNER_TEMP/s03-pg-private/gosu"
+          go version -m "$RUNNER_TEMP/s03-pg-private/gosu" \
+            > "$RUNNER_TEMP/s03-pg-evidence/gosu-version.txt"
+          cp "$RUNNER_TEMP/s03-pg-evidence/gosu-version.txt" "$RUNNER_TEMP/s03-pg-private/gosu-version.txt"
+          sha256sum "$RUNNER_TEMP/s03-pg-private/gosu" > "$RUNNER_TEMP/s03-pg-evidence/gosu-binary-sha256.txt"
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          "$(go env GOPATH)/bin/govulncheck" -mode=binary -json \
+            "$RUNNER_TEMP/s03-pg-private/gosu" > "$RUNNER_TEMP/s03-pg-private/govulncheck.json"
+          python3 scripts/security/audit-gosu-highs.py \
+            "$RUNNER_TEMP/s03-pg-private" \
+            "$RUNNER_TEMP/s03-pg-evidence/gosu-cve-audit.json"
+      - name: Refuser l'adoption en présence de HIGH ou CRITICAL
+        run: |
+          set -euo pipefail
+          python3 scripts/security/s03-pg-scan-gate.py \
+            "$RUNNER_TEMP/s03-pg-private/trivy-postgres.json" \
+            "$RUNNER_TEMP/s03-pg-private/postgres-image-id.txt" \
+            "$RUNNER_TEMP/s03-pg-evidence/decision.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s07-oci-fictif-reindex-et-rollback
+          path: ${{ runner.temp }}/s03-pg-evidence/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Nettoyer les deux bases fictives
+        if: always()
+        run: docker rm -f s03-pg-debian s03-pg-alpine s03-pg-rollback >/dev/null 2>&1 || true
