@@ -1,0 +1,71 @@
+name: S0.3 - Qualification corrective PHP Alpine
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-php-alpine.yml'
+      - 'docker/php/Dockerfile'
+      - 'docker/prod/Dockerfile'
+      - 'scripts/security/qualify-php-image.py'
+      - 'scripts/security/verify-integrated-php.php'
+      - 'docs/security/S0.3-PHP-ALPINE-CANDIDAT.md'
+      - 'composer.lock'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  php-alpine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire l'image PHP finale du commit examiné
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/s03-php" "$RUNNER_TEMP/s03-php-private"
+          docker build --pull --target php -f docker/prod/Dockerfile \
+            --build-arg IKOMA_REVISION="$GITHUB_SHA" \
+            --build-arg IKOMA_BUILD_VERSION="s03-qualification" \
+            -t ikoma-php:s03-qualification .
+          docker image inspect ikoma-php:s03-qualification --format '{{.Id}}' > "$RUNNER_TEMP/s03-php-private/image-id.txt"
+      - name: Vérifier bibliothèques PHP, CSV et XLSX sur l'image réelle
+        run: |
+          set -euo pipefail
+          image=$(cat "$RUNNER_TEMP/s03-php-private/image-id.txt")
+          docker run --rm -i --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,size=32m \
+            --entrypoint php "$image" /dev/stdin < scripts/security/verify-integrated-php.php \
+            > "$RUNNER_TEMP/s03-php-private/php-fixtures.json"
+          python3 - "$RUNNER_TEMP/s03-php-private/php-fixtures.json" <<'PY'
+          import json,sys
+          result=json.load(open(sys.argv[1]))
+          if not isinstance(result,dict):
+              raise SystemExit("STOP: invalid PHP fixture report")
+          print("PHP final: libraries/import fixture response parsed")
+          PY
+      - name: Scanner la véritable image PHP finale avec Trivy inchangé
+        run: |
+          set -euo pipefail
+          sh scripts/security/install-tools.sh > "$RUNNER_TEMP/s03-php-private/security-install.log" 2>&1
+          echo '{}' > "$RUNNER_TEMP/s03-php-private/config.yaml"
+          : > "$RUNNER_TEMP/s03-php-private/ignore"
+          image=$(cat "$RUNNER_TEMP/s03-php-private/image-id.txt")
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/s03-php-private/config.yaml" \
+            --ignorefile "$RUNNER_TEMP/s03-php-private/ignore" \
+            --image-src docker --scanners vuln \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --ignore-unfixed=false --exit-code 0 --format json \
+            --output "$RUNNER_TEMP/s03-php-private/trivy.json" "$image"
+          python3 scripts/security/qualify-php-image.py \
+            "$RUNNER_TEMP/s03-php-private/trivy.json" \
+            "$RUNNER_TEMP/s03-php-private/image-id.txt" \
+            "$RUNNER_TEMP/s03-php/conclusion.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s03-qualification-php-sans-donnees
+          path: ${{ runner.temp }}/s03-php/
+          if-no-files-found: warn
+          retention-days: 90

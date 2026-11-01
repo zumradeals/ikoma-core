@@ -15,17 +15,15 @@ COPY app ./app
 COPY public ./public
 RUN npm run build
 
-# 2) Base PHP : mêmes extensions que le développement ; compilateurs et en-têtes retirés après compilation.
-FROM php:8.5.12-fpm-trixie AS base
+# 2) Base PHP Alpine candidate : extensions identiques au développement ; compilateurs et en-têtes supprimés après compilation.
+FROM php:8.5.12-fpm-alpine3.24 AS base
 RUN set -eux; \
-    apt-get update; \
-    apt-get upgrade -y --no-install-recommends; \
-    apt-get install -y --no-install-recommends $PHPIZE_DEPS libpq-dev libonig-dev libxml2-dev libzip-dev libjpeg62-turbo-dev libpng-dev unzip git; \
+    apk upgrade --no-cache; \
+    apk add --no-cache libpq oniguruma libxml2 libzip libjpeg-turbo libpng; \
+    apk add --no-cache --virtual .ikoma-compile $PHPIZE_DEPS postgresql-dev oniguruma-dev libxml2-dev libzip-dev libjpeg-turbo-dev libpng-dev; \
     docker-php-ext-configure gd --with-jpeg; \
     docker-php-ext-install pdo_pgsql mbstring zip xmlreader gd; \
-    ldd /usr/local/lib/php/extensions/*/*.so | awk '/=>/ { print $(NF-1) }' | xargs -r realpath | sort -u | xargs -r dpkg-query --search | cut -d: -f1 | sort -u | xargs -r apt-mark manual; \
-    apt-get purge -y --auto-remove $PHPIZE_DEPS libpq-dev libonig-dev libxml2-dev libzip-dev libjpeg62-turbo-dev libpng-dev unzip git linux-libc-dev; \
-    rm -rf /var/lib/apt/lists/*
+    apk del .ikoma-compile
 
 # 3) Dépendances PHP de production seulement (sans les outils de test).
 FROM base AS vendor
@@ -43,7 +41,7 @@ RUN composer dump-autoload --optimize --classmap-authoritative --no-dev --no-scr
 
 # 4) Image PHP finale : le code appartient à root et n'est pas modifiable par l'application ; seuls storage/ et bootstrap/cache/ le sont.
 FROM base AS php
-RUN useradd --uid 10001 --user-group --no-create-home --shell /usr/sbin/nologin ikoma
+RUN addgroup -S -g 10001 ikoma && adduser -S -D -H -u 10001 -G ikoma -s /sbin/nologin ikoma
 WORKDIR /var/www/html
 COPY --from=vendor /app/vendor ./vendor
 COPY --from=vendor /app/app ./app
