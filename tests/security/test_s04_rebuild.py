@@ -31,10 +31,11 @@ class S04GateTest(unittest.TestCase):
     def test_pin_two_parent_digests(self):
         output = self.p / "locked.Dockerfile"
         evidence = self.p / "parents.json"
+        locked = json.loads(self.lock.read_text())["parents"]
         r = self.call("pin", "--lock", self.lock, "--source", SOURCE, "--output", output,
                       "--evidence", evidence,
-                      "--golang", "golang@sha256:" + "a" * 64,
-                      "--postgres", "postgres@sha256:" + "b" * 64)
+                      "--golang", locked["golang"]["locked_ref"],
+                      "--postgres", locked["postgres"]["locked_ref"])
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("FROM golang@sha256:", output.read_text())
         self.assertIn("FROM postgres@sha256:", output.read_text())
