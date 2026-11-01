@@ -131,8 +131,8 @@ jobs:
           mkdir -p security-r06
           image=$(docker inspect --format '{{.Image}}' "$(docker compose --env-file prod-data/env -f docker-compose.prod.yml ps -q php)")
           docker run --rm -i --network none --read-only --entrypoint sh "$image" -s < scripts/security/r06-runtime-verify.sh | tee security-r06/verification.txt
-          docker run --rm --network none --read-only --entrypoint dpkg-query "$image" -W -f='${binary:Package}\t${Version}\n' | LC_ALL=C sort > security-r06/paquets-php-final.txt
-          test -s security-r06/paquets-php-final.txt
+          docker run --rm -i --network none --read-only --entrypoint sh "$image" -s < scripts/security/r06-package-inventory.sh | LC_ALL=C sort > security-r06/paquets-php-final.txt
+          grep -Eq '^[^#[:space:]]' security-r06/paquets-php-final.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
