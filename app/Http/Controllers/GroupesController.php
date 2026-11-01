@@ -26,7 +26,7 @@ final class GroupesController
         $q = trim((string) $r->query('q', ''));
         $groups = $event ? DB::table('groups as g')->leftJoin('users as u', 'u.id', '=', 'g.supervisor_id')->where('g.event_id', $event->id)->orderBy('g.name')->get(['g.id', 'g.name', 'g.bus_number', 'g.supervisor_id', 'u.name as supervisor_name', 'g.badge_batch_id', 'g.departed_at'])
             ->map(function ($g) {
-                $members = DB::table('visitors as v')->join('categories as c', 'c.id', '=', 'v.category_id')->where('v.group_id', $g->id)->orderBy('v.full_name')->get(['v.id', 'v.full_name', 'c.name as category']);
+                $members = DB::table('visitors as v')->join('categories as c', 'c.id', '=', 'v.category_id')->where('v.group_id', $g->id)->orderByRaw('v.full_name COLLATE "C" ASC')->orderBy('v.id')->get(['v.id', 'v.full_name', 'c.name as category']);
 
                 return (array) $g + [
                     'members' => $members,
@@ -39,7 +39,7 @@ final class GroupesController
             'event' => $event ? ['id' => $event->id, 'name' => $event->name] : null, 'events' => DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']),
             'groups' => $groups, 'mode' => $this->groups->mode(),
             'encadreurs' => User::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->filter(fn (User $u) => $u->hasRole('encadreur'))->values()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name]),
-            'search' => $q, 'candidates' => $event && $q !== '' ? DB::table('visitors')->where('event_id', $event->id)->whereNull('group_id')->whereRaw('public.ikoma_normalize(full_name) LIKE ?', ['%'.mb_strtolower(DB::selectOne('SELECT public.ikoma_normalize(?) AS v', [$q])->v).'%'])->orderBy('full_name')->limit(20)->get(['id', 'full_name', 'organisation']) : [],
+            'search' => $q, 'candidates' => $event && $q !== '' ? DB::table('visitors')->where('event_id', $event->id)->whereNull('group_id')->whereRaw('public.ikoma_normalize(full_name) LIKE ?', ['%'.mb_strtolower(DB::selectOne('SELECT public.ikoma_normalize(?) AS v', [$q])->v).'%'])->orderByRaw('full_name COLLATE "C" ASC')->orderBy('id')->limit(20)->get(['id', 'full_name', 'organisation']) : [],
             'batches' => $event ? DB::table('badge_batches')->where('event_id', $event->id)->orderBy('created_at')->get(['id', 'name']) : [],
         ]);
     }

@@ -1,0 +1,171 @@
+name: S0.2 - Qualification finale adoption Alpine
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-adoption-alpine.yml'
+      - 'scripts/security/audit-gosu-highs.py'
+      - 'scripts/security/compare-pg-locales.py'
+      - 'scripts/security/pg-locale-fixture.sql'
+      - 'scripts/security/prepare-alpine-e2e.py'
+      - 'scripts/security/summarize-e2e-alpine.py'
+      - 'docs/security/S0.2-QUALIFICATION-ADOPTION-ALPINE.md'
+      - 'app/Services/VisitorSearch.php'
+      - 'app/Http/Controllers/**'
+      - 'resources/js/poste/local/search.ts'
+      - 'database/migrations/**'
+      - 'tests/Feature/BusinessModelTest.php'
+      - 'tests/front/portable-name-sort.test.ts'
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire les images PostgreSQL comparées
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/adoption-pg"
+          docker build --pull -f docker/qualification/postgres-integrated-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
+          docker pull postgres:18.6-trixie
+          docker image inspect postgres:18.6-trixie --format '{{.Id}}' > "$RUNNER_TEMP/adoption-pg/debian-image-id.txt"
+          docker image inspect ikoma-qualification-postgres:18.6-alpine3.24 --format '{{.Id}}' > "$RUNNER_TEMP/adoption-pg/alpine-image-id.txt"
+      - name: Comparer locales, accentuation, tris, index et recherches
+        run: |
+          set -euo pipefail
+          for base in debian alpine; do
+            if [ "$base" = debian ]; then image=postgres:18.6-trixie; else image=ikoma-qualification-postgres:18.6-alpine3.24; fi
+            docker run -d --rm --name "ikoma-fixture-$base" --network none \
+              --tmpfs /var/lib/postgresql:rw,nosuid,size=1024m \
+              -e POSTGRES_PASSWORD=donnees-fictives -e POSTGRES_DB=ikoma_fixture "$image"
+            ready=0
+            for i in $(seq 1 40); do
+              if docker exec "ikoma-fixture-$base" pg_isready -U postgres -d ikoma_fixture >/dev/null 2>&1; then ready=1; break; fi
+              sleep 2
+            done
+            test "$ready" = 1
+            docker exec "ikoma-fixture-$base" postgres --version | grep -F 'PostgreSQL) 18.6'
+            docker exec -i "ikoma-fixture-$base" psql -X -U postgres -d ikoma_fixture -q -A -t -f - \
+              < scripts/security/pg-locale-fixture.sql > "$RUNNER_TEMP/adoption-pg/$base.txt"
+          done
+          python3 scripts/security/compare-pg-locales.py "$RUNNER_TEMP/adoption-pg"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: comparaison-collations-fictives
+          path: ${{ runner.temp }}/adoption-pg/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Détruire les bases fictives
+        if: always()
+        run: docker rm -f ikoma-fixture-debian ikoma-fixture-alpine >/dev/null 2>&1 || true
+
+  gosu-highs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+      - name: Construire et scanner la base PostgreSQL officielle Alpine
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/adoption-go" "$RUNNER_TEMP/adoption-go-private"
+          docker build --pull -f docker/qualification/postgres-integrated-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
+          docker image inspect ikoma-qualification-postgres:18.6-alpine3.24 --format '{{.Id}}' > "$RUNNER_TEMP/adoption-go-private/postgres-image-id.txt"
+          sh scripts/security/install-tools.sh
+          echo '{}' > "$RUNNER_TEMP/adoption-go-private/trivy-config.yaml"
+          : > "$RUNNER_TEMP/adoption-go-private/trivy-ignore"
+          /tmp/ikoma-security-tools/trivy image \
+            --config "$RUNNER_TEMP/adoption-go-private/trivy-config.yaml" \
+            --ignorefile "$RUNNER_TEMP/adoption-go-private/trivy-ignore" \
+            --image-src docker --scanners vuln --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --format json --exit-code 0 --output "$RUNNER_TEMP/adoption-go-private/trivy-postgres.json" \
+            "$(cat "$RUNNER_TEMP/adoption-go-private/postgres-image-id.txt")"
+      - name: Analyse exhaustive des CVE détectées sur gosu avec traçabilité par identifiant
+        run: |
+          set -euo pipefail
+          cid=$(docker create ikoma-qualification-postgres:18.6-alpine3.24)
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/usr/local/bin/gosu" "$RUNNER_TEMP/adoption-go-private/gosu"
+          go version -m "$RUNNER_TEMP/adoption-go-private/gosu" > "$RUNNER_TEMP/adoption-go/gosu-version.txt"
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          "$(go env GOPATH)/bin/govulncheck" -version > "$RUNNER_TEMP/adoption-go/scanner-version.txt"
+          "$(go env GOPATH)/bin/govulncheck" -mode=binary -json "$RUNNER_TEMP/adoption-go-private/gosu" > "$RUNNER_TEMP/adoption-go-private/govulncheck.json"
+          python3 scripts/security/audit-gosu-highs.py "$RUNNER_TEMP/adoption-go-private" "$RUNNER_TEMP/adoption-go/individual-cve-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-individuel-gosu-cve
+          path: ${{ runner.temp }}/adoption-go/
+          if-no-files-found: warn
+          retention-days: 90
+
+  e2e-alpine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Construire PostgreSQL et créer le laboratoire Git isolé
+        run: |
+          set -euo pipefail
+          docker build --pull -f docker/qualification/postgres-integrated-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
+          dir="$RUNNER_TEMP/ikoma-e2e-alpine"
+          git worktree add --detach "$dir" HEAD
+          python3 scripts/security/prepare-alpine-e2e.py "$dir"
+          echo "IKOMA_E2E_DIR=$dir" >> "$GITHUB_ENV"
+      - name: Installer le logiciel entier sur PHP et PostgreSQL Alpine
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_E2E_DIR"
+          make install > "$RUNNER_TEMP/alpine-install-private.log" 2>&1 || { echo 'STOP: installation E2E'; exit 1; }
+          make up > "$RUNNER_TEMP/alpine-up-private.log" 2>&1 || { echo 'STOP: démarrage E2E'; exit 1; }
+          # La CLI des tests s'exécute en root ; le serveur web, lui, s'exécute
+          # en www-data. Vérifier les accès du vrai worker avant le navigateur.
+          docker compose exec -T --user www-data php sh -c 'test -r .env && test -r public/index.php' || { echo 'STOP: accès fichiers du worker PHP non-root'; exit 1; }
+          echo 'installation=PASS' > "$RUNNER_TEMP/adoption-e2e/checks.txt"
+      - name: Migrations et tests PHP du logiciel sur Alpine
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_E2E_DIR"
+          make migrate-fresh-seed > "$RUNNER_TEMP/alpine-seed-private.log" 2>&1 || { echo 'STOP: migrations'; exit 1; }
+          make test > "$RUNNER_TEMP/alpine-php-private.log" 2>&1 || { echo 'STOP: PHP'; exit 1; }
+          make test-front > "$RUNNER_TEMP/alpine-front-private.log" 2>&1 || { echo 'STOP: tests front'; exit 1; }
+          # Ne pas masquer un HTTP 500 sous un timeout Playwright : sonder le vrai
+          # serveur après les migrations (sans journaliser de contenu ou d'URL privée).
+          login_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:8080/login || true)
+          echo "login_http_status=$login_status" >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
+          if [ "$login_status" != 200 ]; then
+            echo "STOP: GET /login HTTP $login_status sur Alpine"
+            python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log
+            exit 1
+          fi
+          echo 'migrations_php_front=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
+      - name: Tests navigateurs E2E, contrôle accueil et agent V2
+        run: |
+          set -euo pipefail
+          cd "$IKOMA_E2E_DIR"
+          make e2e > "$RUNNER_TEMP/alpine-browser-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-browser-private.log" "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; echo 'STOP: E2E navigateur'; cat "$RUNNER_TEMP/adoption-e2e/browser-diagnostic.json"; python3 scripts/security/summarize-laravel-error.py storage/logs/laravel.log; exit 1; }
+          make e2e-agent > "$RUNNER_TEMP/alpine-agent-private.log" 2>&1 || { python3 scripts/security/summarize-e2e-alpine.py "$RUNNER_TEMP/alpine-agent-private.log" "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; echo 'STOP: E2E agent'; cat "$RUNNER_TEMP/adoption-e2e/agent-diagnostic.json"; exit 1; }
+          echo 'e2e_browser_agent=PASS' >> "$RUNNER_TEMP/adoption-e2e/checks.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-alpine-fictifs
+          path: ${{ runner.temp }}/adoption-e2e/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Nettoyer uniquement les données fictives de ce banc d'essai
+        if: always()
+        run: |
+          if [ -n "${IKOMA_E2E_DIR:-}" ] && [ -f "$IKOMA_E2E_DIR/docker-compose.yml" ]; then
+            cd "$IKOMA_E2E_DIR"
+            docker compose down -v --remove-orphans >/dev/null 2>&1 || true
+          fi

@@ -68,7 +68,7 @@ final class BadgeWorkshopController
             $query->where('v.full_name', 'ilike', '%'.$input['q'].'%');
         }
 
-        return response()->json(['people' => $query->orderBy('v.full_name')->orderBy('v.id')->limit(200)->get(['v.id', 'v.full_name', 'v.organisation', 'v.valid_from', 'v.valid_until', 'h.name as host'])])->header('Cache-Control', 'no-store, private');
+        return response()->json(['people' => $query->orderByRaw('v.full_name COLLATE "C" ASC')->orderBy('v.id')->limit(200)->get(['v.id', 'v.full_name', 'v.organisation', 'v.valid_from', 'v.valid_until', 'h.name as host'])])->header('Cache-Control', 'no-store, private');
     }
 
     public function prepare(Request $request, BadgePreparation $preparation): JsonResponse

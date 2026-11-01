@@ -33,15 +33,41 @@ export async function freshOtp(secret: string): Promise<string> {
  * Le serveur impose une limite aux connexions. Les recettes E2E ne désactivent
  * jamais cette limite : elles retentent une seule fois si elle est signalée.
  */
-export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string): Promise<void> {
+export async function loginWithSecondFactor(page: Page, email: string, password: string, secret: string, onChallenge?: () => Promise<void>, onStage?: (stage: string) => void): Promise<void> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    await page.goto('/login');
-    await page.getByLabel('Adresse électronique').fill(email);
+    onStage?.('login.open');
+    const loginResponse = await page.goto('/login');
+    onStage?.('login.navigated');
+    const currentPath = new URL(page.url()).pathname;
+    onStage?.(currentPath === '/login' ? 'login.path.login' : 'login.path.other');
+    if (loginResponse?.status() === 200) onStage?.('login.http.ok');
+    else if ((loginResponse?.status() ?? 0) >= 500) onStage?.('login.http.servererror');
+    else onStage?.('login.http.unexpected');
+    const mount = page.locator('#app');
+    onStage?.(await mount.count() ? 'login.mount.present' : 'login.mount.absent');
+    const emailInput = page.getByLabel('Adresse électronique');
+    const loginHeading = page.getByRole('heading', { name: 'Se connecter', exact: true });
+    try {
+      await expect(loginHeading).toBeVisible({ timeout: 12_000 });
+      onStage?.('login.heading.visible');
+      await expect(emailInput).toBeVisible({ timeout: 8_000 });
+      onStage?.('login.email.visible');
+    } catch {
+      onStage?.(await page.locator('input[type="email"]').count() ? 'login.email.exists' : 'login.email.absent');
+      onStage?.(await page.locator('script[type="module"]').count() ? 'login.scripts.present' : 'login.scripts.absent');
+      onStage?.(await page.locator('h1').count() ? 'login.headings.present' : 'login.headings.absent');
+      throw new Error('Le formulaire de connexion ne s’affiche pas dans le navigateur E2E (voir les jalons non sensibles).');
+    }
+    await emailInput.fill(email);
+    onStage?.('login.email.filled');
     await page.getByLabel('Mot de passe', { exact: true }).fill(password);
+    onStage?.('login.password.filled');
+    onStage?.('login.submit');
     const [response] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === '/login' && r.request().method() === 'POST'),
       page.getByRole('button', { name: 'Se connecter' }).click(),
     ]);
+    onStage?.('login.responded');
     const challenge = page.getByLabel('Code à six chiffres');
     const throttled = page.getByRole('alert').filter({ hasText: /Trop de tentatives/i }).first();
     if (response.status() !== 429) {
@@ -71,12 +97,17 @@ export async function loginWithSecondFactor(page: Page, email: string, password:
         throw new Error(`Écran 2FA absent après deux tentatives normales au maximum (POST HTTP ${response.status()}, redirection ${redirectPath}, page ${currentPath}, erreur de formulaire ${errorVisible ? 'présente' : 'absente'}, contrôle direct du challenge : ${challengeStatus}). Aucun identifiant ou secret journalisé.`);
       }
       if (await challenge.isVisible()) {
+        onStage?.('challenge.visible');
+        await onChallenge?.();
         await challenge.fill(await freshOtp(secret));
+        onStage?.('otp.submit');
         await page.getByRole('button', { name: 'Vérifier', exact: true }).click();
         await expect(page).toHaveURL(/\/(administration|espace|pilotage)$/, { timeout: 15_000 });
+        onStage?.('authenticated');
         return;
       }
     }
+    onStage?.('login.throttled');
     if (attempt === 1) throw new Error('La connexion de recette reste limitée après le délai serveur.');
     const message = await throttled.isVisible() ? await throttled.innerText() : '';
     const secondsInMessage = message.match(/(\d+)\s*secondes?/i);
