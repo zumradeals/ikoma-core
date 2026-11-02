@@ -12,7 +12,8 @@ async function captures(page: Page, screen: string) {
   }
 }
 async function open(page: Page, path: string) {
-  await page.goto(path);
+  const response = await page.goto(path);
+  expect(response?.status(), `Réponse HTTP ${path} : ${await page.locator('body').innerText().catch(() => 'page indisponible')}`).toBe(200);
   const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou');
   await enrol.or(lock).first().waitFor();
   if (await enrol.isVisible()) {

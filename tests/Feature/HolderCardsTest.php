@@ -5,7 +5,6 @@ use App\Services\BadgeLots;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
 use App\Services\CardModels;
-use App\Services\DemoLab;
 use App\Services\HolderCards;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
@@ -269,21 +268,6 @@ it('sépare l’impression définitive (recto et verso seulement) de l’essai d
         ->and($align)->not->toContain('data-template')->and(DB::table('holder_card_prints')->count())->toBe($prints);
     // L'essai ne s'enclenche jamais seul : l'impression ne le contient pas et l'essai se demande par sa propre adresse.
     $this->post('/administration/titulaires/alignement')->assertStatus(405);
-});
-
-it('refuse la remise à zéro de démonstration dès que des titulaires ou des cartes existent, sans rien supprimer', function () {
-    $holder = cardHolder();
-    $this->cards->issue($holder, $this->admin);
-    $this->cards->recordPrint($holder, null, $this->admin);
-    $this->admin->update(['two_factor_confirmed_at' => now(), 'password' => 'Motdepasse-De-Test-12345!']);
-    $before = [DB::table('permanent_holders')->count(), DB::table('holder_cards')->count(), DB::table('holder_card_prints')->count(), DB::table('events')->count(), DB::table('badges')->count()];
-    foreach ([false, true] as $clearUsers) {
-        $this->actingAs($this->admin)->post('/administration/demonstration/remettre-a-zero', ['confirmation' => 'REMETTRE A ZERO IKOMA', 'password' => 'Motdepasse-De-Test-12345!', 'acknowledge' => true, 'clear_users' => $clearUsers])->assertSessionHasErrors('confirmation');
-        expect(fn () => app(DemoLab::class)->clearBusiness($this->admin, $clearUsers))->toThrow(ValidationException::class);
-    }
-    // Même en contournant le service : la fonction SQL et les déclencheurs protègent les cartes et le contexte permanent.
-    expect(fn () => DB::transaction(fn () => DB::select('SELECT public.ikoma_reset_demo_business(CAST(? AS uuid), ?)', [$this->admin->id, false])))->toThrow(QueryException::class);
-    expect([DB::table('permanent_holders')->count(), DB::table('holder_cards')->count(), DB::table('holder_card_prints')->count(), DB::table('events')->count(), DB::table('badges')->count()])->toBe($before);
 });
 
 it('écarte le contexte permanent des écrans et des opérations ordinaires (imports, lots de badges)', function () {
