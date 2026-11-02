@@ -1,7 +1,7 @@
 # ATELIER-BADGES-CONTRAT — Atelier des badges unique : contrat de conception
 
-**Statut : PROJET DE CONTRAT — soumis à la validation du dirigeant. Aucun développement fonctionnel, aucune migration de données, aucune fusion, aucun déploiement n'est autorisé par ce document (HOLD).**
-Date de rédaction : 2 novembre 2026. Base de code examinée : `main` au commit `65c7e2e` (A07 fusionnée). La PR #80 (R1, registre des personnes) n'est **pas** fusionnée : tout ce qui en dépend est signalé « dépend de R1 ». La PR #60 n'est pas concernée.
+**Statut : CONTRAT DE CONCEPTION — révision 2, intégrant les décisions du dirigeant sur l'examen du commit `e86ce46`. Aucun développement fonctionnel, aucune migration, aucune fusion, aucun déploiement n'est autorisé par ce document. R5a et R5b sont en HOLD jusqu'à nouvelle autorisation.**
+Date de rédaction : 2 novembre 2026 (révision 2 le même jour). Base de code examinée : `main` au commit `65c7e2e` (A07 fusionnée). La PR #80 (R1, registre des personnes) n'est **pas** fusionnée : tout ce qui en dépend est signalé « dépend de R1 ». La PR #60 n'est pas concernée.
 
 Ce document ne présente aucune couleur, maquette, finition ou texte comme officiellement approuvé par l'AILCT.
 
@@ -11,7 +11,7 @@ Ce document ne présente aucune couleur, maquette, finition ou texte comme offic
 - **[D]** décision déjà prise par le dirigeant.
 - **[P]** proposition de ce document, à valider.
 - **[V]** validation institutionnelle (AILCT) nécessaire.
-- **INV-nn** invariant de sécurité ; **TR-nn** exigence de traçabilité ; **I-nn** incompatibilité signalée.
+- **DC-n** décision complémentaire du dirigeant (révision 2) ; **INV-nn** invariant de sécurité ; **TR-nn** exigence de traçabilité ; **I-nn** incompatibilité signalée.
 
 ## 1. Décisions validées et principes
 
@@ -25,6 +25,25 @@ Ce document ne présente aucune couleur, maquette, finition ou texte comme offic
 6. **Cycle de vie des cartes permanentes** : conservé dans la fiche du titulaire. **Toute impression passe par l'Atelier.**
 7. **Impression groupée des cartes permanentes** : autorisée dans l'Atelier, avec **vérification individuelle** des cartes.
 
+### 1.1 bis. Décisions complémentaires (examen du commit `e86ce46`) [D]
+
+| N° | Décision |
+|---|---|
+| DC-1 | **Position du QR configurable par modèle**, avec **conservation des comportements existants par défaut** (QR au recto des badges visiteurs, au verso des cartes permanentes). Pour les modèles AILCT, la position est **soumise à la validation institutionnelle** [V]. |
+| DC-2 | **Marquage de l'exposition avant tout aperçu d'un vrai QR**, quel que soit l'écran (atelier, fiche de carte, impression). |
+| DC-3 | **Motif obligatoire à chaque nouvelle génération** d'une carte permanente ou d'un badge nominatif, **même si le tirage précédent n'est pas confirmé**. |
+| DC-4 | **Activation d'une nouvelle carte permanente uniquement après confirmation humaine de l'impression officielle ET remise explicite.** |
+| DC-5 | **Modèle non validé : usage limité à un essai marqué**, jamais une émission officielle. |
+| DC-6 | **Architecture générale de l'Atelier unique approuvée**, sous réserve des précisions de ce document. |
+
+### 1.1 ter. Corrections demandées par le dirigeant
+
+1. Les **états de traçabilité** sont séparés sans ambiguïté des **états métier** (§1.4).
+2. L'**unicité de l'Atelier** est une **expérience et une interface contractuelle communes**, sans moteur de rendu unique imposé (§3.1 bis).
+3. Les **dépendances de R5a et de R5b** sont distinctes (§9.1 et §11).
+
+Les validations de l'AILCT encore nécessaires sont **conservées** (§14).
+
 ### 1.2. Principe directeur
 
 Une seule expérience de production des badges, **sans fusion artificielle des règles métier**.
@@ -35,9 +54,29 @@ Une seule expérience de production des badges, **sans fusion artificielle des r
 |---|---|---|
 | Modèle graphique | présentation d'une catégorie (couleurs, mise en page, mentions, format), versionnée et validée | une identité, un droit |
 | Identité du badge | personne (registre) ou destination nominative ; identifiant imprimé ; jeton QR opaque `IKOMA1:<64 hex>` | une couleur, un droit |
-| Cycle de vie | visiteur : disponible → associé → restitué ; carte : préparée → imprimée → remise/activée → perdue/volée/révoquée/remplacée | une impression |
+| Cycle de vie | visiteur : disponible → associé → restitué ; carte : active, perdue, volée, révoquée, remplacée [C] ; avec R2 : préparée → remise → activée (« imprimée » n'est **pas** un état métier, §1.4) | une impression |
 | Droit d'accès | habilitation explicite (personne × zone × période), politique de zone | une catégorie, une couleur, une impression, une activation de carte |
 | Impression | production d'un support ; trois états de trace (§7) | une remise, une activation, une habilitation |
+
+### 1.4. États métier et états de traçabilité : deux familles disjointes
+
+Les deux familles n'ont **aucun état, aucun mot et aucune table en commun**. Un état de traçabilité décrit **ce qui s'est passé lors d'un tirage** ; un état métier décrit **la situation d'un badge ou d'une carte**.
+
+| Famille | États | Où ils vivent | Qui peut les écrire |
+|---|---|---|---|
+| **Métier — badge visiteur** [C] | Disponible, Associé, Restitué, Annulé, Clos (`BadgeStatus`) ; destination nominative préparée ; réservation à un poste ou à un groupe | `badges`, `badge_assignments` | page Badges, poste d'accueil (`BadgeService`) — **jamais l'Atelier** |
+| **Métier — carte permanente** [C] | active, retirée, perdue, volée, révoquée, remplacée (`holder_cards.status`, rang) | `holder_cards` | fiche du titulaire (`CardLifecycle`) — **jamais l'Atelier** |
+| **Métier — carte permanente, ajouts de R2** [D, à contractualiser en R2] | préparée, remise, activée, avec marqueur « ancienne carte » pour l'existant | tables de R2 | fiche du titulaire — **jamais l'Atelier** |
+| **Métier — droit d'accès** [C] | habilitation (personne × zone × période), politique de zone | `holder_entitlements`, `zone_policies` | administration des habilitations |
+| **Traçabilité — tirage** [P] | **document généré → impression demandée → impression confirmée**, avec la nature **officielle** ou **essai** | `badge_print_runs`, `badge_print_events` (ajout seul) | **l'Atelier uniquement** |
+
+Règles :
+
+- **Aucun état de traçabilité n'est un état métier.** « Imprimée » n'est donc **pas** un statut de carte : c'est un fait de traçabilité (« impression confirmée »), consulté mais jamais copié dans un statut.
+- **L'Atelier n'écrit que des événements de traçabilité.** Il ne modifie jamais un état métier (INV-04, INV-18).
+- **Les états métier peuvent exiger un fait de traçabilité**, sans jamais le produire : l'activation d'une nouvelle carte exige **une impression officielle confirmée** et **une remise explicite** (DC-4) ; ce contrôle est fait **par le service de la fiche**, pas par l'Atelier.
+- Un fait de traçabilité n'ouvre **aucun droit d'accès** ; un état métier « activée » n'en ouvre pas non plus sans habilitation.
+- Un tirage « essai » ne satisfait **aucun préalable** métier (activation, émission officielle).
 
 ## 2. Responsabilités de chaque espace
 
@@ -64,6 +103,15 @@ Une seule expérience de production des badges, **sans fusion artificielle des r
    1 Modèle ─ 2 Sélection ─ 3 Aperçu ─ 4 Contrôles ─ 5 Alignement/Format ─ 6 Impression ─ 7 Suivi
 ```
 
+### 3.1 bis. Ce que signifie « unique »
+
+L'Atelier est **unique comme expérience et comme interface contractuelle**, pas comme moteur de rendu.
+
+- **Unique pour l'utilisateur** : un seul point d'entrée, un seul enchaînement (modèle, sélection, aperçu, contrôles, alignement, impression, suivi), un seul vocabulaire (§7, TR-10).
+- **Unique pour le code appelant** : un seul contrat (`ModelResolver`, `PrintSource`, `PrintTrail`, §4.2) que chaque type de badge respecte.
+- **Non imposé** : un moteur de rendu commun. Les deux moteurs actuels (`card.blade.php` + `cards.css` pour les badges visiteurs ; `holder-card-recto/verso` + `holder-cards.css` pour les cartes) **peuvent rester distincts**. Leur rapprochement éventuel est une décision de R4, jamais une condition de R5.
+- Chaque moteur doit satisfaire le **contrat de rendu** du §4.2 ; la conformité est vérifiée par des tests **par moteur** (§12.2).
+
 ### 3.2. Parcours « Badges visiteurs »
 
 ```
@@ -79,7 +127,7 @@ Page Badges (stock)          Atelier                                         Pos
                             A7. Suivi : historique des tirages du lot (ajout seul)  ─► remise physique
                                                                            association au poste par scan
 ```
-Règles propres [C/D] : le mode standard est anonyme ; le mode nominatif exige les permissions Badges **et** Liste d'invités, l'autorisation de la politique du client et une destination préparée (`BadgePreparation`) ; imprimer n'associe, ne valide et ne fait entrer personne ; le badge se restitue à la sortie ; le même QR sort à chaque réimpression.
+Règles propres [C/D] : le mode standard est anonyme ; le mode nominatif exige les permissions Badges **et** Liste d'invités, l'autorisation de la politique du client et une destination préparée (`BadgePreparation`) ; imprimer n'associe, ne valide et ne fait entrer personne ; le badge se restitue à la sortie ; le même QR sort à chaque réimpression. Pour un badge **nominatif**, chaque génération après la première exige un **motif** (DC-3) ; pour un badge **anonyme réutilisable**, le motif est facultatif mais journalisé.
 
 ### 3.3. Parcours « Cartes permanentes »
 
@@ -93,10 +141,11 @@ Registre            Fiche du titulaire (cycle de vie)                 Atelier (i
                                                                      P5. Document généré → impression
                                                                          demandée → confirmée
                     ◄─────────────────────────────────────────────  P6. Suivi (historique des tirages)
-                    (R2) Remettre / activer (action de la fiche)
+                    (R2) Remise explicite, puis activation — seulement après une impression
+                         OFFICIELLE CONFIRMÉE (actions de la fiche, jamais de l'Atelier)
                     perte · vol · remplacement · révocation (fiche)
 ```
-Règles propres [C/D] : une personne peut exister sans carte ; une carte peut être préparée sans être imprimée, imprimée sans être remise, remise sans être activée ; la catégorie et la couleur ne confèrent aucun droit ; la photo est obligatoire pour une **nouvelle émission** (R2) ; un identifiant, un QR et une version de modèle ne changent jamais en réimpression ; le motif est obligatoire dès le second tirage (règle actuelle, §10, I-06).
+Règles propres [C/D] : une personne peut exister sans carte ; une carte peut être préparée sans qu'une impression officielle ait été confirmée, avoir son impression confirmée sans être remise, être remise sans être activée (l'activation exigeant impression confirmée **et** remise, DC-4) ; la catégorie et la couleur ne confèrent aucun droit ; la photo est obligatoire pour une **nouvelle émission** (R2) ; un identifiant, un QR et une version de modèle ne changent jamais en réimpression ; chaque génération après la première du même support exige un **motif**, que le tirage précédent ait été confirmé ou non (DC-3) ; l'activation d'une nouvelle carte exige une impression officielle confirmée puis une remise explicite (DC-4).
 
 ### 3.4. Tronc commun
 
@@ -108,7 +157,7 @@ Règles propres [C/D] : une personne peut exister sans carte ; une carte peut ê
 | Contrôles | rapport de pré-contrôle, blocages affichés | destinations, postes à synchroniser | photo, catégorie, carte préparée, modèle validé |
 | Alignement | page d'essai sans QR ni donnée personnelle | formats PVC/A4 | CR80 portrait |
 | Impression | page d'impression unique, contrôle de débordement | A4 : planches, étiquettes | CR80 |
-| Traçabilité | trois états (§7) | motif nominatif obligatoire | motif dès le 2ᵉ tirage |
+| Traçabilité | trois états de trace (§7), distincts des états métier (§1.4) | motif à chaque génération après la première pour un badge nominatif | motif à chaque génération après la première, tirage précédent confirmé ou non |
 
 ## 4. Interfaces entre les services existants
 
@@ -135,11 +184,16 @@ PrintSource (par type): candidates(sélection) → liste
                         preflight(sélection) → PreflightReport { bloquants[], avertissements[] }
                         render(élément, mode: modele_fictif | badge_reel, face) → RenderedBadge
                         expose(éléments)  → marque l'exposition (réutilise le marquage existant)
-PrintTrail           : generated(sélection, modèle, format) → run_id
+PrintTrail           : generated(sélection, modèle, format, nature: officiel|essai, motif?) → run_id
                         requested(run_id) ; confirmed(run_id, imprimés, gâchés, note?)
+RenderedBadge        : fragment HTML aux dimensions physiques fixes ; QR noir sur blanc avec zone calme
+                        intacte ; position du QR issue du modèle ; mention « EXEMPLE » ou « ESSAI » ou
+                        « PROVISOIRE » quand elle s'applique ; aucune ressource externe
 ```
 - `VisitorPrintSource` enveloppe `BadgeArtwork` + `BadgePreparation` ; `PermanentPrintSource` enveloppe `HolderCards` + l'état de carte de R2.
 - `ModelResolver` : pour un badge visiteur, la **catégorie d'événement liée** à une catégorie institutionnelle (`categories.institutional_code`, lien explicite [C], écran « Catégories institutionnelles ») donne le modèle de cette catégorie ; sans lien, le **modèle générique** de l'installation. Pour une carte permanente, la catégorie institutionnelle de la personne donne son modèle. Un modèle institutionnel donne aussi **son format** (décision 3).
+- **Contrat de rendu commun** : chaque moteur (visiteurs, cartes) expose `render(élément, mode, face)` et produit un `RenderedBadge` conforme. Les moteurs ne sont ni fusionnés ni remplacés (§3.1 bis).
+- **Position du QR (DC-1)** : champ `qr_cote` (recto ou verso) du modèle. Valeur par défaut = comportement existant : **recto** pour le modèle générique visiteur, **verso** pour les cartes permanentes. Pour un modèle AILCT, la valeur validée par l'institution prévaut [V].
 - L'Atelier **ne dépend d'aucune décision d'accès** : il ne lit ni habilitation, ni politique de zone, ni état de présence.
 
 ### 4.3. Interfaces interdites
@@ -151,8 +205,8 @@ L'Atelier n'appelle jamais : `BadgeService` (association, restitution), `SiteCon
 | N° | Invariant |
 |---|---|
 | INV-01 | Le format du QR (`IKOMA1:` + 64 hexadécimaux), les codes `B-nnn`, les identifiants imprimés et les jetons ne sont jamais modifiés par l'Atelier. Une réimpression produit le même QR. |
-| INV-02 | **Aperçu fictif d'un modèle : aucun véritable QR n'est exposé** ; le QR d'exemple ne correspond à aucun badge (comme `HolderCards::specimen`). |
-| INV-03 | **Aperçu d'un badge réel : le lot est marqué « exposé » (`print_exposed_at`) avant toute lecture des jetons**, pour les deux types, y compris l'aperçu d'une carte permanente (voir I-03). |
+| INV-02 | **Aperçu fictif d'un modèle : aucun véritable QR n'est exposé** ; le QR d'exemple ne correspond à aucun badge (comme `HolderCards::specimen`). Un **essai** (DC-5) utilise lui aussi le QR d'exemple par défaut. |
+| INV-03 | **Marquage de l'exposition avant tout rendu d'un vrai QR (DC-2)** : aperçu de l'Atelier, aperçu de la fiche de carte, page d'impression, pour les deux types. Le lot est marqué (`print_exposed_at`) **avant** la lecture des jetons. Aucun chemin de code ne rend un vrai QR sans ce marquage (I-03). |
 | INV-04 | Imprimer ne modifie ni statut, ni association, ni réservation, ni habilitation, ni activation, ni catégorie. |
 | INV-05 | Toutes les autorisations sont revérifiées **côté serveur** à chaque requête ; l'écran n'est qu'une commodité. Permissions : `badges.gerer` pour l'Atelier ; `listes.importer` en plus pour le nominatif, les personnes et les cartes ; `categories.gerer` pour les modèles (R3). |
 | INV-06 | Les pages contenant des QR ou des données personnelles sont servies `no-store, private`, `Referrer-Policy: no-referrer`, avec nonce CSP, jamais mises en cache ni précachées par le service worker. |
@@ -160,13 +214,16 @@ L'Atelier n'appelle jamais : `BadgeService` (association, restitution), `SiteCon
 | INV-08 | Le journal d'audit ne contient ni nom, ni organisation, ni motif libre ; il contient identifiants, numéros de lot, plages, nombres, version de modèle. |
 | INV-09 | Les traces (§7) sont en **ajout seul**, imposées par la base (déclencheur), pas seulement par l'application. |
 | INV-10 | Une version de modèle utilisée par un tirage est **immuable** ; toute modification crée une nouvelle version à valider (R3). |
-| INV-11 | Un modèle non validé produit un support **marqué** (« MODÈLE PROVISOIRE ») et enregistré comme **non officiel** ; il ne permet pas d'émission officielle ni d'activation de carte [P, V]. |
+| INV-11 | **Modèle non validé : essai marqué uniquement (DC-5).** Le support porte une mention visible (« ESSAI — SANS VALEUR » ou « MODÈLE PROVISOIRE »), le tirage est enregistré avec la nature `essai`, et **jamais** il ne peut servir d'émission officielle, de préalable d'activation ni d'impression « confirmée » au sens du DC-4. Les modèles génériques intégrés des badges visiteurs gardent leur comportement actuel (non institutionnels, officiels par défaut). |
 | INV-12 | La photographie n'est imprimée que si son autorisation propre est cochée ; l'accès au portrait est authentifié ; aucun portrait dans un cache public ni dans un snapshot de tablette. |
 | INV-13 | Les nombres affichés (imprimés, gâchés, restants) sont **recalculés côté serveur** ; le navigateur ne fait pas foi. |
 | INV-14 | Un document généré ou un PDF **n'est jamais présenté comme preuve d'impression physique** (§7). |
 | INV-15 | Plafond de 1 000 badges par tirage ; limitation de débit sur les routes d'impression et d'aperçu ; transaction unique par préparation nominative. |
 | INV-16 | L'avertissement de synchronisation des tablettes après une préparation nominative reste **bloquant** avant la remise. |
 | INV-17 | Les anciennes URL redirigent sans contourner l'authentification ni les permissions de la destination. |
+| INV-18 | **L'Atelier n'écrit que de la traçabilité** (§1.4) : aucune écriture dans `badges`, `badge_assignments`, `holder_cards`, `holder_entitlements`, ni dans les tables d'états de R2. |
+| INV-19 | **Les préalables d'activation sont contrôlés par le service de la fiche** (impression officielle confirmée + remise explicite), côté serveur, dans la même transaction que l'activation ; l'interface de l'Atelier ne peut pas les contourner. |
+| INV-20 | Un tirage `essai` ne peut pas être confirmé comme « officiel » ; sa confirmation ne satisfait aucun préalable. |
 
 ## 6. Aperçus
 
@@ -175,11 +232,13 @@ L'Atelier n'appelle jamais : `BadgeService` (association, restitution), `SiteCon
 | **Fictif (modèle)** | données d'exemple, mention « EXEMPLE · SANS VALEUR » | QR d'exemple sans valeur | aucune | aucune |
 | **Badge réel** | première ou chaque carte/badge sélectionné, vraies données du registre | vrai QR | **marquage obligatoire avant rendu** | `atelier.apercu_reel` (ajout) |
 
+**Essai marqué (DC-5)** : tirage d'un modèle non validé, avec la mention « ESSAI — SANS VALEUR », données et QR d'exemple (aucun vrai jeton, aucune exposition). Un essai avec de vraies données ou un vrai QR n'est **pas prévu** par ce contrat ; s'il devient nécessaire (test de lecture matériel), il fera l'objet d'une décision séparée et le marquage d'exposition (INV-03) s'y appliquerait.
+
 Même rendu, mêmes feuilles de style et mêmes dimensions que l'impression. Le zoom d'écran ne mesure pas le tirage.
 
 ## 7. Exigences de traçabilité
 
-### 7.1. Trois états à ne jamais confondre
+### 7.1. Les trois états de traçabilité (distincts des états métier, §1.4)
 
 | État | Sens | Preuve apportée | Ce que ce n'est PAS |
 |---|---|---|---|
@@ -190,15 +249,17 @@ Même rendu, mêmes feuilles de style et mêmes dimensions que l'impression. Le 
 ### 7.2. Exigences
 
 - **TR-01** Chaque tirage reçoit un `run_id`. Chaque changement d'état est un **événement distinct en ajout seul** : jamais de mise à jour d'une ligne existante.
-- **TR-02** Chaque événement porte : type de badge, événement (visiteurs) ou aucun, lot et plage ou personnes, modèle et version, `officiel` oui/non, format, face, nombre, opérateur, horodatage. Aucune donnée personnelle.
+- **TR-02** Chaque événement porte : type de badge, événement (visiteurs) ou aucun, lot et plage ou personnes, modèle et version, **nature `officiel` ou `essai`**, format, face, nombre, opérateur, horodatage, et le motif quand il est exigé. Aucune donnée personnelle dans le journal d'audit (le motif libre reste dans la table d'historique, comme `holder_card_prints.reason`).
 - **TR-03** La confirmation enregistre `imprimés` et `gâchés` (0 ≤ gâchés ≤ générés), l'opérateur et une note facultative. Elle ne peut pas dépasser le nombre généré. Une confirmation ne peut intervenir qu'après une demande.
 - **TR-04** Un tirage resté sans confirmation reste affiché comme **« non confirmé »** ; il n'est jamais promu automatiquement.
-- **TR-05** Réimpression : motif **obligatoire** pour un badge nominatif ; **facultatif mais journalisé** pour un badge anonyme réutilisable. Pour une carte permanente, la règle actuelle s'applique (motif dès le second tirage).
+- **TR-05** **Motif à chaque génération après la première** (DC-3) : pour un badge nominatif (même destination) et pour une carte permanente (même carte), le motif est **obligatoire dès la deuxième génération, que le tirage précédent ait été confirmé ou non** ; la première génération d'un support n'en exige pas. Pour un badge **anonyme réutilisable**, le motif est facultatif mais journalisé. En impression groupée, un motif commun est accepté mais **enregistré pour chaque élément concerné**. Un remplacement de carte crée un nouveau support (sa première génération n'exige pas de motif ; le motif du remplacement est celui de la fiche).
 - **TR-06** Les étiquettes A4 suivent les mêmes trois états (elles n'ont aujourd'hui aucune trace, voir I-14).
 - **TR-07** Les actions de journal existantes sont conservées telles quelles ; les nouvelles actions s'ajoutent : `atelier.document_genere`, `atelier.impression_demandee`, `atelier.impression_confirmee`, `atelier.apercu_reel`.
 - **TR-08** Table d'historique des tirages en ajout seul, verrouillée par déclencheur (aucune mise à jour, aucune suppression, aucun `TRUNCATE` tant qu'elle contient des lignes) sur le modèle de `holder_card_prints`.
 - **TR-09** Correspondance avec l'existant [C] : `badge.impression_preparee` (visiteurs), `carte.imprimee` et `carte.reimprimee` (permanents) sont journalisées **à la génération de la page**, avant toute impression réelle. Elles correspondent donc à l'état « document généré » et non à une impression physique ; leur nom est conservé pour la chaîne d'audit, leur sens est précisé ici.
 - **TR-10** Vocabulaire à l'écran : « Document prêt », « Impression lancée », « Impression confirmée ». Les mots « imprimé » et « émis » ne s'emploient que pour l'état confirmé.
+- **TR-11** Un tirage porte sa **nature** (`officiel` ou `essai`) dès la génération ; elle ne change jamais. Un tirage `essai` n'est jamais promu en officiel.
+- **TR-12** Les états de traçabilité ne sont **jamais copiés** dans un état métier ; les services métier **interrogent** la traçabilité (par exemple « existe-t-il une impression officielle confirmée pour cette carte ? ») et gardent la responsabilité de leur propre décision.
 
 ## 8. Compatibilité des anciennes URL
 
@@ -216,22 +277,26 @@ Les `data-testid` utilisés par les tests de navigateur sont conservés ou migr�
 
 ## 9. Dépendances et migrations envisagées
 
-### 9.1. Dépendances (sans elles, R5 ne démarre pas)
+### 9.1. Dépendances distinctes de R5a et de R5b
 
-| Lot | Ce que l'Atelier attend | État |
+| Lot | Dépend de | Ne dépend PAS de |
 |---|---|---|
-| **R1** (PR #80) | prénom, nom, qualité, photo dans la fiche, registre sans copie | **non fusionné** |
-| **R2** (cycle des cartes) | états de carte (préparée, imprimée, remise, activée), photo obligatoire pour une nouvelle émission, activation nécessaire au contrôle, anciennes cartes préservées sans présenter une remise comme constatée | conception approuvée, **contrat à présenter** |
-| **R3** (personnalisation) | modèle par catégorie : statut, version immuable, date et valideur, paramètres communs ; revalidation après modification | conception approuvée |
-| **R4** (rendu) | un rendu unique des cartes : logo de l'installation, nom complet de l'institution, prénom/nom, fonction ou qualité, validité, fond de catégorie dominant, QR au verso | conception approuvée |
+| **R5a** — socle de l'Atelier et badges visiteurs génériques | A07 (fusionnée) ; migration additive M-R5-1 (traçabilité) | **R1, R2, R3, R4** : le mode nominatif visiteur lit la table `visitors`, jamais le registre des personnes ; le modèle générique existe déjà |
+| **R5b** — cartes permanentes et modèles institutionnels | **R5a** (traçabilité, enveloppe d'impression commune) ; **R1** (prénom, nom, qualité, photo dans la fiche) ; **R2** (états de carte, photo obligatoire, remise, activation) ; **R3** (modèles versionnés, statut, valideur, `qr_cote`) ; **R4** (rendu des cartes institutionnelles) | — |
+
+Dépendances croisées à connaître :
+
+- **R2 dépend de la traçabilité de R5a** : l'activation d'une nouvelle carte exige « impression officielle confirmée » (DC-4), un fait que seul le suivi de l'Atelier produit. L'ordre d'exécution ne peut donc pas être R2 avant R5a (I-15).
+- **Aucune émission officielle de carte n'est possible avant R3 et la validation institutionnelle d'un modèle** (DC-5) : tant que les modèles AILCT ne sont pas validés, toute carte reste en essai. C'est la conséquence voulue de la règle, pas un défaut.
+- **R1** doit être fusionné avant R5b ; la PR #80 n'est pas fusionnée à ce jour.
 
 ### 9.2. Migrations additives envisagées (aucune n'est autorisée à ce stade)
 
 | Id | Contenu | Lot |
 |---|---|---|
 | M-R5-1 | `badge_print_runs` (tirage) et `badge_print_events` (événements d'état), ajout seul, déclencheurs de protection, droits restreints | R5a |
-| M-R5-2 | lien de l'événement de tirage vers la version de modèle (colonne ou clé étrangère nullable vers R3) | R5b |
-| M-R2-x | états de remise et d'activation des cartes, marqueur « ancienne carte », version de modèle dans `holder_card_prints` | R2 |
+| M-R5-2 | lien de l'événement de tirage vers la version de modèle de R3 (clé étrangère nullable) ; `qr_cote` du modèle appartient à M-R3-x | R5b |
+| M-R2-x | états de remise et d'activation des cartes, marqueur « ancienne carte » (les cartes existantes ne sont pas présentées comme une remise constatée), version de modèle dans `holder_card_prints` ; **le préalable d'activation lit la traçabilité de M-R5-1** | R2 (après R5a) |
 | M-R3-x | modèles de cartes, versions, validations, paramètres communs | R3 |
 
 Aucune table de personnes n'est créée. Le lien catégorie d'événement ↔ catégorie institutionnelle existe déjà (`categories.institutional_code`).
@@ -242,13 +307,13 @@ Chaque incompatibilité est **signalée avant toute proposition de modification*
 
 | N° | Incompatibilité | Constat [C] | Impact | Proposition [P] | Décision |
 |---|---|---|---|---|---|
-| **I-01** | **QR au verso (cahier) et scan visiteur au recto** | Le cahier « recommande » le QR au verso (§20, recto : logo + photo + nom + fonction + catégorie). Les badges visiteurs actuels portent le QR au **recto**. Un agent doit retourner le badge si le QR passe au verso. | Débit et ergonomie des contrôles d'entrée ; porte-badge transparent des deux faces | Position du QR **propre au modèle** (champ `qr_cote`), jamais imposée ; défaut = comportement actuel pour le générique | **[V]** AILCT |
+| **I-01** | **QR au verso (cahier) et scan visiteur au recto** | Le cahier « recommande » le QR au verso (§20). Les badges visiteurs actuels portent le QR au **recto** ; un agent devrait retourner un badge dont le QR est au verso. | Débit des contrôles d'entrée | **Tranchée [D] (DC-1)** : QR configurable par modèle ; défaut = comportement existant ; modèles AILCT soumis à validation institutionnelle | **[V]** AILCT pour les modèles AILCT |
 | **I-02** | **Le journal appelle « imprimée » une simple génération** | `carte.imprimee` et `badge.impression_preparee` sont écrites à la génération de la page (« il s'agit d'une préparation : le navigateur ne permet pas de confirmer le tirage ») | Un lecteur du journal peut croire à un support sorti | Conserver les noms, préciser le sens (TR-09), ajouter les états demandé/confirmé | [D] |
-| **I-03** | **L'aperçu d'une carte réelle ne marque pas l'exposition** | La page Carte rend le **vrai QR** du verso (`cardData`) ; seul `recordPrint` marque le lot. L'atelier visiteurs, lui, marque dès l'aperçu. | Un lot peut rester supprimable alors que son QR a été affiché | Aligner sur la règle visiteurs : marquer à l'aperçu réel (INV-03). Changement **plus restrictif**, sans risque pour les accès | à valider |
+| **I-03** | **L'aperçu d'une carte réelle ne marque pas l'exposition** | La page Carte rend le **vrai QR** du verso (`cardData`) ; seul `recordPrint` marque le lot. L'atelier visiteurs marque dès l'aperçu. | Un lot peut rester supprimable alors que son QR a été affiché | **Tranchée [D] (DC-2)** : marquage avant tout aperçu d'un vrai QR (INV-03) ; changement plus restrictif, sans effet sur les accès | décidée |
 | **I-04** | **L'aperçu visiteur est toujours un badge réel** | `BadgeArtwork::select` prend le premier badge de la plage et marque le lot ; il n'existe pas d'aperçu fictif visiteur | Choisir un modèle expose un vrai QR | Mode « modèle fictif » sans lecture de lot (INV-02) | à valider |
 | **I-05** | **Les modèles originaux ne sont pas disponibles** | Le contrat A01 cite « 24 images de modèles (8 × recto/verso/assemblage) » ; le dépôt n'en contient aucune ; la fiche de relevé de l'A02 (§6.5) n'est pas remplie | Aucune couleur, aucune mise en page ne peut être déclarée conforme | Le relevé devient un livrable préalable à R3 ; en attendant, tout modèle reste « provisoire » | **[V]** AILCT |
-| **I-06** | **« Émission » est consommée à la génération** | `recordPrint` classe le **premier** tirage généré comme « émission » et exige un motif dès le suivant, même si le premier n'a jamais été imprimé | Une impression ratée oblige à motiver une « réimpression » | Conserver la règle (contrat A05 inchangé) et ajouter la confirmation ; décider si le motif s'impose après un tirage **non confirmé** | à décider |
-| **I-07** | **R2 : activation et impression physique** | R2 décide « préparée / imprimée / activée » ; l'impression physique n'est pas observable | Une carte activée sans impression confirmée | Proposition : l'activation exige au moins une impression **confirmée** | à valider (R2) |
+| **I-06** | **« Émission » est consommée à la génération** | `recordPrint` classe le premier tirage généré comme « émission » et exige un motif dès le suivant, même si le premier n'a jamais été imprimé | Une impression ratée oblige à motiver | **Tranchée [D] (DC-3)** : motif obligatoire à chaque génération après la première, confirmée ou non ; règle étendue aux badges nominatifs (TR-05). Le contrat A05 n'est pas modifié (la règle existante est conservée et étendue) | décidée |
+| **I-07** | **R2 : activation et impression physique** | L'impression physique n'est pas observable | Une carte pourrait être activée sans impression | **Tranchée [D] (DC-4)** : activation d'une nouvelle carte seulement après impression officielle confirmée par un humain **et** remise explicite ; anciennes cartes préservées sans présenter une remise comme constatée | décidée (détails dans le contrat R2) |
 | **I-08** | **Logo institutionnel en bitmap** | Le logo est un PNG/JPEG de 32 à 4 000 pixels, stocké en PNG ; les badges visiteurs imposent le logo IKOMA en dur ; ni le verso, ni les étiquettes ne portent de logo | Logo flou à l'impression à faible résolution ; logo non institutionnel sur les badges visiteurs | Résolution minimale conseillée affichée à l'envoi ; logo de l'installation sur tous les rendus ; SVG à étudier | **[V]** logo officiel à fournir |
 | **I-09** | **R1 non fusionné** | `full_name` unique dans `main` | Pas de prénom/nom séparés pour le rendu | R5 ne démarre qu'après la fusion de R1 | dépendance |
 | **I-10** | **Identifiant imprimé** | Le cahier cite `AILCT-2026-XXXXXX` ; le produit imprime `ID-nnnnnn-k` (préfixe, largeur, clé configurables) | Écart d'aspect, aucun écart technique | Conserver les identifiants historiques [D] ; format éventuel par décision séparée | décision séparée |
@@ -256,32 +321,48 @@ Chaque incompatibilité est **signalée avant toute proposition de modification*
 | **I-12** | **Permissions des étiquettes** | `BadgeLabelsController` exige `badges.gerer` seulement, sans contrôle de l'ouverture de l'événement ni trace | Faille de traçabilité | Mêmes contrôles et mêmes traces que les autres formats | [D] |
 | **I-13** | **Verso visiteur générique** | Consignes de visite génériques, non validées par le client | Mention institutionnelle absente du verso | Le verso vient du modèle validé ; générique sinon | **[V]** |
 | **I-14** | **Étiquettes sans aucune trace** | Aucune action de journal, mais marquage de l'exposition | Tirage non traçable | TR-06 | [D] |
+| **I-15** | **Dépendance circulaire apparente R2 ↔ R5a ↔ R3** | L'activation (R2) exige une impression officielle confirmée (R5a) avec un modèle validé (R3) | Aucune carte ne peut être activée officiellement avant R5a, R3 et la validation d'un modèle | R5a avant R2 ; R2 lit la traçabilité ; émission officielle impossible tant qu'aucun modèle n'est validé (DC-5) | décidée ; séquence à confirmer |
+| **I-16** | **« Un seul Atelier » pouvait être lu comme « un seul moteur de rendu »** | Deux moteurs de rendu existent | Fusion forcée risquée (régression des deux rendus) | Unicité = expérience et interface contractuelle (§3.1 bis) ; moteurs distincts autorisés | **Tranchée [D]** |
+| **I-17** | **Essai et vrai QR** | Un essai avec un vrai QR créerait un support lisible sans valeur officielle | Confusion à l'accueil, exposition | Essai = données et QR d'exemple uniquement (§6) ; essai matériel de lecture à décider séparément | à décider si besoin |
 
 ## 11. Séquencement R5a / R5b
 
-Ordre global : **R1 → R2 → R3 → R4 → R5a → R5b**. R5 est découpé pour livrer de la valeur sans attendre les modèles validés.
+**Tous les lots sont en HOLD** jusqu'à nouvelle autorisation du dirigeant.
 
-### R5a — Socle de l'Atelier et parcours visiteurs (générique)
-Dépend de R1 seulement si l'on touche le nominatif ; autrement **indépendant de R2–R4**.
-- Page d'impression unique et contrôle de débordement communs ; page d'alignement commune.
-- Marquage d'exposition factorisé (une seule implémentation, comportement identique).
-- Trace des trois états (M-R5-1), motif de réimpression nominatif obligatoire.
-- Aperçu fictif visiteur ; étiquettes A4 intégrées ; Atelier « visiteurs » avec modèles génériques.
-- Redirections des anciennes URL visiteurs.
+### 11.1. Ordre d'exécution proposé [P]
 
-**Critères de sortie R5a :** aucune régression sur les tests visiteurs existants ; trois états tracés ; étiquettes tracées ; aperçu fictif sans QR réel ; migration additive et réversible à vide.
+```
+R1 (PR #80) ──────────────────────────────────────────────────┐
+R5a (trace + Atelier visiteurs génériques) ─► R2 ─► R3 ─► R4 ─► R5b
+```
+R5a ne dépend ni de R1 ni de R2 à R4 : il peut précéder ou suivre R1. **R2 dépend de R5a** (traçabilité nécessaire à l'activation). R5b dépend de tous les autres.
 
-### R5b — Cartes permanentes et modèles institutionnels
-Dépend de R1, R2, R3, R4.
-- Type « cartes permanentes » : sélection groupée, vérification individuelle, contrôles photo/catégorie/modèle/état.
-- `ModelResolver` complet (modèles validés, version tracée, format du modèle).
-- Visiteurs institutionnels : modèle, format et position du QR du modèle validé.
-- Redirections des anciennes URL permanentes ; la page Carte garde le cycle de vie.
+### 11.2. R5a — socle de l'Atelier et badges visiteurs génériques
+**Dépendances :** A07 (fusionnée), migration M-R5-1. **Aucune** dépendance à R1, R2, R3 ni R4.
 
-**Critères de sortie R5b :** une carte ne s'imprime officiellement qu'avec un modèle validé ; les cartes déjà émises restent valides et réimprimables ; impression ≠ remise ≠ activation ≠ habilitation vérifié par test.
+Contenu :
+- Enveloppe d'impression commune : barre d'outils, consignes, contrôle de débordement, nonce, en-têtes (les **moteurs de rendu restent distincts** ; §3.1 bis).
+- Marquage d'exposition factorisé (une seule implémentation, comportement identique ; DC-2) et aperçu fictif visiteur sans QR réel.
+- Trace des trois états (M-R5-1), motif obligatoire à chaque génération après la première pour un badge nominatif (DC-3), motif facultatif journalisé pour l'anonyme.
+- Étiquettes A4 intégrées au même suivi ; page d'alignement commune.
+- Atelier « visiteurs » avec le modèle générique et le QR au recto (comportement actuel, DC-1) ; redirections des anciennes URL visiteurs.
 
-### Option indépendante
-Factoriser le gabarit d'impression et le marquage d'exposition, à comportement identique, peut précéder R2.
+**Critères de sortie R5a :** aucune régression sur les tests visiteurs existants ; trois états tracés et séparés des états métier ; étiquettes tracées ; aperçu fictif sans jeton lu ; migration additive, réversible à vide ; aucune écriture de l'Atelier dans un état métier.
+
+### 11.3. R5b — cartes permanentes et modèles institutionnels
+**Dépendances :** R5a, **R1**, **R2**, **R3**, **R4**.
+
+Contenu :
+- Type « cartes permanentes » : sélection groupée avec **vérification individuelle**, contrôles photo, catégorie, modèle, état de la carte ; motif à chaque génération après la première (DC-3).
+- `ModelResolver` complet : modèles validés, version tracée, format et `qr_cote` du modèle ; essai marqué pour un modèle non validé (DC-5).
+- Visiteurs institutionnels : modèle, format et position du QR du modèle validé de leur catégorie.
+- Marquage d'exposition dans la fiche de carte (I-03).
+- Redirections des anciennes URL permanentes ; la fiche garde le cycle de vie ; les préalables d'activation (DC-4) sont contrôlés par la fiche (R2).
+
+**Critères de sortie R5b :** aucune émission officielle sans modèle validé ; cartes déjà émises valides et réimprimables ; impression ≠ remise ≠ activation ≠ habilitation vérifié par test ; essai jamais promu en officiel.
+
+### 11.4. Option indépendante
+Factoriser l'enveloppe d'impression et le marquage d'exposition, à comportement identique, peut être réalisé indépendamment de R2.
 
 ## 12. Critères de validation et de non-régression
 
@@ -301,6 +382,9 @@ Factoriser le gabarit d'impression et le marquage d'exposition, à comportement 
 | Architecture | l'Atelier n'appelle ni `BadgeService`, ni `SiteControl`, ni habilitations |
 | Compatibilité | redirections 302 avec paramètres ; ancienne API visiteurs encore opérationnelle en R5a ; `data-testid` migrés |
 | Rendu | aperçu = impression (même vue, mêmes dimensions) ; QR décodable après rendu (jsQR) pour les deux types ; contrôle de débordement ; matrice des 8 catégories × recto/verso |
+| États | tableau de séparation §1.4 : aucune écriture de l'Atelier dans un état métier ; aucun mot de traçabilité dans un statut ; un tirage `essai` ne satisfait aucun préalable |
+| Décisions | DC-1 : défaut conservé (recto visiteur, verso carte) ; DC-2 : aucun chemin de rendu d'un vrai QR sans marquage préalable (fiche de carte comprise) ; DC-3 : motif exigé à la 2ᵉ génération, tirage précédent non confirmé inclus ; DC-4 : activation refusée sans impression officielle confirmée et sans remise explicite ; DC-5 : modèle non validé = essai marqué, nature `essai` enregistrée |
+| Conformité par moteur | chaque moteur de rendu (visiteurs, cartes) satisfait le contrat `RenderedBadge` : dimensions, zone calme du QR, mentions, aucune ressource externe |
 
 ### 12.3. Réserves matérielles
 
@@ -377,20 +461,47 @@ Référence : cahier des charges AILCT, 14 pages (« document de travail »). Se
 
 1. Obtenir du client : couleurs exactes, logo officiel (si possible vectoriel), originaux des 24 modèles, textes des mentions, règle d'affichage fonction/qualité, position du QR **[V]**.
 2. Définir couleurs, mention et finition **dans le modèle de chaque catégorie** (R3), source unique ; supprimer les doublons de couleur.
-3. Rendu unique (R4) : logo, nom complet, prénom/nom, fonction/qualité, validité, catégorie en couleur dominante.
+3. Rendu des cartes (R4) : logo, nom complet, prénom/nom, fonction/qualité, validité, catégorie en couleur dominante. Aucun moteur de rendu unique n'est imposé avec les badges visiteurs (§3.1 bis).
 4. Afficher la catégorie et sa couleur au poste de contrôle pour les titulaires (lot R5b/contrôle, changement additif de la réponse de contrôle).
 5. Rendre toute impression traçable en trois états (§7).
 
 ## 14. Décisions et validations restantes
 
-| Qui | Sujet |
-|---|---|
-| Dirigeant | valider ce contrat ; position du QR par modèle (I-01) ; aperçu réel d'une carte qui marque l'exposition (I-03) ; motif de réimpression après un tirage non confirmé (I-06) ; activation exigeant une impression confirmée (I-07) ; autorisation d'imprimer avec un modèle non validé en « essai » marqué |
-| AILCT | couleurs exactes (RVB/CMJN), logo officiel, 24 modèles originaux, textes des mentions, éléments de sécurité à intégrer côté logiciel, validation officielle des maquettes |
-| Technique | résolution minimale du logo ; plafond d'impression groupée de cartes ; durée d'affichage d'un tirage « non confirmé » |
+### 14.1. Tranchées par le dirigeant (révision 2)
+DC-1 à DC-6 (§1.1 bis) ; unicité de l'Atelier comme expérience et interface (I-16) ; dépendances distinctes de R5a et R5b (§9.1).
+
+### 14.2. Validations institutionnelles (AILCT) conservées [V]
+
+| Sujet |
+|---|
+| couleurs exactes des huit catégories (RVB/CMJN) ; le cahier ne donne que des noms |
+| logo officiel de l'AILCT (si possible vectoriel) |
+| originaux des 24 modèles (8 catégories × recto, verso, assemblage) et fiche de relevé (A02 §6.5) |
+| position du QR pour chacun des modèles AILCT (DC-1) |
+| textes des mentions institutionnelles, mention de catégorie au singulier, règle d'affichage fonction/qualité |
+| éléments de sécurité graphiques à intégrer côté logiciel |
+| **validation officielle de chaque maquette** avant toute émission officielle (cahier §11) ; démonstration de lecture du QR (cahier §14) |
+| imprimante et consommables (essai matériel) |
+
+### 14.3. Points techniques encore ouverts [P]
+
+| Sujet |
+|---|
+| détail de l'activation en R2 : une ou deux actions (remise puis activation) dans la fiche ; durée d'affichage d'un tirage « non confirmé » |
+| confirmation de l'ordre R5a avant R2 (I-15) |
+| statut des modèles génériques intégrés (officiels par défaut pour les badges visiteurs) et absence de modèle générique de carte permanente |
+| résolution minimale du logo ; plafond d'impression groupée de cartes |
+| besoin éventuel d'un essai avec vrai QR pour un test de lecture matériel (I-17) |
 
 ## 15. Limites de ce document
 
-- Il décrit le **contrat** ; il n'implémente rien. Les noms de tables, de classes et d'actions du journal sont des propositions tant que le dirigeant n'a pas validé le contrat.
+- Il décrit le **contrat** ; il n'implémente rien. Les noms de tables, de classes et d'actions du journal restent des propositions de conception : le dirigeant a validé l'architecture générale et les décisions DC-1 à DC-6, mais n'a pas autorisé l'implémentation (HOLD sur R5a et R5b).
 - Les affirmations sur le code sont tirées de la lecture de `main` (65c7e2e) ; elles n'ont pas été rejouées sur matériel.
 - Les couleurs relevées sur le cahier sont indicatives et ne constituent pas une validation institutionnelle.
+
+## 16. Historique des révisions
+
+| Révision | Date | Contenu |
+|---|---|---|
+| 1 | 2 novembre 2026 | Contrat initial (`e86ce46`) : responsabilités, parcours, interfaces, invariants, traçabilité, dépendances, séquencement, audit graphique, incompatibilités I-01 à I-14 |
+| 2 | 2 novembre 2026 | Décisions DC-1 à DC-6 ; séparation des états métier et des états de traçabilité (§1.4) ; unicité de l'Atelier comme expérience et interface contractuelle (§3.1 bis) ; dépendances distinctes de R5a et R5b (§9.1, §11) ; incompatibilités I-15 à I-17 ; I-01, I-03, I-06, I-07 tranchées ; validations AILCT conservées (§14.2) |

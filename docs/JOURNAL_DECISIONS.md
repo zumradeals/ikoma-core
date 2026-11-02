@@ -531,3 +531,16 @@ Recette automatisée sur données fictives ; trois défauts constatés et corrig
 ## Atelier des badges unique — contrat de conception (2 novembre 2026)
 
 Document contractuel `docs/ailct/ATELIER-BADGES-CONTRAT.md` (conception seule : aucun code, aucune migration). Décisions du dirigeant consignées : étiquettes A4 conservées comme format avec traçabilité ; modèle générique conservé ; visiteurs institutionnels soumis au modèle et au format validés de leur catégorie ; historique des tirages visiteurs en ajout seul ; motif de réimpression obligatoire pour les badges nominatifs, facultatif mais journalisé pour les anonymes ; cycle de vie des cartes dans la fiche du titulaire, toute impression par l'Atelier ; impression groupée des cartes avec vérification individuelle. Aperçu fictif sans vrai QR ; aperçu réel avec marquage d'exposition ; trois états de trace (document généré, impression demandée, impression physique confirmée). Séquencement R5a (socle et visiteurs génériques) puis R5b (cartes permanentes et modèles validés), après R1 à R4. Quatorze incompatibilités signalées (I-01 à I-14), aucune corrigée. Développement, migrations, fusion et déploiement en attente (HOLD).
+
+### Atelier des badges — révision 2 du contrat (2 novembre 2026)
+
+Décisions du dirigeant sur l'examen du commit `e86ce46` (DC-1 à DC-6), intégrées à `docs/ailct/ATELIER-BADGES-CONTRAT.md` :
+
+- **DC-1** QR configurable par modèle ; comportements existants par défaut (QR au recto des badges visiteurs, au verso des cartes permanentes) ; position des modèles AILCT soumise à validation institutionnelle.
+- **DC-2** Marquage de l'exposition avant tout aperçu d'un vrai QR (fiche de carte comprise).
+- **DC-3** Motif obligatoire à chaque nouvelle génération d'une carte permanente ou d'un badge nominatif, même si le tirage précédent n'est pas confirmé ; facultatif mais journalisé pour un badge anonyme réutilisable.
+- **DC-4** Activation d'une nouvelle carte permanente uniquement après confirmation humaine de l'impression officielle et remise explicite ; anciennes cartes préservées sans présenter une remise comme constatée.
+- **DC-5** Modèle non validé : essai marqué uniquement, jamais une émission officielle.
+- **DC-6** Architecture de l'Atelier unique approuvée sous ces précisions.
+
+Corrections : états de traçabilité (document généré, impression demandée, impression confirmée) disjoints des états métier (« imprimée » n'est pas un statut de carte) ; unicité de l'Atelier = expérience et interface contractuelle communes, sans moteur de rendu unique imposé ; dépendances distinctes : R5a indépendant de R1 à R4 (A07 et migration de traçabilité seulement), R5b dépendant de R5a, R1, R2, R3, R4 ; R2 dépend de la traçabilité de R5a (ordre R5a avant R2). Incompatibilités I-01, I-03, I-06, I-07 tranchées ; I-15 à I-17 ajoutées. Validations de l'AILCT conservées (couleurs exactes, logo officiel, 24 modèles, position du QR des modèles AILCT, mentions, éléments de sécurité, validation officielle des maquettes). Aucun code, aucune migration. R5a et R5b en HOLD.
