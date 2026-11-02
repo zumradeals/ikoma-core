@@ -65,7 +65,7 @@ it('imprime à la fois un lot de badges visiteurs et la carte d’un titulaire s
 });
 
 it('ouvre les pages de chaque parcours uniquement avec les permissions existantes', function () {
-    $routes = ['/administration/badges' => 'badges.gerer', '/administration/badges/modeles' => 'badges.gerer', '/administration/titulaires' => 'listes.importer', '/administration/titulaires/modeles' => 'badges.gerer', '/administration/habilitations' => 'listes.importer', '/administration/invites' => 'listes.importer', '/administration/imports' => 'listes.importer'];
+    $routes = ['/administration/badges' => 'badges.gerer', '/administration/atelier' => 'badges.gerer', '/administration/titulaires' => 'listes.importer', '/administration/titulaires/modeles' => 'badges.gerer', '/administration/habilitations' => 'listes.importer', '/administration/invites' => 'listes.importer', '/administration/imports' => 'listes.importer'];
     foreach (['agent_accueil', 'superviseur', 'hote', 'encadreur'] as $role) {
         $user = User::create(['name' => 'Compte fictif', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24), 'two_factor_confirmed_at' => now()]);
         $user->assignRole($role);
