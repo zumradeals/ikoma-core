@@ -12,6 +12,7 @@ body { margin: 0; background: #eaf0f6; color: #0f172a; font-family: Arial, sans-
 .toolbar button, .toolbar a { min-height: 56px; padding: 16px 24px; font: inherit; border-radius: 10px; }
 .toolbar button { background: #0B3C6B; color: #fff; border: 0; cursor: pointer; }
 .sheet { width: 53.98mm; height: 85.6mm; margin: 24px auto; background: #fff; overflow: hidden; position: relative; }
+@if ($alignment)
 .align { position: relative; width: 53.98mm; height: 85.6mm; font-size: 2.4mm; }
 .align__edge { position: absolute; inset: 0; border: .2mm solid #000; }
 .align__safe { position: absolute; inset: 3mm; border: .2mm dashed #475569; }
@@ -21,6 +22,7 @@ body { margin: 0; background: #eaf0f6; color: #0f172a; font-family: Arial, sans-
 .align__ruler { position: absolute; left: 4mm; top: 6mm; display: flex; flex-direction: column; gap: 1mm; }
 .align__ruler i { display: block; height: .3mm; background: #000; }
 .align__label { position: absolute; left: 0; right: 0; top: 24mm; text-align: center; font-weight: 700; font-size: 3mm; }
+@endif
 @page { size: 53.98mm 85.6mm; margin: 0; }
 @media print { body { background: #fff; } .toolbar { display: none; } .sheet { margin: 0; break-after: page; } .sheet:last-child { break-after: auto; } }
 </style>

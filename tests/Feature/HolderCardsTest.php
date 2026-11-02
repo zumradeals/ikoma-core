@@ -2,7 +2,9 @@
 
 use App\Models\User;
 use App\Services\BadgeLots;
+use App\Services\BadgeRefused;
 use App\Services\BadgeService;
+use App\Services\DemoLab;
 use App\Services\HolderCards;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
@@ -246,4 +248,45 @@ it('sert une page d’essai d’alignement sans QR ni donnée personnelle et san
     $html = $this->actingAs($this->admin)->get('/administration/titulaires/alignement')->assertOk()->getContent();
     expect($html)->toContain('data-side="recto"')->and($html)->toContain('data-side="verso"')->and($html)->not->toContain('<svg')->and($html)->not->toContain('Personne Fictive')
         ->and(DB::table('holder_card_prints')->count())->toBe($prints);
+});
+
+// --- Qualification A05 ------------------------------------------------------------------------------------------------------
+
+it('sépare l’impression définitive (recto et verso seulement) de l’essai d’alignement, déclenché volontairement', function () {
+    $holder = cardHolder();
+    $this->cards->issue($holder, $this->admin);
+    $this->actingAs($this->admin);
+    $final = $this->post('/administration/titulaires/'.$holder.'/carte/imprimer')->assertOk()->getContent();
+    expect(substr_count($final, 'class="sheet"'))->toBe(2)->and(substr_count($final, 'data-side="recto"'))->toBe(1)->and(substr_count($final, 'data-side="verso"'))->toBe(1)
+        ->and($final)->not->toContain('class="align"')->and($final)->not->toContain('align__edge')->and($final)->toContain('<svg');
+    $prints = DB::table('holder_card_prints')->count();
+    $align = $this->get('/administration/titulaires/alignement')->assertOk()->getContent();
+    expect(substr_count($align, 'class="sheet"'))->toBe(2)->and($align)->toContain('class="align"')->and($align)->not->toContain('<svg')->and($align)->not->toContain('IKOMA1')
+        ->and($align)->not->toContain('data-template')->and(DB::table('holder_card_prints')->count())->toBe($prints);
+    // L'essai ne s'enclenche jamais seul : l'impression ne le contient pas et l'essai se demande par sa propre adresse.
+    $this->post('/administration/titulaires/alignement')->assertStatus(405);
+});
+
+it('refuse la remise à zéro de démonstration dès que des titulaires ou des cartes existent, sans rien supprimer', function () {
+    $holder = cardHolder();
+    $this->cards->issue($holder, $this->admin);
+    $this->cards->recordPrint($holder, null, $this->admin);
+    $this->admin->update(['two_factor_confirmed_at' => now(), 'password' => 'Motdepasse-De-Test-12345!']);
+    $before = [DB::table('permanent_holders')->count(), DB::table('holder_cards')->count(), DB::table('holder_card_prints')->count(), DB::table('events')->count(), DB::table('badges')->count()];
+    foreach ([false, true] as $clearUsers) {
+        $this->actingAs($this->admin)->post('/administration/demonstration/remettre-a-zero', ['confirmation' => 'REMETTRE A ZERO IKOMA', 'password' => 'Motdepasse-De-Test-12345!', 'acknowledge' => true, 'clear_users' => $clearUsers])->assertSessionHasErrors('confirmation');
+        expect(fn () => app(DemoLab::class)->clearBusiness($this->admin, $clearUsers))->toThrow(ValidationException::class);
+    }
+    // Même en contournant le service : la fonction SQL et les déclencheurs protègent les cartes et le contexte permanent.
+    expect(fn () => DB::transaction(fn () => DB::select('SELECT public.ikoma_reset_demo_business(CAST(? AS uuid), ?)', [$this->admin->id, false])))->toThrow(QueryException::class);
+    expect([DB::table('permanent_holders')->count(), DB::table('holder_cards')->count(), DB::table('holder_card_prints')->count(), DB::table('events')->count(), DB::table('badges')->count()])->toBe($before);
+});
+
+it('écarte le contexte permanent des écrans et des opérations ordinaires (imports, lots de badges)', function () {
+    $context = app(PermanentHolders::class)->permanentContext();
+    $this->actingAs($this->admin);
+    $this->get('/administration/imports')->assertInertia(fn ($p) => $p->where('events', fn ($events) => collect($events)->doesntContain(fn ($e) => $e['id'] === $context->id)));
+    $this->get('/administration/imports?event_id='.$context->id)->assertSessionHasErrors('event_id');
+    $category = DB::table('categories')->insertGetId(['id' => $id = (string) Str::uuid(), 'event_id' => $context->id, 'name' => 'Cat test', 'color' => '#336699', 'priority_circuit' => false, 'created_at' => now(), 'updated_at' => now()]) ? $id : $id;
+    expect(fn () => app(BadgeLots::class)->generate($context->id, $category, 5, $this->admin))->toThrow(BadgeRefused::class);
 });

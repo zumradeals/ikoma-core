@@ -31,6 +31,7 @@ final class BadgeLots
 
         return DB::transaction(function () use ($eventId, $categoryId, $expected, $actor): BadgeBatch {
             EventAvailability::requireOpen($eventId);
+            DB::table('events')->where('id', $eventId)->where('is_permanent', true)->doesntExist() || throw new BadgeRefused('contexte_permanent', 'Le contexte permanent ne reçoit que les cartes des titulaires : aucun lot ne s’y fabrique.');
             $category = DB::table('categories')->where('id', $categoryId)->where('event_id', $eventId)->first(['name']) ?? throw new BadgeRefused('categorie', 'Catégorie inconnue pour cet événement.');
             // Verrou par événement : deux générations simultanées ne peuvent pas produire le même code.
             DB::statement("SELECT pg_advisory_xact_lock(hashtextextended('badge-codes:'||?, 4))", [$eventId]);

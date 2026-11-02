@@ -207,6 +207,10 @@ final class DemoLab
     public function clearBusiness(User $actor, bool $clearAccounts = false): array
     {
         self::authorize($actor);
+        // Les titulaires permanents, leurs cartes et leur historique ne font pas partie des données de démonstration : refus net, avant toute suppression.
+        if (DB::table('events')->where('is_permanent', true)->exists() || DB::table('permanent_holders')->exists() || DB::table('holder_cards')->exists()) {
+            throw ValidationException::withMessages(['confirmation' => 'Remise à zéro refusée : le contexte permanent, les titulaires et leurs cartes sont protégés et ne s’effacent jamais ici. Aucune donnée n’a été supprimée.']);
+        }
         $counts = [];
         DB::transaction(function () use ($actor, $clearAccounts, &$counts): void {
             $counts = $this->totals();
