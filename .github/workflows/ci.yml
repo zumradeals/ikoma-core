@@ -51,8 +51,7 @@ jobs:
       - name: Diagnostic serveur des échecs E2E (refus d'accès et sessions expirées, sans donnée personnelle)
         if: ${{ failure() }}
         run: |
-          docker compose exec -T -e PGPASSWORD="$(cat .secrets/db-owner)" db psql -h 127.0.0.1 -U ikoma -d ikoma -c "select to_char(occurred_at,'HH24:MI:SS') as heure, action, (actor_id is null) as anonyme, details->>'route' as route, details->>'statut' as statut from audit_logs where action in ('acces.refuse','session.expiree') order by occurred_at limit 80" || true
-          docker compose exec -T -e PGPASSWORD="$(cat .secrets/db-owner)" db psql -h 127.0.0.1 -U ikoma -d ikoma -c "select key, value from settings where key like 'session%' or key like 'poste%' order by key" || true
+          docker compose exec -T db sh -c 'export PGPASSWORD="$(cat /run/secrets/db-owner)"; psql -h 127.0.0.1 -U ikoma -d ikoma -c "select substr(occurred_at::text,12,8) as heure, action, (actor_id is null) as anonyme, details->>'"'"'route'"'"' as route, details->>'"'"'statut'"'"' as statut from audit_logs where action in ('"'"'acces.refuse'"'"','"'"'session.expiree'"'"') order by occurred_at limit 80"' || true
       - name: Vérifier le contrôle des exceptions de sécurité
         run: python3 -m unittest discover -s tests/security
       - name: Auditer les dépendances applicatives (blocage élevé et critique)
