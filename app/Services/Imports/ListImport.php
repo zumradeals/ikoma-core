@@ -3,6 +3,7 @@
 namespace App\Services\Imports;
 
 use App\Services\Audit;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -205,8 +206,19 @@ final class ListImport
     private function read(string $event): ?array
     {
         $path = $this->directory($event).'/preview.enc';
+        if (! is_file($path)) {
+            return null;
+        }
+        try {
+            return json_decode(Crypt::decryptString(File::get($path)), true, 512, JSON_THROW_ON_ERROR);
+        } catch (DecryptException|\JsonException) {
+            // Aperçu devenu illisible (clé de chiffrement changée, fichier tronqué ou corrompu) : il ne doit pas bloquer tous les imports suivants de l'événement.
+            // Il ne contient que des données d'aperçu non confirmées ; il est retiré et le fait est journalisé, sans donnée personnelle.
+            File::delete($path);
+            app(Audit::class)->append('liste.import_apercu_illisible', null, ['event_id' => $event]);
 
-        return is_file($path) ? json_decode(Crypt::decryptString(File::get($path)), true, 512, JSON_THROW_ON_ERROR) : null;
+            return null;
+        }
     }
 
     /** @param array<string,mixed> $p */

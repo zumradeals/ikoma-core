@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
+import { toUtcIso } from '../../utils/localDateTime';
 
 type Zone = { id: string; name: string; classification: string | null; permanent_allowed: boolean; offline_entry_allowed: boolean };
 type Entitlement = { id: string; holder_id: string; full_name: string; identifier: string; zone_id: string; zone: string; valid_from: string; valid_until: string; revoked_at: string | null; revocation_reason: string | null };
@@ -15,7 +16,10 @@ const props = defineProps<{
 
 function chooseEvent(e: Event) { router.get('/administration/habilitations', { event: (e.target as HTMLSelectElement).value }); }
 const grant = useForm({ holder_id: '', event_id: props.eventId ?? '', zone_id: '', valid_from: '', valid_until: '' });
-function submitGrant() { grant.event_id = props.eventId ?? ''; grant.post('/administration/habilitations', { preserveScroll: true, onSuccess: () => grant.reset('holder_id', 'zone_id', 'valid_from', 'valid_until') }); }
+function submitGrant() {
+  grant.event_id = props.eventId ?? '';
+  // Les champs sont en heure locale : le serveur reçoit des dates UTC explicites.
+  grant.transform(data => ({ ...data, valid_from: toUtcIso(data.valid_from), valid_until: toUtcIso(data.valid_until) })).post('/administration/habilitations', { preserveScroll: true, onSuccess: () => grant.reset('holder_id', 'zone_id', 'valid_from', 'valid_until') }); }
 const revoking = ref<string | null>(null);
 const revokeForm = useForm({ reason: '' });
 function submitRevoke(id: string) { revokeForm.post('/administration/habilitations/' + id + '/retirer', { preserveScroll: true, onSuccess: () => { revoking.value = null; revokeForm.reset(); } }); }
