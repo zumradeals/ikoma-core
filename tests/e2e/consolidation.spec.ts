@@ -20,7 +20,7 @@ test('navigation consolidée : badges visiteurs, cartes permanentes, invités (o
     // Rubrique d'accueil : une entrée par usage, aucune sous-entrée ouverte.
     await page.goto('/administration'); await openMenu();
     await expect(page.getByTestId('menu-badges')).toHaveText('Badges visiteurs');
-    await expect(page.getByTestId('menu-titulaires')).toContainText('Titulaires permanents');
+    await expect(page.getByTestId('menu-titulaires')).toContainText('Personnes et cartes permanentes');
     await expect(page.getByTestId('menu-atelier')).toHaveCount(0);
     await expect(page.getByTestId('menu-modeles-cartes')).toHaveCount(0);
     await noHorizontalScroll(page, `tableau ${label}`);

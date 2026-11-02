@@ -16,7 +16,7 @@ function save() { form.put('/administration/titulaires/modeles', { preserveScrol
   <AdminLayout active="modeles-cartes">
     <div class="space-y-6" data-testid="page-modeles-cartes">
       <header class="space-y-2">
-        <Link href="/administration/titulaires" class="font-semibold underline">← Titulaires permanents</Link>
+        <Link href="/administration/titulaires" class="font-semibold underline">← Registre des personnes</Link>
         <h1 class="text-display font-bold">Modèles de cartes institutionnelles</h1>
         <p>Un modèle par catégorie institutionnelle (AILCT-01 à AILCT-08). Les libellés, couleurs et repères viennent de l’écran « Catégories institutionnelles » ; le logo et le nom viennent de l’identité de l’installation. Les exemples ci-dessous sont fictifs et leur QR ne correspond à aucun badge.</p>
         <p v-if="!settings.valide" class="rounded-lg border-2 border-amber-600 bg-amber-50 p-3 font-semibold" role="status" data-testid="modele-provisoire">Modèles provisoires : aucun élément graphique officiel n’a été fourni. Couleurs et repères neutres jusqu’à validation par l’institution.</p>
