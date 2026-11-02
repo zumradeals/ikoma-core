@@ -12,7 +12,7 @@ type Holder = {
 type Page = { data: Holder[]; links: { url: string | null; label: string; active: boolean }[]; total: number };
 const props = defineProps<{
   holders: Page; filters: { q: string; statut: string; categorie: string }; categories: Category[];
-  identifierFormat: { prefix: string; width: number; check: boolean }; identifierExample: string; permanentContext: { id: string; name: string } | null; canConfigure: boolean;
+  identifierFormat: { prefix: string; width: number; check: boolean }; identifierExample: string; permanentContext: { id: string; name: string } | null; canConfigure: boolean; canCards: boolean;
 }>();
 
 const search = useForm({ q: props.filters.q, statut: props.filters.statut, categorie: props.filters.categorie });
@@ -52,6 +52,8 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
           <span v-else>non créé. <button type="button" class="btn-soft ml-2" data-testid="creer-contexte" @click="createContext">Créer le contexte permanent</button></span>
         </p>
       </header>
+
+      <p v-if="canCards" class="col-span-full"><Link href="/administration/titulaires/modeles" class="font-semibold underline" data-testid="lien-modeles">Modèles de cartes institutionnelles</Link></p>
 
       <form class="col-span-full grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_auto]" role="search" @submit.prevent="runSearch">
         <label class="font-semibold">Rechercher (nom, organisation, identifiant)<input v-model="search.q" class="field mt-1" data-testid="recherche-titulaires" placeholder="Nom ou identifiant"></label>
@@ -100,6 +102,7 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
           <div v-if="h.status === 'actif'" class="mt-3 flex flex-wrap gap-3">
             <button type="button" class="btn-soft" :data-testid="'modifier-' + h.id" @click="startEdit(h)">Modifier</button>
             <button type="button" class="btn-soft" :data-testid="'clore-' + h.id" @click="startClose(h)">Clore</button>
+            <Link v-if="canCards" :href="'/administration/titulaires/' + h.id + '/carte'" class="btn-soft" :data-testid="'carte-' + h.id">Carte</Link>
           </div>
 
           <form v-if="editing === h.id" class="mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2" @submit.prevent="submitEdit(h)">

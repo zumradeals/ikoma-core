@@ -56,6 +56,34 @@ final class BadgeLots
     }
 
     /**
+     * Fabrique UN badge (lot d'un seul exemplaire) destiné à une personne précise : même format de code, même jeton QR aléatoire, même numérotation
+     * que generate(). Le badge reste « Disponible » (non associé) : aucune autorisation n'en découle. Aucun code ni jeton n'est jamais réutilisé.
+     *
+     * @return array{id: string, code: string, batch_id: string}
+     */
+    public function issueSingle(string $eventId, string $categoryId, string $visitorId, string $label, User $actor): array
+    {
+        return DB::transaction(function () use ($eventId, $categoryId, $visitorId, $label, $actor): array {
+            DB::table('categories')->where('id', $categoryId)->where('event_id', $eventId)->exists() || throw new BadgeRefused('categorie', 'Catégorie inconnue pour cet événement.');
+            DB::statement("SELECT pg_advisory_xact_lock(hashtextextended('badge-codes:'||?, 4))", [$eventId]);
+            $alive = (int) DB::table('badges')->where('event_id', $eventId)->whereRaw("code ~ '^B-[0-9]+\$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $retired = (int) DB::table('retired_badge_identifiers')->where('event_id', $eventId)->whereRaw("code ~ '^B-[0-9]+$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $number = max($alive, $retired) + 1;
+            $batch = BadgeBatch::create(['event_id' => $eventId, 'category_id' => $categoryId, 'name' => mb_substr($label, 0, 120), 'quantity' => 1, 'margin' => 0]);
+            $id = (string) Str::uuid7();
+            $code = 'B-'.str_pad((string) $number, 3, '0', STR_PAD_LEFT);
+            DB::table('badges')->insert([
+                'id' => $id, 'event_id' => $eventId, 'category_id' => $categoryId, 'badge_batch_id' => $batch->id, 'code' => $code,
+                'qr_token' => bin2hex(random_bytes(32)), 'status' => BadgeStatus::Available->value, 'printed_for_visitor_id' => $visitorId,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $this->audit->append('badge.exemplaire_cree', $actor->id, ['batch_id' => $batch->id, 'event_id' => $eventId, 'code' => $code]);
+
+            return ['id' => $id, 'code' => $code, 'batch_id' => $batch->id];
+        });
+    }
+
+    /**
      * Réserve d'un coup les badges encore disponibles et non réservés d'un lot
      * pour un poste précis. Le choix du poste est explicite dans l'administration.
      * Les badges d'un groupe ou d'un autre poste restent intouchables.

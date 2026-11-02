@@ -485,3 +485,17 @@ contexte permanent protégé (`events.is_permanent`), liens facultatifs et nulla
 - Huit catégories AILCT-01 à 08 : créées à la demande, libellés des contrats validés, couleurs et repères neutres et modifiables, association facultative aux catégories d'événement. Aucune règle d'accès ne les lit (test d'architecture).
 - Contexte permanent : un seul, jamais clos, archivé, anonymisé, supprimé ni remis à zéro ; exclu des conservations et des événements affichés par défaut. Aucune durée de conservation ni purge propre aux titulaires n'est appliquée : base légale et durées à confirmer par l'AILCT.
 - Droits : permissions existantes (`listes.importer` pour le registre, `categories.gerer` pour le référentiel). Aucun rôle ajouté.
+
+## A05 — Cartes institutionnelles recto verso, génération et impression (2 novembre 2026)
+
+Propositions techniques (non validées par l'AILCT ; à confirmer) : migration additive `holder_cards`, `holder_card_prints`, colonnes de portrait sur `permanent_holders`.
+Le moteur de contrôle, les règles d'entrée et de sortie, le contrat QR `IKOMA1:` et la fabrication des lots standard ne changent pas.
+
+- Une carte = un badge technique (`badges`) hébergé par le contexte permanent, rattaché au titulaire. Le badge reste « Disponible » et sans zone : le contrôle le refuse (non associé). Aucune autorisation ne découle de la catégorie ni de la carte.
+- Une seule carte active par titulaire (index unique partiel). Titulaire, carte physique et identifiants techniques (B-nnn, jeton QR) restent trois notions distinctes ; l'identifiant du titulaire (A04) est imprimé au recto et au verso.
+- Premier tirage = émission ; tirages suivants = réimpressions avec motif obligatoire, même badge, même QR, même identifiant. Historique en ajout seul (déclencheur + droits). Le journal d'audit ne contient ni nom ni motif.
+- `BadgeLots::issueSingle` fabrique un exemplaire avec la même numérotation et les mêmes garanties que `generate`. La remise à zéro de démonstration inclut les deux nouvelles tables (refus si des cartes existent).
+- Huit modèles = les huit catégories (libellé, couleur, repère du référentiel A04) ; couleurs neutres et mention « MODÈLE PROVISOIRE » tant que l'administrateur n'a pas coché la validation. Mentions du verso configurables (réglages `carte_*`), avis par défaut modifiable.
+- Recto : logo, nom de l'institution, portrait (facultatif, chiffré, imprimé seulement si autorisé), nom complet, catégorie, identifiant. Le registre n'ayant qu'un champ « nom complet », nom et prénom ne sont pas séparés.
+- Format CR80 portrait 53,98 × 85,60 mm, recto page 1 / verso page 2 (retournement grand côté), page d'essai d'alignement sans QR. Aucune compatibilité avec une imprimante PVC n'est affirmée sans essai réel.
+- Hors périmètre (A06) : retrait ou remplacement d'une carte perdue, sorties permanentes, restitution, contrôle hors ligne, droits par zone.
