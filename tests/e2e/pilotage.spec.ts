@@ -2,8 +2,10 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 
-type Fixtures = { email: string; password: string; enrolCode3: string; poste3: string; pilotageNames: string[]; pilotageBadges: string[]; supervisor: { email: string; password: string; secret: string } };
+type Fixtures = { event: string; email: string; password: string; enrolCode3: string; poste3: string; pilotageNames: string[]; pilotageBadges: string[]; supervisor: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
+/** Les écrans de supervision choisissent l'événement de la recette de façon explicite : aucune dépendance à l'ordre chronologique global des événements. */
+const forEvent = (path: string) => `${path}${path.includes('?') ? '&' : '?'}event=${fx.event}`;
 const shots = process.env.L8_CAPTURES === '1';
 const TABLET_PIN = '739261';
 const EVAC_PIN = '583614';
@@ -63,7 +65,7 @@ async function refuse(page: Page, name: string, motif: string) {
 
 test('un compteur et une alerte créés par un autre poste apparaissent en moins de 5 secondes sur le smartphone', async () => {
   test.setTimeout(180_000);
-  await sup.goto('/pilotage');
+  await sup.goto(forEvent('/pilotage'));
   await expect(sup.getByRole('heading', { name: 'Tableau de bord' })).toBeVisible(); await noOverflow(sup);
   const before = { presents: Number(await counter(sup, 'presents').innerText()), arrives: Number(await counter(sup, 'arrives').innerText()), refuses: Number(await counter(sup, 'refuses').innerText()) };
   await shot(sup, 'l8-tableau-avant');
@@ -120,7 +122,7 @@ test('présents : recherche, fiche, annulation de badge en deux temps, personne 
   await sup.getByTestId('annuler-confirmer').click();
   await expect(sup.getByTestId('a-rebadger')).toContainText('À rebadger'); await expect(sup.getByTestId('annulation')).toHaveCount(0); await shot(sup, 'l8-a-rebadger');
   await noOverflow(sup);
-  await sup.goto('/pilotage');
+  await sup.goto(forEvent('/pilotage'));
   await expect(sup.getByTestId('alerte-badge_annule').first()).toContainText('rebadger', { timeout: 5000 });
 });
 
@@ -144,7 +146,7 @@ test('litiges : décision « autoriser avec conditions », visible à l’accuei
 });
 
 test('groupes et journal sur le smartphone', async () => {
-  await sup.goto('/pilotage/groupes');
+  await sup.goto(forEvent('/pilotage/groupes'));
   await expect(sup.getByRole('heading', { name: 'Groupes et cars' })).toBeVisible(); await noOverflow(sup); await shot(sup, 'l8-groupes');
   await sup.goto('/administration/journal');
   await expect(sup.getByRole('heading', { name: 'Administration · Journal' })).toBeVisible(); await shot(sup, 'l8-journal');
@@ -153,7 +155,7 @@ test('groupes et journal sur le smartphone', async () => {
 
 test('évacuation : liste par zone, impression A4 par zone, copie chiffrée consultable hors ligne avec sa fraîcheur', async () => {
   test.setTimeout(120_000);
-  await sup.goto('/pilotage/evacuation');
+  await sup.goto(forEvent('/pilotage/evacuation'));
   await expect(sup.getByTestId('total')).toBeVisible(); await noOverflow(sup);
   const total = Number((await sup.getByTestId('total').innerText()).match(/\d+/)![0]);
   await expect(sup.getByTestId('personne').first()).toBeVisible(); await shot(sup, 'l8-evacuation');

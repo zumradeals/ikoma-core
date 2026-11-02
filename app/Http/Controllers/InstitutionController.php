@@ -42,6 +42,15 @@ final class InstitutionController
         return back()->with('status', trim((string) ($data['nom'] ?? '')) === '' ? 'Aucun nom saisi : l’identité IKOMA ACCESS standard reste affichée.' : 'Identité enregistrée.');
     }
 
+    public function home(Request $request, Institution $institution): RedirectResponse
+    {
+        $this->authorizeAdmin();
+        $data = $request->validate(['actif' => ['required', 'boolean']]);
+        $institution->setHome((bool) $data['actif'], $request->user());
+
+        return back()->with('status', $data['actif'] ? 'Page d’accueil activée : elle présente les informations publiques de l’institution.' : 'Page d’accueil désactivée : l’adresse racine conduit à la connexion. Les contenus sont conservés.');
+    }
+
     public function uploadLogo(Request $request, Institution $institution): RedirectResponse
     {
         $this->authorizeAdmin();

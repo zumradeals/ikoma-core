@@ -13,7 +13,7 @@ function save() { form.put('/administration/titulaires/modeles', { preserveScrol
 </script>
 
 <template>
-  <AdminLayout active="titulaires">
+  <AdminLayout active="modeles-cartes">
     <div class="space-y-6" data-testid="page-modeles-cartes">
       <header class="space-y-2">
         <Link href="/administration/titulaires" class="font-semibold underline">← Titulaires permanents</Link>

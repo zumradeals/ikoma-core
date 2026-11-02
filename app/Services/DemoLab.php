@@ -19,9 +19,18 @@ final class DemoLab
         'formation' => 'Formation et groupes',
     ];
 
+    /**
+     * Seuls les environnements explicitement prévus pour les essais (demo, local, testing) disposent du laboratoire. En exploitation (production), ni la page,
+     * ni la génération, ni la remise à zéro n'existent : le contrôle est fait côté serveur à chaque appel (routes, contrôleur et service), jamais par un bouton.
+     */
+    public static function available(): bool
+    {
+        return app()->environment('demo', 'local', 'testing') && ! app()->environment('production');
+    }
+
     public static function authorize(User $actor): void
     {
-        abort_unless(app()->environment('demo', 'local', 'testing'), 403, 'Laboratoire indisponible en production.');
+        abort_unless(self::available(), 403, 'Laboratoire indisponible en exploitation.');
         abort_unless($actor->active && $actor->two_factor_confirmed_at !== null
             && $actor->hasRole('administrateur') && $actor->can('comptes.gerer'), 403);
     }

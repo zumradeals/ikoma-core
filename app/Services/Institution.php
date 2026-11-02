@@ -44,7 +44,7 @@ final class Institution
     /**
      * @return array{
      *   custom: bool, name: string, fullName: string, tagline: string, logoUrl: ?string, homeTitle: string, homeDescription: string,
-     *   loginGreeting: string, footer: string, primary: string, secondary: string, accent: string, version: string
+     *   loginGreeting: string, footer: string, primary: string, secondary: string, accent: string, version: string, homeEnabled: bool
      * }
      */
     public function profile(): array
@@ -77,6 +77,7 @@ final class Institution
             'secondary' => $color('secondary'),
             'accent' => $color('accent'),
             'version' => $version,
+            'homeEnabled' => $this->homeEnabled((string) ($raw['institution_accueil'] ?? ''), $custom),
         ];
     }
 
@@ -96,7 +97,7 @@ final class Institution
     /**
      * Valeurs saisies telles qu'enregistrées, pour l'écran d'administration.
      *
-     * @return array<string, string>
+     * @return array<string, bool|string>
      */
     public function form(): array
     {
@@ -105,12 +106,26 @@ final class Institution
         foreach (array_keys(self::TEXTS) as $key) {
             $out[$key] = (string) ($raw['institution_'.$key] ?? '');
         }
+        $out['accueil_actif'] = $this->profile()['homeEnabled'];
         foreach (array_keys(self::COLORS) as $key) {
             $stored = (string) ($raw['institution_couleur_'.$key] ?? '');
             $out[$key] = self::validColor($stored) ? $stored : self::COLORS[$key];
         }
 
         return $out;
+    }
+
+    /**
+     * Page d'accueil publique. Sans réglage explicite : active pour l'installation IKOMA ACCESS standard (comportement historique), désactivée pour une installation
+     * institutionnelle (nom configuré). Désactiver n'efface ni contenu ni réglage ; le réglage n'a aucun lien avec l'authentification ni les permissions.
+     */
+    private function homeEnabled(string $stored, bool $custom): bool
+    {
+        return match ($stored) {
+            '1' => true,
+            '0' => false,
+            default => ! $custom,
+        };
     }
 
     public static function validColor(string $value): bool
@@ -148,6 +163,17 @@ final class Institution
             }
             $this->touch();
             app(Audit::class)->append('institution.modifiee', $actor->id, ['personnalisee' => trim((string) ($data['nom'] ?? '')) !== '']);
+        });
+        $this->profile = null;
+    }
+
+    /** Active ou désactive la page d'accueil publique, de façon explicite. Aucun contenu ni autre réglage n'est modifié ou supprimé. */
+    public function setHome(bool $enabled, User $actor): void
+    {
+        DB::transaction(function () use ($enabled, $actor): void {
+            $this->put('institution_accueil', $enabled ? '1' : '0');
+            $this->touch();
+            app(Audit::class)->append('institution.accueil_modifie', $actor->id, ['actif' => $enabled]);
         });
         $this->profile = null;
     }

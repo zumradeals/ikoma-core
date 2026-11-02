@@ -27,14 +27,14 @@ export default defineConfig({
       manifest: { name: 'IKOMA ACCESS', short_name: 'IKOMA ACCESS', lang: 'fr', start_url: '/', scope: '/', display: 'standalone', theme_color: '#0B3C6B', background_color: '#f8fafc', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }] },
       workbox: {
         globPatterns: ['**/*.{js,css,woff2}'], navigateFallback: undefined,
-        // Page publique provisoire et coquille publique du poste (/poste/shell : aucune session, aucun nom, aucune donnée).
-        additionalManifestEntries: [{ url: '/', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-icon.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-logo.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-logo-slogan.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }, { url: '/controle/shell', revision: sourceHash() }, { url: '/groupe/shell', revision: sourceHash() }, { url: '/pilotage/evacuation/shell', revision: sourceHash() }],
+        // Coquille publique de l'accueil (secours hors ligne : l'adresse racine passe toujours par le serveur, qui peut la désactiver) et coquille publique du poste (/poste/shell : aucune session, aucun nom, aucune donnée).
+        additionalManifestEntries: [{ url: '/accueil/shell', revision: sourceHash() }, { url: '/icon.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-icon.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-logo.svg', revision: sourceHash() }, { url: '/brand/ikoma-access-logo-slogan.svg', revision: sourceHash() }, { url: '/poste/shell', revision: sourceHash() }, { url: '/controle/shell', revision: sourceHash() }, { url: '/groupe/shell', revision: sourceHash() }, { url: '/pilotage/evacuation/shell', revision: sourceHash() }],
         navigateFallbackDenylist: [/^\/build/],
         // /poste, /controle, /groupe et /pilotage/evacuation passent toujours par le serveur (session, droits) ; sans réseau, on rend la coquille publique précachée. Jamais de contenu authentifié en cache.
         runtimeCaching: [{
-          urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && ['/poste', '/controle', '/groupe', '/pilotage/evacuation'].includes(url.pathname),
+          urlPattern: ({ request, url }: { request: Request; url: URL }) => request.mode === 'navigate' && ['/', '/poste', '/controle', '/groupe', '/pilotage/evacuation'].includes(url.pathname),
           handler: 'NetworkOnly',
-          options: { plugins: [{ handlerDidError: async ({ request }: { request: Request }) => caches.match(new URL(request.url).pathname + '/shell', { ignoreSearch: true }) }] },
+          options: { plugins: [{ handlerDidError: async ({ request }: { request: Request }) => { const path = new URL(request.url).pathname; return caches.match(path === '/' ? '/accueil/shell' : path + '/shell', { ignoreSearch: true }); } }] },
         }],
       },
     }),

@@ -9,7 +9,7 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   const origin = new URL(baseURL || 'http://localhost:8080').origin;
   await page.setViewportSize({ width: 1024, height: 1400 });
   await loginWithSecondFactor(page, user.email, user.password, user.secret);
-  await page.getByRole('link', { name: 'Badges', exact: true }).click();
+  await page.getByRole('link', { name: 'Badges visiteurs', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible();
 
   // 1. Génération d'un lot de 20 badges « Visiteur » : 20 attendus + 10 % de marge = 22.

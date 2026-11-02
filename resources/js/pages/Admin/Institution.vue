@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import { useInstitution } from '../../composables/useInstitution';
@@ -8,9 +8,12 @@ type Fields = {
   nom: string; nom_complet: string; slogan: string; accueil_titre: string; accueil_description: string; connexion_accroche: string; pied: string;
   primary: string; secondary: string; accent: string;
 };
-const props = defineProps<{ form: Fields; limits: Record<string, number>; defaults: Record<string, string>; custom: boolean; hasLogo: boolean }>();
+const props = defineProps<{ form: Fields & { accueil_actif: boolean }; limits: Record<string, number>; defaults: Record<string, string>; custom: boolean; hasLogo: boolean }>();
 const institution = useInstitution();
+const homeActive = computed(() => props.form.accueil_actif);
 const form = useForm<Fields>({ ...props.form });
+const home = useForm({ actif: props.form.accueil_actif });
+function saveHome() { home.put('/administration/identite/accueil', { preserveScroll: true }); }
 const logo = useForm<{ logo: File | null }>({ logo: null });
 const reset = useForm({ confirmation: '' });
 const resetOpen = ref(false);
@@ -73,6 +76,16 @@ const colorFields: { key: 'primary' | 'secondary' | 'accent'; label: string }[] 
         <p class="text-sm">Choisissez des couleurs suffisamment contrastées avec le blanc : le texte des en-têtes et des boutons est blanc. Les couleurs n’ont aucun effet tant qu’aucun nom n’est saisi.</p>
         <button type="submit" :disabled="form.processing" data-testid="enregistrer-identite">Enregistrer l’identité</button>
       </form>
+
+      <section class="space-y-3 rounded-xl border bg-white p-5" data-testid="bloc-accueil">
+        <h2 class="text-heading font-bold">Page d’accueil publique</h2>
+        <p>Quand elle est désactivée, l’adresse racine conduit directement à la connexion. Désactiver ne supprime ni les textes ni le logo : ils sont conservés et reprennent effet à la réactivation. La page n’affiche que les informations publiques de l’institution, jamais de donnée opérationnelle.</p>
+        <p class="font-semibold" data-testid="etat-accueil">État actuel : {{ homeActive ? 'activée' : 'désactivée' }}. {{ custom ? 'Par défaut, une installation institutionnelle n’affiche pas d’accueil.' : 'Par défaut, l’installation standard affiche l’accueil IKOMA ACCESS.' }}</p>
+        <form class="flex flex-wrap items-end gap-3" @submit.prevent="saveHome">
+          <label class="flex items-center gap-2 font-semibold"><input v-model="home.actif" type="checkbox" class="size-6" data-testid="accueil-actif"> Afficher la page d’accueil publique</label>
+          <button type="submit" class="btn-soft" :disabled="home.processing" data-testid="enregistrer-accueil">Enregistrer</button>
+        </form>
+      </section>
 
       <section class="space-y-3 rounded-xl border bg-white p-5">
         <h2 class="text-heading font-bold">Logo</h2>

@@ -100,9 +100,9 @@ onMounted(() => { chooseBatch(); if (form.batch) void preview(); });
 </script>
 
 <template>
-  <AdminLayout active="badges" :event="events.find(event => event.id === form.event) ?? null">
+  <AdminLayout active="atelier" :event="events.find(event => event.id === form.event) ?? null">
     <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div><p class="text-sm font-bold uppercase tracking-widest text-blue-700">Atelier de badges · IKOMA ACCESS</p><h1 class="mt-2 text-display font-bold">Modèles et impression</h1><p class="mt-2 max-w-3xl">Choisissez votre lot, personnalisez le modèle, puis préparez l’impression à taille réelle.</p></div>
+      <div><p class="text-sm font-bold uppercase tracking-widest text-blue-700">Atelier de badges visiteurs · IKOMA ACCESS</p><h1 class="mt-2 text-display font-bold">Modèles et impression</h1><p class="mt-2 max-w-3xl">Choisissez votre lot, personnalisez le modèle, puis préparez l’impression à taille réelle.</p></div>
       <Link href="/administration/badges" class="btn-soft">Retour aux badges</Link>
     </div>
     <p class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-base">Le mode standard reste anonyme. Les données personnelles apparaissent seulement en mode nominatif explicitement autorisé. Les zones ne sont jamais imprimées. Le modèle VIP ne donne aucun droit d’accès supplémentaire.</p>

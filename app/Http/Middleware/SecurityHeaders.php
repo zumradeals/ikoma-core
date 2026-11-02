@@ -27,10 +27,10 @@ final class SecurityHeaders
      * du navigateur, parfois pendant une connexion : si leur réponse (anonyme, émise avant la connexion) arrive après celle de /login, son cookie
      * de session périmé remplaçait le cookie authentifié et l'utilisateur se retrouvait déconnecté. Ces pages n'ont aucune donnée de session.
      */
-    public const PRECACHED_PUBLIC_PATHS = ['/', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'];
+    public const PRECACHED_PUBLIC_PATHS = ['accueil/shell', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'];
 
     /** Ressources publiques d'identité (couleurs, logo) : appelées pendant la connexion, elles ne doivent pas non plus renvoyer de cookie d'état. */
-    public const STATELESS_PUBLIC_PATHS = ['institution/theme.css', 'institution/logo'];
+    public const STATELESS_PUBLIC_PATHS = ['/', 'institution/theme.css', 'institution/logo'];
 
     private static function dropStateCookies(Response $response): void
     {

@@ -43,6 +43,20 @@ test('identité institutionnelle : configuration par l’administrateur, afficha
     await expect(page.getByTestId('logo-actuel')).toBeVisible();
     await page.screenshot({ path: 'test-results/a03-admin-identite-ailct.png', fullPage: true });
 
+    // Accueil : désactivé par défaut pour une installation institutionnelle (la racine conduit à la connexion), activable depuis l'écran Identité.
+    await expect(page.getByTestId('etat-accueil')).toContainText('désactivée');
+    const closed = await browser.newContext({ baseURL: info.project.use.baseURL });
+    const closedPage = await closed.newPage();
+    await closedPage.goto('/');
+    await expect(closedPage).toHaveURL(/\/login$/);
+    await page.getByTestId('accueil-actif').check();
+    await page.getByTestId('enregistrer-accueil').click();
+    await expect(page.getByTestId('etat-accueil')).toContainText('activée');
+    await page.screenshot({ path: 'test-results/a065-identite-accueil-active.png', fullPage: true });
+    await closedPage.goto('/');
+    await expect(closedPage.getByTestId('accueil-institution')).toBeVisible();
+    await closed.close();
+
     // L'espace d'administration porte l'identité de l'institution.
     await page.goto('/administration');
     await expect(page.locator('.admin-brand')).toContainText('AILCT');
