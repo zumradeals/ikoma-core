@@ -53,6 +53,9 @@ function a07Participation(): array
 }
 
 beforeEach(function () {
+    // Les aperçus d'import (fichiers chiffrés) vont sur un disque factice : un test ne doit jamais laisser de fichier dans le stockage réel,
+    // que les recettes navigateur partagent (un aperçu résiduel d'un autre compte bloque l'import de l'événement de démonstration).
+    Storage::fake('local');
     $this->seed(RoleSeeder::class);
     $this->admin = a07User('administrateur');
     $this->agent = a07User('agent_accueil');

@@ -10,6 +10,8 @@ Données fictives uniquement. **Réussi** = preuve automatisée citée. **Non te
 | D3 | Un aperçu d'import devenu illisible (clé de chiffrement changée, fichier corrompu) faisait échouer **tous** les imports suivants de l'événement, en silence (constaté pendant la recette locale). | L'aperçu illisible est retiré, le fait est journalisé (`liste.import_apercu_illisible`, sans donnée personnelle) et l'import continue. | `RecetteA07Test` « ne laisse pas un aperçu d'import illisible… » |
 | D2 | Les dates d'une habilitation saisies en heure locale étaient lues comme de l'UTC par le serveur : décalage de plusieurs heures hors UTC. | Conversion en UTC explicite avant l'envoi (`toUtcIso`). | `habilitations.test.ts` (fuseaux Europe/Paris et Abidjan) |
 
+**Incident de CI (corrigé) :** deux jobs (`verification`, `e2e-alpine`) échouaient sur `import.spec.ts` parce que mes nouveaux tests Pest écrivaient un aperçu d'import dans le stockage **réel** (événement de démonstration à identifiant fixe) ; le même stockage est partagé avec les recettes navigateur, qui refusaient alors l'import (« un autre administrateur prépare déjà un import »). Les tests utilisent désormais un disque factice. Aucun test ni contrôle n'a été désactivé.
+
 ## 2. Tableau de recette
 
 | Parcours | Résultat | Preuve |
