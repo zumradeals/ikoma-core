@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use stdClass;
 
@@ -117,11 +118,39 @@ final class BadgeWorkshopController
         $nonce = base64_encode(random_bytes(16));
         $request->attributes->set('csp_style_nonce', $nonce);
         // Il s’agit d’une préparation : le navigateur ne permet pas de confirmer le tirage physique.
-        app(Audit::class)->append('badge.impression_preparee', auth()->id(), [
-            'event_id' => $options['event'], 'batch_id' => $options['batch'], 'modele' => $options['design'],
-            'format' => $options['format'], 'face' => $options['side'], 'nombre' => $badges->count(),
-            'premier' => $badges->firstOrFail()->code, 'dernier' => $badges->reverse()->firstOrFail()->code,
-        ]);
+        DB::transaction(function () use ($options, $badges): void {
+            $runId = (string) Str::uuid();
+            $operatorId = auth()->id();
+            $now = now();
+            DB::table('badge_print_runs')->insert([
+                'id' => $runId,
+                'event_id' => $options['event'],
+                'batch_id' => $options['batch'],
+                'operator_id' => $operatorId,
+                'model' => $options['design'],
+                'format' => $options['format'],
+                'face' => $options['side'],
+                'badge_count' => $badges->count(),
+                'first_code' => $badges->firstOrFail()->code,
+                'last_code' => $badges->last()->code,
+                'generated_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            DB::table('badge_print_events')->insert([
+                'id' => (string) Str::uuid(),
+                'print_run_id' => $runId,
+                'operator_id' => $operatorId,
+                'event_type' => 'generated',
+                'created_at' => $now,
+            ]);
+            app(Audit::class)->append('badge.impression_preparee', $operatorId, [
+                'print_run_id' => $runId,
+                'event_id' => $options['event'], 'batch_id' => $options['batch'], 'modele' => $options['design'],
+                'format' => $options['format'], 'face' => $options['side'], 'nombre' => $badges->count(),
+                'premier' => $badges->firstOrFail()->code, 'dernier' => $badges->last()->code,
+            ]);
+        });
 
         return response()->view('badges.artwork-print', [
             'options' => $options, 'sheets' => array_chunk($cards, $perSheet), 'count' => count($cards),
