@@ -163,6 +163,35 @@ final class PermanentAccess
     }
 
     /**
+     * Annuaire en lecture seule pour la recherche à l'accueil : les personnes permanentes actives avec l'état de leur carte.
+     * Aucune photo, aucun jeton, aucune date de naissance ou coordonnée : nom, identifiant, organisation, catégorie et état de la carte, rien d'autre.
+     * Il ne sert qu'à renseigner l'agent ; il n'ouvre jamais d'accès et n'est jamais lu par la décision d'entrée.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function directory(): array
+    {
+        $cards = DB::table('holder_cards')->orderByDesc('rank')->get(['holder_id', 'status', 'activated_at'])->groupBy('holder_id');
+        $state = function (string $holderId) use ($cards): string {
+            $own = $cards[$holderId] ?? collect();
+            $active = $own->firstWhere('status', 'active');
+            if ($active !== null) {
+                return $active->activated_at === null ? 'non_activee' : 'active';
+            }
+
+            return $own->isEmpty() ? 'aucune' : (string) $own->first()->status;
+        };
+
+        /** @var array<string, array<string, mixed>|null> $categories */
+        $categories = [];
+
+        return DB::table('permanent_holders')->where('status', 'actif')->orderByRaw('public.ikoma_normalize(full_name)')->limit(5000)
+            ->get(['id', 'identifier', 'full_name', 'organisation', 'institutional_category'])
+            ->map(fn ($h) => ['id' => $h->id, 'identifier' => $h->identifier, 'name' => $h->full_name, 'organisation' => $h->organisation,
+                'category' => $h->institutional_category === null ? null : ($categories[$h->institutional_category] ??= $this->categoryOf($h->institutional_category)), 'card' => $state($h->id)])->all();
+    }
+
+    /**
      * Catégorie affichée au poste de contrôle (nom et couleur du modèle de carte). Informative : elle n'ouvre aucun accès.
      *
      * @return array{id: string, name: string, color: string, priority_circuit: false}|null
@@ -222,7 +251,7 @@ final class PermanentAccess
         $context = $this->holders->permanentContext();
         $trust = $this->offlineTrust();
         if ($context === null) {
-            return ['trust_minutes' => $trust['effective'], 'cards' => [], 'holders' => []];
+            return ['directory' => [], 'trust_minutes' => $trust['effective'], 'cards' => [], 'holders' => []];
         }
         $iso = fn (?string $v): ?string => $v === null ? null : Carbon::parse($v)->utc()->format('Y-m-d\TH:i:s.u\Z');
         $cards = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id')->get(['b.qr_token', 'k.status', 'k.activated_at', 'h.id as holder_id', 'h.identifier'])
@@ -234,6 +263,7 @@ final class PermanentAccess
         $policies = DB::table('zone_policies')->where('event_id', $eventId)->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->all();
 
         return [
+            'directory' => $this->directory(),
             'trust_minutes' => $trust['effective'], 'cards' => $cards, 'policies' => $policies,
             'holders' => $holders->map(fn ($h) => ['id' => $h->id, 'category' => $this->categoryOf($h->institutional_category), 'identifier' => $h->identifier, 'name' => $h->full_name, 'organisation' => $h->organisation, 'status' => $h->status, 'starts_on' => $h->engagement_starts_on, 'ends_on' => $h->engagement_ends_on,
                 'entitlements' => ($entitlements[$h->id] ?? collect())->map(fn ($e) => ['zone_id' => $e->zone_id, 'valid_from' => $iso($e->valid_from), 'valid_until' => $iso($e->valid_until)])->values()->all()])->all(),

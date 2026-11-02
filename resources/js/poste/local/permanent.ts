@@ -1,7 +1,11 @@
 import type { PointRef } from '../types';
 
 /** Copie de la situation des titulaires permanents pour cet événement (hachages de jetons uniquement, jamais de jeton). */
+export type DirectoryEntry = { id: string; identifier: string; name: string; organisation: string | null; category: { id: string; name: string; color: string; priority_circuit: boolean } | null; card: string };
+
 export type PermanentSnapshot = {
+  /** Annuaire en lecture seule (recherche à l'accueil) : nom, identifiant, catégorie, état de la carte ; ni photo ni jeton. N'ouvre aucun accès. */
+  directory?: DirectoryEntry[];
   trust_minutes: number;
   cards: { hash: string; status: string; holder_id: string; identifier: string }[];
   policies: { zone_id: string; permanent_allowed: boolean; offline_entry_allowed: boolean }[];
@@ -71,4 +75,27 @@ export function trustRemainingMinutes(snap: PermanentSnapshot | undefined, now: 
   const known = knownAt ? Date.parse(knownAt) : NaN;
   if (Number.isNaN(known) || known > now) return 0;
   return Math.floor(snap.trust_minutes - (now - known) / 60_000);
+}
+
+export type PermanentResult = DirectoryEntry & { zones: string[] };
+
+const CARD_LABELS: Record<string, string> = { active: 'Carte active', non_activee: 'Carte pas encore remise', perdue: 'Carte perdue', volee: 'Carte volée', revoquee: 'Carte révoquée', retiree: 'Carte retirée', aucune: 'Aucune carte' };
+export const cardLabel = (state: string): string => CARD_LABELS[state] ?? state;
+
+const fold = (v: string): string => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/**
+ * Recherche d'une personne permanente à l'accueil (lecture seule, sans réseau). Chaque mot saisi doit se trouver dans le nom, l'identifiant, l'organisation ou la catégorie.
+ * Les zones sont celles des habilitations EN COURS pour cet événement : information seulement, la décision d'entrée reste celle du contrôle.
+ */
+export function searchPermanentDirectory(snap: PermanentSnapshot | undefined, zones: { id: string; name: string }[], query: string, now: number, limit = 10): PermanentResult[] {
+  const words = fold(query).split(/\s+/).filter(w => w.length > 0);
+  if (!snap?.directory || words.length === 0) return [];
+  const zoneName = new Map(zones.map(z => [z.id, z.name]));
+  const found = snap.directory.filter(d => { const hay = fold([d.name, d.identifier, d.organisation ?? '', d.category?.name ?? ''].join(' ')); return words.every(w => hay.includes(w)); }).slice(0, limit);
+  return found.map(d => {
+    const holder = snap.holders.find(h => h.id === d.id);
+    const names = (holder?.entitlements ?? []).filter(e => (e.valid_from === null || Date.parse(e.valid_from) <= now) && e.valid_until !== null && Date.parse(e.valid_until) > now).map(e => zoneName.get(e.zone_id)).filter((n): n is string => !!n);
+    return { ...d, zones: [...new Set(names)].sort((a, b) => a.localeCompare(b, 'fr')) };
+  });
 }

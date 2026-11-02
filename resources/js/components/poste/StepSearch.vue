@@ -2,11 +2,13 @@
 import AdminIcon from '../admin/AdminIcon.vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import CategorySwatch from '../CategorySwatch.vue';
+import PermanentSearch from './PermanentSearch.vue';
 import type { PosteRepository } from '../../poste/repository';
 import { ApiError, type SearchResult } from '../../poste/types';
 const props = defineProps<{ repository: PosteRepository; refreshKey?: string | null }>();
 const emit = defineEmits<{ select: [result: SearchResult]; started: []; unlisted: []; error: [error: ApiError] }>();
 const query = ref(''); const results = ref<SearchResult[]>([]); const searched = ref(false); const loading = ref(false);
+const showPermanent = ref(false);
 let timer: number | undefined; let sequence = 0;
 
 /** Sans recherche : les dix premiers noms de la liste du poste, y compris hors ligne. */
@@ -60,6 +62,10 @@ onBeforeUnmount(() => { window.clearTimeout(timer); ++sequence; });
     </ul>
     <p v-if="searched && !results.length && !loading && query.trim().length >= 2" role="status">Aucun visiteur ne correspond. Vérifiez l’orthographe ou enregistrez un visiteur non listé.</p>
     <p v-if="searched && !results.length && !loading && query.trim().length < 2" role="status">Aucune personne enregistrée pour cet événement. Vérifiez la liste ou signalez un visiteur non listé.</p>
-    <button type="button" class="btn-soft" @click="$emit('unlisted')"><AdminIcon name="plus" /> Visiteur non listé</button>
+    <div class="flex flex-wrap gap-3">
+      <button type="button" class="btn-soft" @click="$emit('unlisted')"><AdminIcon name="plus" /> Visiteur non listé</button>
+      <button v-if="repository.searchPermanent" type="button" class="btn-soft" :aria-expanded="showPermanent" data-testid="ouvrir-permanents" @click="showPermanent = !showPermanent">{{ showPermanent ? 'Fermer la recherche de personnes permanentes' : 'Chercher une personne permanente' }}</button>
+    </div>
+    <PermanentSearch v-if="showPermanent && repository.searchPermanent" :repository="repository" />
   </section>
 </template>

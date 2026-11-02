@@ -5,6 +5,7 @@ import { sha256Hex } from './crypto';
 import { getMeta } from './db';
 import { applyGroupOp, groupSummaries, groupView, type ArrivalResult, type GroupSummary, type GroupView } from './group';
 import { LocalList, type Snapshot } from './list';
+import { searchPermanentDirectory, type PermanentResult } from './permanent';
 import { checkpointsOf, controlLocal, exitLocal, resolveBadge } from './site';
 import type { PosteStore } from './store';
 import type { SyncManager } from './sync';
@@ -81,6 +82,8 @@ export class LocalPosteRepository implements GroupPosteRepository {
   }
 
   async search(query: string): Promise<SearchResult[]> { return searchOf(this.list, query); }
+  /** Recherche d'une personne permanente (lecture seule, copie locale). */
+  async searchPermanent(query: string): Promise<PermanentResult[]> { return searchPermanentDirectory(this.list.snapshot.permanent, this.list.snapshot.zones, query, Date.now()); }
   async visitor(id: string): Promise<Fiche> { return ficheOf(this.list, id, this.now()); }
   async pendingCount(): Promise<number> { return this.store.count('pending'); }
 
