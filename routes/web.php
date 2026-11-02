@@ -175,6 +175,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/demonstration/{event}/nettoyer', [DemoLabController::class, 'clear'])->whereUuid('event')->middleware([EnsureDemoLab::class, 'can:comptes.gerer', 'throttle:3,1']);
         Route::get('/administration/habilitations', [HolderEntitlementsController::class, 'index'])->middleware('can:listes.importer');
         Route::post('/administration/habilitations', [HolderEntitlementsController::class, 'grant'])->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
+        Route::post('/administration/habilitations/groupe', [HolderEntitlementsController::class, 'grantMany'])->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
         Route::post('/administration/habilitations/{entitlement}/retirer', [HolderEntitlementsController::class, 'revoke'])->whereUuid('entitlement')->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
         Route::put('/administration/habilitations/zones/{zone}', [HolderEntitlementsController::class, 'policy'])->whereUuid('zone')->middleware(['can:zones.gerer', 'throttle:titulaires']);
         Route::put('/administration/habilitations/confiance', [HolderEntitlementsController::class, 'trust'])->middleware(['can:postes.gerer', 'throttle:titulaires']);

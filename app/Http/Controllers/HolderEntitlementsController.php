@@ -31,7 +31,10 @@ final class HolderEntitlementsController
             'events' => $events, 'eventId' => $eventId,
             'zones' => $eventId ? array_map(fn ($z) => ['id' => $z->id, 'name' => $z->name, 'classification' => $z->classification, 'permanent_allowed' => (bool) $z->permanent_allowed, 'offline_entry_allowed' => (bool) $z->offline_entry_allowed], $entitlements->zones($eventId)) : [],
             'entitlements' => $eventId ? $entitlements->forEvent($eventId) : [],
-            'holders' => DB::table('permanent_holders')->where('status', 'actif')->orderByRaw('public.ikoma_normalize(full_name)')->limit(500)->get(['id', 'identifier', 'full_name']),
+            'holders' => DB::table('permanent_holders as h')->leftJoin('institutional_categories as c', 'c.code', '=', 'h.institutional_category')->where('h.status', 'actif')->orderByRaw('public.ikoma_normalize(h.full_name)')->limit(500)
+                ->get(['h.id', 'h.identifier', 'h.full_name', 'h.institutional_category as category_code', 'c.label as category_label']),
+            'eventDates' => $eventId ? DB::table('events')->where('id', $eventId)->first(['starts_at', 'ends_at']) : null,
+            'categories' => DB::table('institutional_categories')->orderBy('sort_order')->get(['code', 'label', 'color']),
             'decisions' => $eventId ? $this->decisions($eventId) : [],
             'devices' => $eventId ? $this->devices($eventId, $trust['effective']) : [],
             'trust' => $trust + ['max' => PermanentAccess::OFFLINE_MAX_MINUTES],
@@ -46,6 +49,30 @@ final class HolderEntitlementsController
         $entitlements->grant($data['holder_id'], $data['event_id'], $data['zone_id'], $data['valid_from'], $data['valid_until'], $request->user());
 
         return back()->with('status', 'Habilitation accordée.');
+    }
+
+    /** Accorde l'accès à plusieurs personnes et zones : « tout l'événement » (dates de l'événement) ou des dates précises. */
+    public function grantMany(Request $request, HolderEntitlements $entitlements): RedirectResponse
+    {
+        $this->authorizeGrant();
+        $data = $request->validate([
+            'event_id' => ['required', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)],
+            'holders' => ['required', 'array', 'min:1', 'max:200'], 'holders.*' => ['uuid', 'distinct'],
+            'zones' => ['required', 'array', 'min:1', 'max:30'], 'zones.*' => ['uuid', 'distinct'],
+            'whole_event' => ['required', 'boolean'],
+            'valid_from' => ['required_if:whole_event,false', 'nullable', 'date'], 'valid_until' => ['required_if:whole_event,false', 'nullable', 'date'],
+        ]);
+        if ($data['whole_event']) {
+            $event = DB::table('events')->where('id', $data['event_id'])->first(['starts_at', 'ends_at']);
+            $from = (string) $event->starts_at;
+            $until = (string) $event->ends_at;
+        } else {
+            $from = (string) $data['valid_from'];
+            $until = (string) $data['valid_until'];
+        }
+        $result = $entitlements->grantMany($data['holders'], $data['event_id'], $data['zones'], $from, $until, $request->user());
+
+        return back()->with('status', $result['accordees'].' accès accordé(s)'.($result['deja_couvertes'] > 0 ? ', '.$result['deja_couvertes'].' déjà en place (ignoré(s))' : '').'.');
     }
 
     public function revoke(Request $request, string $entitlement, HolderEntitlements $entitlements): RedirectResponse

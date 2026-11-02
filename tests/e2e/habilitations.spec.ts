@@ -9,7 +9,6 @@ const admin = JSON.parse(readFileSync('.secrets/screen-permanents.json', 'utf8')
 async function noHorizontalScroll(page: Page, label: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), label).toBe(true);
 }
-const local = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
 test('titulaires permanents : habilitations par zone, perte, révocation et remplacement de carte, confiance hors ligne (ordinateur et tablette)', async ({ page }) => {
   test.setTimeout(300_000);
@@ -36,24 +35,25 @@ test('titulaires permanents : habilitations par zone, perte, révocation et remp
   // Zone, politique explicite puis habilitation : rien n'est implicite.
   await page.goto('/administration/habilitations');
   await expect(page.getByTestId('page-habilitations')).toBeVisible();
-  // Point de départ rejouable : aucune confiance approuvée.
+  // Point de départ rejouable : aucune confiance approuvée (réglages avancés, repliés par défaut).
+  await page.getByTestId('reglages-avances').locator('summary').click();
   await page.getByTestId('confiance-minutes').fill('0');
   await page.getByTestId('confiance-approuvee').uncheck();
   await page.getByTestId('confiance-enregistrer').click();
   await expect(page.getByTestId('confiance-resume')).toContainText('aucune');
-  const zone = page.locator('[data-testid^="zone-"]:not([data-testid="zone-sans-politique"])').first();
+  // 1. Où ? Une zone ouverte aux permanents (première zone fermée trouvée, sinon la première).
+  const zone = page.locator('li[data-testid^="zone-"]').first();
   await expect(zone).toBeVisible();
   const zoneId = ((await zone.getAttribute('data-testid')) ?? '').replace('zone-', '');
-  await page.getByTestId('classification-' + zoneId).fill('NEUTRE-TEST');
-  await page.getByTestId('permanents-' + zoneId).check();
-  await page.getByTestId('politique-' + zoneId).click();
-  await expect(page.getByTestId('zone-' + zoneId).getByTestId('zone-sans-politique')).toHaveCount(0);
-  await page.getByTestId('hab-titulaire').selectOption({ label: `${name} (${identifier})` });
-  await page.getByTestId('hab-zone').selectOption(zoneId);
-  await page.getByTestId('hab-debut').fill(local(new Date(Date.now() - 3_600_000)));
-  await page.getByTestId('hab-fin').fill(local(new Date(Date.now() + 86_400_000)));
+  if ((await page.getByTestId('etat-zone-' + zoneId).innerText()).trim() === 'Fermée') await page.getByTestId('bascule-zone-' + zoneId).click();
+  await expect(page.getByTestId('etat-zone-' + zoneId)).toHaveText('Ouverte');
+  // 2. Qui ? 3. Où et quand ? Une personne, la zone ouverte, tout l'événement.
+  await page.getByTestId('chercher-personne').fill(name);
+  await page.getByTestId('personne-' + identifier).check();
+  await page.getByTestId('choisir-zone-' + zoneId).check();
+  await page.getByTestId('periode-evenement').check();
   await page.getByTestId('hab-accorder').click();
-  const entitlement = page.locator('li[data-testid^="hab-"]').filter({ hasText: name }).first();
+  const entitlement = page.getByTestId('acces-' + identifier);
   await expect(page.getByTestId('liste-habilitations')).toContainText(name);
   await expect(page.getByTestId('liste-habilitations')).toContainText('En cours');
   // Confiance hors ligne : sans approbation, aucune confiance effective.
@@ -106,5 +106,5 @@ test('titulaires permanents : habilitations par zone, perte, révocation et remp
   await entitlement.getByRole('button', { name: 'Retirer' }).click();
   await page.getByTestId('motif-retrait').fill('Fin de mission (essai)');
   await page.getByTestId('confirmer-retrait').click();
-  await expect(page.getByTestId('liste-habilitations')).toContainText('Retirée');
+  await expect(page.getByTestId('liste-habilitations')).toContainText('Retiré');
 });
