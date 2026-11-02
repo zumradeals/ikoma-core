@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -48,9 +49,16 @@ if not already_alpine:
     dockerfile.write_text(alpine+old[old.index(end):])
 compose=root/"docker-compose.yml"
 text=compose.read_text()
-old="image: postgres:18.6-trixie"
-if text.count(old)!=1:raise SystemExit("STOP: PostgreSQL dev base contract changed")
-compose.write_text(text.replace(old,"image: ikoma-qualification-postgres:18.6-alpine3.24"))
+# Contrat actuel (depuis S0.7, PR #58) : le développement et la production utilisent la MÊME image PostgreSQL 18.6 Alpine vérifiée, épinglée par
+# digest. Il n'y a donc plus d'image Debian à remplacer : on qualifie l'image réellement utilisée, sans la modifier.
+candidate=re.compile(r"image: (ghcr\.io/zumradeals/ikoma-access-postgres-candidate@sha256:[0-9a-f]{64})")
+found=candidate.findall(text)
+if len(found)!=1:
+    raise SystemExit("STOP: PostgreSQL dev base contract changed (image OCI vérifiée attendue une seule fois)")
+production=(root/"docker-compose.prod.yml").read_text()
+if candidate.findall(production)!=found:
+    raise SystemExit("STOP: PostgreSQL dev and production images differ")
+postgres_image=found[0]
 # Première passe de diagnostic : arrêt au premier échec réel, sans 40 minutes de retries supplémentaires.
 # Le passage complet sera relancé après correction ; modification limitée au worktree éphémère.
 playwright=root/"playwright.config.ts"
@@ -58,7 +66,7 @@ config=playwright.read_text()
 if config.count("workers: 1,")!=1:
     raise SystemExit("STOP: Playwright configuration contract changed")
 playwright.write_text(config.replace("workers: 1,","workers: 1, maxFailures: 1,",1))
-git("add","docker/php/Dockerfile","docker-compose.yml","playwright.config.ts")
+git("add","docker/php/Dockerfile","playwright.config.ts")
 subprocess.check_call(("git","-C",str(root),"-c","user.name=IKOMA Qualification",
     "-c","user.email=ci@invalid.example","commit","-m","Temporary Alpine E2E fixture - not deliverable"),
     stdout=subprocess.DEVNULL)
@@ -66,6 +74,7 @@ manifest={"kind":"isolated-dev-e2e-alpine-not-a-release","pr_checkout":revision,
           "local_fixture_commit":git("rev-parse","HEAD"),
           "dev_dockerfile_sha256":hashlib.sha256(dockerfile.read_bytes()).hexdigest(),
           "dev_compose_sha256":hashlib.sha256(compose.read_bytes()).hexdigest(),
+          "postgres_image":postgres_image,
           "customer_data":False}
 out=Path(os.environ["RUNNER_TEMP"])/"adoption-e2e"
 out.mkdir(exist_ok=True)
