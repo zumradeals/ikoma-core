@@ -547,3 +547,15 @@ Premier des six lots de la refonte des identités, badges et cartes (R1 à R6, v
 - **Étiquettes A4** : format de l'Atelier (même suivi, même marquage). Les anciens liens `/administration/badges/modeles` et `/administration/badges/etiquettes` redirigent vers `/administration/atelier` en conservant la sélection ; les anciennes API visiteurs (`…/modeles/apercu|personnes|preparer|imprimer`) restent actives et sont désormais tracées.
 - **Motif (DC-3) :** obligatoire à chaque nouvelle génération d'un badge nominatif déjà tiré (confirmé ou non), facultatif mais journalisé pour un badge anonyme. Le motif libre reste dans le registre, jamais dans le journal d'audit.
 - Les cartes permanentes (R5b), les habilitations et le contrôle d'accès ne sont pas modifiés.
+
+
+## Cartes — Lisibilité de l’aperçu et des textes (2 novembre 2026)
+
+Demande du dirigeant après examen de l’aperçu et d’un tirage PDF A4 : agrandir la lecture à l’écran et améliorer la mise en page, en conservant le CR80 portrait. Aucun contrat métier, aucune donnée ni migration modifiés.
+
+- Aperçus de la fiche et du document d’impression agrandis à 160 % sur ordinateur ; adaptation aux petits écrans. Le zoom est limité au média écran : l’impression garde 53,98 × 85,60 mm, recto puis verso. Le papier du pilote et les en-têtes/pieds de page restent des réglages du navigateur ; choisir CR80 et 100 % pour une imprimante carte. Aucun nouveau mode A4 ajouté.
+- Le sélecteur `.hc p` écrasait les marges des éléments typographiques ; sa spécificité est réduite pour rétablir les espacements. Les textes institutionnels, fonction, validité, référence technique et avis sont agrandis. Le portrait reste au ratio 3:4 ; sa hauteur est ramenée à 28 mm pour réserver de la place aux textes. Les éléments ne sont plus comprimés silencieusement par flexbox.
+- Le contrôle avant impression couvre aussi le débordement global de la carte et les dépassements horizontaux ; un texte impossible à loger bloque toujours l’impression.
+- Recette navigateur étendue : agrandissement à l’écran, dimensions physiques en média impression, deux pages PDF CR80, absence de débordements, marge sous la photo et refus d’un nom excessivement long. Vérification locale : `git diff --check` réussie. PHP/Docker absents et téléchargement de Chromium indisponible dans cet environnement : recette complète à exécuter par la CI avant de déclarer la correction qualifiée. Essai matériel PVC toujours nécessaire.
+
+- Correctif de recette (CI 41506111524) : un seul échec navigateur, au contrôle de débordement du cadre `.hc` ; 49 parcours réussis, production et analyses de sécurité réussies. Le retrait horizontal du cadre est déplacé sur les blocs de texte (`largeur = largeur carte - 6 mm`) : les bandes pleine largeur n’étendent plus le contenu défilable dans le retrait droit du cadre flex. Les retraits visuels de 3 mm et les dimensions physiques sont conservés ; le contrôle de débordement reste actif. Les assertions de recette affichent désormais les mesures de chaque axe en cas d’échec.

@@ -88,11 +88,11 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
         <template v-else-if="card">
           <section class="space-y-3 rounded-xl border bg-white p-5" aria-label="Aperçu">
             <h2 class="text-heading font-bold">Aperçu recto et verso</h2>
-            <p class="text-sm">Taille réelle CR80 (53,98 × 85,60 mm). Badge technique <strong data-testid="code-badge">{{ card.badge_code }}</strong> · statut <strong>{{ card.badge_status }}</strong> · {{ card.associated ? 'associé à un événement' : 'non associé : aucun accès' }}.</p>
+            <p class="text-sm">Aperçu agrandi à l’écran. Impression à taille réelle CR80 (53,98 × 85,60 mm). Badge technique <strong data-testid="code-badge">{{ card.badge_code }}</strong> · statut <strong>{{ card.badge_status }}</strong> · {{ card.associated ? 'associé à un événement' : 'non associé : aucun accès' }}.</p>
             <div v-if="preview" class="flex flex-wrap gap-8" data-testid="apercu-carte">
               <!-- eslint-disable vue/no-v-html -->
-              <figure class="space-y-2"><figcaption class="font-semibold">Recto</figcaption><div class="hc-preview" data-testid="apercu-recto" v-html="preview.recto"></div></figure>
-              <figure class="space-y-2"><figcaption class="font-semibold">Verso</figcaption><div class="hc-preview" data-testid="apercu-verso" v-html="preview.verso"></div></figure>
+              <figure class="space-y-2"><figcaption class="font-semibold">Recto</figcaption><div class="hc-preview hc-preview--large" data-testid="apercu-recto" v-html="preview.recto"></div></figure>
+              <figure class="space-y-2"><figcaption class="font-semibold">Verso</figcaption><div class="hc-preview hc-preview--large" data-testid="apercu-verso" v-html="preview.verso"></div></figure>
               <!-- eslint-enable vue/no-v-html -->
             </div>
           </section>

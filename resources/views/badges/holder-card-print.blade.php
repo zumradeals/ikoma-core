@@ -12,6 +12,8 @@ body { margin: 0; background: #eaf0f6; color: #0f172a; font-family: Arial, sans-
 .toolbar button, .toolbar a { min-height: 56px; padding: 16px 24px; font: inherit; border-radius: 10px; }
 .toolbar button { background: #0B3C6B; color: #fff; border: 0; cursor: pointer; }
 .sheet { width: 53.98mm; height: 85.6mm; margin: 24px auto; background: #fff; overflow: hidden; position: relative; }
+@media screen { .sheet { zoom: 1.6; box-shadow: 0 2px 12px #0f172a26; } }
+@media screen and (max-width: 480px) { .sheet { zoom: 1.25; } }
 @if ($alignment)
 .align { position: relative; width: 53.98mm; height: 85.6mm; font-size: 2.4mm; }
 .align__edge { position: absolute; inset: 0; border: .2mm solid #000; }
@@ -31,6 +33,7 @@ body { margin: 0; background: #eaf0f6; color: #0f172a; font-family: Arial, sans-
 <div class="toolbar">
 <strong>{{ $alignment ? 'Page d’essai d’alignement (aucun QR, aucune donnée personnelle)' : (isset($cards) ? count($cards).' carte(s)' : ($kind === 'emission' ? 'Émission de la carte' : 'Réimpression de la carte')) }} · CR80 · recto puis verso</strong>
 <button id="print" type="button">Imprimer</button><a href="{{ $back }}">Retour</a>
+<p>Aperçu agrandi à l’écran pour faciliter la lecture. L’impression conserve la taille réelle CR80.</p>
 <p>Format du papier : <strong>CR80, 53,98 × 85,60 mm, portrait</strong>. Échelle <strong>100 % / taille réelle</strong>, sans en-têtes ni pieds de page, arrière-plans activés. Recto-verso : le recto est la page 1, le verso la page 2, retournement sur le <strong>grand côté</strong>.</p>
 <p>@if ($alignment)Imprimez cette page en recto-verso puis tenez la carte à contre-jour : les traits du recto et du verso doivent se superposer. La zone en pointillés est la zone de sécurité de 3 mm.@else Faites d’abord un essai sur la page d’alignement. Le navigateur ne confirme pas le tirage physique ; la compatibilité avec une imprimante PVC précise n’est pas garantie sans essai réel sur ce matériel.@endif</p>
 <p id="layout-error" role="alert" hidden>Un texte est trop long pour la carte. Revenez à la fiche et raccourcissez-le avant d’imprimer.</p>
@@ -47,7 +50,7 @@ body { margin: 0; background: #eaf0f6; color: #0f172a; font-family: Arial, sans-
 @endforeach
 @endif
 <script nonce="{{ $nonce }}">document.getElementById('print').addEventListener('click', function () { try {
- var invalid = Array.from(document.querySelectorAll('.hc__name, .hc__role, .hc__mention, .hc__category, .hc__line, .hc__notice, .hc__contact, .hc__institution')).some(function (t) { return t.scrollHeight > t.clientHeight + 1; });
+ var invalid = Array.from(document.querySelectorAll('.hc, .hc__name, .hc__role, .hc__mention, .hc__category, .hc__line, .hc__notice, .hc__contact, .hc__institution, .hc__validity, .hc__tech')).some(function (t) { return t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1; });
  document.getElementById('layout-error').hidden = !invalid;
  if (!invalid) window.print();
  } catch (e) { document.getElementById('print-error').hidden = false; } });</script>
