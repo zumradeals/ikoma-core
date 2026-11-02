@@ -19,6 +19,7 @@ use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HolderCardsController;
 use App\Http\Controllers\HolderEntitlementsController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\HostController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstitutionalCategoriesController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
+use App\Http\Middleware\EnsureDemoLab;
 use App\Http\Middleware\EnsureF06Active;
 use App\Http\Middleware\ResolvePoste;
 use Illuminate\Http\Request;
@@ -47,7 +49,8 @@ use Inertia\Inertia;
 Route::get('/sante', HealthController::class)->middleware('throttle:sante');
 Route::get('/installation', [InstallationController::class, 'show'])->middleware('throttle:installation-lecture');
 Route::post('/installation', [InstallationController::class, 'store'])->middleware('throttle:installation-ecriture');
-Route::get('/', fn () => Inertia::render('Home'))->name('home');
+Route::get('/', [HomeController::class, 'show'])->name('home');
+Route::get('/accueil/shell', [HomeController::class, 'shell']);
 // Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
 Route::get('/institution/theme.css', [InstitutionController::class, 'theme']);
 Route::get('/institution/logo', [InstitutionController::class, 'logo']);
@@ -152,10 +155,10 @@ Route::middleware(['auth'])->group(function (): void {
 
             return Inertia::render('Space');
         })->name('space');
-        Route::get('/administration/demonstration', [DemoLabController::class, 'index'])->middleware('can:comptes.gerer');
-        Route::post('/administration/demonstration/generer', [DemoLabController::class, 'generate'])->middleware(['can:comptes.gerer', 'throttle:5,1']);
-        Route::post('/administration/demonstration/remettre-a-zero', [DemoLabController::class, 'reset'])->middleware(['can:comptes.gerer', 'throttle:3,1']);
-        Route::post('/administration/demonstration/{event}/nettoyer', [DemoLabController::class, 'clear'])->whereUuid('event')->middleware(['can:comptes.gerer', 'throttle:3,1']);
+        Route::get('/administration/demonstration', [DemoLabController::class, 'index'])->middleware([EnsureDemoLab::class, 'can:comptes.gerer']);
+        Route::post('/administration/demonstration/generer', [DemoLabController::class, 'generate'])->middleware([EnsureDemoLab::class, 'can:comptes.gerer', 'throttle:5,1']);
+        Route::post('/administration/demonstration/remettre-a-zero', [DemoLabController::class, 'reset'])->middleware([EnsureDemoLab::class, 'can:comptes.gerer', 'throttle:3,1']);
+        Route::post('/administration/demonstration/{event}/nettoyer', [DemoLabController::class, 'clear'])->whereUuid('event')->middleware([EnsureDemoLab::class, 'can:comptes.gerer', 'throttle:3,1']);
         Route::get('/administration/habilitations', [HolderEntitlementsController::class, 'index'])->middleware('can:listes.importer');
         Route::post('/administration/habilitations', [HolderEntitlementsController::class, 'grant'])->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
         Route::post('/administration/habilitations/{entitlement}/retirer', [HolderEntitlementsController::class, 'revoke'])->whereUuid('entitlement')->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
@@ -185,6 +188,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/identite', [InstitutionController::class, 'update'])->middleware(['can:comptes.gerer', 'throttle:identite']);
         Route::post('/administration/identite/logo', [InstitutionController::class, 'uploadLogo'])->middleware(['can:comptes.gerer', 'throttle:identite']);
         Route::delete('/administration/identite/logo', [InstitutionController::class, 'removeLogo'])->middleware(['can:comptes.gerer', 'throttle:identite']);
+        Route::put('/administration/identite/accueil', [InstitutionController::class, 'home'])->middleware(['can:comptes.gerer', 'throttle:identite']);
         Route::post('/administration/identite/reinitialiser', [InstitutionController::class, 'reset'])->middleware(['can:comptes.gerer', 'throttle:identite']);
         Route::get('/administration/modules', [ModulesController::class, 'index'])->middleware('can:comptes.gerer');
         Route::put('/administration/modules/F06', [ModulesController::class, 'update'])->middleware(['can:comptes.gerer', 'throttle:6,1']);

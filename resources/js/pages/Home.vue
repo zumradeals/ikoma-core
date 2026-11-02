@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import { onMounted } from 'vue';
 import InstitutionHome from '../components/InstitutionHome.vue';
 import { useInstitution } from '../composables/useInstitution';
 const institution = useInstitution();
+// Accueil désactivé : le serveur redirige déjà vers la connexion ; ce repli ne sert qu'à la coquille précachée (secours hors ligne).
+onMounted(() => { if (institution.value.homeEnabled === false) window.location.replace('/login'); });
 
 const features = [
   { icon: 'person', title: 'Accueil des visiteurs', text: 'Recherche, vérification, validation et remise des badges dans un parcours en sept étapes.' },
@@ -24,7 +27,8 @@ const roles = [
 </script>
 
 <template>
-  <InstitutionHome v-if="institution.custom" />
+  <p v-if="institution.homeEnabled === false" class="p-6" role="status">Redirection vers la connexion…</p>
+  <InstitutionHome v-else-if="institution.custom" />
   <template v-else>
   <Head title="IKOMA ACCESS — Contrôlez les accès. Maîtrisez les visites.">
     <meta name="description" content="IKOMA ACCESS, plateforme professionnelle de gestion des visiteurs, des badges, des accès et de la supervision opérationnelle.">

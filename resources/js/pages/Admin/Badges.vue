@@ -13,7 +13,7 @@ const form = useForm({ status: props.filters.status || '', batch: props.filters.
 </script>
 <template>
 <AdminLayout active="badges">
-<h1 class="mb-4 text-display font-bold">Administration · Badges</h1><p class="mb-6">Fabriquez les lots de badges par catégorie, réservez des plages à un poste ou à un groupe, puis imprimez les étiquettes. Aucun nom de personne n’apparaît sur cet écran.</p>
+<h1 class="mb-4 text-display font-bold">Administration · Badges</h1><p class="mb-6">Fabriquez les lots de badges par catégorie, réservez des plages à un poste ou à un groupe, puis imprimez les étiquettes. Aucun nom de personne n’apparaît sur cet écran. <strong>Cette rubrique concerne les badges de visiteurs temporaires</strong> ; les cartes des titulaires permanents (CR80 recto verso, réimpression, perte, vol, remplacement) se gèrent depuis <Link href="/administration/titulaires" class="font-semibold underline" data-testid="lien-cartes-permanentes">le registre des titulaires permanents</Link>.</p>
 <BaseCard class="mb-6"><div class="flex flex-wrap items-center justify-between gap-4"><div><h2 class="text-heading font-bold">Modèles et impression</h2><p>Créez vos badges Visiteur, VIP ou Prestataire, puis imprimez en PVC ou sur papier A4.</p></div><Link href="/administration/badges/modeles" class="action">Ouvrir l’atelier</Link></div></BaseCard>
 <div class="mb-8 space-y-6">
 <BaseCard><h2 class="mb-3 text-heading font-bold">Étape 1 — Générer les badges</h2><p class="mb-4">Après création, attribuez ces badges à un poste à l’étape 2 ci-dessous.</p><BadgeLotForm :events="events" :categories="categories" :margin="settings.margin" /></BaseCard>

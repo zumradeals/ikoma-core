@@ -23,7 +23,7 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   await page.getByLabel('Zoom du portrait').focus(); await page.getByLabel('Zoom du portrait').press('ArrowRight');
   await page.getByLabel('Autoriser l’utilisation de ce portrait', { exact: false }).check();
   await page.getByRole('button', { name: 'Enregistrer la fiche', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Fiche de la personne', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fiche de l’invité', exact: true })).toBeVisible();
   const person = new URL(page.url()).searchParams.get('visitor')!;
   await expect(page.getByAltText('Aperçu du portrait')).toBeVisible();
   await page.screenshot({ path: 'test-results/fiche-personne-portrait.png', fullPage: true });

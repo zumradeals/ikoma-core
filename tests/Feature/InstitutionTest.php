@@ -55,6 +55,8 @@ it('garde l’identité IKOMA ACCESS standard quand rien n’est configuré', fu
 
 it('affiche l’identité personnalisée sur les pages publiques', function () {
     $this->actingAs($admin = instUser('administrateur'))->put('/administration/identite', instForm())->assertRedirect();
+    // A06.5 : par défaut, l'accueil d'une installation institutionnelle est désactivé ; on l'active explicitement pour vérifier son contenu public.
+    $this->put('/administration/identite/accueil', ['actif' => true])->assertRedirect();
     auth()->logout();
     $this->get('/')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Home')->where('institution.custom', true)->where('institution.name', 'AILCT')->where('institution.primary', '#0C2D66'));
     $this->get('/login')->assertSee('<title>AILCT</title>', false)->assertSee('/institution/theme.css?v=', false)
