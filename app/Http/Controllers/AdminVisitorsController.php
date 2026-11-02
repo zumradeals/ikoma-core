@@ -25,7 +25,7 @@ final class AdminVisitorsController
         Gate::authorize('listes.importer');
         $input = $request->validate(['event_id' => 'nullable|uuid|exists:events,id', 'q' => 'nullable|string|max:160', 'withdrawn' => 'nullable|boolean', 'page' => 'nullable|integer|min:1|max:100000', 'visitor' => 'nullable|uuid|exists:visitors,id']);
         $visitor = isset($input['visitor']) ? Visitor::findOrFail($input['visitor']) : null;
-        $event = $visitor->event_id ?? ($input['event_id'] ?? DB::table('events')->orderBy('name')->value('id'));
+        $event = $visitor->event_id ?? ($input['event_id'] ?? DB::table('events')->where('is_permanent', false)->orderBy('name')->value('id'));
         $editable = $visitor?->withdrawn_at === null;
         if ($visitor) {
             try {

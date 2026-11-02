@@ -20,6 +20,8 @@ const items = [
   { key: 'imports', label: 'Liste d’invités', icon: 'list', href: '/administration/imports', permission: 'listes.importer' },
   { key: 'badges', label: 'Badges', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
+  { key: 'titulaires', label: 'Titulaires permanents', icon: 'users', href: '/administration/titulaires', permission: 'listes.importer' },
+  { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer' },
   { key: 'identite', label: 'Identité', icon: 'settings', href: '/administration/identite', permission: 'comptes.gerer' },
   { key: 'modules', label: 'Modules', icon: 'settings', href: '/administration/modules', permission: 'comptes.gerer' },
   { key: 'postes', label: 'Postes et tablettes', icon: 'monitor', href: '/administration/postes', permission: 'postes.gerer' },

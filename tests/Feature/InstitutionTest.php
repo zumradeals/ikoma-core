@@ -146,8 +146,8 @@ it('ne change ni les rôles, ni les permissions, ni la page de connexion de l’
     expect($agent->fresh()->getAllPermissions()->pluck('name')->sort()->values()->all())->toBe($before);
 });
 
-it('n’est lue par aucun service métier : seuls l’affichage et l’écran d’administration y accèdent', function () {
-    $allowed = ['Services/Institution.php', 'Http/Controllers/InstitutionController.php', 'Http/Middleware/HandleInertiaRequests.php', 'Providers/AppServiceProvider.php'];
+it('n’est lue par aucun service métier : seuls l’affichage, l’écran d’administration et le nom du contexte permanent y accèdent', function () {
+    $allowed = ['Services/Institution.php', 'Http/Controllers/InstitutionController.php', 'Http/Middleware/HandleInertiaRequests.php', 'Providers/AppServiceProvider.php', 'Services/PermanentHolders.php'];
     $readers = [];
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path())) as $file) {
         if ($file->isFile() && str_ends_with($file->getFilename(), '.php') && str_contains((string) file_get_contents($file->getPathname()), 'Institution::class')) {
