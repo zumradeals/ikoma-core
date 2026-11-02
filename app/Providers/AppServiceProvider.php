@@ -37,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('installation-lecture', fn (Request $r) => Limit::perMinute(30)->by($r->ip()));
         RateLimiter::for('installation-ecriture', fn (Request $r) => Limit::perMinute(6)->by($r->ip()));
         RateLimiter::for('titulaires', fn (Request $r) => Limit::perMinute(60)->by($r->user()?->id));
+        RateLimiter::for('atelier', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id));
         RateLimiter::for('identite', fn (Request $r) => Limit::perMinute(20)->by($r->user()?->id));
         RateLimiter::for('exports', fn (Request $r) => Limit::perMinute(3)->by($r->user()?->id));
         Event::listen(Login::class, function ($event): void {

@@ -33,16 +33,12 @@ body { margin: 0; background: #e2e8f0; color: #000; font-family: system-ui, -app
 </style>
 </head>
 <body>
-<form class="toolbar" method="get" action="/administration/badges/etiquettes">
-  <input type="hidden" name="batch" value="{{ $query['batch'] }}">
-  <label>Du badge n°<input type="number" name="from" min="1" value="{{ $query['from'] ?? '' }}" placeholder="premier"></label>
-  <label>Au badge n°<input type="number" name="to" min="1" value="{{ $query['to'] ?? '' }}" placeholder="dernier"></label>
-  <label>Colonnes<select name="cols">@foreach (range(1, 4) as $n)<option value="{{ $n }}" @selected($cols === $n)>{{ $n }}</option>@endforeach</select></label>
-  <label>Lignes<select name="rows">@foreach (range(1, 10) as $n)<option value="{{ $n }}" @selected($rows === $n)>{{ $n }}</option>@endforeach</select></label>
-  <button type="submit">Mettre à jour la page</button>
-  <button type="button" id="imprimer">Imprimer ({{ $count }} étiquette(s))</button>
-  <a href="/administration/badges">Retour aux badges</a>
-</form>
+<div class="toolbar">
+  <strong>Étiquettes A4 · {{ $count }} étiquette(s) · {{ $cols }} × {{ $rows }} par page</strong>
+  <button type="button" id="imprimer" data-print>Imprimer ({{ $count }} étiquette(s))</button>
+  <a href="/administration/atelier">Retour à l’atelier</a>
+  <p>Réglez l’échelle sur <strong>100 % / taille réelle</strong>, sans en-têtes ni pieds de page. Pour changer la plage ou la grille, revenez à l’atelier et générez un nouveau document.</p>
+</div>
 @if ($tooMany)
   <p class="notice" role="alert">Plus de {{ $max }} étiquettes demandées. Choisissez une plage de badges (du n° … au n° …) de {{ $max }} étiquettes au plus.</p>
 @elseif ($count === 0)
@@ -63,6 +59,6 @@ body { margin: 0; background: #e2e8f0; color: #000; font-family: system-ui, -app
   </div>
 </section>
 @endforeach
-<script nonce="{{ $nonce }}">document.getElementById('imprimer').addEventListener('click', function () { window.print(); });</script>
+@include('badges.partials.print-trace', ['runId' => $runId ?? null, 'count' => $count, 'check' => 'none', 'nature' => 'officiel'])
 </body>
 </html>
