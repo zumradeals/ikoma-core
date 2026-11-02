@@ -278,3 +278,14 @@ it('écarte le contexte permanent des écrans et des opérations ordinaires (imp
     $category = DB::table('categories')->insertGetId(['id' => $id = (string) Str::uuid(), 'event_id' => $context->id, 'name' => 'Cat test', 'color' => '#336699', 'priority_circuit' => false, 'created_at' => now(), 'updated_at' => now()]) ? $id : $id;
     expect(fn () => app(BadgeLots::class)->generate($context->id, $category, 5, $this->admin))->toThrow(BadgeRefused::class);
 });
+
+it('n’affiche jamais la carte d’une personne permanente dans la page des badges visiteurs, ni comme lot ni comme badge réservable', function () {
+    $holder = cardHolder();
+    $this->cards->issue($holder, $this->admin);
+    $code = (string) DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.code');
+    $permanentBatch = (string) DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.badge_batch_id');
+    $this->actingAs($this->admin)->get('/administration/badges')->assertOk()->assertInertia(fn ($p) => $p->component('Admin/Badges')
+        ->where('batches', fn ($batches) => collect($batches)->doesntContain(fn ($b) => $b['id'] === $permanentBatch))
+        ->where('badges.data', fn ($rows) => collect($rows)->doesntContain(fn ($b) => $b['code'] === $code && $b['batch_name'] === DB::table('badge_batches')->where('id', $permanentBatch)->value('name'))));
+    $this->get('/administration/badges?batch='.$permanentBatch)->assertOk()->assertInertia(fn ($p) => $p->has('badges.data', 0));
+});
