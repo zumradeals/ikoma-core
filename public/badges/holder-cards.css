@@ -1,6 +1,6 @@
 /* Cartes institutionnelles CR80 portrait (53,98 × 85,60 mm). Unités physiques uniquement ; QR noir sur blanc avec sa zone calme. */
 .hc, .hc * { box-sizing: border-box; }
-.hc { position: relative; display: flex; flex-direction: column; align-items: center; width: 53.98mm; height: 85.6mm; padding: 0 3mm 3mm; overflow: hidden; background: #fff; color: #111827; font-family: Arial, sans-serif; line-height: 1.15; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.hc { position: relative; display: flex; flex-direction: column; align-items: center; width: 53.98mm; height: 85.6mm; padding: 0 0 3mm; overflow: hidden; background: #fff; color: #111827; font-family: Arial, sans-serif; line-height: 1.15; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 :where(.hc) p { margin: 0; }
 .hc > * { flex-shrink: 0; }
 .hc__head { display: flex; align-items: center; justify-content: center; gap: 2mm; width: 53.98mm; height: 15mm; padding: 2mm 3mm; background: var(--hc-color); color: var(--hc-ink); }
@@ -8,34 +8,34 @@
 .hc__institution { max-height: 11mm; overflow: hidden; font-size: 3.4mm; font-weight: 700; letter-spacing: .2mm; overflow-wrap: anywhere; }
 .hc__photo { display: flex; align-items: center; justify-content: center; width: 21mm; height: 28mm; margin-top: 2.5mm; border: .3mm solid #94a3b8; background: #f1f5f9; color: #64748b; font-size: 9mm; font-weight: 700; overflow: hidden; }
 .hc__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.hc__name { width: 100%; margin-top: 1.8mm; font-size: 4.4mm; font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; max-height: 10mm; overflow: hidden; }
+.hc__name { width: calc(100% - 6mm); margin-top: 1.8mm; font-size: 4.4mm; font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; max-height: 10mm; overflow: hidden; }
 .hc__name.medium { font-size: 3.5mm; }
 .hc__name.long { font-size: 2.9mm; }
-.hc__category { display: flex; align-items: center; justify-content: center; gap: 1.5mm; width: 100%; margin-top: 2mm; font-size: 2.9mm; font-weight: 700; max-height: 7mm; overflow: hidden; }
+.hc__category { display: flex; align-items: center; justify-content: center; gap: 1.5mm; width: calc(100% - 6mm); margin-top: 2mm; font-size: 2.9mm; font-weight: 700; max-height: 7mm; overflow: hidden; }
 .hc__symbol { display: inline-flex; align-items: center; justify-content: center; min-width: 6mm; height: 5mm; padding: 0 1mm; border-radius: 1mm; background: var(--hc-color); color: var(--hc-ink); font-size: 2.8mm; flex-shrink: 0; }
 .hc__id { margin-top: auto; font-family: "Courier New", monospace; font-size: 4mm; font-weight: 700; letter-spacing: .25mm; white-space: nowrap; }
 .hc__id--small { margin-top: 1.5mm; font-size: 3.2mm; }
-.hc__mark { margin-top: 1.2mm; width: 100%; border-top: .25mm solid #b45309; padding-top: .8mm; color: #92400e; font-size: 2mm; font-weight: 700; letter-spacing: .2mm; }
+.hc__mark { margin-top: 1.2mm; width: calc(100% - 6mm); border-top: .25mm solid #b45309; padding-top: .8mm; color: #92400e; font-size: 2mm; font-weight: 700; letter-spacing: .2mm; }
 .hc--verso { padding-top: 0; }
 .hc__band { width: 53.98mm; height: 4mm; background: var(--hc-color); }
-.hc__line { width: 100%; margin-top: 3mm; font-size: 2.9mm; overflow-wrap: anywhere; max-height: 9mm; overflow: hidden; }
+.hc__line { width: calc(100% - 6mm); margin-top: 3mm; font-size: 2.9mm; overflow-wrap: anywhere; max-height: 9mm; overflow: hidden; }
 .hc__line--main { font-weight: 700; }
 .hc__line + .hc__line { margin-top: 1mm; }
 .hc__qr { width: 32mm; height: 32mm; margin-top: 4mm; background: #fff; flex-shrink: 0; }
 .hc__qr svg { display: block; width: 100%; height: 100%; }
 .hc__tech { margin-top: 1.2mm; font-size: 2.8mm; color: #475569; }
-.hc__notice { width: 100%; margin-top: 3mm; font-size: 2.9mm; line-height: 1.2; overflow-wrap: anywhere; max-height: 14mm; overflow: hidden; }
-.hc__contact { width: 100%; margin-top: 1.5mm; font-size: 2.8mm; font-weight: 700; overflow-wrap: anywhere; max-height: 7mm; overflow: hidden; }
+.hc__notice { width: calc(100% - 6mm); margin-top: 3mm; font-size: 2.9mm; line-height: 1.2; overflow-wrap: anywhere; max-height: 14mm; overflow: hidden; }
+.hc__contact { width: calc(100% - 6mm); margin-top: 1.5mm; font-size: 2.8mm; font-weight: 700; overflow-wrap: anywhere; max-height: 7mm; overflow: hidden; }
 .hc--verso .hc__mark { margin-top: auto; }
 /* Aperçu à l'écran : ombre autour de la carte, jamais à l'impression. */
 .hc-preview { display: inline-block; box-shadow: 0 0 0 .3mm #cbd5e1, 0 2mm 6mm rgba(15, 23, 42, .18); }
 
 /* Catégorie : bande de la couleur du modèle, mention en grand (la couleur est l'élément dominant). */
 .hc__institution { font-size: 2.9mm; line-height: 1.15; }
-.hc__role { width: 100%; margin-top: 1mm; font-size: 3mm; line-height: 1.15; max-height: 7mm; overflow: hidden; overflow-wrap: anywhere; }
+.hc__role { width: calc(100% - 6mm); margin-top: 1mm; font-size: 3mm; line-height: 1.15; max-height: 7mm; overflow: hidden; overflow-wrap: anywhere; }
 .hc__mention { display: flex; align-items: center; justify-content: center; gap: 1.5mm; width: 53.98mm; min-height: 8mm; max-height: 11mm; margin-top: 2.5mm; padding: 1mm 3mm; background: var(--hc-color); color: var(--hc-ink); font-size: 3.4mm; font-weight: 800; letter-spacing: .2mm; line-height: 1.1; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .hc__mention .hc__symbol { background: var(--hc-ink); color: var(--hc-color); }
-.hc__validity { width: 100%; margin-top: 1mm; font-size: 2.8mm; font-weight: 700; }
+.hc__validity { width: calc(100% - 6mm); margin-top: 1mm; font-size: 2.8mm; font-weight: 700; }
 .hc__row { display: flex; align-items: center; justify-content: center; gap: 3mm; margin-top: 3mm; }
 .hc--qr-recto .hc__photo { width: 20mm; height: 26.7mm; margin-top: 0; }
 .hc__qr--recto { width: 24mm; height: 24mm; margin: 0; background: #fff; }

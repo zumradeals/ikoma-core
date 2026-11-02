@@ -108,7 +108,9 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   expect((await popup.locator('.sheet').first().boundingBox())!.width).toBeCloseTo(53.98 * MM * 1.6, 0);
   for (const selector of ['.hc', '.hc__institution', '.hc__name', '.hc__role', '.hc__mention', '.hc__line', '.hc__notice']) {
     for (const node of await popup.locator(selector).all()) {
-      expect(await node.evaluate(t => t.scrollHeight <= t.clientHeight + 1 && t.scrollWidth <= t.clientWidth + 1), `contenu lisible ${selector}`).toBe(true);
+      const dimensions = await node.evaluate(t => ({ height: t.clientHeight, contentHeight: t.scrollHeight, width: t.clientWidth, contentWidth: t.scrollWidth }));
+      expect(dimensions.contentHeight, `hauteur lisible ${selector} ${JSON.stringify(dimensions)}`).toBeLessThanOrEqual(dimensions.height + 1);
+      expect(dimensions.contentWidth, `largeur lisible ${selector} ${JSON.stringify(dimensions)}`).toBeLessThanOrEqual(dimensions.width + 1);
     }
   }
   const nameTop = await popup.locator('.hc__name').evaluate(t => t.getBoundingClientRect().top);
