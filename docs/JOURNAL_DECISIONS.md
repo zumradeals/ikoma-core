@@ -471,3 +471,17 @@ Sans nom enregistré, l'identité IKOMA ACCESS standard est affichée, à l'iden
   Ces deux ressources publiques ne renvoient aucun cookie (même risque de course que la correction du précache).
 - Limites assumées : le manifeste PWA (nom d'installation) et les badges imprimés (lot A05) ne suivent pas encore l'identité ;
   la page d'accueil précachée peut afficher l'ancienne identité jusqu'à la mise à jour du service worker.
+
+
+## A04 — Registre des titulaires permanents (2 novembre 2026)
+
+Approche C1 vérifiée sur le code puis implémentée : registre d'identité hors événement (`permanent_holders`),
+contexte permanent protégé (`events.is_permanent`), liens facultatifs et nullables (`visitors.holder_id`,
+`categories.institutional_code`). Migration additive ; le moteur de contrôle, les entrées et sorties, les badges et le préfixe QR
+`IKOMA1:` ne sont pas modifiés (lots A05/A06).
+
+- Le registre est la référence d'identité : aucune fiche d'événement ne la remplace. Un titulaire ne se supprime pas (déclencheur + droits) : actif ou clos, clôture irréversible avec motif.
+- Identifiant imprimable : séquence PostgreSQL (jamais recyclée), format configurable (préfixe, largeur, clé de Luhn), immuable, jamais réattribué ; distinct de l'UUID, du code B-nnn et du jeton QR. Rattaché au titulaire (le choix titulaire ou carte reste à valider par l'institution).
+- Huit catégories AILCT-01 à 08 : créées à la demande, libellés des contrats validés, couleurs et repères neutres et modifiables, association facultative aux catégories d'événement. Aucune règle d'accès ne les lit (test d'architecture).
+- Contexte permanent : un seul, jamais clos, archivé, anonymisé, supprimé ni remis à zéro ; exclu des conservations et des événements affichés par défaut. Aucune durée de conservation ni purge propre aux titulaires n'est appliquée : base légale et durées à confirmer par l'AILCT.
+- Droits : permissions existantes (`listes.importer` pour le registre, `categories.gerer` pour le référentiel). Aucun rôle ajouté.

@@ -38,7 +38,7 @@ final class DataRetention
             DB::table('visitors')->orderBy('id')->lockForUpdate()->get(['id']);
             $counts = array_fill_keys(self::TYPES, 0);
             $now = now();
-            foreach (DB::table('events')->where('ends_at', '<', $now)->orderBy('id')->lockForUpdate()->get() as $event) {
+            foreach (DB::table('events')->where('ends_at', '<', $now)->where('is_permanent', false)->orderBy('id')->lockForUpdate()->get() as $event) {
                 // Ne jamais effacer une identité nécessaire à une évacuation en cours, même si la date de fin est dépassée.
                 if (app(Presence::class)->count($event->id) > 0 || DB::table('sync_conflicts')->where('event_id', $event->id)->whereNull('resolved_at')->exists() || DB::table('alerts')->where('event_id', $event->id)->whereNull('resolved_at')->exists()) {
                     continue;
