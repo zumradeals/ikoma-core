@@ -2,6 +2,8 @@
 @import "./pilotage.css";
 @import "./agent.css";
 @source "../js";
+/* Couleurs de la marque : valeurs d'IKOMA ACCESS par défaut ; une identité institutionnelle les redéfinit (/institution/theme.css). */
+:root { --inst-primary: #0B3C6B; --inst-secondary: #0F5AA6; --inst-accent: #F75C03; }
 @theme {
   --color-ikoma-blue: #0F5AA6;
   --color-ikoma-navy: #0B3C6B;
@@ -54,17 +56,17 @@ html { scroll-padding-bottom: 6rem; }
 @keyframes nprogress-spinner { to { transform: rotate(360deg); } }
 
 /* Cadre administratif commun. Aucun style ne touche les postes ou le pilotage. */
-.admin-shell { min-height:100vh; background:#f5f9fd; color:#0b3c6b; font-size:1rem; line-height:1.5; }
-.admin-header { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:10px 38px; min-height:64px; background:linear-gradient(110deg,#0b3c6b,#073766); color:white; }
+.admin-shell { min-height:100vh; background:#f5f9fd; color:var(--inst-primary); font-size:1rem; line-height:1.5; }
+.admin-header { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:10px 38px; min-height:64px; background:linear-gradient(110deg,var(--inst-primary),#073766); color:white; }
 .admin-brand { display:flex; align-items:center; gap:14px; flex-shrink:0; font-size:20px; }
 .admin-brand strong { font-weight:850; }
 .admin-logo { display:grid; place-items:center; width:40px; height:40px; padding:3px; border-radius:10px; background:#fff; }
 .admin-event { min-width:0; max-width:38%; font-size:14px; font-weight:650; overflow-wrap:anywhere; }
 .admin-event-caption { display:block; font-size:11px; font-weight:400; color:#dbeafe; }
-.admin-event-select select { min-height:48px; max-width:100%; background:#0b3c6b; color:white; border:1px solid #93b5d8; padding:8px; border-radius:8px; }
+.admin-event-select select { min-height:48px; max-width:100%; background:var(--inst-primary); color:white; border:1px solid #93b5d8; padding:8px; border-radius:8px; }
 .admin-session { display:flex; align-items:center; justify-content:flex-end; gap:24px; min-width:0; font-size:14px; }
 .admin-user { display:flex; align-items:center; gap:10px; min-width:0; overflow-wrap:anywhere; }
-.admin-avatar { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; background:#eff6ff; color:#0b3c6b; font-weight:800; }
+.admin-avatar { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; background:#eff6ff; color:var(--inst-primary); font-weight:800; }
 .admin-logout { min-height:48px; flex:none; border:1px solid white; border-radius:8px; padding:8px 16px; font-weight:650; }
 .admin-frame { display:grid; grid-template-columns:256px minmax(0,1fr); max-width:1800px; margin:auto; }
 .admin-sidebar { align-self:stretch; background:white; border-right:1px solid #e5edf6; padding:24px 16px; }
@@ -85,10 +87,10 @@ html { scroll-padding-bottom: 6rem; }
 .admin-main .action { padding:10px 18px; }
 .admin-main section { border-color:#e0ebf7; }
 .admin-menu-toggle { display:none; }
-.admin-skip { position:absolute; left:8px; top:-120px; z-index:60; background:white; color:#0b3c6b; padding:12px; }
+.admin-skip { position:absolute; left:8px; top:-120px; z-index:60; background:white; color:var(--inst-primary); padding:12px; }
 .admin-skip:focus { top:8px; }
 .admin-flash { margin-bottom:16px; border:1px solid #b4dfcc; border-radius:8px; padding:14px; background:#ecfdf5; }
-.admin-shell :is(button,input,select,textarea,a,summary):focus-visible { outline:3px solid #0f5aa6; outline-offset:3px; }
+.admin-shell :is(button,input,select,textarea,a,summary):focus-visible { outline:3px solid var(--inst-secondary); outline-offset:3px; }
 .admin-header :is(button,select,a):focus-visible { outline-color:#fff; }
 .admin-shell button, .admin-shell summary { cursor:pointer; }
 .admin-shell button:disabled { cursor:not-allowed; }
@@ -139,7 +141,7 @@ html { scroll-padding-bottom: 6rem; }
 @media (max-width:1350px) { .account-summary-tile { gap:10px; padding:16px; } .account-metric-icon { width:44px; height:44px; } .account-summary-tile strong { font-size:34px; } .account-create-form { grid-template-columns:repeat(2,minmax(0,1fr)); } .account-create-form > button { justify-self:start; } }
 @media (max-width:1199px) { .account-settings { grid-template-columns:repeat(2,minmax(0,1fr)); } .account-settings > :first-child { grid-column:1/-1; } }
 @media (max-width:699px) { .account-summary { grid-template-columns:1fr; } .account-summary-tile { padding:14px 18px; } .account-create-form, .account-settings { grid-template-columns:minmax(0,1fr); } .account-search { width:100%; } .account-settings > :first-child { grid-column:auto; } }
-.dashboard-hero { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:24px; border-radius:14px; background:radial-gradient(circle at 90% 100%,#134f86 0,transparent 38%),#0b3c6b; padding:24px 28px; color:white; margin-bottom:16px; }
+.dashboard-hero { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:24px; border-radius:14px; background:radial-gradient(circle at 90% 100%,#134f86 0,transparent 38%),var(--inst-primary); padding:24px 28px; color:white; margin-bottom:16px; }
 .dashboard-hero h1 { font-size:34px; color:white; }
 .dashboard-next { min-width:240px; min-height:56px; }
 .dashboard-tiles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:16px; }

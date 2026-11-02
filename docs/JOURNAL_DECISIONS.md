@@ -454,3 +454,20 @@ verrou sont expliquées dans [le rapport R05](security/S0.2-R05-SYMFONY-MIME.md)
 Les tests portent sur les noms MIME invalides et la sérialisation valide, sans
 envoi de courriel. Les alertes système restent visibles et bloquantes ; aucune
 fusion de remédiation, livraison ou intervention serveur n'est autorisée.
+
+
+## A03 — Identité institutionnelle configurable (2 novembre 2026)
+
+L'identité visible (nom, dénomination, logo, trois couleurs, accroches, pied de page) est un
+réglage de l'installation : clés `institution_*` de la table `settings`, écran
+Administration → Identité (administrateur, permission `comptes.gerer` existante, aucun nouveau droit).
+Sans nom enregistré, l'identité IKOMA ACCESS standard est affichée, à l'identique d'avant.
+
+- Un seul service (`App\Services\Institution`) lit les réglages, valide les couleurs (`#RRGGBB`) et
+  partage le profil aux pages Inertia et au gabarit HTML. Aucun service métier ne le lit (test d'architecture).
+- Les couleurs de marque passent par les variables CSS `--inst-*` (valeurs d'IKOMA par défaut) ;
+  `/institution/theme.css` ne les redéfinit que si une identité est enregistrée. Aucun style en ligne : la CSP n'est pas modifiée.
+- Le logo (PNG ou JPEG, 1 Mo) est réencodé en PNG ≤ 512 px, stocké en privé et servi par `/institution/logo`.
+  Ces deux ressources publiques ne renvoient aucun cookie (même risque de course que la correction du précache).
+- Limites assumées : le manifeste PWA (nom d'installation) et les badges imprimés (lot A05) ne suivent pas encore l'identité ;
+  la page d'accueil précachée peut afficher l'ancienne identité jusqu'à la mise à jour du service worker.

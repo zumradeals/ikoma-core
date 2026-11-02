@@ -15,7 +15,7 @@ final class SecurityHeaders
         }
 
         $response = self::apply($request, $next($request));
-        if ($request->isMethod('GET') && in_array($request->path(), self::PRECACHED_PUBLIC_PATHS, true)) {
+        if ($request->isMethod('GET') && in_array($request->path(), [...self::PRECACHED_PUBLIC_PATHS, ...self::STATELESS_PUBLIC_PATHS], true)) {
             self::dropStateCookies($response);
         }
 
@@ -28,6 +28,9 @@ final class SecurityHeaders
      * de session périmé remplaçait le cookie authentifié et l'utilisateur se retrouvait déconnecté. Ces pages n'ont aucune donnée de session.
      */
     public const PRECACHED_PUBLIC_PATHS = ['/', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'];
+
+    /** Ressources publiques d'identité (couleurs, logo) : appelées pendant la connexion, elles ne doivent pas non plus renvoyer de cookie d'état. */
+    public const STATELESS_PUBLIC_PATHS = ['institution/theme.css', 'institution/logo'];
 
     private static function dropStateCookies(Response $response): void
     {

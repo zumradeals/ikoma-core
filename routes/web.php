@@ -19,6 +19,7 @@ use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HostController;
 use App\Http\Controllers\InstallationController;
+use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalExportController;
 use App\Http\Controllers\ListImportsController;
@@ -44,6 +45,8 @@ Route::get('/installation', [InstallationController::class, 'show'])->middleware
 Route::post('/installation', [InstallationController::class, 'store'])->middleware('throttle:installation-ecriture');
 Route::get('/', fn () => Inertia::render('Home'))->name('home');
 // Coquille publique du poste, sans aucune donnée : précachée par le service worker pour rouvrir /poste sans réseau (elle ne contient ni session ni nom).
+Route::get('/institution/theme.css', [InstitutionController::class, 'theme']);
+Route::get('/institution/logo', [InstitutionController::class, 'logo']);
 Route::get('/poste/shell', fn () => Inertia::render('Poste'));
 Route::get('/controle/shell', fn () => Inertia::render('Controle'));
 Route::get('/groupe/shell', fn () => Inertia::render('Groupe'));
@@ -149,6 +152,11 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/demonstration/generer', [DemoLabController::class, 'generate'])->middleware(['can:comptes.gerer', 'throttle:5,1']);
         Route::post('/administration/demonstration/remettre-a-zero', [DemoLabController::class, 'reset'])->middleware(['can:comptes.gerer', 'throttle:3,1']);
         Route::post('/administration/demonstration/{event}/nettoyer', [DemoLabController::class, 'clear'])->whereUuid('event')->middleware(['can:comptes.gerer', 'throttle:3,1']);
+        Route::get('/administration/identite', [InstitutionController::class, 'index'])->middleware('can:comptes.gerer');
+        Route::put('/administration/identite', [InstitutionController::class, 'update'])->middleware(['can:comptes.gerer', 'throttle:identite']);
+        Route::post('/administration/identite/logo', [InstitutionController::class, 'uploadLogo'])->middleware(['can:comptes.gerer', 'throttle:identite']);
+        Route::delete('/administration/identite/logo', [InstitutionController::class, 'removeLogo'])->middleware(['can:comptes.gerer', 'throttle:identite']);
+        Route::post('/administration/identite/reinitialiser', [InstitutionController::class, 'reset'])->middleware(['can:comptes.gerer', 'throttle:identite']);
         Route::get('/administration/modules', [ModulesController::class, 'index'])->middleware('can:comptes.gerer');
         Route::put('/administration/modules/F06', [ModulesController::class, 'update'])->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');

@@ -10,8 +10,10 @@ import { pinProblem, PinError } from '../../poste/local/vault';
 import type { LocalOp } from '../../poste/local/apply';
 import type { SyncState } from '../../poste/local/sync';
 import { ApiError } from '../../poste/types';
+import { useInstitution } from '../../composables/useInstitution';
 
 const props = defineProps<{ agent: { id: string; name: string } | null; runtime?: PosteRuntime; app?: 'poste' | 'controle' | 'groupe' }>();
+const institution = useInstitution();
 const phase = ref<'chargement' | 'vide' | 'verrouille' | 'ouvert'>('chargement');
 const sync = ref<SyncState | null>(null);
 const wiped = ref<WipeReason | null>(null);
@@ -125,7 +127,7 @@ onBeforeUnmount(() => {
   <div v-if="phase === 'chargement'" class="grid min-h-screen place-items-center bg-slate-50 text-ikoma-navy"><p role="status">Ouverture du poste…</p></div>
 
   <main v-else-if="phase === 'vide'" class="agent-lockscreen mx-auto min-h-screen max-w-xl space-y-5 bg-slate-50 px-4 py-8 text-ikoma-navy" data-testid="ecran-enrolement">
-    <p class="text-2xl font-bold">IKOMA <span class="font-normal">Accueil</span></p>
+    <p class="text-2xl font-bold">{{ institution.custom ? institution.name : 'IKOMA' }} <span class="font-normal">Accueil</span></p>
     <p v-if="wiped" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-900" data-testid="message-efface"><span aria-hidden="true">⚠</span> {{ wipeText[wiped] }}</p>
     <h1 class="text-display font-bold">Enrôler cette tablette</h1>
     <template v-if="agent">
@@ -145,7 +147,7 @@ onBeforeUnmount(() => {
   </main>
 
   <main v-else-if="phase === 'verrouille'" class="agent-lockscreen mx-auto min-h-screen max-w-xl space-y-5 bg-slate-50 px-4 py-8 text-ikoma-navy" data-testid="ecran-verrou">
-    <p class="text-2xl font-bold">IKOMA <span class="font-normal">Accueil</span></p>
+    <p class="text-2xl font-bold">{{ institution.custom ? institution.name : 'IKOMA' }} <span class="font-normal">Accueil</span></p>
     <h1 class="text-display font-bold">Tablette verrouillée</h1>
     <p>Saisissez votre PIN à 6 chiffres. Rien n’est lisible sur cette tablette tant qu’elle est verrouillée.</p>
     <form class="space-y-4" @submit.prevent="unlock">

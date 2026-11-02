@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
+import BrandName from '../components/BrandName.vue';
+import BrandLogo from '../components/BrandLogo.vue';
 import { useAlertSound } from '../pilotage/useAlertSound';
 import { wipePilotageLocal } from '../pilotage/evacuation';
 import { pilotageHref } from '../pilotage/navigation';
@@ -37,7 +39,7 @@ function change(event: Event) {
   <div class="pilotage-shell" :class="{ 'is-bare': bare }" data-testid="pilotage-layout">
     <a href="#contenu" class="pilotage-skip no-print">Aller au contenu</a>
     <header v-if="!bare" class="pilotage-header no-print">
-      <div class="pilotage-brand"><span class="pilotage-logo"><img :src="'/brand/ikoma-access-icon.svg'" alt="" width="36" height="36"></span><p><strong>IKOMA</strong> ACCESS <span class="pilotage-caption">Pilotage</span></p></div>
+      <div class="pilotage-brand"><span class="pilotage-logo"><BrandLogo :size="36" /></span><p><BrandName variant="strong" /> <span class="pilotage-caption">Pilotage</span></p></div>
       <div v-if="currentEvent" class="pilotage-event">
         <label v-if="events.length > 1">Événement de référence<select :value="currentEvent.id" data-testid="evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select></label>
         <p v-else data-testid="evenement"><span class="pilotage-caption">Événement de référence</span>{{ currentEvent.name }}</p>
