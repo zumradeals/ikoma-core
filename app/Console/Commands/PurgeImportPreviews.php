@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Imports\HolderImport;
 use App\Services\Imports\ListImport;
 use Illuminate\Console\Command;
 
@@ -11,9 +12,9 @@ final class PurgeImportPreviews extends Command
 
     protected $description = 'Supprime les aperçus privés expirés après une heure.';
 
-    public function handle(ListImport $imports): int
+    public function handle(ListImport $imports, HolderImport $holderImports): int
     {
-        $count = $imports->purge();
+        $count = $imports->purge() + $holderImports->purge();
         $this->info($count.' aperçu(s) supprimé(s).');
 
         return self::SUCCESS;

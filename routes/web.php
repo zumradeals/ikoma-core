@@ -174,6 +174,13 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/titulaires/{holder}/carte/imprimer', [HolderCardsController::class, 'print'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/portrait', [HolderCardsController::class, 'portrait'])->whereUuid('holder')->middleware(['can:listes.importer', 'throttle:titulaires']);
         Route::delete('/administration/titulaires/{holder}/portrait', [HolderCardsController::class, 'removePortrait'])->whereUuid('holder')->middleware(['can:listes.importer', 'throttle:titulaires']);
+        Route::post('/administration/titulaires/import/apercu', [PermanentHoldersController::class, 'importPreview'])->middleware(['can:listes.importer', 'throttle:titulaires']);
+        Route::post('/administration/titulaires/import/confirmer', [PermanentHoldersController::class, 'importConfirm'])->middleware(['can:listes.importer', 'throttle:titulaires']);
+        Route::post('/administration/titulaires/import/abandonner', [PermanentHoldersController::class, 'importAbandon'])->middleware(['can:listes.importer', 'throttle:titulaires']);
+        Route::get('/administration/titulaires/import/modele', [PermanentHoldersController::class, 'importTemplate'])->middleware('can:listes.importer');
+        Route::post('/administration/titulaires/groupe/categorie', [PermanentHoldersController::class, 'bulkCategory'])->middleware(['can:listes.importer', 'throttle:titulaires']);
+        Route::post('/administration/titulaires/groupe/cloturer', [PermanentHoldersController::class, 'bulkClose'])->middleware(['can:listes.importer', 'throttle:titulaires']);
+        Route::get('/administration/titulaires/{holder}/portrait', [HolderCardsController::class, 'portraitImage'])->whereUuid('holder')->middleware('can:listes.importer');
         Route::get('/administration/titulaires', [PermanentHoldersController::class, 'index'])->middleware('can:listes.importer');
         Route::post('/administration/titulaires', [PermanentHoldersController::class, 'store'])->middleware(['can:listes.importer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/format', [PermanentHoldersController::class, 'format'])->middleware(['can:categories.gerer', 'throttle:titulaires']);

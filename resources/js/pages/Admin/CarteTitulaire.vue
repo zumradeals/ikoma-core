@@ -40,7 +40,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
   <AdminLayout active="titulaires">
     <div class="space-y-6" data-testid="page-carte-titulaire">
       <header class="space-y-3">
-        <Link href="/administration/titulaires" class="font-semibold underline" data-testid="retour-titulaires">← Titulaires permanents</Link>
+        <Link href="/administration/titulaires" class="font-semibold underline" data-testid="retour-titulaires">← Registre des personnes</Link>
         <h1 class="text-display font-bold">Carte de {{ holder.full_name }}</h1>
         <p class="font-mono text-lg font-bold" data-testid="identifiant-carte">{{ holder.identifier }}</p>
         <ol class="flex flex-wrap gap-2" aria-label="Étapes">

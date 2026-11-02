@@ -45,3 +45,4 @@ pest()->use(DatabaseTransactions::class)->in('Feature/HomeConfigTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/DemoProtectionTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/ConsolidationTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/RecetteA07Test.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/RegistrePersonnesTest.php');

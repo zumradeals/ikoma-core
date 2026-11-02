@@ -130,6 +130,15 @@ final class HolderCardsController
         return back()->with('status', 'Portrait enregistré.');
     }
 
+    public function portraitImage(string $holder, HolderCards $cards): Response
+    {
+        Gate::authorize('listes.importer');
+        $jpeg = $cards->portraitBytes($holder);
+        abort_if($jpeg === null, 404);
+
+        return response($jpeg)->header('Content-Type', 'image/jpeg')->header('Cache-Control', 'no-store, private')->header('Content-Disposition', 'inline')->header('X-Content-Type-Options', 'nosniff');
+    }
+
     public function removePortrait(Request $request, string $holder, HolderCards $cards): RedirectResponse
     {
         Gate::authorize('listes.importer');
