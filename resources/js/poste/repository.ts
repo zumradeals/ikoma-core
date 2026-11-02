@@ -35,6 +35,8 @@ export interface SitePosteRepository extends PosteRepository {
   exit(operationId: string, code: string, point: PointRef | null): Promise<ExitResult>;
   /** Nombre de personnes présentes selon le serveur, ou null sans réseau. */
   presentCount(): Promise<number | null>;
+  /** Durée de confiance hors ligne (minutes) approuvée pour les titulaires permanents ; 0 : aucune, toute nouvelle entrée hors ligne est refusée. */
+  trustMinutes?(): number;
 }
 
 /**

@@ -53,6 +53,7 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   await page.getByTestId('creer-nom').fill(name);
   await page.getByTestId('creer-categorie').selectOption('AILCT-04');
   await page.getByTestId('enregistrer-titulaire').click();
+  await expect(page.getByText('Titulaire enregistré.')).toBeVisible();
   await page.getByTestId('recherche-titulaires').fill(name);
   await page.getByTestId('lancer-recherche').click();
   const row = page.locator('[data-testid^="titulaire-"]').filter({ hasText: name });

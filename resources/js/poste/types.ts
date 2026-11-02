@@ -18,8 +18,9 @@ export type PointRef = { type: 'zone' | 'poste'; id: string };
 export type ControlResult = {
   valid: boolean; reason: string | null; message: string; badge_code: string | null; zone_ok: boolean | null; point: string; person: { name: string } | null; organisation: string | null;
   category: Category | null; zones: string[]; source: 'serveur' | 'local'; known_at?: string | null;
+  permanent?: { identifier: string; entered?: boolean } | null;
 };
-export type ExitResult = { ok: boolean; reason?: string; message?: string; badge_code: string | null; badge_status?: string; person?: { name: string }; point?: string; presents?: number | null; warning?: string | null; source: 'serveur' | 'local'; known_at?: string | null };
+export type ExitResult = { ok: boolean; reason?: string; message?: string; badge_code: string | null; badge_status?: string; person?: { name: string }; point?: string; presents?: number | null; warning?: string | null; source: 'serveur' | 'local'; known_at?: string | null; permanent?: { identifier: string; card_kept?: boolean } | null };
 export type Avis = 'hote' | 'superviseur';
 /** Chiffres du poste d'accueil, calculés sur la copie de la tablette (donc disponibles sans réseau). */
 export type DeskSummary = {
