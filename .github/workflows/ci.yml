@@ -40,7 +40,7 @@ jobs:
       - name: Tests frontend
         if: ${{ !cancelled() }}
         run: make test-front
-      - name: Tests E2E (sonde de bissection : exécutés même si les tests PHP échouent)
+      - name: Tests E2E (sonde de bissection, exécutés même si les tests PHP échouent)
         if: ${{ !cancelled() }}
         run: make e2e
       - name: Recette et captures Agent V2 sur données fictives isolées
