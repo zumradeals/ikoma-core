@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CardLifecycle;
 use App\Services\HolderCards;
+use App\Services\HolderEntitlements;
 use App\Services\Institution;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
@@ -36,7 +38,7 @@ final class HolderCardsController
         return Inertia::render('Admin/CarteTitulaire', [
             'holder' => ['id' => $row->id, 'identifier' => $row->identifier, 'full_name' => $row->full_name, 'status' => $row->status, 'institutional_category' => $row->institutional_category, 'has_photo' => $row->photo_file !== null, 'photo_print_allowed' => (bool) $row->photo_print_allowed],
             'category' => $category === null ? null : ['code' => $category->code, 'label' => $category->label],
-            'card' => $card, 'preview' => $html, 'permanentContext' => $holders->permanentContext() !== null,
+            'card' => $card, 'cards' => app(CardLifecycle::class)->history($holder), 'reasons' => CardLifecycle::REASONS, 'entitlements' => app(HolderEntitlements::class)->forHolder($holder), 'preview' => $html, 'permanentContext' => $holders->permanentContext() !== null,
             'provisional' => ! $cards->settings()['valide'],
             'csrf' => csrf_token(),
         ])->withViewData([]);
@@ -48,6 +50,24 @@ final class HolderCardsController
         $cards->issue($holder, $request->user());
 
         return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte préparée. Vérifiez l’aperçu avant de l’imprimer.');
+    }
+
+    public function revoke(Request $request, string $holder, CardLifecycle $lifecycle): RedirectResponse
+    {
+        $this->authorizeCard();
+        $data = $request->validate(['reason' => ['required', 'string', 'in:'.implode(',', array_keys(CardLifecycle::REASONS))], 'note' => ['nullable', 'string', 'max:200'], 'confirmation' => ['required', 'accepted']]);
+        $lifecycle->revoke($holder, $data['reason'], $data['note'] ?? null, $request->user());
+
+        return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte révoquée : elle est refusée partout, immédiatement et définitivement. Remplacez-la pour émettre une nouvelle carte.');
+    }
+
+    public function replace(Request $request, string $holder, CardLifecycle $lifecycle): RedirectResponse
+    {
+        $this->authorizeCard();
+        $data = $request->validate(['reason' => ['required', 'string', 'in:'.implode(',', array_keys(CardLifecycle::REASONS))], 'note' => ['nullable', 'string', 'max:200'], 'confirmation' => ['required', 'accepted']]);
+        $lifecycle->replace($holder, $data['reason'], $data['note'] ?? null, $request->user());
+
+        return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Nouvelle carte préparée. L’ancienne est révoquée ; le titulaire, son identifiant et ses habilitations sont inchangés.');
     }
 
     public function print(Request $request, string $holder, HolderCards $cards): Response

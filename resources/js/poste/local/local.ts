@@ -188,9 +188,10 @@ export class LocalPosteRepository implements GroupPosteRepository {
     const server = await this.remote<ControlResult>('/poste/api/controle', { code, point }, operationId);
     if (server) return { ...server, source: 'serveur' };
     const printed = await resolveBadge(this.list, code);
-    const result = controlLocal(this.list, printed, point, this.now(), await this.knownAt());
+    const known = await this.knownAt();
+    const result = controlLocal(this.list, printed, point, this.now(), known);
     // Seul le code imprimé part dans la file : le contenu du QR n'est conservé nulle part sur la tablette.
-    await this.enqueue(operationId, 'controle', { code: printed ?? 'INCONNU', point, local_valid: result.valid });
+    await this.enqueue(operationId, 'controle', { code: printed ?? 'INCONNU', point, local_valid: result.valid, known_at: known });
     return result;
   }
 
@@ -202,6 +203,8 @@ export class LocalPosteRepository implements GroupPosteRepository {
     if (result.ok) await this.enqueue(operationId, 'sortie', { code: printed, point });
     return result;
   }
+
+  trustMinutes(): number { return this.list.snapshot.permanent?.trust_minutes ?? 0; }
 
   async presentCount(): Promise<number | null> {
     if (!this.sync || !this.online) return null;

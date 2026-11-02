@@ -36,8 +36,20 @@ const known = computed(() => {
   const at = control.value?.known_at ?? exit.value?.known_at ?? null;
   return at ? new Date(at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null;
 });
+// Confiance hors ligne des titulaires permanents : l'ancienneté est recalculée toutes les 15 s ET à chaque décision (côté repository), jamais seulement au démarrage.
+const tick = ref(Date.now());
+let trustTimer: number | undefined;
+const trust = computed(() => {
+  if (online.value) return null;
+  const minutes = props.repository.trustMinutes?.() ?? 0;
+  const last = props.sync?.lastSyncAt ? Date.parse(props.sync.lastSyncAt) : NaN;
+  if (minutes < 1) return { state: 'aucune', text: 'Aucune confiance hors ligne approuvée : les nouvelles entrées de titulaires permanents sont refusées. Les sorties restent possibles.' };
+  const left = Number.isNaN(last) || last > tick.value ? 0 : Math.floor(minutes - (tick.value - last) / 60_000);
+  return left > 0 ? { state: 'valide', text: `Confiance hors ligne : encore ${left} min pour les nouvelles entrées de titulaires permanents.` }
+    : { state: 'expiree', text: 'Confiance hors ligne EXPIRÉE : les nouvelles entrées de titulaires permanents sont refusées jusqu’à la synchronisation. Les sorties restent possibles.' };
+});
 const lastSync = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSyncAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais'));
-const reasonLabels: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti' };
+const reasonLabels: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti' , carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée' };
 
 function readStored(): { type: string; id: string } | null {
   try { const raw = window.localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -95,7 +107,8 @@ onMounted(async () => {
   void refreshPresent();
   presentTimer = window.setInterval(() => { if (navigator.onLine) void refreshPresent(); }, 15000);
 });
-onBeforeUnmount(() => { stopCamera(); window.clearTimeout(dismissTimer); window.clearInterval(presentTimer); window.removeEventListener('online', setOnline); window.removeEventListener('offline', setOnline); });
+onMounted(() => { trustTimer = window.setInterval(() => { tick.value = Date.now(); }, 15_000); });
+onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.clearTimeout(dismissTimer); window.clearInterval(presentTimer); window.removeEventListener('online', setOnline); window.removeEventListener('offline', setOnline); });
 </script>
 
 <template>
@@ -117,6 +130,7 @@ onBeforeUnmount(() => { stopCamera(); window.clearTimeout(dismissTimer); window.
           <p class="rounded-full bg-white px-4 py-2 text-xl font-bold" data-testid="presents"><span aria-hidden="true">👥</span> Présents : {{ present ?? '—' }}</p>
         </div>
         <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="situation-connue"><span aria-hidden="true">⚠</span> Hors ligne : les contrôles s’appuient sur la situation connue à {{ lastSync }}. Un badge annulé depuis peut apparaître valide.</p>
+        <p v-if="trust" role="status" class="rounded-xl border-2 p-3 font-semibold" :class="trust.state === 'valide' ? 'border-amber-700 bg-amber-50 text-amber-950' : 'border-red-700 bg-red-50 text-red-900'" :data-testid="'confiance-' + trust.state"><span aria-hidden="true">⏱</span> {{ trust.text }}</p>
         <div class="grid grid-cols-2 gap-3" role="group" aria-label="Mode">
           <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'controle' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'controle'" data-testid="mode-controle" @click="mode = 'controle'">Contrôle</button>
           <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'sortie' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'sortie'" data-testid="mode-sortie" @click="mode = 'sortie'">Sortie</button>

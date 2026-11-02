@@ -30,6 +30,25 @@ const mountApp = (r: SitePosteRepository, sync = null) => mount(ControleApp, { p
 describe('écran de contrôle', () => {
   beforeEach(() => { window.localStorage.clear(); scans.length = 0; });
 
+  it('signale clairement un terminal hors ligne : aucune confiance, confiance valide, puis confiance expirée', async () => {
+    const offline = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const choose = async (r: SitePosteRepository, sync: object) => {
+      window.localStorage.clear();
+      const wrapper = mount(ControleApp, { props: { agent: 'Agent fictif', repository: r, sync: sync as never } });
+      await flushPromises();
+      await wrapper.findAll('button').find(b => b.text().includes('Hall'))!.trigger('click');
+      await flushPromises();
+      return wrapper;
+    };
+    const none = await choose(repo({ trustMinutes: () => 0 }), { lastSyncAt: new Date().toISOString(), pending: 0 });
+    expect(none.get('[data-testid="confiance-aucune"]').text()).toContain('refusées');
+    const fresh = await choose(repo({ trustMinutes: () => 30 }), { lastSyncAt: new Date(Date.now() - 5 * 60_000).toISOString(), pending: 0 });
+    expect(fresh.get('[data-testid="confiance-valide"]').text()).toContain('encore');
+    const stale = await choose(repo({ trustMinutes: () => 30 }), { lastSyncAt: new Date(Date.now() - 45 * 60_000).toISOString(), pending: 0 });
+    expect(stale.get('[data-testid="confiance-expiree"]').text()).toContain('EXPIRÉE');
+    offline.mockRestore();
+  });
+
   it('demande le point de contrôle, le retient, puis affiche le compteur de présents', async () => {
     const wrapper = mountApp(repo());
     await flushPromises();

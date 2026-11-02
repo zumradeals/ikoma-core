@@ -160,7 +160,7 @@ final class HolderCards
                 $id = (string) Str::uuid();
                 DB::table('holder_cards')->insert([
                     'id' => $id, 'holder_id' => $holderId, 'badge_id' => $badge['id'], 'event_id' => $context->id, 'status' => 'active',
-                    'issued_by' => $actor->id, 'issued_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+                    'issued_by' => $actor->id, 'issued_at' => now(), 'rank' => (int) DB::table('holder_cards')->where('holder_id', $holderId)->max('rank') + 1, 'created_at' => now(), 'updated_at' => now(),
                 ]);
                 $this->audit->append('carte.emise', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier, 'code_badge' => $badge['code']]);
 
@@ -216,7 +216,7 @@ final class HolderCards
         $holder = DB::table('permanent_holders as h')->leftJoin('institutional_categories as c', 'c.code', '=', 'h.institutional_category')
             ->where('h.id', $holderId)->first(['h.*', 'c.label as category_label', 'c.color as category_color', 'c.symbol as category_symbol']);
         abort_unless($holder !== null, 404);
-        $card = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holderId)->where('k.status', 'active')->first(['k.id', 'b.code', 'b.qr_token']);
+        $card = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holderId)->where('k.status', 'active')->first(['k.id', 'k.rank', 'b.code', 'b.qr_token']);
         abort_if($card === null, 404);
 
         return $this->compose([
@@ -224,7 +224,7 @@ final class HolderCards
             'label' => $holder->category_label, 'color' => $holder->category_color, 'symbol' => $holder->category_symbol,
             'portrait' => $withPortrait ? $this->portraitDataUri($holder) : null,
             'qr' => app(QrSvg::class)->render(QrSvg::payload($card->qr_token), 'QR de la carte '.$holder->identifier),
-            'badge_code' => $card->code, 'card_id' => $card->id, 'specimen' => false,
+            'badge_code' => $card->code, 'card_id' => $card->id, 'rank' => $card->rank, 'specimen' => false,
         ]);
     }
 
@@ -239,7 +239,7 @@ final class HolderCards
 
         return $this->compose([
             'name' => 'Prénom NOM (exemple)', 'identifier' => $format, 'code' => $category->code, 'label' => $category->label, 'color' => $category->color, 'symbol' => $category->symbol,
-            'portrait' => null, 'qr' => app(QrSvg::class)->render(QrSvg::payload(str_repeat('0', 64)), 'QR d’exemple, sans valeur'), 'badge_code' => null, 'card_id' => null, 'specimen' => true,
+            'portrait' => null, 'qr' => app(QrSvg::class)->render(QrSvg::payload(str_repeat('0', 64)), 'QR d’exemple, sans valeur'), 'badge_code' => null, 'card_id' => null, 'rank' => 1, 'specimen' => true,
         ]);
     }
 
