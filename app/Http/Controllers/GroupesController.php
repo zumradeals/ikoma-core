@@ -36,7 +36,7 @@ final class GroupesController
             }) : collect();
 
         return Inertia::render('Admin/Groupes', [
-            'event' => $event ? ['id' => $event->id, 'name' => $event->name] : null, 'events' => DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']),
+            'event' => $event ? ['id' => $event->id, 'name' => $event->name] : null, 'events' => DB::table('events')->where('is_permanent', false)->orderByDesc('starts_at')->get(['id', 'name']),
             'groups' => $groups, 'mode' => $this->groups->mode(),
             'encadreurs' => User::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->filter(fn (User $u) => $u->hasRole('encadreur'))->values()->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name]),
             'search' => $q, 'candidates' => $event && $q !== '' ? DB::table('visitors')->where('event_id', $event->id)->whereNull('group_id')->whereRaw('public.ikoma_normalize(full_name) LIKE ?', ['%'.mb_strtolower(DB::selectOne('SELECT public.ikoma_normalize(?) AS v', [$q])->v).'%'])->orderByRaw('full_name COLLATE "C" ASC')->orderBy('id')->limit(20)->get(['id', 'full_name', 'organisation']) : [],

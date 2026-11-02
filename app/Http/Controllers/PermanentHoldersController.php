@@ -27,6 +27,7 @@ final class PermanentHoldersController
             'identifierExample' => $holders->formatIdentifier(1),
             'permanentContext' => $holders->permanentContext(),
             'canConfigure' => $request->user()->can('categories.gerer'),
+            'canCards' => $request->user()->can('badges.gerer'),
         ]);
     }
 

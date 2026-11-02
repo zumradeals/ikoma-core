@@ -41,7 +41,7 @@ final class AdminVisitorsController
             ->paginate(20, ['id', 'full_name', 'organisation'], 'page', (int) ($input['page'] ?? 1)) : null;
 
         return Inertia::render('Admin/Visitors', [
-            'events' => DB::table('events')->orderBy('name')->get(['id', 'name', 'starts_at', 'ends_at']), 'eventId' => $event,
+            'events' => DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name', 'starts_at', 'ends_at']), 'eventId' => $event,
             'hosts' => DB::table('hosts')->orderBy('name')->get(['id', 'event_id', 'name']), 'categories' => DB::table('categories')->orderBy('name')->get(['id', 'event_id', 'name']),
             'groups' => DB::table('groups')->orderBy('name')->get(['id', 'event_id', 'name']),
             'visitor' => $visitor ? [...$visitor->only(['id', 'event_id', 'full_name', 'organisation', 'position', 'category_id', 'host_id', 'group_id', 'valid_from', 'valid_until', 'profile_photo_print_allowed', 'withdrawn_at']), 'has_photo' => (bool) $visitor->profile_photo_file, 'revision' => (string) $visitor->updated_at] : null,

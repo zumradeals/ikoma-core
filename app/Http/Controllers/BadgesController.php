@@ -41,7 +41,7 @@ final class BadgesController
             'batches' => $batches,
             'statuses' => array_column(BadgeStatus::cases(), 'value'),
             'filters' => $filters,
-            'events' => DB::table('events')->orderBy('name')->get(['id', 'name']),
+            'events' => DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name']),
             'categories' => DB::table('categories')->orderBy('name')->get(['id', 'event_id', 'name', 'color']),
             'devices' => DB::table('devices')->orderBy('name')->get(['id', 'event_id', 'name', 'station']),
             'groups' => DB::table('groups')->orderBy('name')->get(['id', 'event_id', 'name']),
