@@ -57,6 +57,15 @@ final class HolderCardsController
         return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte préparée. Imprimez-la dans l’Atelier des badges, puis remettez-la.');
     }
 
+    /** « Tout préparer » : prépare les cartes de toutes les personnes (avec photo et catégorie) qui n'en ont pas encore. */
+    public function prepareAll(Request $request, HolderCards $cards): RedirectResponse
+    {
+        $this->authorizeCard();
+        $result = $cards->prepareAll($request->user());
+
+        return redirect('/administration/titulaires')->with('status', $result['preparees'].' carte(s) préparée(s)'.($result['restantes'] > 0 ? ', '.$result['restantes'].' restante(s) : recommencez' : '').'. Imprimez-les dans l’Atelier des badges.');
+    }
+
     public function activate(Request $request, string $holder, HolderCards $cards): RedirectResponse
     {
         $this->authorizeCard();

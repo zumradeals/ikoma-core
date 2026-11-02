@@ -144,6 +144,54 @@ final class HolderCards
     }
 
     /** Une nouvelle carte exige la photographie du titulaire (jamais pour enregistrer la personne). */
+    /**
+     * Où en sont les cartes des personnes en cours : sans carte (avec ou sans photo), à imprimer, à remettre, actives.
+     * Les compteurs sont des nombres de personnes, rien de nominatif.
+     *
+     * @return array{sans_carte: int, sans_photo: int, a_imprimer: int, a_remettre: int, actives: int, prochaine_remise: ?string}
+     */
+    public function pipeline(): array
+    {
+        $active = DB::table('holder_cards as k')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id')->where('h.status', 'actif')->where('k.status', 'active');
+        $printed = fn ($q) => $q->selectRaw('1')->from('holder_card_prints as p')->whereColumn('p.card_id', 'k.id');
+        $withoutCard = fn () => DB::table('permanent_holders as h')->where('h.status', 'actif')->whereNotNull('h.institutional_category')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('holder_cards as k')->whereColumn('k.holder_id', 'h.id')->where('k.status', 'active'));
+        $next = (clone $active)->whereNull('k.activated_at')->whereExists($printed)->orderBy('k.issued_at')->value('h.id');
+
+        return [
+            'sans_carte' => $withoutCard()->whereNotNull('h.photo_file')->count(),
+            'sans_photo' => $withoutCard()->whereNull('h.photo_file')->count(),
+            'a_imprimer' => (clone $active)->whereNull('k.activated_at')->whereNotExists($printed)->count(),
+            'a_remettre' => (clone $active)->whereNull('k.activated_at')->whereExists($printed)->count(),
+            'actives' => (clone $active)->whereNotNull('k.activated_at')->count(),
+            'prochaine_remise' => $next === null ? null : (string) $next,
+        ];
+    }
+
+    /**
+     * « Tout préparer » : prépare (sans activer) la carte de chaque personne en cours qui a une catégorie et une photo et pas encore de carte.
+     * Même règle que la préparation unitaire ; 200 personnes au plus par demande.
+     *
+     * @return array{preparees: int, restantes: int}
+     */
+    public function prepareAll(User $actor, int $max = 200): array
+    {
+        $ids = DB::table('permanent_holders as h')->where('h.status', 'actif')->whereNotNull('h.institutional_category')->whereNotNull('h.photo_file')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('holder_cards as k')->whereColumn('k.holder_id', 'h.id')->where('k.status', 'active'))
+            ->orderBy('h.identifier_seq')->limit($max + 1)->pluck('h.id')->all();
+        $done = 0;
+        foreach (array_slice($ids, 0, $max) as $id) {
+            try {
+                $this->issue((string) $id, $actor, false);
+                $done++;
+            } catch (ValidationException) {
+                // Une personne qui ne peut pas recevoir de carte (ex. état changé entre-temps) n'arrête pas les autres.
+            }
+        }
+
+        return ['preparees' => $done, 'restantes' => max(0, count($ids) - $max)];
+    }
+
     public function requirePhoto(string $holderId): void
     {
         $photo = DB::table('permanent_holders')->where('id', $holderId)->value('photo_file');

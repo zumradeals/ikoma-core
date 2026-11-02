@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\HolderCards;
 use App\Services\Imports\HolderImport;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
@@ -33,6 +34,7 @@ final class PermanentHoldersController
             'permanentContext' => $holders->permanentContext(),
             'canConfigure' => $request->user()->can('categories.gerer'),
             'canCards' => $request->user()->can('badges.gerer'),
+            'pipeline' => $request->user()->can('badges.gerer') ? app(HolderCards::class)->pipeline() : null,
         ]);
     }
 

@@ -187,6 +187,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/titulaires/modeles/{code}/apercu', [HolderCardsController::class, 'modelPreview'])->where('code', 'AILCT-0[1-8]')->middleware(['can:badges.gerer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/modeles/{code}', [HolderCardsController::class, 'saveModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/modeles/{code}/valider', [HolderCardsController::class, 'validateModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);
+        Route::post('/administration/titulaires/cartes/preparer-toutes', [HolderCardsController::class, 'prepareAll'])->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/carte/activer', [HolderCardsController::class, 'activate'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/modeles', [HolderCardsController::class, 'settings'])->middleware(['can:categories.gerer', 'throttle:titulaires']);
         Route::get('/administration/titulaires/alignement', [HolderCardsController::class, 'alignment'])->middleware('can:badges.gerer');
