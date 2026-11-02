@@ -16,7 +16,13 @@ e2e:
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-business.json'
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-import.json'
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-badges.json'
+	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-institution.json'
+	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-titulaires.json'
+	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-cartes.json'
+	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-permanents.json'
+	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:screen-account > .secrets/screen-consolidation.json'
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:desk-fixtures > .secrets/desk-fixtures.json'
+	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:permanent-fixtures > .secrets/permanent-fixtures.json'
 	docker compose exec -T -e APP_ENV=testing php sh -c 'php artisan test:host-fixtures > .secrets/host-fixtures.json'
 	docker compose run --rm e2e
 lint:

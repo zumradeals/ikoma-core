@@ -315,7 +315,7 @@ final class Desk
     private function visitor(Device $poste, string $id, bool $lock = false): Visitor
     {
         EventAvailability::requireOpen($poste->event_id);
-        $query = Visitor::query()->where('event_id', $poste->event_id)->whereNull('withdrawn_at');
+        $query = Visitor::query()->where('event_id', $poste->event_id)->whereNull('withdrawn_at')->whereNull('holder_id');
         if ($lock) {
             $query->lockForUpdate();
         }

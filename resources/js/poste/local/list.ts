@@ -1,5 +1,6 @@
 import type { Category } from '../types';
 import { normalize, trigrams, type Indexed } from './search';
+import type { PermanentSnapshot } from './permanent';
 
 export type SnapVisitor = {
   id: string; full_name: string; organisation: string | null; host_id: string | null; category_id: string; valid_from: string; valid_until: string; source: string; status: string;
@@ -13,7 +14,7 @@ export type Snapshot = {
   settings: { identity_document?: boolean; inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; controle_stagiaires?: 'identite' | 'encadreur'; f06_active?: boolean;
     offline_call_minutes?: number; offline_max_hours?: number; low_badges_percent?: number; low_badges_min?: number };
   categories: Category[]; zones: { id: string; name: string; est_accueil: boolean }[]; category_zone: { category_id: string; zone_id: string }[];
-  hosts: { id: string; name: string; service: string | null }[]; postes: { id: string; name: string }[]; visitors: SnapVisitor[]; badges: SnapBadge[]; groups?: SnapGroup[]; members?: SnapMember[];
+  hosts: { id: string; name: string; service: string | null }[]; postes: { id: string; name: string }[]; visitors: SnapVisitor[]; badges: SnapBadge[]; groups?: SnapGroup[]; members?: SnapMember[]; permanent?: PermanentSnapshot;
 };
 
 /** Copie de travail en mémoire (déchiffrée seulement tant que la tablette est déverrouillée). */

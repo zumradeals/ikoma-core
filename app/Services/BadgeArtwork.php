@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\Visitor;
+use App\Services\Atelier\ExposureMarker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use stdClass;
@@ -25,6 +27,17 @@ final class BadgeArtwork
     /** @return array<string, mixed> */
     public function validate(Request $request, bool $selection = true): array
     {
+        return $this->validateInput($request->all(), $selection);
+    }
+
+    /**
+     * Mêmes règles que validate(), à partir d'un tableau : l'Atelier relit les options mémorisées d'un tirage sans requête HTTP.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function validateInput(array $input, bool $selection = true): array
+    {
         $rules = [
             'event' => 'required|uuid|exists:events,id',
             'design' => ['required', Rule::in(['visiteur', 'vip', 'prestataire'])],
@@ -39,7 +52,7 @@ final class BadgeArtwork
         ];
         if ($selection) {
             $rules += [
-                'batch' => ['required', 'uuid', Rule::exists('badge_batches', 'id')->where('event_id', $request->input('event'))],
+                'batch' => ['required', 'uuid', Rule::exists('badge_batches', 'id')->where('event_id', $input['event'] ?? null)],
                 'from' => 'nullable|integer|min:1|max:2147483647',
                 'to' => 'nullable|integer|min:1|max:2147483647|gte:from',
                 'format' => ['required', Rule::in(['pvc', 'a4'])],
@@ -47,12 +60,12 @@ final class BadgeArtwork
                 'side' => ['required', Rule::in(['recto', 'verso'])],
             ];
         }
-        $data = $request->validate($rules, [
+        $data = Validator::make($input, $rules, [
             'batch.exists' => 'Ce lot n’appartient pas à l’événement choisi.',
             'to.gte' => 'Le dernier numéro doit être supérieur ou égal au premier.',
             'primary.regex' => 'Choisissez une couleur valide.', 'accent.regex' => 'Choisissez une couleur valide.',
             'mode.in' => 'Choisissez le mode standard ou nominatif.',
-        ]);
+        ])->validate();
         if (($data['mode'] ?? '') === 'nominatif') {
             Gate::authorize('listes.importer');
         }
@@ -78,7 +91,7 @@ final class BadgeArtwork
     public function select(array $options): Collection
     {
         // Un aperçu contient un véritable QR et peut être capturé ou imprimé. Protéger le lot avant de lire ses jetons.
-        abort_unless(DB::table('badge_batches')->where('id', $options['batch'])->where('event_id', $options['event'])->update(['print_exposed_at' => now()]) === 1, 404);
+        abort_unless(app(ExposureMarker::class)->markBatch($options['batch'], $options['event']), 404);
         $number = "CASE WHEN b.code ~ '^B-[0-9]+\$' THEN substring(b.code from 3)::integer END";
         $query = DB::table('badges as b')->leftJoin('categories as c', 'c.id', '=', 'b.category_id')
             ->where('b.event_id', $options['event'])->where('b.badge_batch_id', $options['batch'])
@@ -106,6 +119,27 @@ final class BadgeArtwork
         }
 
         return $badges;
+    }
+
+    /**
+     * Badge d'EXEMPLE : données fictives et QR d'exemple (jeton nul) qui ne correspond à aucun badge. Ne lit aucun lot, aucune fiche, aucun portrait,
+     * donc n'expose aucun vrai QR et ne marque aucune exposition. Sert à l'aperçu d'un modèle et à l'essai marqué.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function specimenCard(array $options, string $side): string
+    {
+        $badge = (object) ['code' => 'B-000', 'qr_token' => str_repeat('0', 64), 'status' => 'Disponible', 'printed_for_visitor_id' => null, 'category' => 'Catégorie exemple', 'number' => 0];
+        $person = null;
+        if (($options['mode'] ?? '') === 'nominatif' && $side === 'recto') {
+            $person = (object) ['full_name' => 'Prénom NOM (exemple)', 'position' => 'Fonction exemple', 'organisation' => 'Organisation exemple', 'valid_from' => now()->startOfDay(), 'valid_until' => now()->addDay()->startOfDay()];
+        }
+        $options = [...$options, 'side' => $side];
+
+        return view('badges.card', [
+            'person' => $person, 'portrait' => null, 'badge' => $badge, 'options' => $options, 'specimen' => true,
+            'svg' => $side === 'recto' ? app(QrSvg::class)->render(QrSvg::payload($badge->qr_token), 'QR d’exemple, sans valeur') : '',
+        ])->render();
     }
 
     /** @param array<string, mixed> $options */

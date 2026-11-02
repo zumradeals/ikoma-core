@@ -2,6 +2,7 @@ import type { Checkpoint, ControlResult, ExitResult, PointRef } from '../types';
 import { outsidePeriod } from './apply';
 import { sha256Hex } from './crypto';
 import type { LocalList } from './list';
+import { PERMANENT_PREFIX, decidePermanentOffline, findPermanentCard } from './permanent';
 
 /** Retrouve un badge de l'événement à partir du code imprimé ou du contenu du QR (comparé par hachage : le jeton n'est jamais conservé). */
 export async function resolveBadge(list: LocalList, input: string): Promise<string | null> {
@@ -9,7 +10,8 @@ export async function resolveBadge(list: LocalList, input: string): Promise<stri
   if (/^[0-9a-f]{64}$/i.test(value)) {
     const hash = await sha256Hex(value.toLowerCase());
     for (const b of list.badges.values()) if (b.token_hash === hash) return b.code;
-    return null;
+    // Carte permanente : seule l'empreinte du jeton est conservée et mise en file (jamais le jeton).
+    return findPermanentCard(list.snapshot.permanent, hash) ? PERMANENT_PREFIX + hash : null;
   }
   return list.badges.has(value.toUpperCase()) ? value.toUpperCase() : null;
 }
@@ -33,6 +35,13 @@ const REFUSALS: Record<string, string> = {
 export function controlLocal(list: LocalList, printed: string | null, point: PointRef | null, now: number, knownAt: string | null): ControlResult {
   const base = { badge_code: printed, zone_ok: null, point: pointName(list, point), person: null, organisation: null, category: null, zones: [] as string[], source: 'local' as const, known_at: knownAt };
   const refuse = (reason: string): ControlResult => ({ ...base, valid: false, reason, message: REFUSALS[reason] });
+  if (printed?.startsWith(PERMANENT_PREFIX) && list.snapshot.permanent) {
+    const decision = decidePermanentOffline(list.snapshot.permanent, printed.slice(PERMANENT_PREFIX.length), point, list.snapshot.zones, now, knownAt);
+
+    return { ...base, badge_code: decision.holder?.identifier ?? null, valid: decision.allowed, reason: decision.reason, message: decision.message, person: decision.allowed && decision.holder ? { name: decision.holder.name } : null, organisation: decision.holder?.organisation ?? null,
+      category: decision.allowed ? (decision.holder?.category ?? null) : null,
+      zones: decision.zones, zone_ok: decision.allowed && point?.type === 'zone' ? true : null, permanent: decision.holder ? { identifier: decision.holder.identifier } : null };
+  }
   const badge = printed ? list.badges.get(printed) : undefined;
   if (!badge) return refuse('inconnu');
   if (badge.status === 'Annulé') return refuse('annule');
@@ -50,6 +59,12 @@ export function controlLocal(list: LocalList, printed: string | null, point: Poi
 export function exitLocal(list: LocalList, printed: string | null, point: PointRef | null, knownAt: string | null): ExitResult {
   const base = { source: 'local' as const, known_at: knownAt, point: pointName(list, point) };
   const refuse = (reason: string, message: string): ExitResult => ({ ...base, ok: false, reason, message, badge_code: printed });
+  if (printed?.startsWith(PERMANENT_PREFIX)) {
+    // Sortie d'un titulaire permanent : jamais soumise à l'habilitation, au statut de la carte ni à la confiance hors ligne ; le serveur vérifie qu'une entrée existe.
+    const card = findPermanentCard(list.snapshot.permanent, printed.slice(PERMANENT_PREFIX.length));
+    const holder = list.snapshot.permanent?.holders.find(h => h.id === card?.holder_id);
+    return { ...base, ok: true, badge_code: card?.identifier ?? null, person: holder ? { name: holder.name } : undefined, permanent: { identifier: card?.identifier ?? '', card_kept: true }, warning: 'Sortie enregistrée hors ligne : la carte est conservée, le serveur vérifiera l’entrée à la synchronisation.' };
+  }
   const badge = printed ? list.badges.get(printed) : undefined;
   if (!badge) return refuse('inconnu', 'Badge inconnu : vérifiez le code ou scannez à nouveau.');
   if (badge.status === 'Annulé') return refuse('annule', 'Badge annulé : la sortie n’est pas enregistrée. Prévenez le superviseur.');

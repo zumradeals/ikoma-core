@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
+import BrandName from '../components/BrandName.vue';
+import BrandLogo from '../components/BrandLogo.vue';
 import { wipePilotageLocal } from '../pilotage/evacuation';
 
 type EventRef = { id: string; name: string };
@@ -10,14 +12,26 @@ const page = usePage<{ auth: { name: string; permissions: string[] }; adminConte
 const eventRef = computed(() => props.event ?? page.props.adminContext?.event ?? null);
 const can = (permission: string) => page.props.auth.permissions.includes(permission);
 const open = ref(false);
-const items = [
+const visible = (item: Item) => (!item.permission || can(item.permission)) && (item.key !== 'demonstration' || page.props.demoLabAvailable) && (item.key !== 'groupes' || page.props.f06Active)
+  && (!item.parent || props.active === item.key || props.active === item.parent || items.some(other => other.parent === item.parent && other.key === props.active));
+const menu = computed(() => items.filter(visible));
+// `parent` : l'entrée n'apparaît, en retrait, que lorsque l'utilisateur est dans la rubrique (une seule entrée de premier niveau par usage, jamais deux menus pour la même action).
+type Item = { key: string; label: string; icon: string; href: string; permission: string | null; parent?: string };
+const items: Item[] = [
   { key: 'tableau', label: 'Tableau de bord', icon: 'home', href: '/administration', permission: 'evenements.gerer' },
   { key: 'evenements', label: 'Événements', icon: 'calendar', href: '/administration/evenements', permission: 'evenements.gerer' },
   { key: 'zones', label: 'Zones', icon: 'map', href: '/administration/zones', permission: 'zones.gerer' },
   { key: 'categories', label: 'Catégories', icon: 'tag', href: '/administration/categories', permission: 'categories.gerer' },
   { key: 'imports', label: 'Liste d’invités', icon: 'list', href: '/administration/imports', permission: 'listes.importer' },
-  { key: 'badges', label: 'Badges', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
+  { key: 'badges', label: 'Badges visiteurs', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
+  { key: 'atelier', label: 'Atelier des badges', icon: 'qr', href: '/administration/atelier', permission: 'badges.gerer' },
+
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
+  { key: 'titulaires', label: 'Personnes et cartes permanentes', icon: 'users', href: '/administration/titulaires', permission: 'listes.importer' },
+  { key: 'modeles-cartes', label: 'Personnalisation des cartes', icon: 'tag', href: '/administration/titulaires/modeles', permission: 'badges.gerer', parent: 'titulaires' },
+  { key: 'habilitations', label: 'Habilitations et zones', icon: 'shield', href: '/administration/habilitations', permission: 'listes.importer', parent: 'titulaires' },
+  { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer', parent: 'titulaires' },
+  { key: 'identite', label: 'Identité', icon: 'settings', href: '/administration/identite', permission: 'comptes.gerer' },
   { key: 'modules', label: 'Modules', icon: 'settings', href: '/administration/modules', permission: 'comptes.gerer' },
   { key: 'postes', label: 'Postes et tablettes', icon: 'monitor', href: '/administration/postes', permission: 'postes.gerer' },
   { key: 'comptes', label: 'Comptes', icon: 'users', href: '/administration/comptes', permission: 'comptes.gerer' },
@@ -34,7 +48,7 @@ function change(e: Event) { router.get('/administration', { event: (e.target as 
   <div class="admin-shell" data-testid="admin-layout">
     <a href="#contenu" class="admin-skip">Aller au contenu</a>
     <header class="admin-header">
-      <div class="admin-brand"><span class="admin-logo"><img :src="'/brand/ikoma-access-icon.svg'" alt="" width="36" height="36"></span><p><strong>IKOMA</strong> ACCESS</p></div>
+      <div class="admin-brand"><span class="admin-logo"><BrandLogo :size="36" /></span><p><BrandName variant="strong" /></p></div>
       <div class="admin-event">
         <label v-if="eventRef && events.length > 1 && active === 'tableau'" class="admin-event-select"><span class="sr-only">Événement</span>
           <select :value="eventRef.id" data-testid="choix-evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
@@ -51,7 +65,7 @@ function change(e: Event) { router.get('/administration', { event: (e.target as 
       <aside class="admin-sidebar">
         <button type="button" class="admin-menu-toggle" :aria-expanded="open" aria-controls="menu-admin" data-testid="ouvrir-menu" @click="open = !open"><span>Menu administrateur</span><AdminIcon name="menu" /></button>
         <nav id="menu-admin" aria-label="Menu administrateur" :class="{ 'is-open': open }">
-          <template v-for="item in items" :key="item.key"><Link v-if="(!item.permission || can(item.permission)) && (item.key !== 'demonstration' || page.props.demoLabAvailable) && (item.key !== 'groupes' || page.props.f06Active)" :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="admin-nav-link" :data-testid="'menu-' + item.key" @click="open = false"><AdminIcon :name="item.icon" :size="24" /><span>{{ item.label }}</span></Link></template>
+          <template v-for="item in menu" :key="item.key"><Link :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="admin-nav-link" :class="item.parent ? 'admin-nav-sub' : ''" :data-testid="'menu-' + item.key" @click="open = false"><AdminIcon :name="item.icon" :size="item.parent ? 20 : 24" /><span>{{ item.label }}</span></Link></template>
         </nav>
       </aside>
       <main id="contenu" class="admin-main" tabindex="-1">

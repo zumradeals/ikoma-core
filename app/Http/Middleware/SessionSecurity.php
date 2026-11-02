@@ -30,7 +30,7 @@ class SessionSecurity
         }
         $response = $next($request);
         app(AccessAudit::class)->record($request, $response);
-        if ($request->path() !== '/' && ! str_starts_with($request->path(), 'build/')) {
+        if ($request->path() !== '/' && ! str_starts_with($request->path(), 'build/') && ! str_starts_with($request->path(), 'institution/')) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
 

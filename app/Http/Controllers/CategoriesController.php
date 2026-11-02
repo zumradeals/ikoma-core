@@ -22,7 +22,7 @@ final class CategoriesController
         Gate::authorize('categories.gerer');
         $categories = Category::with(['event:id,name', 'zones:id,name'])->orderBy('name')->get()->map(fn (Category $c) => ['id' => $c->id, 'event_id' => $c->event_id, 'event_name' => $c->event->name, 'name' => $c->name, 'color' => $c->color, 'priority_circuit' => $c->priority_circuit, 'zone_ids' => $c->zones->pluck('id'), 'zone_names' => $c->zones->pluck('name')]);
 
-        return Inertia::render('Admin/Categories', ['events' => Event::orderBy('name')->get(['id', 'name']), 'zones' => Zone::orderBy('name')->get(['id', 'name', 'event_id']), 'categories' => $categories]);
+        return Inertia::render('Admin/Categories', ['events' => Event::where('is_permanent', false)->orderBy('name')->get(['id', 'name']), 'zones' => Zone::orderBy('name')->get(['id', 'name', 'event_id']), 'categories' => $categories]);
     }
 
     /** @return array{event_id:string,name:string,color:string,priority_circuit:bool,zone_ids:list<string>} */

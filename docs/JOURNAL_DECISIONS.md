@@ -454,3 +454,96 @@ verrou sont expliquées dans [le rapport R05](security/S0.2-R05-SYMFONY-MIME.md)
 Les tests portent sur les noms MIME invalides et la sérialisation valide, sans
 envoi de courriel. Les alertes système restent visibles et bloquantes ; aucune
 fusion de remédiation, livraison ou intervention serveur n'est autorisée.
+
+
+## A03 — Identité institutionnelle configurable (2 novembre 2026)
+
+L'identité visible (nom, dénomination, logo, trois couleurs, accroches, pied de page) est un
+réglage de l'installation : clés `institution_*` de la table `settings`, écran
+Administration → Identité (administrateur, permission `comptes.gerer` existante, aucun nouveau droit).
+Sans nom enregistré, l'identité IKOMA ACCESS standard est affichée, à l'identique d'avant.
+
+- Un seul service (`App\Services\Institution`) lit les réglages, valide les couleurs (`#RRGGBB`) et
+  partage le profil aux pages Inertia et au gabarit HTML. Aucun service métier ne le lit (test d'architecture).
+- Les couleurs de marque passent par les variables CSS `--inst-*` (valeurs d'IKOMA par défaut) ;
+  `/institution/theme.css` ne les redéfinit que si une identité est enregistrée. Aucun style en ligne : la CSP n'est pas modifiée.
+- Le logo (PNG ou JPEG, 1 Mo) est réencodé en PNG ≤ 512 px, stocké en privé et servi par `/institution/logo`.
+  Ces deux ressources publiques ne renvoient aucun cookie (même risque de course que la correction du précache).
+- Limites assumées : le manifeste PWA (nom d'installation) et les badges imprimés (lot A05) ne suivent pas encore l'identité ;
+  la page d'accueil précachée peut afficher l'ancienne identité jusqu'à la mise à jour du service worker.
+
+
+## A04 — Registre des titulaires permanents (2 novembre 2026)
+
+Approche C1 vérifiée sur le code puis implémentée : registre d'identité hors événement (`permanent_holders`),
+contexte permanent protégé (`events.is_permanent`), liens facultatifs et nullables (`visitors.holder_id`,
+`categories.institutional_code`). Migration additive ; le moteur de contrôle, les entrées et sorties, les badges et le préfixe QR
+`IKOMA1:` ne sont pas modifiés (lots A05/A06).
+
+- Le registre est la référence d'identité : aucune fiche d'événement ne la remplace. Un titulaire ne se supprime pas (déclencheur + droits) : actif ou clos, clôture irréversible avec motif.
+- Identifiant imprimable : séquence PostgreSQL (jamais recyclée), format configurable (préfixe, largeur, clé de Luhn), immuable, jamais réattribué ; distinct de l'UUID, du code B-nnn et du jeton QR. Rattaché au titulaire (le choix titulaire ou carte reste à valider par l'institution).
+- Huit catégories AILCT-01 à 08 : créées à la demande, libellés des contrats validés, couleurs et repères neutres et modifiables, association facultative aux catégories d'événement. Aucune règle d'accès ne les lit (test d'architecture).
+- Contexte permanent : un seul, jamais clos, archivé, anonymisé, supprimé ni remis à zéro ; exclu des conservations et des événements affichés par défaut. Aucune durée de conservation ni purge propre aux titulaires n'est appliquée : base légale et durées à confirmer par l'AILCT.
+- Droits : permissions existantes (`listes.importer` pour le registre, `categories.gerer` pour le référentiel). Aucun rôle ajouté.
+
+## A05 — Cartes institutionnelles recto verso, génération et impression (2 novembre 2026)
+
+Propositions techniques (non validées par l'AILCT ; à confirmer) : migration additive `holder_cards`, `holder_card_prints`, colonnes de portrait sur `permanent_holders`.
+Le moteur de contrôle, les règles d'entrée et de sortie, le contrat QR `IKOMA1:` et la fabrication des lots standard ne changent pas.
+
+- Une carte = un badge technique (`badges`) hébergé par le contexte permanent, rattaché au titulaire. Le badge reste « Disponible » et sans zone : le contrôle le refuse (non associé). Aucune autorisation ne découle de la catégorie ni de la carte.
+- Une seule carte active par titulaire (index unique partiel). Titulaire, carte physique et identifiants techniques (B-nnn, jeton QR) restent trois notions distinctes ; l'identifiant du titulaire (A04) est imprimé au recto et au verso.
+- Premier tirage = émission ; tirages suivants = réimpressions avec motif obligatoire, même badge, même QR, même identifiant. Historique en ajout seul (déclencheur + droits). Le journal d'audit ne contient ni nom ni motif.
+- `BadgeLots::issueSingle` fabrique un exemplaire avec la même numérotation et les mêmes garanties que `generate`. La remise à zéro de démonstration inclut les deux nouvelles tables (refus si des cartes existent).
+- Huit modèles = les huit catégories (libellé, couleur, repère du référentiel A04) ; couleurs neutres et mention « MODÈLE PROVISOIRE » tant que l'administrateur n'a pas coché la validation. Mentions du verso configurables (réglages `carte_*`), avis par défaut modifiable.
+- Recto : logo, nom de l'institution, portrait (facultatif, chiffré, imprimé seulement si autorisé), nom complet, catégorie, identifiant. Le registre n'ayant qu'un champ « nom complet », nom et prénom ne sont pas séparés.
+- Format CR80 portrait 53,98 × 85,60 mm, recto page 1 / verso page 2 (retournement grand côté), page d'essai d'alignement sans QR. Aucune compatibilité avec une imprimante PVC n'est affirmée sans essai réel.
+- Hors périmètre (A06) : retrait ou remplacement d'une carte perdue, sorties permanentes, restitution, contrôle hors ligne, droits par zone.
+- Qualification A05 : le contexte permanent est exclu des listes d'événements des écrans ordinaires (imports, postes, zones, catégories, badges, atelier, groupes, visiteurs) ; l'import et la fabrication de lots l'y refusent (cause du rouge E2E « import » : l'événement permanent était présélectionné). La remise à zéro de démonstration est refusée, avant toute suppression, dès qu'un titulaire, une carte ou le contexte permanent existe ; en production la fonction SQL n'est de toute façon pas accordée au compte web.
+
+## A06 — Cycle de vie des cartes permanentes, entrées/sorties, habilitations, hors ligne (2 novembre 2026)
+
+Propositions techniques (non validées par l'AILCT) ; migration additive `2026_11_19`. Le contrat QR `IKOMA1:`, le registre A04, l'impression A05 et les parcours visiteurs ne changent pas.
+
+- **Identifiants :** l'identifiant imprimé reste celui du titulaire (A04). Une carte a son propre badge (code B-nnn jamais recyclé, jeton QR neuf) et un rang d'émission (« Carte n° 2 » au verso). Aucun identifiant supplémentaire imprimé.
+- **Cycle de vie :** perdue / volée / révoquée sont des statuts terminaux (déclencheur : aucune réactivation, motif figé). Le badge passe à « Annulé » : le contrôle, la copie hors ligne et les alertes le refusent comme tout badge annulé. Remplacement = révocation + nouvelle carte, lien conservé ; historique et tirages intacts. Journal sans nom ni motif libre.
+- **Contrôle :** pas de second moteur. `SiteControl` (contrôle et sortie) délègue la décision à `PermanentAccess` quand le QR est une carte permanente et garde journal, alertes, synchronisation et présences. L'entrée est enregistrée au poste d'entrée via une fiche de participation de l'événement (catégorie sans zone). La sortie n'est soumise ni à l'habilitation, ni au statut de la carte, ni à la confiance hors ligne, ne restitue rien et exige une entrée ; une carte révoquée qui sort déclenche une alerte.
+- **Habilitations :** `holder_entitlements` (titulaire, événement, zone, période ; retrait avec motif, jamais de modification ni suppression). `zone_policies` : classification saisie par l'institution (aucune valeur officielle fournie), « titulaires permanents admis » et « entrée hors ligne admise » ; sans politique, refus. Catégories AILCT, carte et rôles n'accordent rien (test).
+- **Hors ligne :** la tablette reçoit des empreintes de jetons, les cartes révoquées, les habilitations et politiques. La confiance (`titulaire_hors_ligne_minutes` + `titulaire_hors_ligne_approuve`) est nulle tant que l'institution n'a pas approuvé une durée : toute nouvelle entrée hors ligne est alors refusée. L'ancienneté est jugée à chaque décision (client) et rejugée par le serveur au rejeu (heure déclarée, dernière synchronisation connue, politique de zone) ; horloge à l'envers = expirée. Rejeu idempotent ; une entrée jugée valide hors ligne mais refusée par le serveur passe en conflit.
+- **Écrans :** carte du titulaire (cartes, perte/vol/révocation/remplacement avec confirmation), « Habilitations et zones » (politiques, habilitations, confiance, état des terminaux, décisions), bandeau de confiance sur le poste. Permissions existantes uniquement (`listes.importer`, `badges.gerer`, `zones.gerer`, `postes.gerer`) ; aucun rôle ajouté.
+- **À valider par l'AILCT :** classification et restrictions des zones, durées de confiance hors ligne, procédures de panne prolongée, opérations permises quand la confiance est expirée, conservation légale.
+
+## A06.5 — Consolidation des interfaces (2 novembre 2026)
+
+Aucun contrat métier A01–A06 n'est modifié ; aucune migration. Une seule PR.
+
+- **Accueil public configurable :** réglage `institution_accueil` (table des réglages, jamais un fichier technique). Sans réglage : actif pour l'installation standard (comportement historique), **désactivé pour une installation institutionnelle** (nom configuré), décision validée pour l'AILCT. Désactivé, `/` redirige vers `/login` (`no-store`, sans cookie) ; contenus et réglages conservés ; réactivable depuis « Identité » (`PUT /administration/identite/accueil`, droit `comptes.gerer`, journalisé). Sans lien avec l'authentification ni les permissions. L'accueil ne reçoit que les données publiques d'identité.
+- **Service worker :** `/` n'est plus précachée (une page servie du cache ignorait le réglage). L'adresse racine passe toujours par le serveur ; la coquille publique `/accueil/shell` (toujours en 200, sans session) sert de secours hors ligne et redirige vers la connexion si l'accueil est désactivé.
+- **Invités :** « Ajouter une personne » devient « Ajouter un invité », parcours réservé aux invités temporaires ; renvoi explicite vers le registre des titulaires, qui reste le seul parcours de création de titulaire (test).
+- **Navigation :** une entrée de premier niveau par usage — « Badges visiteurs » (sous-entrée « Atelier d'impression ») et « Titulaires permanents et cartes » (sous-entrées « Modèles de cartes », « Habilitations et zones », « Catégories institutionnelles »), sous-entrées visibles seulement dans leur rubrique, selon les permissions existantes. Les deux parcours d'impression gardent des composants distincts (formats, règles et cycles de vie différents) : les mutualiser aurait changé des règles métier ; ils sont reliés par des liens croisés.
+- **Démonstration :** `DemoLab::available()` (demo, local, testing uniquement) est vérifié côté serveur par un middleware de route (404), dans le contrôleur et dans chaque méthode du service ; absent de la navigation en exploitation. Protections A05/A06 des titulaires et cartes inchangées (la remise à zéro reste refusée dès qu'ils existent).
+- **Recette :** `desk-fixtures` expose l'identifiant de l'événement ; `pilotage` et `z-groupes` sélectionnent explicitement leur événement (`?event=`) au lieu de dépendre du plus récent. Le comportement métier de sélection d'événement ne change pas.
+
+## A07 — Recette opérationnelle (2 novembre 2026)
+
+Recette automatisée sur données fictives ; trois défauts constatés et corrigés (fiches de participation des titulaires visibles dans les outils d'invités ; dates d'habilitation décalées hors UTC ; aperçu d'import illisible bloquant). Aucun contrat métier, aucune migration, aucun nouveau module. Rapport : `docs/RECETTE_A07.md` (réussi / partiel / non testé sur matériel réel / bloqué). Conclusion : qualifié en environnement de test, **non prêt à l'exploitation réelle** tant que les essais matériels et les décisions de l'AILCT ne sont pas obtenus.
+
+## R1 — Registre des personnes (2 novembre 2026)
+
+Premier des six lots de la refonte des identités, badges et cartes (R1 à R6, validés par le dirigeant). Périmètre : le registre seul. Aucune carte, aucun QR, aucune habilitation, aucune règle de contrôle, aucun contrat A04–A06 n'est modifié.
+
+- **Nom et prénom :** colonnes additives `first_name`, `last_name` (facultatives, toujours ensemble : contrainte en base) et `quality` (qualité, distincte de `position` = fonction). `full_name` reste la valeur de référence (unicité, recherche, carte, participation) : dérivée « Prénom Nom » quand prénom et nom sont fournis, saisie telle quelle sinon. **Les fiches historiques ne sont jamais découpées automatiquement** ; elles peuvent l'être à la main, fiche par fiche.
+- **Import :** `App\Services\Imports\HolderImport`. Aperçu chiffré (disque privé, un par administrateur, 1 h, purge par la commande existante `imports:purge`), 500 lignes au plus, CSV ou XLSX (lecteur existant). Colonnes : prénom + nom, ou « nom complet » (ou « nom » seul) conservé non découpé ; les colonnes ambiguës ou absentes sont refusées. Chaque ligne est contrôlée par les règles de la saisie individuelle. États : à enregistrer, homonyme (confirmation explicite ligne par ligne), doublon du registre, doublon du fichier, erreur. Confirmation en **une transaction** (tout ou rien), sous verrou, état du registre lu avant toute création, aperçu consommé dans la même transaction : un rejeu ne crée rien (les lignes déjà créées sont des doublons). Journal sans nom ni organisation (empreinte du fichier, compteurs, premier et dernier identifiant, un `titulaire.cree` par fiche).
+- **Photographie :** la fiche réutilise les routes et le stockage chiffré d'A05 (`photo_file`, `photo_print_allowed`) ; ajout d'une lecture authentifiée (`GET …/portrait`, sans cache). La liste n'expose plus le chemin du fichier, seulement `has_photo`. La photo reste facultative dans R1 (obligation prévue en R2).
+- **Recherche, filtres, sélection multiple :** recherche étendue à la fonction et à la qualité ; filtres état, catégorie (dont « sans catégorie »), photo ; opérations groupées (100 au plus) : catégorie (étiquette, sans effet sur les accès, fiches clôturées ignorées) et clôture avec motif et confirmation (irréversible comme la clôture individuelle).
+- **Enregistrer n'émet rien :** test automatisé (création, import, opérations groupées) sur cartes, tirages, badges, lots, fiches de participation, habilitations, affectations. Audit du comportement « B-001 » : `issue()` n'est appelé que par « Préparer la carte » (page Carte), le remplacement de carte et les commandes de données fictives ; jamais par l'enregistrement. Le code `B-nnn` est un badge technique (unicité `(event_id, code)`, numérotation propre au contexte permanent, sans lien avec les badges visiteurs des événements). Correction de présentation prévue en R2.
+- **Vocabulaire :** « Registre des personnes », « Ajouter une personne », « Clôturée » ; menu « Personnes et cartes permanentes ». Identifiants internes (data-testid, routes) inchangés.
+
+## R5a — Atelier des badges, parcours visiteurs (reprise de la PR #82, 2 novembre 2026)
+
+- **Cause des échecs de CI (runs 41459743120 et 41459742816) :** la migration `2026_11_02_000001_create_badge_print_ledger.php` déclarait `operator_id` avec `foreignId()` (bigint) alors que `users.id` est un UUID (SQLSTATE 42804). Corrigée en `foreignUuid()` sur `badge_print_runs` et `badge_print_events`. Une base vierge se migre jusqu'au bout (29 migrations) ; le retour arrière est refusé si des tirages existent.
+- **Registre des tirages (ajout seul) :** `badge_print_runs` (un tirage, immuable, nature officiel ou essai, options mémorisées sans donnée personnelle) et `badge_print_events` (états de TRAÇABILITÉ `generated`, `requested`, `operator_confirmed`). Ces états ne sont jamais des états métier : l'Atelier n'écrit ni statut, ni association, ni réservation, ni carte, ni habilitation. Déclencheurs de protection (UPDATE, DELETE, TRUNCATE) et droits retirés au compte applicatif (`scripts/grant-db.php`). Un seul `generated` et un seul `operator_confirmed` par tirage (index uniques) ; plusieurs `requested` possibles. Pas de clé étrangère vers événements et lots (purges et remise à zéro de démonstration inchangées). Conséquence : le compte applicatif ne peut pas verrouiller les lignes du registre (`FOR UPDATE` exige le droit UPDATE) ; les verrous sont consultatifs par tirage et par lot.
+- **Marquage d'exposition factorisé :** `Atelier\ExposureMarker`, appelé avant tout rendu d'un vrai QR (aperçu réel, tirage, étiquettes). L'aperçu d'un modèle est un exemple (QR d'exemple, aucun lot lu, aucune exposition).
+- **Étiquettes A4** : format de l'Atelier (même suivi, même marquage). Les anciens liens `/administration/badges/modeles` et `/administration/badges/etiquettes` redirigent vers `/administration/atelier` en conservant la sélection ; les anciennes API visiteurs (`…/modeles/apercu|personnes|preparer|imprimer`) restent actives et sont désormais tracées.
+- **Motif (DC-3) :** obligatoire à chaque nouvelle génération d'un badge nominatif déjà tiré (confirmé ou non), facultatif mais journalisé pour un badge anonyme. Le motif libre reste dans le registre, jamais dans le journal d'audit.
+- Les cartes permanentes (R5b), les habilitations et le contrôle d'accès ne sont pas modifiés.

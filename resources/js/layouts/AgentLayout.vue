@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
+import BrandName from '../components/BrandName.vue';
+import BrandLogo from '../components/BrandLogo.vue';
 const props = withDefaults(defineProps<{ active: 'home' | 'poste' | 'groupe' | 'controle' | 'securite'; agent?: string; online?: boolean; permissions?: string[] }>(), { agent: '', online: true, permissions: undefined });
 const page = usePage<{ auth?: { name: string; permissions: string[] } | null }>();
 const open = ref(false);
@@ -19,7 +21,7 @@ const allowed = computed(() => items.filter(item => props.active === item.key ||
   <div class="agent-shell" data-testid="agent-layout" :data-active="active">
     <a href="#contenu" class="agent-skip">Aller au contenu</a>
     <header class="agent-header">
-      <div class="agent-brand"><span class="agent-logo"><img :src="'/brand/ikoma-access-icon.svg'" alt="" width="36" height="36"></span><p><strong>IKOMA</strong> ACCESS<span>Agent d’accueil</span></p></div>
+      <div class="agent-brand"><span class="agent-logo"><BrandLogo :size="36" /></span><p><BrandName variant="strong" /><span>Agent d’accueil</span></p></div>
       <div class="agent-header-context"><slot name="header-context" /></div>
       <div class="agent-session"><span v-if="active === 'home' || active === 'securite'" class="agent-network" :data-online="online"><span aria-hidden="true">{{ online ? '●' : '✕' }}</span> {{ online ? 'En ligne' : 'Hors ligne' }}</span><span v-if="agent" class="agent-user"><span class="agent-avatar" aria-hidden="true">{{ agent.charAt(0).toUpperCase() }}</span><span>{{ agent }}</span></span><button type="button" class="agent-menu-toggle" :aria-expanded="open" aria-controls="menu-agent" data-testid="menu-agent-toggle" @click="open = !open"><AdminIcon name="menu" /><span>Menu</span></button></div>
     </header>

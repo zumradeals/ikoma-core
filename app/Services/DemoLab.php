@@ -19,10 +19,19 @@ final class DemoLab
         'formation' => 'Formation et groupes',
     ];
 
+    /**
+     * Phase d'essais : le laboratoire est ouvert aux administrateurs, y compris sur le serveur d'essai (APP_ENV=production), pour pouvoir tout remettre à zéro.
+     * Avant la livraison au client, remettre ici la restriction aux environnements d'essai (demo, local, testing) : un seul endroit à changer.
+     */
+    public static function available(): bool
+    {
+        return true;
+    }
+
     public static function authorize(User $actor): void
     {
-        abort_unless($actor->active && $actor->hasRole('administrateur')
-            && $actor->can('comptes.gerer'), 403);
+        abort_unless(self::available(), 403, 'Laboratoire indisponible.');
+        abort_unless($actor->active && $actor->hasRole('administrateur') && $actor->can('comptes.gerer'), 403);
     }
 
     /** @return array<string, int> */
@@ -206,6 +215,10 @@ final class DemoLab
     public function clearBusiness(User $actor, bool $clearAccounts = false): array
     {
         self::authorize($actor);
+        // Les titulaires permanents, leurs cartes et leur historique ne font pas partie des données de démonstration : refus net, avant toute suppression.
+        if (DB::table('events')->where('is_permanent', true)->exists() || DB::table('permanent_holders')->exists() || DB::table('holder_cards')->exists()) {
+            throw ValidationException::withMessages(['confirmation' => 'Remise à zéro refusée : le contexte permanent, les titulaires et leurs cartes sont protégés et ne s’effacent jamais ici. Aucune donnée n’a été supprimée.']);
+        }
         $counts = [];
         DB::transaction(function () use ($actor, $clearAccounts, &$counts): void {
             $counts = $this->totals();

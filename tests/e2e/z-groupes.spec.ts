@@ -5,11 +5,13 @@ import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 
 type Car = { id: string; name: string; bus: string; members: string[]; ids: string[]; badges: string[]; qr: Record<string, string> };
-type Fixtures = {
+type Fixtures = { event: string;
   cars: Record<string, Car>; enrolCode4: string; posteCars: string; carAgent: { email: string; password: string }; liveEncadreur: { email: string; password: string };
   supervisor: { email: string; password: string; secret: string }; admin: { email: string; password: string; secret: string };
 };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
+/** Les écrans de supervision choisissent l'événement de la recette de façon explicite : aucune dépendance à l'ordre chronologique global des événements. */
+const forEvent = (path: string) => `${path}${path.includes('?') ? '&' : '?'}event=${fx.event}`;
 const shots = process.env.L9_CAPTURES === '1';
 const PIN = '482915';
 
@@ -217,10 +219,10 @@ test('arrivée du car : scan continu, écarts signalés au superviseur', async (
   const supervisor = await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 380, height: 800 }, hasTouch: true, isMobile: true });
   await login(supervisor, fx.supervisor.email, fx.supervisor.password, fx.supervisor.secret);
   const sup = await supervisor.newPage();
-  await sup.goto('/pilotage/groupes');
+  await sup.goto(forEvent('/pilotage/groupes'));
   const card = sup.getByTestId('liste-groupes').locator('li').filter({ hasText: car.bus });
   await expect(card).toContainText('car parti'); await expect(card.getByTestId('ecarts-groupe')).toBeVisible(); await shot(sup, 'pilotage-groupes');
-  await sup.goto('/pilotage/alertes');
+  await sup.goto(forEvent('/pilotage/alertes'));
   await expect(sup.getByText('n’étaient pas embarquée').or(sup.getByText('alors que la personne n’était pas embarquée')).first()).toBeVisible();
   await expect(sup.getByText(/embarqué\(s\) du car Car 4 n’ont pas été scannés/)).toBeVisible();
   await supervisor.close();

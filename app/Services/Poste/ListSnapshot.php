@@ -4,6 +4,7 @@ namespace App\Services\Poste;
 
 use App\Models\Device;
 use App\Services\FoundingModules;
+use App\Services\PermanentAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -33,7 +34,8 @@ final class ListSnapshot
             (SELECT list_revision FROM events WHERE id = ?),
             ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
 
-        return sha1((string) $row->v);
+        // Cartes permanentes, habilitations et politiques de zone : toute révocation ou habilitation modifiée change la version et est donc reprise à la prochaine synchronisation.
+        return sha1((string) $row->v.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)));
     }
 
     private function groupMode(): string
@@ -55,7 +57,7 @@ final class ListSnapshot
             EXISTS (SELECT 1 FROM photos p WHERE p.visitor_id = v.id) AS photo_done,
             EXISTS (SELECT 1 FROM access_events a WHERE a.visitor_id = v.id AND a.type = 'validation') AS validated,
             (SELECT b.code FROM badge_assignments x JOIN badges b ON b.id = x.badge_id WHERE x.visitor_id = v.id AND x.returned_at IS NULL AND x.cancelled_at IS NULL LIMIT 1) AS badge_code
-            FROM visitors v WHERE v.event_id = ? AND v.withdrawn_at IS NULL ORDER BY v.full_name, v.id", [$e]);
+            FROM visitors v WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND v.holder_id IS NULL ORDER BY v.full_name, v.id", [$e]);
         $iso = fn (?string $value): ?string => $value === null ? null : Carbon::parse($value)->utc()->format('Y-m-d\TH:i:s.u\Z');
 
         return [
@@ -70,6 +72,7 @@ final class ListSnapshot
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
             'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
+            'permanent' => app(PermanentAccess::class)->snapshot($e),
             'postes' => DB::table('devices')->where('event_id', $e)->whereNull('revoked_at')->orderBy('name')->get(['id', 'name', 'station'])->map(fn ($d) => ['id' => $d->id, 'name' => $d->station ?? $d->name])->all(),
             // Les jetons QR ne quittent jamais le serveur en clair : la tablette compare le hachage du jeton scanné. Tous les badges de l'événement
             // sont copiés pour le contrôle hors ligne ; `mine` indique ceux que ce poste peut associer (réservés à lui).

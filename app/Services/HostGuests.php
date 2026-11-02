@@ -45,7 +45,7 @@ final class HostGuests
         if ($administration) {
             abort_unless($actor->can('listes.importer'), 403);
         }
-        $original = $id ? ($administration ? Visitor::whereNull('withdrawn_at')->findOrFail($id) : $this->owned($actor, $id)) : null;
+        $original = $id ? ($administration ? Visitor::whereNull('withdrawn_at')->whereNull('holder_id')->findOrFail($id) : $this->owned($actor, $id)) : null;
         $hostId = $administration ? ($data['host_id'] ?? null) : ($original ? $original->host_id : $data['host_id']);
         $hostQuery = DB::table('hosts')->where('id', $hostId);
         if (! $administration) {
@@ -69,7 +69,7 @@ final class HostGuests
                 $host = DB::table('hosts')->where('id', $host->id)->where('user_id', $actor->id)->lockForUpdate()->first();
                 abort_unless($host !== null, 403);
             }
-            $v = $id ? ($administration ? Visitor::whereNull('withdrawn_at')->lockForUpdate()->findOrFail($id) : $this->owned($actor, $id, true)) : null;
+            $v = $id ? ($administration ? Visitor::whereNull('withdrawn_at')->whereNull('holder_id')->lockForUpdate()->findOrFail($id) : $this->owned($actor, $id, true)) : null;
             if ($v) {
                 $this->editable($v, $administration);
             }
@@ -131,7 +131,7 @@ final class HostGuests
     {
         DB::transaction(function () use ($actor, $id, $administration) {
             abort_unless(! $administration || $actor->can('listes.importer'), 403);
-            $v = $administration ? Visitor::whereNull('withdrawn_at')->lockForUpdate()->findOrFail($id) : $this->owned($actor, $id, true);
+            $v = $administration ? Visitor::whereNull('withdrawn_at')->whereNull('holder_id')->lockForUpdate()->findOrFail($id) : $this->owned($actor, $id, true);
             if ($administration) {
                 if ($v->status === 'present' || app(Presence::class)->visitorPresent($id)) {
                     throw new DeskRefused('personne_presente', 'Cette personne est encore présente. Enregistrez sa sortie avant de la retirer.', 409);

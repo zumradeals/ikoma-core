@@ -35,3 +35,14 @@ pest()->use(DatabaseTransactions::class)->in('Feature/InstallationTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/DemoCleanupTest.php');
 
 pest()->use(DatabaseTransactions::class)->in('Feature/EventsTest.php');
+
+pest()->use(DatabaseTransactions::class)->in('Feature/InstitutionTest.php');
+
+pest()->use(DatabaseTransactions::class)->in('Feature/PermanentHoldersTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/HolderCardsTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/PermanentAccessTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/HomeConfigTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/DemoProtectionTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/ConsolidationTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/RecetteA07Test.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/RegistrePersonnesTest.php');

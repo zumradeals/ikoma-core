@@ -23,7 +23,7 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   await page.getByLabel('Zoom du portrait').focus(); await page.getByLabel('Zoom du portrait').press('ArrowRight');
   await page.getByLabel('Autoriser l’utilisation de ce portrait', { exact: false }).check();
   await page.getByRole('button', { name: 'Enregistrer la fiche', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Fiche de la personne', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fiche de l’invité', exact: true })).toBeVisible();
   const person = new URL(page.url()).searchParams.get('visitor')!;
   await expect(page.getByAltText('Aperçu du portrait')).toBeVisible();
   await page.screenshot({ path: 'test-results/fiche-personne-portrait.png', fullPage: true });
@@ -41,14 +41,14 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   await reserve.getByTestId('reserver-badges-libres').locator('input[type="checkbox"]').check();
   await reserve.locator('select').nth(1).selectOption({ label: 'Poste fictif A' });
   await reserve.getByRole('button', { name: 'Réserver les badges disponibles', exact: true }).click();
-  await page.goto('/administration/badges/modeles?person=' + person);
+  await page.goto('/administration/atelier?person=' + person);
   await page.getByRole('combobox', { name: 'Lot', exact: true }).selectOption(batch);
   await page.getByLabel('Au badge n°').fill(await page.getByLabel('Du badge n°').inputValue());
   await page.getByRole('combobox', { name: 'Mode de badge', exact: true }).selectOption('nominatif');
   await page.getByLabel('La politique du client autorise').check();
   await page.getByRole('button', { name: 'Charger les personnes de cette catégorie (200 max.)', exact: true }).click();
   await page.locator(`input[type="checkbox"][value="${person}"]`).check();
-  await page.getByRole('button', { name: 'Préparer 1 destination(s) nominative(s)', exact: true }).click();
+  await page.getByRole('button', { name: 'Préparer les destinations', exact: true }).click();
   await expect(page.getByText('1 destination(s) nominative(s) préparée(s)', { exact: false })).toBeVisible();
   await expect(page.getByTestId('synchronisation-nominative')).toContainText('Poste fictif A');
   for (const design of ['visiteur', 'vip', 'prestataire']) {
@@ -56,18 +56,18 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
     for (const orientation of ['paysage', 'portrait']) {
     await page.getByRole('combobox', { name: 'Orientation', exact: true }).selectOption(orientation);
     for (const photo of [false, true]) {
-      await page.getByLabel('Afficher le portrait de profil autorisé, si disponible').setChecked(photo);
-      await page.getByRole('button', { name: 'Actualiser l’aperçu', exact: true }).click();
-      await expect(page.locator('.access-card')).toContainText(name);
-      await expect(page.locator('.access-card__portrait')).toHaveCount(photo ? 1 : 0);
-      const qr = await page.locator('.access-card__qr').boundingBox(); const footer = await page.locator('.access-card__footer').boundingBox();
+      await page.getByLabel('Afficher le portrait autorisé, si disponible').setChecked(photo);
+      await page.getByTestId('afficher-reel').click();
+      await expect(page.getByTestId('badge-reel').locator('.access-card')).toContainText(name);
+      await expect(page.getByTestId('badge-reel').locator('.access-card__portrait')).toHaveCount(photo ? 1 : 0);
+      const qr = await page.getByTestId('badge-reel').locator('.access-card__qr').boundingBox(); const footer = await page.getByTestId('badge-reel').locator('.access-card__footer').boundingBox();
       expect(qr!.y + qr!.height).toBeLessThanOrEqual(footer!.y + .5);
-      await page.locator('.access-card').screenshot({ path: `test-results/badge-nominatif-${design}-${orientation}-${photo ? 'photo' : 'sans-photo'}.png` });
+      await page.getByTestId('badge-reel').locator('.access-card').screenshot({ path: `test-results/badge-nominatif-${design}-${orientation}-${photo ? 'photo' : 'sans-photo'}.png` });
     }
     }
   }
   await page.screenshot({ path: 'test-results/atelier-nominatif.png', fullPage: true });
   await page.getByRole('combobox', { name: 'Mode de badge', exact: true }).selectOption('reutilisable');
-  await page.getByRole('button', { name: 'Actualiser l’aperçu', exact: true }).click();
-  await expect(page.locator('.access-card')).not.toContainText(name); await expect(page.locator('.access-card__portrait')).toHaveCount(0);
+  await page.getByTestId('afficher-reel').click();
+  await expect(page.getByTestId('badge-reel').locator('.access-card')).not.toContainText(name); await expect(page.getByTestId('badge-reel').locator('.access-card__portrait')).toHaveCount(0);
 });

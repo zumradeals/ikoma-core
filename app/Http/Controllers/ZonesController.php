@@ -19,7 +19,7 @@ final class ZonesController
     {
         Gate::authorize('zones.gerer');
 
-        return Inertia::render('Admin/Zones', ['events' => Event::orderBy('name')->get(['id', 'name']), 'zones' => Zone::query()->join('events', 'events.id', '=', 'zones.event_id')->orderBy('events.name')->orderBy('zones.name')->get(['zones.id', 'zones.event_id', 'zones.name', 'zones.est_accueil', 'events.name as event_name'])]);
+        return Inertia::render('Admin/Zones', ['events' => Event::where('is_permanent', false)->orderBy('name')->get(['id', 'name']), 'zones' => Zone::query()->join('events', 'events.id', '=', 'zones.event_id')->orderBy('events.name')->orderBy('zones.name')->get(['zones.id', 'zones.event_id', 'zones.name', 'zones.est_accueil', 'events.name as event_name'])]);
     }
 
     public function store(Request $r): RedirectResponse
