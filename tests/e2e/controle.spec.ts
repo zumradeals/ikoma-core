@@ -16,6 +16,8 @@ test.beforeAll(async ({ browser }, info) => {
   const page = await tablet.newPage();
   await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(fx.email); await page.getByLabel('Mot de passe', { exact: true }).fill(fx.password); await page.getByRole('button', { name: 'Se connecter' }).click();
   await expect(page).toHaveURL(/\/espace/);
+  const probe = await tablet.request.get('/poste', { maxRedirects: 0, failOnStatusCode: false });
+  console.info(`E2E_DIAG controle /poste après connexion : HTTP ${probe.status()} location=${probe.headers()['location'] ?? '-'} cookies=${(await tablet.cookies()).map(c => `${c.name}:${c.expires}`).join(',')}`);
   await page.close();
 });
 test.afterAll(async () => { await tablet.close(); });

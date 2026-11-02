@@ -42,6 +42,16 @@ jobs:
       - name: Recette et captures Agent V2 sur données fictives isolées
         if: ${{ !cancelled() }}
         run: make e2e-agent
+      - name: Diagnostic des échecs E2E (contexte de page de chaque test en échec, données fictives)
+        if: ${{ failure() }}
+        run: |
+          find test-results -name error-context.md 2>/dev/null | sort | head -12 | while read -r f; do
+            echo "::group::$f"; sed -n '1,70p' "$f" | cut -c1-240; echo "::endgroup::"
+          done || true
+      - name: Diagnostic serveur des échecs E2E (refus d'accès et sessions expirées, sans donnée personnelle)
+        if: ${{ failure() }}
+        run: |
+          docker compose exec -T db sh -c 'export PGPASSWORD="$(cat /run/secrets/db-owner)"; psql -h 127.0.0.1 -U ikoma -d ikoma -c "select substr(occurred_at::text,12,8) as heure, action, (actor_id is null) as anonyme, (details::json)->>'"'"'route'"'"' as route, (details::json)->>'"'"'statut'"'"' as statut from audit_logs where action in ('"'"'acces.refuse'"'"','"'"'session.expiree'"'"') order by occurred_at limit 80"' || true
       - name: Vérifier le contrôle des exceptions de sécurité
         run: python3 -m unittest discover -s tests/security
       - name: Auditer les dépendances applicatives (blocage élevé et critique)
