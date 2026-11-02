@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
+import BrandName from '../components/BrandName.vue';
+import BrandLogo from '../components/BrandLogo.vue';
 import { wipePilotageLocal } from '../pilotage/evacuation';
 
 type EventRef = { id: string; name: string };
@@ -18,6 +20,7 @@ const items = [
   { key: 'imports', label: 'Liste d’invités', icon: 'list', href: '/administration/imports', permission: 'listes.importer' },
   { key: 'badges', label: 'Badges', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
+  { key: 'identite', label: 'Identité', icon: 'settings', href: '/administration/identite', permission: 'comptes.gerer' },
   { key: 'modules', label: 'Modules', icon: 'settings', href: '/administration/modules', permission: 'comptes.gerer' },
   { key: 'postes', label: 'Postes et tablettes', icon: 'monitor', href: '/administration/postes', permission: 'postes.gerer' },
   { key: 'comptes', label: 'Comptes', icon: 'users', href: '/administration/comptes', permission: 'comptes.gerer' },
@@ -34,7 +37,7 @@ function change(e: Event) { router.get('/administration', { event: (e.target as 
   <div class="admin-shell" data-testid="admin-layout">
     <a href="#contenu" class="admin-skip">Aller au contenu</a>
     <header class="admin-header">
-      <div class="admin-brand"><span class="admin-logo"><img :src="'/brand/ikoma-access-icon.svg'" alt="" width="36" height="36"></span><p><strong>IKOMA</strong> ACCESS</p></div>
+      <div class="admin-brand"><span class="admin-logo"><BrandLogo :size="36" /></span><p><BrandName variant="strong" /></p></div>
       <div class="admin-event">
         <label v-if="eventRef && events.length > 1 && active === 'tableau'" class="admin-event-select"><span class="sr-only">Événement</span>
           <select :value="eventRef.id" data-testid="choix-evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>

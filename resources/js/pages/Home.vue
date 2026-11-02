@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import InstitutionHome from '../components/InstitutionHome.vue';
+import { useInstitution } from '../composables/useInstitution';
+const institution = useInstitution();
 
 const features = [
   { icon: 'person', title: 'Accueil des visiteurs', text: 'Recherche, vérification, validation et remise des badges dans un parcours en sept étapes.' },
@@ -21,35 +24,37 @@ const roles = [
 </script>
 
 <template>
+  <InstitutionHome v-if="institution.custom" />
+  <template v-else>
   <Head title="IKOMA ACCESS — Contrôlez les accès. Maîtrisez les visites.">
     <meta name="description" content="IKOMA ACCESS, plateforme professionnelle de gestion des visiteurs, des badges, des accès et de la supervision opérationnelle.">
   </Head>
-  <div class="min-h-screen bg-[#F4F7FB] text-[#0B3C6B]">
+  <div class="min-h-screen bg-[#F4F7FB] text-[var(--inst-primary)]">
     <a href="#contenu" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:p-4">Aller au contenu</a>
 
     <header class="sticky top-0 z-40 border-b border-[#DDE8F3] bg-white/95 shadow-sm backdrop-blur">
       <div class="mx-auto flex min-h-[82px] w-full max-w-[1800px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
         <a href="/" class="flex shrink-0 items-center gap-3" aria-label="IKOMA ACCESS — accueil">
           <img :src="'/brand/ikoma-access-icon.svg'" alt="" width="46" height="46" class="h-11 w-11">
-          <span class="text-lg font-extrabold tracking-tight sm:text-xl">IKOMA <span class="text-[#F75C03]">ACCESS</span></span>
+          <span class="text-lg font-extrabold tracking-tight sm:text-xl">IKOMA <span class="text-[var(--inst-accent)]">ACCESS</span></span>
         </a>
         <nav aria-label="Navigation principale" class="hidden items-center gap-7 text-sm font-semibold text-[#345B82] lg:flex">
-          <a href="#solutions" class="hover:text-[#F75C03]">Fonctionnalités</a>
-          <a href="#fonctionnement" class="hover:text-[#F75C03]">Fonctionnement</a>
-          <a href="#espaces" class="hover:text-[#F75C03]">Espaces de travail</a>
-          <a href="#contact" class="hover:text-[#F75C03]">Contact</a>
+          <a href="#solutions" class="hover:text-[var(--inst-accent)]">Fonctionnalités</a>
+          <a href="#fonctionnement" class="hover:text-[var(--inst-accent)]">Fonctionnement</a>
+          <a href="#espaces" class="hover:text-[var(--inst-accent)]">Espaces de travail</a>
+          <a href="#contact" class="hover:text-[var(--inst-accent)]">Contact</a>
         </nav>
-        <a href="/login" class="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#0B3C6B] px-4 text-sm font-bold text-white transition hover:bg-[#0054A0] sm:px-6">Se connecter <span aria-hidden="true">↗</span></a>
+        <a href="/login" class="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--inst-primary)] px-4 text-sm font-bold text-white transition hover:bg-[#0054A0] sm:px-6">Se connecter <span aria-hidden="true">↗</span></a>
       </div>
     </header>
 
     <main id="contenu">
-      <section class="relative overflow-hidden bg-[#0B3C6B] text-white" aria-labelledby="titre-principal">
+      <section class="relative overflow-hidden bg-[var(--inst-primary)] text-white" aria-labelledby="titre-principal">
         <div aria-hidden="true" class="pointer-events-none absolute -right-52 -top-60 h-[700px] w-[700px] rounded-full border-[120px] border-white/[0.045]"></div>
         <div class="relative mx-auto grid w-full max-w-[1800px] items-center gap-12 px-5 py-14 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,.9fr)] lg:px-12 lg:py-24 xl:gap-20">
           <div class="max-w-3xl">
             <div class="mb-6 inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-extrabold uppercase tracking-[.16em] text-[#FFD7BA]">
-              <span class="h-2.5 w-2.5 rounded-full bg-[#F75C03]" aria-hidden="true"></span> Plateforme de gestion des visiteurs & des accès
+              <span class="h-2.5 w-2.5 rounded-full bg-[var(--inst-accent)]" aria-hidden="true"></span> Plateforme de gestion des visiteurs & des accès
             </div>
             <h1 id="titre-principal" class="text-[clamp(2.35rem,4vw,4.8rem)] font-extrabold leading-[1.1] tracking-tight">
               Contrôlez les accès.<br><span class="text-[#FF9C59]">Maîtrisez les visites.</span>
@@ -58,7 +63,7 @@ const roles = [
               Une seule plateforme pour accueillir vos visiteurs, contrôler les autorisations, suivre les présences et superviser votre site — de l’arrivée à la sortie.
             </p>
             <div class="mt-9 flex flex-wrap gap-4">
-              <a href="mailto:ikomagroup2@gmail.com?subject=Demande%20de%20pr%C3%A9sentation%20IKOMA%20ACCESS" class="inline-flex min-h-14 items-center justify-center gap-3 rounded-lg bg-[#F75C03] px-7 font-extrabold text-white transition hover:bg-[#DE5100]">Demander une présentation <span aria-hidden="true">↗</span></a>
+              <a href="mailto:ikomagroup2@gmail.com?subject=Demande%20de%20pr%C3%A9sentation%20IKOMA%20ACCESS" class="inline-flex min-h-14 items-center justify-center gap-3 rounded-lg bg-[var(--inst-accent)] px-7 font-extrabold text-white transition hover:bg-[#DE5100]">Demander une présentation <span aria-hidden="true">↗</span></a>
               <a href="#solutions" class="inline-flex min-h-14 items-center justify-center rounded-lg border border-white/70 px-7 font-bold text-white transition hover:bg-white/10">Découvrir les fonctionnalités</a>
             </div>
             <p role="status" class="mt-6 flex items-start gap-2 text-sm text-[#DCE9F8]"><span aria-hidden="true">ⓘ</span><span>Après une première visite, cette page et vos outils d’accueil s’ouvrent même sans réseau.</span></p>
@@ -70,10 +75,10 @@ const roles = [
           </div>
 
           <div class="relative min-w-0" aria-label="Aperçu illustratif des trois espaces IKOMA ACCESS">
-            <div class="absolute -bottom-6 left-7 right-7 top-8 rounded-3xl bg-[#F75C03]/20 blur-3xl" aria-hidden="true"></div>
-            <div class="relative overflow-hidden rounded-2xl border border-white/20 bg-[#F7FAFE] text-[#0B3C6B] shadow-[0_30px_85px_rgba(0,13,32,.35)]">
+            <div class="absolute -bottom-6 left-7 right-7 top-8 rounded-3xl bg-[var(--inst-accent)]/20 blur-3xl" aria-hidden="true"></div>
+            <div class="relative overflow-hidden rounded-2xl border border-white/20 bg-[#F7FAFE] text-[var(--inst-primary)] shadow-[0_30px_85px_rgba(0,13,32,.35)]">
               <div class="flex min-h-14 items-center justify-between gap-3 border-b border-[#DDE7F3] bg-white px-5">
-                <div class="flex items-center gap-2"><img :src="'/brand/ikoma-access-icon.svg'" alt="" class="h-8 w-8"><span class="text-sm font-extrabold">IKOMA <span class="text-[#F75C03]">ACCESS</span></span></div>
+                <div class="flex items-center gap-2"><img :src="'/brand/ikoma-access-icon.svg'" alt="" class="h-8 w-8"><span class="text-sm font-extrabold">IKOMA <span class="text-[var(--inst-accent)]">ACCESS</span></span></div>
                 <span class="rounded-full bg-[#E7F5ED] px-3 py-1 text-xs font-bold text-[#14733F]">Plateforme unifiée</span>
               </div>
               <div class="grid grid-cols-[84px_minmax(0,1fr)] sm:grid-cols-[132px_minmax(0,1fr)]">
@@ -98,7 +103,7 @@ const roles = [
                 </div>
               </div>
             </div>
-            <div class="absolute -bottom-6 -left-5 hidden rounded-xl border border-[#DCE8F4] bg-white px-5 py-4 text-[#0B3C6B] shadow-xl sm:block"><p class="text-xs text-[#617A97]">Une interface pour chaque rôle</p><p class="mt-1 font-extrabold">Administration · Terrain · Pilotage</p></div>
+            <div class="absolute -bottom-6 -left-5 hidden rounded-xl border border-[#DCE8F4] bg-white px-5 py-4 text-[var(--inst-primary)] shadow-xl sm:block"><p class="text-xs text-[#617A97]">Une interface pour chaque rôle</p><p class="mt-1 font-extrabold">Administration · Terrain · Pilotage</p></div>
           </div>
         </div>
       </section>
@@ -111,7 +116,7 @@ const roles = [
 
       <section id="solutions" class="scroll-mt-24 py-16 lg:py-24">
         <div class="mx-auto w-full max-w-[1800px] px-5 sm:px-8 lg:px-12">
-          <p class="text-sm font-extrabold uppercase tracking-[.16em] text-[#F75C03]">Une solution complète</p>
+          <p class="text-sm font-extrabold uppercase tracking-[.16em] text-[var(--inst-accent)]">Une solution complète</p>
           <div class="mt-3 flex flex-wrap items-end justify-between gap-6">
             <h2 class="max-w-3xl text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl xl:text-5xl">Du premier accueil à la dernière sortie.</h2>
             <p class="max-w-xl text-base leading-relaxed text-[#506D94]">Des outils complémentaires, pensés pour les responsables de site comme pour les équipes sur le terrain.</p>
@@ -137,13 +142,13 @@ const roles = [
         <div class="mx-auto w-full max-w-[1800px] px-5 sm:px-8 lg:px-12">
           <div class="grid gap-10 lg:grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)] lg:gap-16">
             <div>
-              <p class="text-sm font-extrabold uppercase tracking-[.16em] text-[#F75C03]">Une expérience guidée</p>
+              <p class="text-sm font-extrabold uppercase tracking-[.16em] text-[var(--inst-accent)]">Une expérience guidée</p>
               <h2 class="mt-3 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">Sept étapes. Un parcours maîtrisé.</h2>
               <p class="mt-5 max-w-xl leading-relaxed text-[#506D94]">À l’accueil, chaque personne suit un chemin clair. Les contrôles applicables restent soumis aux règles et aux décisions configurées par l’organisation.</p>
             </div>
             <ol class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               <li v-for="step in steps" :key="step.num" class="rounded-xl border border-[#DFE8F3] bg-[#F7FAFD] p-5">
-                <span class="text-2xl font-black text-[#F75C03]">{{ step.num }}</span><p class="mt-3 font-bold">{{ step.title }}</p>
+                <span class="text-2xl font-black text-[var(--inst-accent)]">{{ step.num }}</span><p class="mt-3 font-bold">{{ step.title }}</p>
               </li>
             </ol>
           </div>
@@ -153,23 +158,23 @@ const roles = [
 
       <section id="espaces" class="scroll-mt-24 py-16 lg:py-24">
         <div class="mx-auto w-full max-w-[1800px] px-5 sm:px-8 lg:px-12">
-          <p class="text-sm font-extrabold uppercase tracking-[.16em] text-[#F75C03]">Trois espaces complémentaires</p>
+          <p class="text-sm font-extrabold uppercase tracking-[.16em] text-[var(--inst-accent)]">Trois espaces complémentaires</p>
           <h2 class="mt-3 max-w-3xl text-3xl font-extrabold tracking-tight sm:text-4xl">À chaque équipe, son espace de travail.</h2>
           <div class="mt-10 grid gap-5 lg:grid-cols-3">
             <article v-for="role in roles" :key="role.title" class="flex flex-col rounded-2xl border border-[#DFE8F3] bg-white p-7">
               <span class="mb-8 inline-flex self-start rounded-md bg-[#EAF3FF] px-3 py-2 text-xs font-extrabold tracking-wider text-[#0059AC]">{{ role.tag }}</span>
               <h3 class="text-2xl font-extrabold">{{ role.title }}</h3>
               <p class="mt-3 flex-1 leading-relaxed text-[#506D94]">{{ role.text }}</p>
-              <div class="mt-8 border-t border-[#E0EAF5] pt-5"><span class="text-sm font-bold text-[#F75C03]">Interface dédiée et sécurisée</span></div>
+              <div class="mt-8 border-t border-[#E0EAF5] pt-5"><span class="text-sm font-bold text-[var(--inst-accent)]">Interface dédiée et sécurisée</span></div>
             </article>
           </div>
         </div>
       </section>
 
-      <section id="contact" class="scroll-mt-24 bg-[#0B3C6B] py-14 text-white lg:py-20">
+      <section id="contact" class="scroll-mt-24 bg-[var(--inst-primary)] py-14 text-white lg:py-20">
         <div class="mx-auto flex w-full max-w-[1800px] flex-col items-start justify-between gap-8 px-5 sm:px-8 lg:flex-row lg:items-center lg:px-12">
           <div><p class="text-sm font-bold uppercase tracking-[.16em] text-[#FFB387]">IKOMA ACCESS par IKOMA GROUP</p><h2 class="mt-3 max-w-3xl text-3xl font-extrabold sm:text-4xl">Prêt à moderniser l’accueil et le contrôle de votre site ?</h2><p class="mt-4 max-w-2xl text-[#DCE9F8]">Échangeons sur votre organisation, vos zones, vos visiteurs et votre environnement de travail.</p></div>
-          <a href="mailto:ikomagroup2@gmail.com?subject=Demande%20de%20pr%C3%A9sentation%20IKOMA%20ACCESS" class="inline-flex min-h-14 shrink-0 items-center justify-center rounded-lg bg-[#F75C03] px-7 font-extrabold text-white hover:bg-[#DE5100]">Demander une présentation <span aria-hidden="true" class="ml-3">→</span></a>
+          <a href="mailto:ikomagroup2@gmail.com?subject=Demande%20de%20pr%C3%A9sentation%20IKOMA%20ACCESS" class="inline-flex min-h-14 shrink-0 items-center justify-center rounded-lg bg-[var(--inst-accent)] px-7 font-extrabold text-white hover:bg-[#DE5100]">Demander une présentation <span aria-hidden="true" class="ml-3">→</span></a>
         </div>
       </section>
     </main>
@@ -182,4 +187,5 @@ const roles = [
       </div>
     </footer>
   </div>
+  </template>
 </template>

@@ -29,7 +29,7 @@ function submit() {
         <input v-model="form.recovery_code" class="mt-2 block min-h-14 w-full rounded-lg border border-[#BDD0E4] px-4 text-base focus-visible:outline-3 focus-visible:outline-[#0066B3]" required autocomplete="off">
       </label>
       <div v-if="Object.keys(form.errors).length" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-4 text-sm font-medium text-red-800"><p v-for="(error, key) in form.errors" :key="key">{{ error }}</p></div>
-      <button type="submit" :disabled="form.processing" class="flex min-h-14 w-full items-center justify-center rounded-lg bg-[#F75C03] px-6 font-extrabold text-white hover:bg-[#DE5100] disabled:opacity-60">{{ form.processing ? 'Vérification en cours…' : 'Vérifier' }}</button>
+      <button type="submit" :disabled="form.processing" class="flex min-h-14 w-full items-center justify-center rounded-lg bg-[var(--inst-accent)] px-6 font-extrabold text-white hover:bg-[#DE5100] disabled:opacity-60">{{ form.processing ? 'Vérification en cours…' : 'Vérifier' }}</button>
     </form>
     <button type="button" class="mt-6 min-h-14 w-full rounded-lg border border-[#C9D9EA] px-4 text-center text-sm font-semibold text-[#0053A4] hover:bg-[#EFF6FF]" @click="toggleRecovery">{{ recovery ? 'Utiliser un code à six chiffres' : 'Utiliser un code de secours' }}</button>
     <p class="mt-6 text-center text-sm text-[#506D94]">Cette étape protège votre espace et ses données.</p>
