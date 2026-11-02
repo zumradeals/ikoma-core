@@ -64,6 +64,8 @@ type Row = { identifier: string; decision: string; reason: string };
 async function decisions(admin: Page): Promise<Row[]> {
   await admin.goto('/administration/habilitations?event=' + fx.event.id);
   await expect(admin.getByTestId('page-habilitations')).toBeVisible();
+  // Les décisions sont dans les « Réglages avancés », repliés par défaut.
+  await admin.getByTestId('reglages-avances').locator('summary').click();
   const rows = admin.locator('[data-testid="table-decisions"] tbody tr');
   await expect(rows.first()).toBeVisible();
   return (await rows.evaluateAll(trs => trs.map(tr => { const c = Array.from(tr.querySelectorAll('td')).map(td => (td.textContent ?? '').replace(/\s+/g, ' ').trim()); return { identifier: c[1], decision: c[3], reason: c[4] }; })));
