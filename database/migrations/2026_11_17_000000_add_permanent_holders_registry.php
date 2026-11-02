@@ -26,7 +26,6 @@ return new class extends Migration
             $t->timestampsTz();
         });
 
-        DB::statement('CREATE SEQUENCE permanent_holder_identifier_seq AS bigint START 1 NO CYCLE');
         Schema::create('permanent_holders', function (Blueprint $t) {
             $t->uuid('id')->primary();
             $t->string('identifier', 40)->unique();
@@ -47,6 +46,8 @@ return new class extends Migration
             $t->foreign('created_by')->references('id')->on('users')->restrictOnDelete();
             $t->foreign('updated_by')->references('id')->on('users')->restrictOnDelete();
         });
+        // La séquence appartient à la table : migrate:fresh la supprime avec elle, et elle n'est jamais remise à zéro sinon.
+        DB::statement('CREATE SEQUENCE IF NOT EXISTS permanent_holder_identifier_seq AS bigint START 1 NO CYCLE OWNED BY permanent_holders.identifier_seq');
         DB::statement("ALTER TABLE permanent_holders ADD CONSTRAINT permanent_holders_status_valid CHECK (status IN ('actif', 'clos'))");
         DB::statement("ALTER TABLE permanent_holders ADD CONSTRAINT permanent_holders_closed_coherent CHECK ((status = 'clos') = (closed_at IS NOT NULL))");
         DB::statement('ALTER TABLE permanent_holders ADD CONSTRAINT permanent_holders_engagement_dates CHECK (engagement_ends_on IS NULL OR engagement_starts_on IS NULL OR engagement_ends_on >= engagement_starts_on)');
