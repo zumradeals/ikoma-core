@@ -31,6 +31,14 @@ const lifecycleForm = useForm({ reason: 'perdue', note: '', confirmation: false 
 function openLifecycle(kind: 'revoquer' | 'remplacer') { lifecycle.value = kind; lifecycleForm.reset(); lifecycleForm.clearErrors(); }
 function submitLifecycle() { lifecycleForm.post(base.value + '/carte/' + lifecycle.value, { preserveScroll: true, onSuccess: () => { lifecycle.value = null; } }); }
 const statusLabel: Record<string, string> = { active: 'Active', perdue: 'Perdue', volee: 'Volée', revoquee: 'Révoquée', retiree: 'Retirée' };
+/** Prévient avant l'activation : la carte n'ouvre que ce que les habilitations permettent (les dates d'engagement ne comptent pas). */
+const habilitationNotice = computed(() => {
+  const live = props.entitlements.filter(e => e.revoked_at === null);
+  const now = Date.now();
+  if (live.some(e => Date.parse(e.valid_from) <= now && Date.parse(e.valid_until) > now)) return null;
+  const next = live.filter(e => Date.parse(e.valid_from) > now).sort((a, b) => Date.parse(a.valid_from) - Date.parse(b.valid_from))[0];
+  return next ? `Aucune habilitation en cours : la carte n’ouvrira rien avant le ${new Date(next.valid_from).toLocaleDateString('fr-FR')}.` : 'Aucune habilitation en cours : la carte n’ouvrira aucune zone. Accordez une habilitation dans « Qui peut entrer où ? ».';
+});
 const steps = ['Préparer la carte', 'Imprimer', 'Remettre et activer'];
 const stage = computed(() => (props.card === null ? 0 : props.card.activated_at !== null ? 3 : props.card.prints.length === 0 ? 1 : 2));
 const activation = useForm({ confirmation: false });
@@ -100,6 +108,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
           <section v-if="card.activated_at === null" class="space-y-3 rounded-xl border-2 border-blue-600 bg-white p-5" aria-label="Remise" data-testid="remise-carte">
             <h2 class="text-heading font-bold">Remettre et activer</h2>
             <p>Quand la carte est imprimée et remise à la personne, activez-la : elle pourra alors être utilisée au contrôle. Avant cela, elle est refusée.</p>
+            <p v-if="habilitationNotice" class="rounded-lg border-2 border-amber-600 bg-amber-50 p-3 font-semibold" role="status" data-testid="avertissement-habilitation">{{ habilitationNotice }}</p>
             <label class="flex items-center gap-2 font-semibold"><input v-model="activation.confirmation" type="checkbox" class="size-6" data-testid="confirmer-remise"> La carte est remise à la personne</label>
             <p v-if="$page.props.errors?.holder || activation.errors.confirmation" class="font-semibold text-red-800" role="alert">{{ $page.props.errors?.holder ?? activation.errors.confirmation }}</p>
             <button type="button" class="admin-primary" :disabled="!activation.confirmation || activation.processing" data-testid="activer-carte" @click="activate">Remettre et activer</button>

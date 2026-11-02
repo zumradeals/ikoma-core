@@ -241,7 +241,7 @@ it('refuse sans habilitation, hors zone habilitée, après expiration ou retrait
     // Pas encore valable.
     app(HolderEntitlements::class)->revoke(DB::table('holder_entitlements')->where('holder_id', $holder)->whereNull('revoked_at')->value('id'), 'Essai (fictif)', $this->admin);
     pxGrant($holder, $this->event, $this->zone, '+1 hour', '+3 hours');
-    pxControl($token)->assertJson(['valid' => false, 'reason' => 'habilitation_absente']);
+    pxControl($token)->assertJson(['valid' => false, 'reason' => 'habilitation_non_commencee']);
 });
 
 it('refuse par défaut une zone sans politique ou fermée aux titulaires permanents', function () {
@@ -256,13 +256,16 @@ it('refuse par défaut une zone sans politique ou fermée aux titulaires permane
     expect(fn () => app(HolderEntitlements::class)->savePolicy($event, $zone, 'NEUTRE-TEST', false, true, $this->admin))->toThrow(ValidationException::class);
 });
 
-it('refuse un titulaire clos, un engagement terminé et un événement clos, mais laisse sortir', function () {
+it('refuse un titulaire clos et un événement clos, mais laisse sortir ; les dates d’engagement n’ouvrent ni ne ferment rien', function () {
     [$holder, $token] = pxCard();
     pxGrant($holder, $this->event, $this->zone);
     pxControl($token)->assertJson(['valid' => true]);
+    // Engagement terminé ou futur : sans effet sur la décision, seules les habilitations comptent.
     DB::table('permanent_holders')->where('id', $holder)->update(['engagement_ends_on' => now()->subDay()->toDateString(), 'engagement_starts_on' => now()->subMonth()->toDateString()]);
-    pxControl($token)->assertJson(['valid' => false, 'reason' => 'engagement_termine']);
-    DB::table('permanent_holders')->where('id', $holder)->update(['engagement_ends_on' => null]);
+    pxControl($token)->assertJson(['valid' => true]);
+    DB::table('permanent_holders')->where('id', $holder)->update(['engagement_ends_on' => null, 'engagement_starts_on' => now()->addYear()->toDateString()]);
+    pxControl($token)->assertJson(['valid' => true]);
+    DB::table('permanent_holders')->where('id', $holder)->update(['engagement_starts_on' => null]);
     app(PermanentHolders::class)->close($holder, 'Motif fictif', $this->admin);
     pxControl($token)->assertJson(['valid' => false, 'reason' => 'titulaire_clos']);
     pxExit($token)->assertJson(['ok' => true]);

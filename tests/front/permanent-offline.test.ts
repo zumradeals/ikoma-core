@@ -83,7 +83,7 @@ describe('titulaires permanents hors ligne', () => {
     expect(decidePermanentOffline(expired, hash, gate, ZONES, T0, known)).toMatchObject({ reason: 'habilitation_expiree' });
     const future = await permanent();
     future.holders[0].entitlements = [{ zone_id: 'z1', valid_from: iso(+10 * MIN), valid_until: iso(+300 * MIN) }];
-    expect(decidePermanentOffline(future, hash, gate, ZONES, T0, known)).toMatchObject({ reason: 'habilitation_absente' });
+    expect(decidePermanentOffline(future, hash, gate, ZONES, T0, known)).toMatchObject({ reason: 'habilitation_non_commencee' });
     const only1 = await permanent();
     only1.holders[0].entitlements = [{ zone_id: 'z1', valid_from: iso(-60 * MIN), valid_until: iso(60 * MIN) }];
     expect(decidePermanentOffline(only1, hash, zone('z2'), ZONES, T0, known)).toMatchObject({ reason: 'habilitation_absente' });
@@ -92,12 +92,20 @@ describe('titulaires permanents hors ligne', () => {
     expect(decidePermanentOffline(noPolicy, hash, gate, ZONES, T0, known)).toMatchObject({ reason: 'zone_sans_politique' });
   });
 
-  it('refuse un titulaire clos ou hors de sa période d’engagement', async () => {
+  it('refuse un titulaire clos ; les dates d’engagement n’ouvrent ni ne ferment rien', async () => {
     const hash = await sha256Hex(TOKEN);
     const closed = await permanent(); closed.holders[0].status = 'clos';
     expect(decidePermanentOffline(closed, hash, gate, ZONES, T0, iso(-1 * MIN)).reason).toBe('titulaire_clos');
-    const ended = await permanent(); ended.holders[0].ends_on = '2027-01-09';
-    expect(decidePermanentOffline(ended, hash, gate, ZONES, T0, iso(-1 * MIN)).reason).toBe('engagement_termine');
+    const ended = await permanent(); ended.holders[0].ends_on = '2000-01-09'; ended.holders[0].starts_on = '2099-01-01';
+    expect(decidePermanentOffline(ended, hash, gate, ZONES, T0, iso(-1 * MIN)).allowed).toBe(true);
+  });
+
+  it('dit quelle habilitation manque et à quelle date', async () => {
+    const hash = await sha256Hex(TOKEN);
+    const future = await permanent(); future.holders[0].entitlements.forEach(e => { e.valid_from = '2099-01-01T00:00:00Z'; e.valid_until = '2099-12-31T00:00:00Z'; });
+    expect(decidePermanentOffline(future, hash, gate, ZONES, T0, iso(-1 * MIN))).toMatchObject({ allowed: false, reason: 'habilitation_non_commencee', message: 'Habilitation pas encore valable : à partir du 01/01/2099.' });
+    const past = await permanent(); past.holders[0].entitlements.forEach(e => { e.valid_from = '2000-01-01T00:00:00Z'; e.valid_until = '2000-02-03T00:00:00Z'; });
+    expect(decidePermanentOffline(past, hash, gate, ZONES, T0, iso(-1 * MIN))).toMatchObject({ allowed: false, reason: 'habilitation_expiree', message: 'Habilitation expirée le 03/02/2000 : accès refusé.' });
   });
 
   it('ne se prononce jamais à partir de la catégorie : elle est seulement transmise pour l’affichage', async () => {

@@ -44,14 +44,15 @@ export function decidePermanentOffline(snap: PermanentSnapshot, hash: string, po
   if (!holder) return refuse('habilitation_absente', 'Aucune habilitation valable pour cet événement : accès refusé.');
   const who = { identifier: holder.identifier, name: holder.name, organisation: holder.organisation, category: holder.category ?? null };
   if (holder.status !== 'actif') return refuse('titulaire_clos', 'Titulaire clos : accès refusé.', who);
-  const today = new Date(now).toISOString().slice(0, 10);
-  if (holder.starts_on && today < holder.starts_on.slice(0, 10)) return refuse('engagement_non_commence', 'L’engagement de ce titulaire n’a pas encore commencé.', who);
-  if (holder.ends_on && today > holder.ends_on.slice(0, 10)) return refuse('engagement_termine', 'L’engagement de ce titulaire est terminé.', who);
   const scoped = holder.entitlements.filter(e => point?.type !== 'zone' || e.zone_id === point.id);
   const current = scoped.filter(e => (e.valid_from === null || Date.parse(e.valid_from) <= now) && (e.valid_until !== null && Date.parse(e.valid_until) > now));
   if (current.length === 0) {
-    const expired = scoped.some(e => e.valid_until !== null && Date.parse(e.valid_until) <= now);
-    return expired ? refuse('habilitation_expiree', 'Habilitation expirée : accès refusé.', who)
+    // Seules les habilitations décident (les dates d'engagement sont indicatives) : le refus dit laquelle manque et à quelle date.
+    const day = (iso: string) => new Date(iso).toISOString().slice(0, 10).split('-').reverse().join('/');
+    const upcoming = scoped.filter(e => e.valid_from !== null && Date.parse(e.valid_from) > now).sort((a, b) => Date.parse(a.valid_from as string) - Date.parse(b.valid_from as string))[0];
+    if (upcoming?.valid_from) return refuse('habilitation_non_commencee', `Habilitation pas encore valable : à partir du ${day(upcoming.valid_from)}.`, who);
+    const last = scoped.filter(e => e.valid_until !== null && Date.parse(e.valid_until) <= now).sort((a, b) => Date.parse(b.valid_until as string) - Date.parse(a.valid_until as string))[0];
+    return last?.valid_until ? refuse('habilitation_expiree', `Habilitation expirée le ${day(last.valid_until)} : accès refusé.`, who)
       : refuse('habilitation_absente', point?.type === 'zone' ? 'Aucune habilitation valable pour cette zone : accès refusé.' : 'Aucune habilitation valable pour cet événement : accès refusé.', who);
   }
   const policyOf = (zoneId: string) => snap.policies.find(p => p.zone_id === zoneId);
