@@ -128,9 +128,9 @@ it('applique les permissions à toutes les entrées de l’atelier', function (s
     $this->get('/administration/badges/modeles/imprimer?'.http_build_query($this->printOptions))->assertForbidden();
 })->with(['agent_accueil', 'superviseur', 'hote']);
 
-it('exige la connexion sans OTP de l’administrateur', function () {
+it('exige la connexion et la double authentification de l’administrateur', function () {
     auth()->logout();
     $this->get('/administration/badges/modeles')->assertRedirect('/login');
     $this->admin->forceFill(['two_factor_confirmed_at' => null])->save();
-    $this->actingAs($this->admin)->get('/administration/badges/modeles')->assertOk();
+    $this->actingAs($this->admin)->get('/administration/badges/modeles')->assertRedirect('/securite');
 });
