@@ -456,3 +456,17 @@ it('interdit de supprimer une zone ou un événement portant des habilitations',
     $event = app(DataLifecycle::class)->inspect('evenement', $this->event, $this->admin);
     expect($event['allowed'])->toBeFalse();
 });
+
+it('rejoue hors ligne la sortie d’une carte volée, après une confiance expirée : sortie enregistrée, alerte critique, évacuation cohérente', function () {
+    [$holder, $token] = pxCard();
+    pxGrant($holder, $this->event, $this->zone);
+    pxControl($token)->assertJson(['valid' => true]);
+    app(CardLifecycle::class)->revoke($holder, 'volee', null, $this->admin);
+    $this->travel(2)->seconds();
+    $op = ['id' => (string) Str::uuid(), 'seq' => 1, 'type' => 'sortie', 'agent_id' => $this->agent->id, 'client_time' => now()->subHours(30)->toIso8601String(), 'payload' => ['code' => 'PC:'.hash('sha256', $token), 'point' => null]];
+    $this->postJson('/poste/api/sync', ['operations' => [$op]], ['X-Device-Token' => PX_TOKEN_A, 'Accept' => 'application/json'])->assertOk();
+    expect(app(Presence::class)->count($this->event))->toBe(0)
+        ->and(DB::table('access_events')->where('event_id', $this->event)->where('type', 'sortie')->where('details->carte_statut', 'volee')->count())->toBe(1)
+        ->and(DB::table('alerts')->where('event_id', $this->event)->where('severity', 'critique')->where('message', 'like', '%présentée à la sortie%')->count())->toBe(1);
+    $this->actingAs(pxUser('superviseur'))->getJson('/pilotage/api/evacuation?event='.$this->event)->assertOk()->assertJsonPath('total', 0);
+});
