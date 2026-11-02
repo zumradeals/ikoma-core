@@ -298,7 +298,7 @@ it('ne confère aucun droit : le changement de catégorie d’un titulaire ne to
 });
 
 it('n’est lu par aucun service de contrôle, d’autorisation ni de badge : seuls le registre et son administration y accèdent', function () {
-    $allowed = ['Services/InstitutionalCategories.php', 'Services/PermanentHolders.php', 'Services/Imports/HolderImport.php', 'Http/Controllers/InstitutionalCategoriesController.php', 'Http/Controllers/PermanentHoldersController.php', 'Services/HolderCards.php', 'Http/Controllers/HolderCardsController.php', 'Services/CardLifecycle.php', 'Services/HolderEntitlements.php', 'Http/Controllers/HolderEntitlementsController.php', 'Services/PermanentAccess.php', 'Services/Poste/SiteControl.php', 'Console/Commands/PermanentFixtures.php', 'Services/DemoLab.php', 'Services/DataLifecycle.php', 'Services/DataRetention.php', 'Services/Maintenance.php'];
+    $allowed = ['Services/InstitutionalCategories.php', 'Services/PermanentHolders.php', 'Services/Imports/HolderImport.php', 'Http/Controllers/InstitutionalCategoriesController.php', 'Http/Controllers/PermanentHoldersController.php', 'Services/HolderCards.php', 'Services/CardModels.php', 'Http/Controllers/AtelierCartesController.php', 'Http/Controllers/HolderCardsController.php', 'Services/CardLifecycle.php', 'Services/HolderEntitlements.php', 'Http/Controllers/HolderEntitlementsController.php', 'Services/PermanentAccess.php', 'Services/Poste/SiteControl.php', 'Console/Commands/PermanentFixtures.php', 'Services/DemoLab.php', 'Services/DataLifecycle.php', 'Services/DataRetention.php', 'Services/Maintenance.php'];
     $readers = [];
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path())) as $file) {
         if ($file->isFile() && str_ends_with($file->getFilename(), '.php') && preg_match('/institutional_categor|institutional_code|permanent_holders|holder_id/', (string) file_get_contents($file->getPathname())) === 1) {
@@ -306,7 +306,7 @@ it('n’est lu par aucun service de contrôle, d’autorisation ni de badge : se
         }
     }
     // Outils d'invités temporaires : ils ne font que EXCLURE les fiches de participation des titulaires (holder_id IS NULL) ; ils ne lisent jamais le registre.
-    $exclusionOnly = ['Services/HostGuests.php', 'Services/VisitorSearch.php', 'Services/Poste/Desk.php', 'Services/Poste/ListSnapshot.php', 'Http/Controllers/AdminVisitorsController.php'];
+    $exclusionOnly = ['Services/HostGuests.php', 'Services/VisitorSearch.php', 'Services/Poste/Desk.php', 'Services/Poste/ListSnapshot.php', 'Http/Controllers/AdminVisitorsController.php', 'Http/Controllers/AtelierController.php'];
     foreach (array_intersect($readers, $exclusionOnly) as $file) {
         $rest = preg_replace("/whereNull\\('(?:v\\.)?holder_id'\\)|whereNotNull\\('holder_id'\\)|\\b[a-z]\\.holder_id IS NULL/", '', (string) file_get_contents(app_path($file)));
         expect(preg_match('/institutional_categor|institutional_code|permanent_holders|holder_id/', (string) $rest), $file)->toBe(0);

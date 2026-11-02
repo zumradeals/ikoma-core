@@ -39,6 +39,7 @@ export function controlLocal(list: LocalList, printed: string | null, point: Poi
     const decision = decidePermanentOffline(list.snapshot.permanent, printed.slice(PERMANENT_PREFIX.length), point, list.snapshot.zones, now, knownAt);
 
     return { ...base, badge_code: decision.holder?.identifier ?? null, valid: decision.allowed, reason: decision.reason, message: decision.message, person: decision.allowed && decision.holder ? { name: decision.holder.name } : null, organisation: decision.holder?.organisation ?? null,
+      category: decision.allowed ? (decision.holder?.category ?? null) : null,
       zones: decision.zones, zone_ok: decision.allowed && point?.type === 'zone' ? true : null, permanent: decision.holder ? { identifier: decision.holder.identifier } : null };
   }
   const badge = printed ? list.badges.get(printed) : undefined;

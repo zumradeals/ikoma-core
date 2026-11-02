@@ -2,7 +2,7 @@
     <header class="hc__band"></header>
     <p class="hc__line hc__line--main">{{ $card['verso']['ligne1'] }}</p>
     @if ($card['verso']['ligne2'] !== '')<p class="hc__line">{{ $card['verso']['ligne2'] }}</p>@endif
-    <div class="hc__qr">{!! $card['qr'] !!}</div>
+    @if (($card['qrSide'] ?? 'verso') !== 'recto')<div class="hc__qr">{!! $card['qr'] !!}</div>@endif
     <p class="hc__id hc__id--small">{{ $card['identifier'] }}</p>
     @if ($card['badge_code'])<p class="hc__tech">Carte n° {{ $card['rank'] }} · Badge {{ $card['badge_code'] }}</p>@endif
     <p class="hc__notice">{{ $card['verso']['avis'] }}</p>

@@ -28,3 +28,15 @@
 .hc--verso .hc__mark { margin-top: auto; }
 /* Aperçu à l'écran : ombre autour de la carte, jamais à l'impression. */
 .hc-preview { display: inline-block; box-shadow: 0 0 0 .3mm #cbd5e1, 0 2mm 6mm rgba(15, 23, 42, .18); }
+
+/* Catégorie : bande de la couleur du modèle, mention en grand (la couleur est l'élément dominant). */
+.hc__institution { font-size: 2.5mm; line-height: 1.15; }
+.hc__role { width: 100%; margin-top: 1mm; font-size: 2.8mm; line-height: 1.15; max-height: 7mm; overflow: hidden; overflow-wrap: anywhere; }
+.hc__mention { display: flex; align-items: center; justify-content: center; gap: 1.5mm; width: 53.98mm; min-height: 8mm; max-height: 11mm; margin-top: 2.5mm; padding: 1mm 3mm; background: var(--hc-color); color: var(--hc-ink); font-size: 3.4mm; font-weight: 800; letter-spacing: .2mm; line-height: 1.1; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.hc__mention .hc__symbol { background: var(--hc-ink); color: var(--hc-color); }
+.hc__validity { margin-top: .8mm; font-size: 2.6mm; font-weight: 700; }
+.hc__row { display: flex; align-items: center; justify-content: center; gap: 3mm; margin-top: 3mm; }
+.hc--qr-recto .hc__photo { width: 20mm; height: 26.7mm; margin-top: 0; }
+.hc__qr--recto { width: 24mm; height: 24mm; margin: 0; background: #fff; }
+
+.hc-preview--large { zoom: 1.6; }

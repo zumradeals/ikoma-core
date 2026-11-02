@@ -116,8 +116,12 @@ function status(e: Entitlement) { return e.revoked_at ? 'Retirée' : (Date.parse
           <p v-if="decisions.length === 0" data-testid="aucune-decision">Aucune décision pour les titulaires permanents.</p>
           <table v-else class="w-full text-left text-sm" data-testid="table-decisions">
             <thead><tr><th class="p-2">Heure</th><th class="p-2">Titulaire</th><th class="p-2">Point</th><th class="p-2">Décision</th><th class="p-2">Motif</th></tr></thead>
-            <tbody><tr v-for="d in decisions" :key="d.id" class="border-t" :data-testid="'decision-' + d.id"><td class="p-2">{{ when(d.at) }}<span v-if="d.deferred" class="ml-1 rounded bg-amber-100 px-1">hors ligne</span></td><td class="p-2 font-mono">{{ d.identifier }}</td><td class="p-2">{{ d.point }}</td>
-              <td class="p-2 font-semibold">{{ d.type === 'entree' ? 'Entrée' : d.type === 'sortie' ? 'Sortie' : d.verdict === 'valide' ? 'Contrôle valide' : 'Refus' }}</td><td class="p-2">{{ d.reason ? (reasonLabel[d.reason] ?? d.reason) : '—' }}</td></tr></tbody>
+            <tbody>
+<tr v-for="d in decisions" :key="d.id" class="border-t" :data-testid="'decision-' + d.id">
+<td class="p-2">{{ when(d.at) }}<span v-if="d.deferred" class="ml-1 rounded bg-amber-100 px-1">hors ligne</span></td><td class="p-2 font-mono">{{ d.identifier }}</td><td class="p-2">{{ d.point }}</td>
+              <td class="p-2 font-semibold">{{ d.type === 'entree' ? 'Entrée' : d.type === 'sortie' ? 'Sortie' : d.verdict === 'valide' ? 'Contrôle valide' : 'Refus' }}</td><td class="p-2">{{ d.reason ? (reasonLabel[d.reason] ?? d.reason) : '—' }}</td>
+</tr>
+</tbody>
           </table>
         </section>
       </template>

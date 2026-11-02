@@ -1,4 +1,5 @@
 <article class="access-card access-card--{{ $options['design'] }} access-card--{{ $options['orientation'] }} {{ $person ? 'access-card--nominatif' : '' }} {{ $portrait ? 'access-card--photo' : '' }}" style="--badge-primary: {{ $options['primary'] }}; --badge-accent: {{ $options['accent'] }}" aria-label="Badge {{ $badge->code }}">
+    @if (!empty($specimen))<p class="access-card__specimen">EXEMPLE · SANS VALEUR</p>@endif
     <header class="access-card__identity">
         <img src="/brand/ikoma-access-logo.svg" alt="IKOMA ACCESS" width="140" height="34">
         <p @class(['access-card__title-long' => mb_strlen($options['title']) > 35])>{{ $options['title'] }}</p>

@@ -24,10 +24,11 @@ const items: Item[] = [
   { key: 'categories', label: 'Catégories', icon: 'tag', href: '/administration/categories', permission: 'categories.gerer' },
   { key: 'imports', label: 'Liste d’invités', icon: 'list', href: '/administration/imports', permission: 'listes.importer' },
   { key: 'badges', label: 'Badges visiteurs', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
-  { key: 'atelier', label: 'Atelier d’impression', icon: 'qr', href: '/administration/badges/modeles', permission: 'badges.gerer', parent: 'badges' },
+  { key: 'atelier', label: 'Atelier des badges', icon: 'qr', href: '/administration/atelier', permission: 'badges.gerer' },
+
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
   { key: 'titulaires', label: 'Personnes et cartes permanentes', icon: 'users', href: '/administration/titulaires', permission: 'listes.importer' },
-  { key: 'modeles-cartes', label: 'Modèles de cartes', icon: 'tag', href: '/administration/titulaires/modeles', permission: 'badges.gerer', parent: 'titulaires' },
+  { key: 'modeles-cartes', label: 'Personnalisation des cartes', icon: 'tag', href: '/administration/titulaires/modeles', permission: 'badges.gerer', parent: 'titulaires' },
   { key: 'habilitations', label: 'Habilitations et zones', icon: 'shield', href: '/administration/habilitations', permission: 'listes.importer', parent: 'titulaires' },
   { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer', parent: 'titulaires' },
   { key: 'identite', label: 'Identité', icon: 'settings', href: '/administration/identite', permission: 'comptes.gerer' },

@@ -18,6 +18,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function badgeAccount(string $role): User
@@ -41,6 +42,14 @@ function demoLot(int $expected, int $category = 1): Badge
     $batch = $lots->generate(DemoSeeder::id('event'), DemoSeeder::id('category'.$category), $expected, badgeAccount('administrateur'));
 
     return Badge::where('badge_batch_id', $batch->id)->orderBy('code')->firstOrFail();
+}
+
+/** Étiquettes A4 : format de l'Atelier. Génère le tirage (traçé) puis ouvre son document d'impression. */
+function labelsDocument(object $test, string $batch, array $extra = []): TestResponse
+{
+    $plan = $test->postJson('/administration/atelier/tirages', ['format' => 'etiquettes', 'batch' => $batch, ...$extra])->assertOk()->json();
+
+    return $test->get($plan['document_url'])->assertOk();
 }
 
 /** Lignes de journal écrites par le test courant (les lignes d’autres tests, jamais supprimées, sont ignorées). */
@@ -547,7 +556,7 @@ it('imprime 400 étiquettes A4 sans aucune ressource externe ni jeton en clair',
     $lot = demoLot(400);
     $this->actingAs(badgeAccount('administrateur'));
     $start = microtime(true);
-    $response = $this->get('/administration/badges/etiquettes?batch='.$lot->badge_batch_id.'&cols=4&rows=10')->assertOk();
+    $response = labelsDocument($this, $lot->badge_batch_id, ['cols' => 4, 'rows' => 10]);
     $html = $response->getContent();
     expect(microtime(true) - $start)->toBeLessThan(30.0);
     // Politique de sécurité (L11) : le bloc de style de la page d'impression n'est permis que par son nonce, propre à la réponse.
@@ -573,7 +582,7 @@ it('imprime une plage avec une grille réglable, en indiquant catégorie, symbol
     $lot = demoLot(10, 3);
     $first = (int) substr($lot->code, 2);
     $this->actingAs(badgeAccount('administrateur'));
-    $html = $this->get('/administration/badges/etiquettes?batch='.$lot->badge_batch_id.'&from='.($first + 2).'&to='.($first + 4).'&cols=2&rows=3')->assertOk()->getContent();
+    $html = labelsDocument($this, $lot->badge_batch_id, ['from' => $first + 2, 'to' => $first + 4, 'cols' => 2, 'rows' => 3])->getContent();
     expect(substr_count($html, '<article class="label"'))->toBe(3)->and($html)->toContain('repeat(2, 1fr)')->and($html)->toContain('repeat(3, 1fr)')->and($html)->toContain('Stagiaire')->and($html)->toContain('■')->and($html)->toContain('N° '.($first + 2))->and($html)->not->toContain('B-'.$first.'<');
     $this->get('/administration/badges/etiquettes?batch='.$lot->badge_batch_id.'&cols=9')->assertSessionHasErrors('cols');
     $this->get('/administration/badges/etiquettes?batch='.(string) Str::uuid())->assertSessionHasErrors('batch');
@@ -582,8 +591,10 @@ it('imprime une plage avec une grille réglable, en indiquant catégorie, symbol
 it('limite le nombre d’étiquettes par page et affiche un message clair', function () {
     DB::table('settings')->where('key', 'badge_marge_pourcent')->update(['value' => '0']);
     $lot = demoLot(1001);
-    $html = $this->actingAs(badgeAccount('administrateur'))->get('/administration/badges/etiquettes?batch='.$lot->badge_batch_id)->assertOk()->getContent();
-    expect($html)->toContain('Choisissez une plage')->and(substr_count($html, '<article'))->toBe(0);
+    // Plus de 1 000 étiquettes : le tirage est refusé avec un message clair, rien n'est généré ni tracé.
+    $before = DB::table('badge_print_runs')->count();
+    $this->actingAs(badgeAccount('administrateur'))->postJson('/administration/atelier/tirages', ['format' => 'etiquettes', 'batch' => $lot->badge_batch_id])->assertUnprocessable()->assertJsonValidationErrors('to');
+    expect(DB::table('badge_print_runs')->count())->toBe($before);
 });
 
 it('ne propose plus de route de contrôle de démonstration (retirée au lot L5)', function () {

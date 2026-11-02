@@ -21,7 +21,7 @@ test('navigation consolidée : badges visiteurs, cartes permanentes, invités (o
     await page.goto('/administration'); await openMenu();
     await expect(page.getByTestId('menu-badges')).toHaveText('Badges visiteurs');
     await expect(page.getByTestId('menu-titulaires')).toContainText('Personnes et cartes permanentes');
-    await expect(page.getByTestId('menu-atelier')).toHaveCount(0);
+    await expect(page.getByTestId('menu-atelier')).toHaveText('Atelier des badges');
     await expect(page.getByTestId('menu-modeles-cartes')).toHaveCount(0);
     await noHorizontalScroll(page, `tableau ${label}`);
     await page.screenshot({ path: `test-results/a065-tableau-${label}.png`, fullPage: true });
@@ -39,7 +39,7 @@ test('navigation consolidée : badges visiteurs, cartes permanentes, invités (o
     await openMenu();
     await expect(page.getByTestId('menu-modeles-cartes')).toBeVisible();
     await expect(page.getByTestId('menu-habilitations')).toBeVisible();
-    await expect(page.getByTestId('menu-atelier')).toHaveCount(0);
+    await expect(page.getByTestId('menu-atelier')).toBeVisible();
     await expect(page.getByTestId('navigation-cartes')).toContainText('Badges visiteurs');
     await noHorizontalScroll(page, `titulaires ${label}`);
     await page.screenshot({ path: `test-results/a065-titulaires-cartes-${label}.png`, fullPage: true });
