@@ -74,10 +74,10 @@ test('confiance hors ligne : entrée autorisée, refus sans habilitation et cart
   // Première visite en ligne : enrôlement, copie de la situation (habilitations, politiques, cartes révoquées) et service worker.
   const first = await tablet.newPage();
   await open(first);
-  await first.evaluate(async () => {
-    await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller) await new Promise<void>(resolve => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true }));
-  });
+  await first.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+  // Une page n'est contrôlée par le service worker qu'après un rechargement : on le vérifie avant de couper le réseau.
+  await open(first);
+  await expect.poll(() => first.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 30_000 }).toBe(true);
   await expect(first.getByTestId('en-attente')).toHaveText('0');
   await first.close();
 

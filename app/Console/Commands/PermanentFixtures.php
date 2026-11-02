@@ -43,8 +43,9 @@ class PermanentFixtures extends Command
         $agent = User::create(['name' => "Agent fictif {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $agentPassword = Str::password(24)]);
         $agent->assignRole('agent_accueil');
 
+        // Événement volontairement ANCIEN : les écrans qui choisissent par défaut l'événement le plus récent gardent celui des autres recettes.
         $event = (string) Str::uuid();
-        DB::table('events')->insert(['id' => $event, 'name' => "Recette titulaires permanents {$s}", 'starts_at' => $now->copy()->subHour(), 'ends_at' => $now->copy()->addDays(2), 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('events')->insert(['id' => $event, 'name' => "Recette titulaires permanents {$s}", 'starts_at' => $now->copy()->subDays(30), 'ends_at' => $now->copy()->addDays(2), 'created_at' => $now, 'updated_at' => $now]);
         $hall = (string) Str::uuid();
         DB::table('zones')->insert(['id' => $hall, 'event_id' => $event, 'name' => "Hall titulaires {$s}", 'est_accueil' => true, 'created_at' => $now, 'updated_at' => $now]);
         $holders = app(HolderEntitlements::class);
