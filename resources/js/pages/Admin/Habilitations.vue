@@ -73,7 +73,7 @@ const trustForm = useForm({ minutes: props.trust.configured, approved: props.tru
 function saveTrust() { trustForm.put('/administration/habilitations/confiance', { preserveScroll: true }); }
 const stateLabel: Record<Device['state'], string> = { aucune_confiance: 'Aucune confiance hors ligne : nouvelles entrées refusées', confiance_expiree: 'Confiance expirée ou jamais synchronisé : nouvelles entrées refusées', confiance_valide: 'Confiance valide' };
 const reasonLabel: Record<string, string> = {
-  carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé',
+  carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', habilitation_non_commencee: 'Habilitation pas encore valable',
   evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée',
   perdue: 'Carte perdue', volee: 'Carte volée', revoquee: 'Carte révoquée', active: '',
 };

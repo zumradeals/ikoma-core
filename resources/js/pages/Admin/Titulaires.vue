@@ -264,7 +264,7 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
               <span class="rounded-lg px-3 py-1 text-sm font-bold" :class="h.status === 'actif' ? 'bg-green-100 text-green-900' : 'bg-slate-200 text-slate-800'" data-testid="etat-titulaire">{{ h.status === 'actif' ? 'En cours' : 'Clôturée' }}</span>
             </div>
           </div>
-          <p v-if="h.engagement_starts_on || h.engagement_ends_on" class="mt-2 text-sm">Engagement : {{ h.engagement_starts_on ?? '…' }} → {{ h.engagement_ends_on ?? 'sans fin prévue' }}</p>
+          <p v-if="h.engagement_starts_on || h.engagement_ends_on" class="mt-2 text-sm">Engagement (indicatif, n’ouvre ni ne ferme aucun accès) : {{ h.engagement_starts_on ?? '…' }} → {{ h.engagement_ends_on ?? 'sans fin prévue' }}</p>
           <p v-if="h.status === 'clos'" class="mt-2 text-sm">Clôturée : {{ h.closed_reason }}</p>
           <div v-if="h.status === 'actif'" class="mt-3 flex flex-wrap gap-3">
             <button type="button" class="btn-soft" :data-testid="'modifier-' + h.id" @click="startEdit(h)">Modifier</button>

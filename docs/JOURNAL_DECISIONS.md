@@ -559,3 +559,14 @@ Demande du dirigeant après examen de l’aperçu et d’un tirage PDF A4 : agra
 - Recette navigateur étendue : agrandissement à l’écran, dimensions physiques en média impression, deux pages PDF CR80, absence de débordements, marge sous la photo et refus d’un nom excessivement long. Vérification locale : `git diff --check` réussie. PHP/Docker absents et téléchargement de Chromium indisponible dans cet environnement : recette complète à exécuter par la CI avant de déclarer la correction qualifiée. Essai matériel PVC toujours nécessaire.
 
 - Correctif de recette (CI 41506111524) : un seul échec navigateur, au contrôle de débordement du cadre `.hc` ; 49 parcours réussis, production et analyses de sécurité réussies. Le retrait horizontal du cadre est déplacé sur les blocs de texte (`largeur = largeur carte - 6 mm`) : les bandes pleine largeur n’étendent plus le contenu défilable dans le retrait droit du cadre flex. Les retraits visuels de 3 mm et les dimensions physiques sont conservés ; le contrôle de débordement reste actif. Les assertions de recette affichent désormais les mesures de chaque axe en cas d’échec.
+
+
+## Accès permanents — les habilitations seules décident (2 novembre 2026)
+
+Constat de recette sur tablette : une carte active avec une habilitation en cours était refusée (« Engagement non commencé ») parce que la fiche portait un début d'engagement futur. Deux jeux de dates se contredisaient.
+
+- **Décision du dirigeant :** les dates d'engagement de la fiche (début, fin) deviennent **indicatives** : elles ne refusent plus l'entrée. Seules les habilitations (zone, dates) décident, avec la carte active et le titulaire actif. Les motifs `engagement_non_commence` et `engagement_termine` ne sont plus produits (ils restent affichables dans l'historique ancien).
+- **Refus plus clairs :** nouveau motif `habilitation_non_commencee` (« à partir du jj/mm/aaaa ») ; l'expiration indique la date (« expirée le jj/mm/aaaa »). Mêmes règles sur la tablette hors ligne.
+- **Fiche de la carte :** avant « Remettre et activer », un avertissement indique si aucune habilitation n'est en cours (et à partir de quand la carte ouvrira quelque chose).
+- **Conséquence à connaître :** une personne dont la fin d'engagement est passée garde son accès tant que ses habilitations courent et qu'elle n'est pas clôturée ; la fin d'une habilitation ou la clôture du titulaire reste le moyen de couper l'accès.
+- **Non fait :** proposer par défaut aux nouvelles habilitations les dates d'engagement de la personne.

@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
  *
  * Règles, dans cet ordre (refus par défaut) :
  *  1. la carte est active (une carte perdue, volée ou révoquée est refusée tout de suite) ;
- *  2. le titulaire est actif et sa période d'engagement couvre aujourd'hui ;
+ *  2. le titulaire est actif (ses dates d'engagement sont indicatives : elles n'ouvrent ni ne ferment aucun accès) ;
  *  3. l'événement est ouvert ;
  *  4. une habilitation non retirée et en cours de validité couvre la zone demandée (ou, au poste d'entrée, au moins une zone) ;
  *  5. la zone a une politique qui accepte les titulaires permanents.
@@ -73,13 +73,6 @@ final class PermanentAccess
         if ($card->holder_status !== 'actif') {
             return $refuse('titulaire_clos', 'Titulaire clos : accès refusé.');
         }
-        $today = $now->copy()->utc()->toDateString();
-        if ($card->engagement_starts_on !== null && $today < substr((string) $card->engagement_starts_on, 0, 10)) {
-            return $refuse('engagement_non_commence', 'L’engagement de ce titulaire n’a pas encore commencé.');
-        }
-        if ($card->engagement_ends_on !== null && $today > substr((string) $card->engagement_ends_on, 0, 10)) {
-            return $refuse('engagement_termine', 'L’engagement de ce titulaire est terminé.');
-        }
         $event = DB::table('events')->where('id', $eventId)->first(['status', 'anonymized_at', 'is_permanent']);
         if ($event === null || $event->is_permanent || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
             return $refuse('evenement_indisponible', 'Cet événement est clôturé, archivé ou anonymisé : aucune entrée n’est autorisée.');
@@ -91,10 +84,16 @@ final class PermanentAccess
         $current = $entitlements->filter(fn ($e) => strtotime((string) $e->valid_from) <= $now->getTimestamp())
             ->filter(fn ($e) => strtotime((string) $e->valid_until) > $now->getTimestamp());
         if ($current->isEmpty()) {
-            $expired = $entitlements->contains(fn ($e) => strtotime((string) $e->valid_until) <= $now->getTimestamp());
+            // Seules les habilitations décident (les dates d'engagement de la fiche sont indicatives) : le refus dit laquelle manque et à quelle date.
+            $day = fn (string $date): string => Carbon::parse($date)->utc()->format('d/m/Y');
+            $upcoming = $entitlements->filter(fn ($e) => strtotime((string) $e->valid_from) > $now->getTimestamp())->sortBy('valid_from')->first();
+            if ($upcoming !== null) {
+                return $refuse('habilitation_non_commencee', 'Habilitation pas encore valable : à partir du '.$day((string) $upcoming->valid_from).'.');
+            }
+            $lastEnd = $entitlements->filter(fn ($e) => strtotime((string) $e->valid_until) <= $now->getTimestamp())->sortByDesc('valid_until')->first();
 
-            return $expired
-                ? $refuse('habilitation_expiree', 'Habilitation expirée : accès refusé.')
+            return $lastEnd !== null
+                ? $refuse('habilitation_expiree', 'Habilitation expirée le '.$day((string) $lastEnd->valid_until).' : accès refusé.')
                 : $refuse('habilitation_absente', $point['type'] === 'zone' ? 'Aucune habilitation valable pour cette zone : accès refusé.' : 'Aucune habilitation valable pour cet événement : accès refusé.');
         }
         $permitted = $current->filter(fn ($e) => (bool) $e->permanent_allowed);
