@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
+import { expandMenu } from './menu';
 
 test('CSP : aucun script injecté, caméra autorisée au poste, coquille réouverte hors ligne', async ({ page, context }) => {
   const violations: { directive: string; blocked: string }[] = [];
@@ -37,6 +38,7 @@ test('administrateur : politique de conservation proposée et export daté du jo
   test.setTimeout(180_000); // intègre la limite de connexion et l'attente TOTP
   const fx = JSON.parse(readFileSync('.secrets/screen-account.json', 'utf8')) as { email: string; password: string; secret: string };
   await loginWithSecondFactor(page, fx.email, fx.password, fx.secret);
+  await expandMenu(page);
   await page.getByRole('link', { name: 'Conservation des données' }).click();
   await expect(page.getByRole('heading', { name: 'Conservation des données' })).toBeVisible();
   await expect(page.getByLabel(/Le client a approuvé/)).not.toBeChecked();

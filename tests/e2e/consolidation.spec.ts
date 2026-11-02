@@ -22,14 +22,14 @@ test('navigation consolidée : badges visiteurs, cartes permanentes, invités (o
     await expect(page.getByTestId('menu-badges')).toHaveText('Badges visiteurs');
     await expect(page.getByTestId('menu-titulaires')).toContainText('Personnes et cartes permanentes');
     await expect(page.getByTestId('menu-atelier')).toHaveText('Atelier des badges');
-    await expect(page.getByTestId('menu-modeles-cartes')).toHaveCount(0);
+    await expect(page.getByTestId('menu-modeles-cartes')).toBeHidden();
     await noHorizontalScroll(page, `tableau ${label}`);
     await page.screenshot({ path: `test-results/a065-tableau-${label}.png`, fullPage: true });
 
     // Badges visiteurs : l'atelier est une sous-entrée ; renvoi explicite vers les cartes permanentes.
     await page.goto('/administration/badges'); await openMenu();
     await expect(page.getByTestId('menu-atelier')).toBeVisible();
-    await expect(page.getByTestId('menu-modeles-cartes')).toHaveCount(0);
+    await expect(page.getByTestId('menu-modeles-cartes')).toBeVisible();
     await noHorizontalScroll(page, `badges ${label}`);
     await page.screenshot({ path: `test-results/a065-badges-visiteurs-${label}.png`, fullPage: true });
     await page.getByTestId('lien-cartes-permanentes').click();

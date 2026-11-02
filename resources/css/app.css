@@ -176,3 +176,9 @@ html { scroll-padding-bottom: 6rem; }
 }
 /* Sous-entrées de menu : retrait visuel, même cible tactile. */
 .admin-nav-sub { margin-left: 18px; font-size: 0.92em; }
+
+.admin-nav-group { display:flex; flex-direction:column; gap:2px; margin-top:6px; }
+.admin-nav-heading { display:flex; align-items:center; justify-content:space-between; min-height:44px; padding:6px 16px; border-radius:10px; font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#52677b; text-align:left; }
+.admin-nav-heading:hover { background:#eef5ff; }
+.admin-nav-items { display:flex; flex-direction:column; gap:2px; }
+.admin-nav-items .admin-nav-link { min-height:48px; padding-left:24px; font-size:15px; }

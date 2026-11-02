@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
+import { expandMenu } from './menu';
 
 test('connexion par mot de passe, comptes et journal', async ({ page }) => {
   // Conserve la limitation des connexions sans utiliser de second facteur.
@@ -20,7 +21,7 @@ test('connexion par mot de passe, comptes et journal', async ({ page }) => {
 
   await test.step('accès à la gestion des comptes', async () => {
     mark('auth.accounts.menu');
-    await page.getByTestId('ouvrir-menu').click();
+    await expandMenu(page);
     mark('auth.accounts.click');
     await page.getByRole('link', { name: 'Comptes', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Administration · Comptes' })).toBeVisible();

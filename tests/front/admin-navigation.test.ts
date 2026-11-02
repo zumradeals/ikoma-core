@@ -27,17 +27,24 @@ describe('navigation d’administration', () => {
     }
   });
 
-  it('sépare les badges visiteurs et les cartes permanentes ; l’Atelier des badges est une entrée de premier niveau toujours visible, les autres sous-entrées seulement dans leur rubrique', () => {
-    expect(menu('tableau', ALL).ids).toEqual(expect.arrayContaining(['badges', 'titulaires']));
-    expect(menu('tableau', ALL).ids).not.toEqual(expect.arrayContaining(['modeles-cartes', 'habilitations', 'categories-institutionnelles']));
-    const badges = menu('badges', ALL);
-    expect(badges.ids).toContain('atelier'); expect(badges.ids).not.toContain('modeles-cartes');
-    expect(badges.wrapper.get('[data-testid="menu-badges"]').text()).toBe('Badges visiteurs');
-    for (const active of ['titulaires', 'modeles-cartes', 'habilitations', 'categories-institutionnelles']) {
-      const ids = menu(active, ALL).ids;
-      expect(ids, active).toEqual(expect.arrayContaining(['titulaires', 'modeles-cartes', 'habilitations', 'categories-institutionnelles'])); expect(ids).toContain('atelier');
-    }
-    expect(menu('atelier', ALL).ids).toContain('atelier');
+  it('regroupe le menu en rubriques par usage et ne déplie que la rubrique de la page en cours', () => {
+    const { wrapper, ids } = menu('tableau', ALL, true);
+    const headings = wrapper.findAll('[data-testid^="rubrique-"]').map(b => b.text().replace(/[+–]/g, '').trim());
+    expect(headings).toEqual(['Événement', 'Badges et cartes', 'Sur le terrain', 'Réglages', 'Suivi et données']);
+    expect(ids).toEqual(expect.arrayContaining(['tableau', 'atelier', 'badges', 'titulaires', 'modeles-cartes', 'habilitations', 'categories-institutionnelles']));
+    // Page d'accueil : toutes les rubriques sont repliées ; sur une page, seule sa rubrique est dépliée.
+    expect(wrapper.findAll('[data-testid^="rubrique-"][aria-expanded="true"]')).toHaveLength(0);
+    const cards = menu('habilitations', ALL);
+    expect(cards.wrapper.findAll('[data-testid^="rubrique-"][aria-expanded="true"]').map(b => b.attributes('data-testid'))).toEqual(['rubrique-badges']);
+    expect(cards.wrapper.get('[data-testid="menu-badges"]').text()).toBe('Badges visiteurs');
+  });
+
+  it('déplie une rubrique au clic sans quitter la page', async () => {
+    const { wrapper } = menu('tableau', ALL);
+    await wrapper.get('[data-testid="rubrique-reglages"]').trigger('click');
+    expect(wrapper.get('[data-testid="rubrique-reglages"]').attributes('aria-expanded')).toBe('true');
+    await wrapper.get('[data-testid="rubrique-reglages"]').trigger('click');
+    expect(wrapper.get('[data-testid="rubrique-reglages"]').attributes('aria-expanded')).toBe('false');
   });
 
   it('retire la démonstration de la navigation en exploitation et ne la montre que dans les environnements d’essai', () => {
@@ -50,5 +57,6 @@ describe('navigation d’administration', () => {
     expect(limited.ids).toEqual(expect.arrayContaining(['imports', 'titulaires', 'habilitations']));
     expect(limited.ids).not.toEqual(expect.arrayContaining(['badges', 'modeles-cartes', 'categories-institutionnelles', 'zones', 'comptes', 'postes', 'demonstration']));
     expect(menu('tableau', []).ids).toEqual(['securite']);
+    expect(menu('tableau', ['listes.importer']).wrapper.findAll('[data-testid^="rubrique-"]').map(b => b.attributes('data-testid'))).not.toContain('rubrique-reglages');
   });
 });
