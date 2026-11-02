@@ -29,7 +29,8 @@ test('titulaires permanents : catégories, enregistrement, doublon, recherche, m
   await page.goto('/administration/titulaires');
   await expect(page.getByTestId('page-titulaires')).toBeVisible();
   await page.getByTestId('bloc-creation').locator('summary').click();
-  await page.getByTestId('creer-nom').fill(name);
+  await page.getByTestId('creer-prenom').fill(name.split(' ')[0]);
+  await page.getByTestId('creer-nom').fill(name.split(' ').slice(1).join(' '));
   await page.getByTestId('creer-organisation').fill('Organisation fictive');
   await page.getByTestId('creer-fonction').fill('Fonction fictive');
   await page.getByTestId('creer-categorie').selectOption('AILCT-01');
@@ -41,7 +42,8 @@ test('titulaires permanents : catégories, enregistrement, doublon, recherche, m
   await page.screenshot({ path: 'test-results/a04-titulaires-1440.png', fullPage: true });
 
   // Doublon refusé (le formulaire reste ouvert après l'enregistrement).
-  await page.getByTestId('creer-nom').fill(name.toUpperCase());
+  await page.getByTestId('creer-prenom').fill(name.split(' ')[0].toUpperCase());
+  await page.getByTestId('creer-nom').fill(name.split(' ').slice(1).join(' ').toUpperCase());
   await page.getByTestId('creer-organisation').fill('organisation fictive');
   await page.getByTestId('enregistrer-titulaire').click();
   await expect(page.getByText('aucun doublon n’est créé')).toBeVisible();
@@ -49,9 +51,9 @@ test('titulaires permanents : catégories, enregistrement, doublon, recherche, m
   // Recherche par identifiant, puis modification : l'identifiant ne change pas.
   await page.getByTestId('recherche-titulaires').fill(identifier);
   await page.getByTestId('lancer-recherche').click();
-  await expect(page.getByTestId('total-titulaires')).toContainText('1 titulaire');
+  await expect(page.getByTestId('total-titulaires')).toContainText('1 personne');
   await page.getByRole('button', { name: 'Modifier' }).first().click();
-  await page.getByTestId('edit-nom').fill(name);
+  await page.getByTestId('edit-nom-famille').fill(name.split(' ').slice(1).join(' '));
   await page.locator('form').filter({ hasText: 'Début d’engagement' }).last().getByLabel('Fonction').fill('Fonction fictive modifiée');
   await page.getByTestId('enregistrer-modification').click();
   await expect(page.getByText('Fonction fictive modifiée')).toBeVisible();
@@ -68,7 +70,7 @@ test('titulaires permanents : catégories, enregistrement, doublon, recherche, m
   await page.getByTestId('valider-cloture').click();
   await expect(page.getByTestId('aucun-titulaire')).toBeVisible();
   await page.goto('/administration/titulaires?statut=clos&q=' + encodeURIComponent(identifier));
-  await expect(page.getByTestId('etat-titulaire')).toHaveText('Clos');
+  await expect(page.getByTestId('etat-titulaire')).toHaveText('Clôturée');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/administration/categories-institutionnelles');
   await noHorizontalScroll(page, 'catégories mobile');

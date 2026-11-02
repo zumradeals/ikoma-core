@@ -107,6 +107,18 @@ final class HolderCards
         }
     }
 
+    /** Portrait (JPEG nettoyé) d'une fiche pour son affichage dans l'administration ; null s'il n'y en a pas. Ne sert jamais pour l'impression. */
+    public function portraitBytes(string $holderId): ?string
+    {
+        $path = DB::table('permanent_holders')->where('id', $holderId)->value('photo_file');
+        if ($path === null || preg_match('~^holder-portraits/[0-9a-f-]{36}\.enc$~', $path) !== 1) {
+            return null;
+        }
+        $encrypted = Storage::disk('local')->get($path);
+
+        return $encrypted === null ? null : Crypt::decryptString($encrypted);
+    }
+
     private function portraitDataUri(object $holder): ?string
     {
         if ($holder->photo_file === null || ! $holder->photo_print_allowed || preg_match('~^holder-portraits/[0-9a-f-]{36}\.enc$~', $holder->photo_file) !== 1) {

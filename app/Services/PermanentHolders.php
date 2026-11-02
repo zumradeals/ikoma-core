@@ -20,7 +20,10 @@ use Illuminate\Validation\ValidationException;
  */
 final class PermanentHolders
 {
-    public const FIELDS = ['full_name', 'organisation', 'position', 'institutional_category', 'engagement_starts_on', 'engagement_ends_on'];
+    public const FIELDS = ['full_name', 'first_name', 'last_name', 'organisation', 'position', 'quality', 'institutional_category', 'engagement_starts_on', 'engagement_ends_on'];
+
+    /** Plafond d'une opération groupée (sélection multiple) : évite une opération irréfléchie sur tout le registre. */
+    public const BULK_MAX = 100;
 
     public const DEFAULT_PREFIX = 'ID';
 
@@ -83,21 +86,33 @@ final class PermanentHolders
     }
 
     /** @return LengthAwarePaginator<int, \stdClass> */
-    public function paginate(?string $query, string $status, ?string $category, int $perPage = 25): LengthAwarePaginator
+    public function paginate(?string $query, string $status, ?string $category, int $perPage = 25, ?string $photo = null): LengthAwarePaginator
     {
+        // Colonnes explicites : le chemin du fichier de portrait ne quitte jamais le serveur, seule sa présence est exposée.
         $q = DB::table('permanent_holders as h')->leftJoin('institutional_categories as c', 'c.code', '=', 'h.institutional_category')
-            ->select('h.*', 'c.label as category_label', 'c.color as category_color', 'c.symbol as category_symbol');
+            ->select('h.id', 'h.identifier', 'h.full_name', 'h.first_name', 'h.last_name', 'h.organisation', 'h.position', 'h.quality', 'h.institutional_category', 'h.engagement_starts_on', 'h.engagement_ends_on', 'h.status', 'h.closed_at', 'h.closed_reason', 'h.photo_print_allowed',
+                'c.label as category_label', 'c.color as category_color', 'c.symbol as category_symbol')
+            ->selectRaw('(h.photo_file IS NOT NULL) AS has_photo');
         if (in_array($status, ['actif', 'clos'], true)) {
             $q->where('h.status', $status);
         }
-        if ($category !== null && $category !== '') {
+        if ($category === 'aucune') {
+            $q->whereNull('h.institutional_category');
+        } elseif ($category !== null && $category !== '') {
             $q->where('h.institutional_category', $category);
+        }
+        if ($photo === 'avec') {
+            $q->whereNotNull('h.photo_file');
+        } elseif ($photo === 'sans') {
+            $q->whereNull('h.photo_file');
         }
         $term = trim((string) $query);
         if ($term !== '') {
             $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term).'%';
             $q->where(fn ($w) => $w->whereRaw('public.ikoma_normalize(h.full_name) LIKE public.ikoma_normalize(?)', [$like])
                 ->orWhereRaw("public.ikoma_normalize(coalesce(h.organisation, '')) LIKE public.ikoma_normalize(?)", [$like])
+                ->orWhereRaw("public.ikoma_normalize(coalesce(h.position, '')) LIKE public.ikoma_normalize(?)", [$like])
+                ->orWhereRaw("public.ikoma_normalize(coalesce(h.quality, '')) LIKE public.ikoma_normalize(?)", [$like])
                 ->orWhere('h.identifier', 'ilike', $like));
         }
 
@@ -118,17 +133,103 @@ final class PermanentHolders
 
         return $this->guardRace(fn () => DB::transaction(function () use ($clean, $actor, $confirmHomonym): string {
             $this->preventDuplicates($clean, null, $confirmHomonym);
-            $sequence = (int) DB::selectOne("SELECT nextval('permanent_holder_identifier_seq') AS n")->n;
-            $id = (string) Str::uuid();
-            $identifier = $this->formatIdentifier($sequence);
-            DB::table('permanent_holders')->insert([
-                'id' => $id, 'identifier' => $identifier, 'identifier_seq' => $sequence, ...$clean, 'status' => 'actif',
-                'created_by' => $actor->id, 'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now(),
-            ]);
-            app(Audit::class)->append('titulaire.cree', $actor->id, ['holder_id' => $id, 'identifiant' => $identifier]);
 
-            return $id;
+            return $this->insertHolder($clean, $actor);
         }));
+    }
+
+    /**
+     * Enregistre UNE fiche dans la transaction en cours (identifiant émis une seule fois). Elle ne crée jamais de carte, de badge,
+     * de fiche de participation ni d'habilitation : enregistrer une personne est une opération d'identité, rien d'autre.
+     *
+     * @param  array<string, mixed>  $clean
+     * @param  array<string, mixed>  $audit  éléments non personnels ajoutés au journal (par exemple l'identifiant de l'import)
+     */
+    public function insertHolder(array $clean, User $actor, array $audit = []): string
+    {
+        $sequence = (int) DB::selectOne("SELECT nextval('permanent_holder_identifier_seq') AS n")->n;
+        $id = (string) Str::uuid();
+        $identifier = $this->formatIdentifier($sequence);
+        DB::table('permanent_holders')->insert([
+            'id' => $id, 'identifier' => $identifier, 'identifier_seq' => $sequence, ...$clean, 'status' => 'actif',
+            'created_by' => $actor->id, 'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        app(Audit::class)->append('titulaire.cree', $actor->id, ['holder_id' => $id, 'identifiant' => $identifier, ...$audit]);
+
+        return $id;
+    }
+
+    /**
+     * Étiquette de catégorie sur plusieurs fiches actives, en une seule transaction. L'étiquette ne confère aucun accès.
+     *
+     * @param  list<string>  $ids
+     * @return array{modifies: int, inchanges: int, clos: int}
+     */
+    public function setCategoryMany(array $ids, ?string $category, User $actor): array
+    {
+        $ids = $this->bulkIds($ids);
+        if ($category !== null && ! DB::table('institutional_categories')->where('code', $category)->exists()) {
+            throw ValidationException::withMessages(['category' => 'Catégorie institutionnelle inconnue.']);
+        }
+
+        return DB::transaction(function () use ($ids, $category, $actor): array {
+            $result = ['modifies' => 0, 'inchanges' => 0, 'clos' => 0];
+            foreach (DB::table('permanent_holders')->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get() as $holder) {
+                if ($holder->status === 'clos') {
+                    $result['clos']++;
+                } elseif ($holder->institutional_category === $category) {
+                    $result['inchanges']++;
+                } else {
+                    DB::table('permanent_holders')->where('id', $holder->id)->update(['institutional_category' => $category, 'updated_by' => $actor->id, 'updated_at' => now()]);
+                    app(Audit::class)->append('titulaire.modifie', $actor->id, ['holder_id' => $holder->id, 'identifiant' => $holder->identifier, 'champs' => ['institutional_category'], 'groupe' => true]);
+                    $result['modifies']++;
+                }
+            }
+
+            return $result;
+        });
+    }
+
+    /**
+     * Clôture de plusieurs fiches actives avec un même motif, tout ou rien. Irréversible, comme la clôture individuelle.
+     *
+     * @param  list<string>  $ids
+     * @return array{clos: int, deja_clos: int}
+     */
+    public function closeMany(array $ids, string $reason, User $actor): array
+    {
+        $ids = $this->bulkIds($ids);
+
+        return DB::transaction(function () use ($ids, $reason, $actor): array {
+            $result = ['clos' => 0, 'deja_clos' => 0];
+            foreach (DB::table('permanent_holders')->whereIn('id', $ids)->orderBy('id')->get(['id', 'status']) as $holder) {
+                if ($holder->status === 'clos') {
+                    $result['deja_clos']++;
+                } else {
+                    $this->close($holder->id, $reason, $actor);
+                    $result['clos']++;
+                }
+            }
+
+            return $result;
+        });
+    }
+
+    /**
+     * @param  list<string>  $ids
+     * @return list<string>
+     */
+    private function bulkIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn ($id) => Str::isUuid($id))));
+        if ($ids === []) {
+            throw ValidationException::withMessages(['ids' => 'Sélectionnez au moins une personne.']);
+        }
+        if (count($ids) > self::BULK_MAX) {
+            throw ValidationException::withMessages(['ids' => 'Sélectionnez au plus '.self::BULK_MAX.' personnes à la fois.']);
+        }
+
+        return $ids;
     }
 
     /**
@@ -264,14 +365,45 @@ final class PermanentHolders
             throw ValidationException::withMessages(['engagement_ends_on' => 'La fin de l’engagement précède son début.']);
         }
 
+        // Prénom et nom vont ensemble ; quand ils sont fournis, le nom complet en est dérivé (« Prénom Nom »). Sinon le nom complet saisi est conservé tel quel, sans découpage.
+        $first = $text('first_name', 100);
+        $last = $text('last_name', 100);
+        if (($first === null) !== ($last === null)) {
+            throw ValidationException::withMessages([$first === null ? 'first_name' : 'last_name' => 'Renseignez le prénom ET le nom, ou laissez les deux vides et saisissez le nom complet.']);
+        }
+        if ($first !== null) {
+            $full = $first.' '.$last;
+            if (mb_strlen($full) > 160) {
+                throw ValidationException::withMessages(['last_name' => 'Prénom et nom trop longs (160 caractères au plus ensemble).']);
+            }
+        } else {
+            $full = $text('full_name', 160, true);
+        }
+
         return [
-            'full_name' => $text('full_name', 160, true), 'organisation' => $text('organisation', 160), 'position' => $text('position', 160),
+            'full_name' => $full, 'first_name' => $first, 'last_name' => $last, 'organisation' => $text('organisation', 160), 'position' => $text('position', 160), 'quality' => $text('quality', 160),
             'institutional_category' => $category === '' ? null : $category, 'engagement_starts_on' => $from, 'engagement_ends_on' => $until,
         ];
     }
 
-    /** @param array<string, mixed> $clean */
-    private function preventDuplicates(array $clean, ?string $ignoreId, bool $confirmHomonym): void
+    /**
+     * Données saisies (formulaire, ligne d'import) → valeurs contrôlées et prêtes à enregistrer, ou ValidationException.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public function sanitize(array $data): array
+    {
+        return $this->clean($data);
+    }
+
+    /**
+     * Situation d'une identité par rapport au registre : « ok », « doublon » (un titulaire actif porte déjà ce nom dans cette organisation)
+     * ou « homonyme » (même nom, autre organisation ou titulaire clos : à confirmer explicitement). Verrouille les fiches lues.
+     *
+     * @param  array<string, mixed>  $clean
+     */
+    public function classify(array $clean, ?string $ignoreId = null): string
     {
         $same = DB::table('permanent_holders')->whereRaw('public.ikoma_normalize(full_name) = public.ikoma_normalize(?)', [$clean['full_name']])
             ->when($ignoreId !== null, fn ($q) => $q->where('id', '<>', $ignoreId))->lockForUpdate()->get(['id', 'status', 'organisation']);
@@ -279,10 +411,21 @@ final class PermanentHolders
         $normalize = fn (string $v): string => (string) DB::selectOne('SELECT public.ikoma_normalize(?) AS n', [$v])->n;
         foreach ($same as $row) {
             if ($row->status === 'actif' && $normalize((string) $row->organisation) === $normalize($org)) {
-                throw ValidationException::withMessages(['full_name' => 'Un titulaire actif porte déjà ce nom dans cette organisation : aucun doublon n’est créé.']);
+                return 'doublon';
             }
         }
-        if ($same->isNotEmpty() && ! $confirmHomonym) {
+
+        return $same->isNotEmpty() ? 'homonyme' : 'ok';
+    }
+
+    /** @param array<string, mixed> $clean */
+    private function preventDuplicates(array $clean, ?string $ignoreId, bool $confirmHomonym): void
+    {
+        $state = $this->classify($clean, $ignoreId);
+        if ($state === 'doublon') {
+            throw ValidationException::withMessages(['full_name' => 'Un titulaire actif porte déjà ce nom dans cette organisation : aucun doublon n’est créé.']);
+        }
+        if ($state === 'homonyme' && ! $confirmHomonym) {
             throw ValidationException::withMessages(['confirm_homonym' => 'Un titulaire de même nom existe déjà (autre organisation ou titulaire clos). Confirmez qu’il s’agit d’une autre personne pour continuer.']);
         }
     }
