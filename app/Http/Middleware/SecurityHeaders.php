@@ -14,7 +14,28 @@ final class SecurityHeaders
             config(['session.secure' => true]);
         }
 
-        return self::apply($request, $next($request));
+        $response = self::apply($request, $next($request));
+        if ($request->isMethod('GET') && in_array($request->path(), self::PRECACHED_PUBLIC_PATHS, true)) {
+            self::dropStateCookies($response);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Pages publiques précachées par le service worker (vite.config.ts, additionalManifestEntries). Le précache les télécharge avec les cookies
+     * du navigateur, parfois pendant une connexion : si leur réponse (anonyme, émise avant la connexion) arrive après celle de /login, son cookie
+     * de session périmé remplaçait le cookie authentifié et l'utilisateur se retrouvait déconnecté. Ces pages n'ont aucune donnée de session.
+     */
+    public const PRECACHED_PUBLIC_PATHS = ['/', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'];
+
+    private static function dropStateCookies(Response $response): void
+    {
+        foreach ($response->headers->getCookies() as $cookie) {
+            if (in_array($cookie->getName(), [config('session.cookie'), 'XSRF-TOKEN'], true)) {
+                $response->headers->removeCookie($cookie->getName(), $cookie->getPath(), $cookie->getDomain());
+            }
+        }
     }
 
     public static function apply(Request $request, Response $response): Response
