@@ -50,7 +50,7 @@ final class PermanentAccess
             $query->where('b.qr_token', strtolower($token));
         }
 
-        return $query->first(['k.id as card_id', 'k.status as card_status', 'k.revocation_reason', 'k.rank', 'b.id as badge_id', 'b.code as badge_code', 'h.id as holder_id', 'h.identifier', 'h.full_name', 'h.organisation', 'h.status as holder_status', 'h.institutional_category', 'h.engagement_starts_on', 'h.engagement_ends_on']);
+        return $query->first(['k.id as card_id', 'k.status as card_status', 'k.activated_at', 'k.revocation_reason', 'k.rank', 'b.id as badge_id', 'b.code as badge_code', 'h.id as holder_id', 'h.identifier', 'h.full_name', 'h.organisation', 'h.status as holder_status', 'h.institutional_category', 'h.engagement_starts_on', 'h.engagement_ends_on']);
     }
 
     /**
@@ -66,6 +66,9 @@ final class PermanentAccess
                 'volee' => $refuse('carte_volee', 'Carte déclarée volée : accès refusé. Prévenez le superviseur.'),
                 default => $refuse('carte_revoquee', 'Carte révoquée : accès refusé. Prévenez le superviseur.'),
             };
+        }
+        if ($card->activated_at === null) {
+            return $refuse('carte_non_activee', 'Carte pas encore remise : activez-la dans la fiche du titulaire.');
         }
         if ($card->holder_status !== 'actif') {
             return $refuse('titulaire_clos', 'Titulaire clos : accès refusé.');
@@ -159,6 +162,21 @@ final class PermanentAccess
         return $id;
     }
 
+    /**
+     * Catégorie affichée au poste de contrôle (nom et couleur du modèle de carte). Informative : elle n'ouvre aucun accès.
+     *
+     * @return array{id: string, name: string, color: string, priority_circuit: false}|null
+     */
+    public function categoryOf(?string $code): ?array
+    {
+        if ($code === null) {
+            return null;
+        }
+        $model = app(CardModels::class)->forCategory($code);
+
+        return ['id' => 'carte-'.$code, 'name' => $model['label'], 'color' => $model['color'], 'priority_circuit' => false];
+    }
+
     // --- Confiance hors ligne ---------------------------------------------------------------------------------------------------
 
     /**
@@ -207,16 +225,17 @@ final class PermanentAccess
             return ['trust_minutes' => $trust['effective'], 'cards' => [], 'holders' => []];
         }
         $iso = fn (?string $v): ?string => $v === null ? null : Carbon::parse($v)->utc()->format('Y-m-d\TH:i:s.u\Z');
-        $cards = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id')->get(['b.qr_token', 'k.status', 'h.id as holder_id', 'h.identifier'])
-            ->map(fn ($c) => ['hash' => hash('sha256', $c->qr_token), 'status' => $c->status, 'holder_id' => $c->holder_id, 'identifier' => $c->identifier])->all();
+        $cards = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id')->get(['b.qr_token', 'k.status', 'k.activated_at', 'h.id as holder_id', 'h.identifier'])
+            // Carte pas encore remise : la tablette la refuse (statut « non_activee »), comme le serveur.
+            ->map(fn ($c) => ['hash' => hash('sha256', $c->qr_token), 'status' => $c->status === 'active' && $c->activated_at === null ? 'non_activee' : $c->status, 'holder_id' => $c->holder_id, 'identifier' => $c->identifier])->all();
         $holderIds = DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->distinct()->pluck('holder_id');
-        $holders = DB::table('permanent_holders')->whereIn('id', $holderIds)->get(['id', 'identifier', 'full_name', 'organisation', 'status', 'engagement_starts_on', 'engagement_ends_on']);
+        $holders = DB::table('permanent_holders')->whereIn('id', $holderIds)->get(['id', 'identifier', 'full_name', 'organisation', 'status', 'engagement_starts_on', 'engagement_ends_on', 'institutional_category']);
         $entitlements = DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->get(['holder_id', 'zone_id', 'valid_from', 'valid_until'])->groupBy('holder_id');
         $policies = DB::table('zone_policies')->where('event_id', $eventId)->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->all();
 
         return [
             'trust_minutes' => $trust['effective'], 'cards' => $cards, 'policies' => $policies,
-            'holders' => $holders->map(fn ($h) => ['id' => $h->id, 'identifier' => $h->identifier, 'name' => $h->full_name, 'organisation' => $h->organisation, 'status' => $h->status, 'starts_on' => $h->engagement_starts_on, 'ends_on' => $h->engagement_ends_on,
+            'holders' => $holders->map(fn ($h) => ['id' => $h->id, 'category' => $this->categoryOf($h->institutional_category), 'identifier' => $h->identifier, 'name' => $h->full_name, 'organisation' => $h->organisation, 'status' => $h->status, 'starts_on' => $h->engagement_starts_on, 'ends_on' => $h->engagement_ends_on,
                 'entitlements' => ($entitlements[$h->id] ?? collect())->map(fn ($e) => ['zone_id' => $e->zone_id, 'valid_from' => $iso($e->valid_from), 'valid_until' => $iso($e->valid_until)])->values()->all()])->all(),
         ];
     }

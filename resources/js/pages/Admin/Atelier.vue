@@ -17,6 +17,20 @@ const props = defineProps<{
   person?: { id: string; event_id: string; category_id: string; full_name: string } | null;
 }>();
 
+const mode = ref<'visiteurs' | 'cartes'>(new URLSearchParams(window.location.search).get('mode') === 'cartes' ? 'cartes' : 'visiteurs');
+type PermanentCard = { id: string; identifier: string; name: string; category: string | null; activated: boolean; printed: boolean };
+const permanentCards = ref<PermanentCard[]>([]);
+const csrf = ref('');
+async function loadCards() {
+  try {
+    const response = await fetch('/administration/atelier/cartes', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (response.ok) { const body = await response.json(); permanentCards.value = body.cards; csrf.value = body.csrf; }
+  } catch { /* la liste reste vide */ }
+}
+watch(mode, value => { if (value === 'cartes' && props.canPrepare) void loadCards(); }, { immediate: true });
+const chosen = ref<string[]>([]);
+const chosenPrinted = computed(() => permanentCards.value.some(c => c.printed && chosen.value.includes(c.id)));
+function toggleAll(on: boolean) { chosen.value = on ? permanentCards.value.map(c => c.id) : []; }
 const defaults: Visual = { design: 'visiteur', title: 'IKOMA ACCESS', primary: '#0066B3', accent: '#F75C03', orientation: 'paysage' };
 const initialEvent = props.person?.event_id ?? props.initial.event ?? props.events[0]?.id ?? '';
 const initialFormat = props.initial.format ?? 'pvc';
@@ -155,12 +169,13 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
       <p class="max-w-3xl">Un seul endroit pour choisir un modèle, sélectionner des badges, les prévisualiser, les imprimer et suivre chaque tirage. Imprimer ne donne <strong>aucun droit d’accès</strong> et ne change ni l’état ni la réservation d’un badge.</p>
     </div>
 
-    <div class="mb-6 grid gap-4 sm:grid-cols-2" aria-label="Type de badge">
-      <div class="rounded-xl border-2 border-blue-600 bg-blue-50 p-4" data-testid="type-visiteurs"><h2 class="text-heading font-bold">Badges visiteurs</h2><p>Badges temporaires d’un événement : lots, plages, étiquettes. <strong>Parcours ouvert ci-dessous.</strong></p></div>
-      <div class="rounded-xl border bg-white p-4" data-testid="type-permanents"><h2 class="text-heading font-bold">Cartes permanentes</h2><p>Les cartes des personnes du registre s’impriment pour l’instant depuis leur fiche. <Link href="/administration/titulaires" class="font-semibold underline">Ouvrir le registre des personnes</Link></p></div>
+    <div class="mb-6 grid gap-4 sm:grid-cols-2" role="group" aria-label="Type de badge">
+      <button type="button" class="rounded-xl border-2 p-4 text-left" :class="mode === 'visiteurs' ? 'border-blue-600 bg-blue-50' : 'bg-white'" :aria-pressed="mode === 'visiteurs'" data-testid="type-visiteurs" @click="mode = 'visiteurs'"><span class="block text-heading font-bold">Badges visiteurs</span><span>Badges temporaires d’un événement : lots, plages, étiquettes.</span></button>
+      <button type="button" class="rounded-xl border-2 p-4 text-left" :class="mode === 'cartes' ? 'border-blue-600 bg-blue-50' : 'bg-white'" :aria-pressed="mode === 'cartes'" data-testid="type-permanents" @click="mode = 'cartes'"><span class="block text-heading font-bold">Cartes permanentes</span><span>Cartes des personnes du registre : choisissez les personnes et imprimez.</span></button>
     </div>
 
-    <p class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4" data-testid="rappel-trace">Chaque tirage suit trois étapes distinctes : <strong>document généré</strong>, <strong>impression demandée</strong>, <strong>impression confirmée par vous</strong>. Un document ou un PDF n’est jamais la preuve qu’un badge est sorti de l’imprimante.</p>
+    <template v-if="mode === 'visiteurs'">
+<p class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4" data-testid="rappel-trace">Chaque tirage suit trois étapes distinctes : <strong>document généré</strong>, <strong>impression demandée</strong>, <strong>impression confirmée par vous</strong>. Un document ou un PDF n’est jamais la preuve qu’un badge est sorti de l’imprimante.</p>
 
     <div v-if="errors.length" role="alert" class="mb-6 rounded-xl border-2 border-red-700 bg-red-50 p-4" data-testid="erreurs-atelier"><p v-for="error in errors" :key="error">{{ error }}</p></div>
 
@@ -289,7 +304,29 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
         </li>
       </ul>
     </section>
-  </AdminLayout>
+    </template>
+
+    <section v-if="mode === 'cartes'" class="space-y-4 rounded-xl border bg-white p-5" data-testid="cartes-permanentes" aria-label="Cartes permanentes">
+      <h2 class="text-heading font-bold">Cartes permanentes</h2>
+      <p>Cochez les personnes dont vous voulez imprimer la carte. Une carte imprimée n’est utilisable qu’après le bouton « Remettre et activer » dans la fiche de la personne.</p>
+      <p v-if="!canPrepare" class="font-semibold" role="status">Ce parcours demande le droit de gérer les listes de personnes.</p>
+      <p v-else-if="permanentCards.length === 0" data-testid="aucune-carte">Aucune carte préparée. Préparez d’abord une carte depuis la fiche d’une personne (photo obligatoire).</p>
+      <form v-else method="post" action="/administration/atelier/cartes" target="_blank" class="space-y-4" data-testid="formulaire-cartes">
+        <input type="hidden" name="_token" :value="csrf">
+        <label class="flex items-center gap-2 font-semibold"><input type="checkbox" class="size-6" data-testid="tout-cocher" :checked="chosen.length === permanentCards.length" @change="toggleAll(($event.target as HTMLInputElement).checked)"> Tout sélectionner</label>
+        <ul class="space-y-1">
+          <li v-for="c in permanentCards" :key="c.id">
+            <label class="flex flex-wrap items-center gap-2"><input v-model="chosen" type="checkbox" name="holders[]" :value="c.id" class="size-6" :data-testid="'carte-' + c.identifier">
+              <strong>{{ c.name }}</strong> <span class="font-mono text-sm">{{ c.identifier }}</span> <span class="text-sm">{{ c.category }}</span>
+              <span class="rounded px-2 py-0.5 text-sm font-bold" :class="c.activated ? 'bg-green-100 text-green-900' : 'bg-amber-100 text-amber-900'">{{ c.activated ? 'Activée' : 'Pas encore remise' }}</span>
+              <span v-if="c.printed" class="text-sm">· déjà imprimée</span></label>
+          </li>
+        </ul>
+        <label v-if="chosenPrinted" class="block max-w-xl font-semibold">Motif de la réimpression<input name="reason" class="field mt-1" maxlength="200" required data-testid="motif-cartes"></label>
+        <button type="submit" class="admin-primary" :disabled="chosen.length === 0" data-testid="imprimer-cartes">Imprimer {{ chosen.length }} carte(s)</button>
+      </form>
+    </section>
+</AdminLayout>
 </template>
 
 <style scoped>

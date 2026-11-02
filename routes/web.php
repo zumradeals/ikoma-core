@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminVisitorsController;
+use App\Http\Controllers\AtelierCartesController;
 use App\Http\Controllers\AtelierController;
 use App\Http\Controllers\BadgeDetailsController;
 use App\Http\Controllers\BadgeLabelsController;
@@ -179,7 +180,13 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/habilitations/confiance', [HolderEntitlementsController::class, 'trust'])->middleware(['can:postes.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/carte/revoquer', [HolderCardsController::class, 'revoke'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/carte/remplacer', [HolderCardsController::class, 'replace'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
+        Route::get('/administration/atelier/cartes', [AtelierCartesController::class, 'index'])->middleware(['can:listes.importer', 'can:badges.gerer']);
+        Route::post('/administration/atelier/cartes', [AtelierCartesController::class, 'document'])->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:atelier']);
         Route::get('/administration/titulaires/modeles', [HolderCardsController::class, 'models'])->middleware('can:badges.gerer');
+        Route::post('/administration/titulaires/modeles/{code}/apercu', [HolderCardsController::class, 'modelPreview'])->where('code', 'AILCT-0[1-8]')->middleware(['can:badges.gerer', 'throttle:titulaires']);
+        Route::put('/administration/titulaires/modeles/{code}', [HolderCardsController::class, 'saveModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);
+        Route::post('/administration/titulaires/modeles/{code}/valider', [HolderCardsController::class, 'validateModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);
+        Route::post('/administration/titulaires/{holder}/carte/activer', [HolderCardsController::class, 'activate'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/modeles', [HolderCardsController::class, 'settings'])->middleware(['can:categories.gerer', 'throttle:titulaires']);
         Route::get('/administration/titulaires/alignement', [HolderCardsController::class, 'alignment'])->middleware('can:badges.gerer');
         Route::get('/administration/titulaires/{holder}/carte', [HolderCardsController::class, 'show'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer']);

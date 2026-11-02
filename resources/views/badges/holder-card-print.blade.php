@@ -29,7 +29,7 @@ body { margin: 0; background: #eaf0f6; color: #0f172a; font-family: Arial, sans-
 </head>
 <body>
 <div class="toolbar">
-<strong>{{ $alignment ? 'Page d’essai d’alignement (aucun QR, aucune donnée personnelle)' : ($kind === 'emission' ? 'Émission de la carte' : 'Réimpression de la carte') }} · CR80 · recto puis verso</strong>
+<strong>{{ $alignment ? 'Page d’essai d’alignement (aucun QR, aucune donnée personnelle)' : (isset($cards) ? count($cards).' carte(s)' : ($kind === 'emission' ? 'Émission de la carte' : 'Réimpression de la carte')) }} · CR80 · recto puis verso</strong>
 <button id="print" type="button">Imprimer</button><a href="{{ $back }}">Retour</a>
 <p>Format du papier : <strong>CR80, 53,98 × 85,60 mm, portrait</strong>. Échelle <strong>100 % / taille réelle</strong>, sans en-têtes ni pieds de page, arrière-plans activés. Recto-verso : le recto est la page 1, le verso la page 2, retournement sur le <strong>grand côté</strong>.</p>
 <p>@if ($alignment)Imprimez cette page en recto-verso puis tenez la carte à contre-jour : les traits du recto et du verso doivent se superposer. La zone en pointillés est la zone de sécurité de 3 mm.@else Faites d’abord un essai sur la page d’alignement. Le navigateur ne confirme pas le tirage physique ; la compatibilité avec une imprimante PVC précise n’est pas garantie sans essai réel sur ce matériel.@endif</p>
@@ -41,11 +41,13 @@ body { margin: 0; background: #eaf0f6; color: #0f172a; font-family: Arial, sans-
 <section class="sheet" aria-label="{{ $face }}"><div class="align" data-side="{{ strtolower($face) }}"><div class="align__edge"></div><div class="align__safe"></div><div class="align__h"></div><div class="align__v"></div><div class="align__ruler">@foreach ([10, 8, 6, 4, 2] as $w)<i style="width: {{ $w }}mm"></i>@endforeach</div><div class="align__label">{{ $face }}<br>53,98 × 85,60 mm</div></div></section>
 @endforeach
 @else
-<section class="sheet" aria-label="Recto">@include('badges.holder-card-recto', ['card' => $card])</section>
-<section class="sheet" aria-label="Verso">@include('badges.holder-card-verso', ['card' => $card])</section>
+@foreach ($cards ?? [$card] as $c)
+<section class="sheet" aria-label="Recto">@include('badges.holder-card-recto', ['card' => $c])</section>
+<section class="sheet" aria-label="Verso">@include('badges.holder-card-verso', ['card' => $c])</section>
+@endforeach
 @endif
 <script nonce="{{ $nonce }}">document.getElementById('print').addEventListener('click', function () { try {
- var invalid = Array.from(document.querySelectorAll('.hc__name, .hc__category, .hc__line, .hc__notice, .hc__contact, .hc__institution')).some(function (t) { return t.scrollHeight > t.clientHeight + 1; });
+ var invalid = Array.from(document.querySelectorAll('.hc__name, .hc__role, .hc__mention, .hc__category, .hc__line, .hc__notice, .hc__contact, .hc__institution')).some(function (t) { return t.scrollHeight > t.clientHeight + 1; });
  document.getElementById('layout-error').hidden = !invalid;
  if (!invalid) window.print();
  } catch (e) { document.getElementById('print-error').hidden = false; } });</script>

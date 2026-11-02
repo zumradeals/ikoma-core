@@ -28,7 +28,7 @@ const items: Item[] = [
 
   { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
   { key: 'titulaires', label: 'Personnes et cartes permanentes', icon: 'users', href: '/administration/titulaires', permission: 'listes.importer' },
-  { key: 'modeles-cartes', label: 'Modèles de cartes', icon: 'tag', href: '/administration/titulaires/modeles', permission: 'badges.gerer', parent: 'titulaires' },
+  { key: 'modeles-cartes', label: 'Personnalisation des cartes', icon: 'tag', href: '/administration/titulaires/modeles', permission: 'badges.gerer', parent: 'titulaires' },
   { key: 'habilitations', label: 'Habilitations et zones', icon: 'shield', href: '/administration/habilitations', permission: 'listes.importer', parent: 'titulaires' },
   { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer', parent: 'titulaires' },
   { key: 'identite', label: 'Identité', icon: 'settings', href: '/administration/identite', permission: 'comptes.gerer' },

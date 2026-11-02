@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Services\CardLifecycle;
+use App\Services\CardModels;
 use App\Services\HolderCards;
 use App\Services\HolderEntitlements;
 use App\Services\Institution;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 
@@ -39,7 +42,7 @@ final class HolderCardsController
             'holder' => ['id' => $row->id, 'identifier' => $row->identifier, 'full_name' => $row->full_name, 'status' => $row->status, 'institutional_category' => $row->institutional_category, 'has_photo' => $row->photo_file !== null, 'photo_print_allowed' => (bool) $row->photo_print_allowed],
             'category' => $category === null ? null : ['code' => $category->code, 'label' => $category->label],
             'card' => $card, 'cards' => app(CardLifecycle::class)->history($holder), 'reasons' => CardLifecycle::REASONS, 'entitlements' => app(HolderEntitlements::class)->forHolder($holder), 'preview' => $html, 'permanentContext' => $holders->permanentContext() !== null,
-            'provisional' => ! $cards->settings()['valide'],
+            'provisional' => $row->institutional_category === null || ! app(CardModels::class)->forCategory($row->institutional_category)['validated'],
             'csrf' => csrf_token(),
         ])->withViewData([]);
     }
@@ -47,9 +50,20 @@ final class HolderCardsController
     public function issue(Request $request, string $holder, HolderCards $cards): RedirectResponse
     {
         $this->authorizeCard();
-        $cards->issue($holder, $request->user());
+        $cards->requirePhoto($holder);
+        // Carte préparée, pas encore remise : elle n'ouvre rien tant qu'elle n'est pas activée (bouton « Remettre et activer »).
+        $cards->issue($holder, $request->user(), false);
 
-        return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte préparée. Vérifiez l’aperçu avant de l’imprimer.');
+        return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte préparée. Imprimez-la dans l’Atelier des badges, puis remettez-la.');
+    }
+
+    public function activate(Request $request, string $holder, HolderCards $cards): RedirectResponse
+    {
+        $this->authorizeCard();
+        $request->validate(['confirmation' => ['required', 'accepted']]);
+        $cards->activate($holder, $request->user());
+
+        return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte remise et activée : elle peut maintenant être utilisée au contrôle (selon les habilitations).');
     }
 
     public function revoke(Request $request, string $holder, CardLifecycle $lifecycle): RedirectResponse
@@ -65,7 +79,8 @@ final class HolderCardsController
     {
         $this->authorizeCard();
         $data = $request->validate(['reason' => ['required', 'string', 'in:'.implode(',', array_keys(CardLifecycle::REASONS))], 'note' => ['nullable', 'string', 'max:200'], 'confirmation' => ['required', 'accepted']]);
-        $lifecycle->replace($holder, $data['reason'], $data['note'] ?? null, $request->user());
+        app(HolderCards::class)->requirePhoto($holder);
+        $lifecycle->replace($holder, $data['reason'], $data['note'] ?? null, $request->user(), false);
 
         return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Nouvelle carte préparée. L’ancienne est révoquée ; le titulaire, son identifiant et ses habilitations sont inchangés.');
     }
@@ -97,25 +112,62 @@ final class HolderCardsController
         ])->header('Cache-Control', 'no-store, private')->header('Referrer-Policy', 'no-referrer');
     }
 
-    public function models(HolderCards $cards, InstitutionalCategories $categories): \Inertia\Response
+    /** Page « Personnalisation des cartes » : un modèle à la fois, choisi parmi les huit catégories. */
+    public function models(Request $request, HolderCards $cards, InstitutionalCategories $categories, CardModels $models): \Inertia\Response
     {
         Gate::authorize('badges.gerer');
-        $specimens = [];
-        foreach ($categories->all() as $category) {
+        $all = $categories->all();
+        $codes = array_map(fn ($c) => $c->code, $all);
+        $selected = in_array($request->query('categorie'), $codes, true) ? (string) $request->query('categorie') : ($codes[0] ?? null);
+        $model = $selected === null ? null : $models->forCategory($selected);
+        $preview = null;
+        if ($selected !== null) {
+            $category = collect($all)->firstWhere('code', $selected);
             $data = $cards->specimen($category);
-            $specimens[] = ['code' => $category->code, 'label' => $category->label, 'recto' => view('badges.holder-card-recto', ['card' => $data])->render(), 'verso' => view('badges.holder-card-verso', ['card' => $data])->render()];
+            $preview = ['recto' => view('badges.holder-card-recto', ['card' => $data])->render(), 'verso' => view('badges.holder-card-verso', ['card' => $data])->render()];
         }
 
-        return Inertia::render('Admin/ModelesCartes', [
-            'specimens' => $specimens, 'settings' => $cards->settings(), 'limits' => ['ligne1' => 80, 'ligne2' => 80, 'contact' => 80, 'avis' => 160],
-            'initialized' => $categories->initialized(), 'canConfigure' => request()->user()->can('categories.gerer'),
+        return Inertia::render('Admin/PersonnalisationCartes', [
+            'categories' => array_map(fn ($c) => ['code' => $c->code, 'label' => $c->label], $all), 'selected' => $selected, 'model' => $model, 'preview' => $preview,
+            'settings' => $cards->settings(), 'limits' => ['ligne1' => 80, 'ligne2' => 80, 'contact' => 80, 'avis' => 160],
+            'initialized' => $categories->initialized(), 'canConfigure' => $request->user()->can('categories.gerer'),
         ]);
+    }
+
+    /** Aperçu en direct d'un modèle avec des valeurs pas encore enregistrées : exemple fictif, aucun vrai QR. */
+    public function modelPreview(Request $request, string $code, HolderCards $cards, CardModels $models): JsonResponse
+    {
+        Gate::authorize('badges.gerer');
+        $category = DB::table('institutional_categories')->where('code', $code)->first();
+        abort_if($category === null, 404);
+        $override = $models->clean($code, $request->all());
+        $data = $cards->specimen($category, $override);
+
+        return response()->json(['recto' => view('badges.holder-card-recto', ['card' => $data])->render(), 'verso' => view('badges.holder-card-verso', ['card' => $data])->render()])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function saveModel(Request $request, string $code, CardModels $models): RedirectResponse
+    {
+        Gate::authorize('categories.gerer');
+        abort_unless(DB::table('institutional_categories')->where('code', $code)->exists(), 404);
+        $models->save($code, $request->all(), $request->user());
+
+        return redirect('/administration/titulaires/modeles?categorie='.$code)->with('status', 'Modèle enregistré. Il est « à valider » avant de servir de modèle officiel.');
+    }
+
+    public function validateModel(Request $request, string $code, CardModels $models): RedirectResponse
+    {
+        Gate::authorize('categories.gerer');
+        abort_unless(DB::table('institutional_categories')->where('code', $code)->exists(), 404);
+        $models->validate($code, $request->user());
+
+        return redirect('/administration/titulaires/modeles?categorie='.$code)->with('status', 'Modèle validé.');
     }
 
     public function settings(Request $request, HolderCards $cards): RedirectResponse
     {
         Gate::authorize('categories.gerer');
-        $data = $request->validate(['ligne1' => 'nullable|string|max:80', 'ligne2' => 'nullable|string|max:80', 'contact' => 'nullable|string|max:80', 'avis' => 'nullable|string|max:160', 'valide' => 'boolean']);
+        $data = $request->validate(['ligne1' => 'nullable|string|max:80', 'ligne2' => 'nullable|string|max:80', 'contact' => 'nullable|string|max:80', 'avis' => 'nullable|string|max:160']);
         $cards->saveSettings($data, $request->user());
 
         return back()->with('status', 'Mentions du verso enregistrées.');

@@ -100,9 +100,17 @@ describe('titulaires permanents hors ligne', () => {
     expect(decidePermanentOffline(ended, hash, gate, ZONES, T0, iso(-1 * MIN)).reason).toBe('engagement_termine');
   });
 
-  it('ne se prononce jamais à partir de la catégorie : aucun champ de catégorie dans la décision', async () => {
+  it('ne se prononce jamais à partir de la catégorie : elle est seulement transmise pour l’affichage', async () => {
     const source = decidePermanentOffline.toString();
-    expect(source).not.toMatch(/categor/i);
+    expect(source.replace(/category: holder\.category \?\? null/, '')).not.toMatch(/categor/i);
+  });
+
+  it('refuse une carte préparée mais pas encore remise (non activée)', async () => {
+    const snap = await permanent();
+    snap.cards[0].status = 'non_activee';
+    const d = decidePermanentOffline(snap, snap.cards[0].hash, null, [], Date.now(), new Date().toISOString());
+    expect(d.allowed).toBe(false);
+    expect(d.reason).toBe('carte_non_activee');
   });
 
   it('branche la décision dans le contrôle local et laisse toujours sortir, même carte révoquée ou confiance expirée', async () => {

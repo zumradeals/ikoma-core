@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
+use App\Services\CardModels;
 use App\Services\DemoLab;
 use App\Services\HolderCards;
 use App\Services\InstitutionalCategories;
@@ -59,7 +60,7 @@ it('émet une carte pour chacune des huit catégories institutionnelles avec son
         $data = $this->cards->cardData($holder);
         $recto = view('badges.holder-card-recto', ['card' => $data])->render();
         $verso = view('badges.holder-card-verso', ['card' => $data])->render();
-        expect($recto)->toContain('data-template="'.$code.'"')->and($recto)->toContain(InstitutionalCategories::LABELS[$code])->and($verso)->toContain('data-template="'.$code.'"');
+        expect($recto)->toContain('data-template="'.$code.'"')->and($recto)->toContain(CardModels::MENTIONS[$code])->and($verso)->toContain('data-template="'.$code.'"');
         $seen[] = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.code');
     }
     expect(array_unique($seen))->toHaveCount(8);
@@ -67,7 +68,7 @@ it('émet une carte pour chacune des huit catégories institutionnelles avec son
 
 it('présente huit modèles d’exemple fictifs dont le QR ne correspond à aucun badge', function () {
     $this->actingAs($this->admin)->get('/administration/titulaires/modeles')->assertOk()
-        ->assertInertia(fn ($page) => $page->component('Admin/ModelesCartes')->has('specimens', 8)->where('settings.valide', false));
+        ->assertInertia(fn ($page) => $page->component('Admin/PersonnalisationCartes')->has('categories', 8)->where('model.validated', false)->has('preview.recto'));
     $specimen = $this->cards->specimen(collect(app(InstitutionalCategories::class)->all())->first());
     expect($specimen['specimen'])->toBeTrue()->and(DB::table('badges')->where('qr_token', str_repeat('0', 64))->exists())->toBeFalse();
 });
@@ -75,14 +76,14 @@ it('présente huit modèles d’exemple fictifs dont le QR ne correspond à aucu
 // --- A05.2 recto, A05.3 verso ------------------------------------------------------------------------------------------------
 
 it('imprime au recto le logo, le nom, la catégorie et l’identifiant stable, sans donnée annexe ni jeton', function () {
-    $holder = cardHolder('AILCT-04', ['full_name' => 'Aminata Fictive Koné', 'position' => 'Fonction secrète', 'organisation' => 'Organisation secrète']);
+    $holder = cardHolder('AILCT-04', ['full_name' => 'Aminata Fictive Koné', 'position' => 'Fonction fictive', 'organisation' => 'Organisation secrète']);
     $this->cards->issue($holder, $this->admin);
     $data = $this->cards->cardData($holder);
     $recto = view('badges.holder-card-recto', ['card' => $data])->render();
     $identifier = DB::table('permanent_holders')->where('id', $holder)->value('identifier');
     $token = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.qr_token');
-    expect($recto)->toContain('Aminata Fictive Koné')->and($recto)->toContain($identifier)->and($recto)->toContain('Délégations officielles')
-        ->and($recto)->not->toContain('Fonction secrète')->and($recto)->not->toContain('Organisation secrète')->and($recto)->not->toContain($token);
+    expect($recto)->toContain('Aminata Fictive Koné')->and($recto)->toContain($identifier)->and($recto)->toContain('DÉLÉGATION OFFICIELLE')
+        ->and($recto)->toContain('Fonction fictive')->and($recto)->not->toContain('Organisation secrète')->and($recto)->not->toContain($token);
 });
 
 it('place au verso un QR conforme au contrat IKOMA1 sans donnée personnelle ni secret dans la charge utile', function () {
@@ -103,7 +104,8 @@ it('rend les mentions du verso configurables et retire la mention provisoire à 
     $this->cards->issue($holder, $this->admin);
     $recto = fn () => view('badges.holder-card-recto', ['card' => $this->cards->cardData($holder)])->render();
     expect($recto())->toContain('MODÈLE PROVISOIRE');
-    $this->actingAs($this->admin)->put('/administration/titulaires/modeles', ['ligne1' => 'Ligne fictive un', 'ligne2' => 'Ligne fictive deux', 'contact' => 'contact@exemple.test', 'avis' => 'Avis fictif', 'valide' => true])->assertRedirect();
+    $this->actingAs($this->admin)->put('/administration/titulaires/modeles', ['ligne1' => 'Ligne fictive un', 'ligne2' => 'Ligne fictive deux', 'contact' => 'contact@exemple.test', 'avis' => 'Avis fictif'])->assertRedirect();
+    $this->post('/administration/titulaires/modeles/AILCT-01/valider')->assertRedirect();
     $verso = view('badges.holder-card-verso', ['card' => $this->cards->cardData($holder)])->render();
     expect($recto())->not->toContain('PROVISOIRE')->and($verso)->toContain('Ligne fictive un')->and($verso)->toContain('contact@exemple.test')->and($verso)->toContain('Avis fictif');
     $this->put('/administration/titulaires/modeles', ['ligne1' => "x\x01y"])->assertSessionHasErrors('ligne1');
@@ -228,8 +230,10 @@ it('déroule le parcours administrateur : fiche, préparation, aperçu, impressi
     $holder = cardHolder('AILCT-07');
     $this->actingAs($this->admin);
     $this->get('/administration/titulaires/'.$holder.'/carte')->assertOk()->assertInertia(fn ($p) => $p->component('Admin/CarteTitulaire')->where('card', null)->where('preview', null));
+    $this->post('/administration/titulaires/'.$holder.'/carte')->assertSessionHasErrors('holder');
+    $this->post('/administration/titulaires/'.$holder.'/portrait', ['photo' => UploadedFile::fake()->createWithContent('p.png', cardPng())])->assertRedirect();
     $this->post('/administration/titulaires/'.$holder.'/carte')->assertRedirect('/administration/titulaires/'.$holder.'/carte');
-    $this->get('/administration/titulaires/'.$holder.'/carte')->assertInertia(fn ($p) => $p->where('card.associated', false)->has('preview.recto')->has('preview.verso'));
+    $this->get('/administration/titulaires/'.$holder.'/carte')->assertInertia(fn ($p) => $p->where('card.associated', false)->where('card.activated_at', null)->has('preview.recto')->has('preview.verso'));
     $response = $this->post('/administration/titulaires/'.$holder.'/carte/imprimer')->assertOk();
     expect($response->headers->get('Cache-Control'))->toContain('no-store');
     preg_match("/'nonce-([^']+)'/", (string) $response->headers->get('Content-Security-Policy'), $m);

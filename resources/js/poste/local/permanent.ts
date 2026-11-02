@@ -5,15 +5,16 @@ export type PermanentSnapshot = {
   trust_minutes: number;
   cards: { hash: string; status: string; holder_id: string; identifier: string }[];
   policies: { zone_id: string; permanent_allowed: boolean; offline_entry_allowed: boolean }[];
-  holders: { id: string; identifier: string; name: string; organisation: string | null; status: string; starts_on: string | null; ends_on: string | null; entitlements: { zone_id: string; valid_from: string | null; valid_until: string | null }[] }[];
+  holders: { id: string; category?: { id: string; name: string; color: string; priority_circuit: boolean } | null; identifier: string; name: string; organisation: string | null; status: string; starts_on: string | null; ends_on: string | null; entitlements: { zone_id: string; valid_from: string | null; valid_until: string | null }[] }[];
 };
 
-export type PermanentDecision = { allowed: boolean; reason: string | null; message: string; zones: string[]; holder: { identifier: string; name: string; organisation: string | null } | null };
+export type PermanentDecision = { allowed: boolean; reason: string | null; message: string; zones: string[]; holder: { identifier: string; name: string; organisation: string | null; category?: { id: string; name: string; color: string; priority_circuit: boolean } | null } | null };
 
 export const PERMANENT_PREFIX = 'PC:';
 
 const CARD_REFUSALS: Record<string, [string, string]> = {
   perdue: ['carte_perdue', 'Carte déclarée perdue : accès refusé. Prévenez le superviseur.'],
+  non_activee: ['carte_non_activee', 'Carte pas encore remise : activez-la dans la fiche du titulaire.'],
   volee: ['carte_volee', 'Carte déclarée volée : accès refusé. Prévenez le superviseur.'],
 };
 
@@ -37,7 +38,7 @@ export function decidePermanentOffline(snap: PermanentSnapshot, hash: string, po
   }
   const holder = snap.holders.find(h => h.id === card.holder_id);
   if (!holder) return refuse('habilitation_absente', 'Aucune habilitation valable pour cet événement : accès refusé.');
-  const who = { identifier: holder.identifier, name: holder.name, organisation: holder.organisation };
+  const who = { identifier: holder.identifier, name: holder.name, organisation: holder.organisation, category: holder.category ?? null };
   if (holder.status !== 'actif') return refuse('titulaire_clos', 'Titulaire clos : accès refusé.', who);
   const today = new Date(now).toISOString().slice(0, 10);
   if (holder.starts_on && today < holder.starts_on.slice(0, 10)) return refuse('engagement_non_commence', 'L’engagement de ce titulaire n’a pas encore commencé.', who);

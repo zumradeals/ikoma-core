@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 final class PrintTrail
 {
     /**
-     * @param  array{nature: string, event_id: ?string, batch_id: ?string, format: string, side: string, design: ?string, mode: ?string, planned_count: int, first_number: ?int, last_number: ?int, options: array<string, mixed>}  $ctx
+     * @param  array{kind?: string, nature: string, event_id: ?string, batch_id: ?string, format: string, side: string, design: ?string, mode: ?string, planned_count: int, first_number: ?int, last_number: ?int, options: array<string, mixed>}  $ctx
      * @return string identifiant du tirage
      */
     public function generate(User $actor, array $ctx, ?string $reason): string
@@ -36,7 +36,7 @@ final class PrintTrail
             $id = (string) Str::uuid();
             $now = now();
             DB::table('badge_print_runs')->insert([
-                'id' => $id, 'kind' => 'visiteur', 'event_id' => $ctx['event_id'], 'batch_id' => $ctx['batch_id'], 'operator_id' => $actor->id, 'nature' => $ctx['nature'],
+                'id' => $id, 'kind' => $ctx['kind'] ?? 'visiteur', 'event_id' => $ctx['event_id'], 'batch_id' => $ctx['batch_id'], 'operator_id' => $actor->id, 'nature' => $ctx['nature'],
                 'model' => $ctx['design'], 'mode' => $ctx['mode'], 'format' => $ctx['format'], 'face' => $ctx['side'], 'badge_count' => $ctx['planned_count'],
                 'first_code' => $ctx['first_number'] === null ? null : self::code($ctx['first_number']), 'last_code' => $ctx['last_number'] === null ? null : self::code($ctx['last_number']),
                 'first_number' => $ctx['first_number'], 'last_number' => $ctx['last_number'], 'reason' => $reason,
@@ -44,7 +44,7 @@ final class PrintTrail
             ]);
             DB::table('badge_print_events')->insert(['id' => (string) Str::uuid(), 'print_run_id' => $id, 'operator_id' => $actor->id, 'event_type' => 'generated', 'created_at' => $now]);
             app(Audit::class)->append('atelier.document_genere', $actor->id, [
-                'tirage' => $id, 'type' => 'visiteur', 'evenement' => $ctx['event_id'], 'lot' => $ctx['batch_id'], 'format' => $ctx['format'], 'face' => $ctx['side'],
+                'tirage' => $id, 'type' => $ctx['kind'] ?? 'visiteur', 'evenement' => $ctx['event_id'], 'lot' => $ctx['batch_id'], 'format' => $ctx['format'], 'face' => $ctx['side'],
                 'modele' => $ctx['design'], 'mode' => $ctx['mode'], 'nature' => $ctx['nature'], 'nombre' => $ctx['planned_count'],
                 'premier' => $ctx['first_number'], 'dernier' => $ctx['last_number'], 'motif_fourni' => $reason !== null,
             ]);

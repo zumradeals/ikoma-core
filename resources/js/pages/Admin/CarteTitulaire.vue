@@ -6,7 +6,7 @@ import '../../../../public/badges/holder-cards.css';
 
 type Print = { id: string; kind: 'emission' | 'reimpression'; reason: string | null; created_at: string; by: string | null };
 type CardRow = { id: string; rank: number; status: 'active' | 'perdue' | 'volee' | 'revoquee' | 'retiree'; issued_at: string; revoked_at: string | null; revocation_reason: string | null; revocation_note: string | null; replaced_by_card_id: string | null; badge_code: string; badge_status: string; revoked_by: string | null; prints: Print[] };
-type Card = { id: string; issued_at: string; badge_code: string; badge_status: string; associated: boolean; prints: Print[] };
+type Card = { id: string; issued_at: string; activated_at: string | null; activation_source: string | null; badge_code: string; badge_status: string; associated: boolean; prints: Print[] };
 const props = defineProps<{
   holder: { id: string; identifier: string; full_name: string; status: 'actif' | 'clos'; institutional_category: string | null; has_photo: boolean; photo_print_allowed: boolean };
   category: { code: string; label: string } | null; card: Card | null; preview: { recto: string; verso: string } | null;
@@ -31,8 +31,10 @@ const lifecycleForm = useForm({ reason: 'perdue', note: '', confirmation: false 
 function openLifecycle(kind: 'revoquer' | 'remplacer') { lifecycle.value = kind; lifecycleForm.reset(); lifecycleForm.clearErrors(); }
 function submitLifecycle() { lifecycleForm.post(base.value + '/carte/' + lifecycle.value, { preserveScroll: true, onSuccess: () => { lifecycle.value = null; } }); }
 const statusLabel: Record<string, string> = { active: 'Active', perdue: 'Perdue', volee: 'Volée', revoquee: 'Révoquée', retiree: 'Retirée' };
-const steps = ['Sélectionner un titulaire', 'Préparer la carte', 'Prévisualiser', 'Générer / imprimer'];
-const stage = computed(() => (props.card === null ? 1 : props.card.prints.length === 0 ? 2 : 3));
+const steps = ['Préparer la carte', 'Imprimer', 'Remettre et activer'];
+const stage = computed(() => (props.card === null ? 0 : props.card.activated_at !== null ? 3 : props.card.prints.length === 0 ? 1 : 2));
+const activation = useForm({ confirmation: false });
+function activate() { activation.post(base.value + '/carte/activer', { preserveScroll: true }); }
 function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
 </script>
 
@@ -46,8 +48,8 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
         <ol class="flex flex-wrap gap-2" aria-label="Étapes">
           <li v-for="(label, i) in steps" :key="label" class="rounded-lg border px-3 py-1 text-sm font-semibold" :class="i <= stage ? 'bg-white' : 'opacity-60'" :aria-current="i === stage ? 'step' : undefined">{{ i + 1 }}. {{ label }}</li>
         </ol>
-        <p class="rounded-lg border bg-white p-3 text-sm" data-testid="avis-acces">Le titulaire, la carte physique et ses identifiants techniques sont trois choses distinctes. <strong>Posséder une carte ne donne aucun droit d’accès</strong> : les accès dépendent uniquement des règles de chaque événement.</p>
-        <p v-if="provisional" class="rounded-lg border-2 border-amber-600 bg-amber-50 p-3 text-sm font-semibold" role="status" data-testid="avis-provisoire">Modèle provisoire : couleurs, repères et mentions ne sont pas encore validés par l’institution. Les cartes portent la mention « MODÈLE PROVISOIRE ».</p>
+        <p class="rounded-lg border bg-white p-3 text-sm" data-testid="avis-acces">Posséder une carte ne donne aucun droit d’accès : les accès dépendent des habilitations de chaque événement.</p>
+        <p v-if="provisional" class="rounded-lg border-2 border-amber-600 bg-amber-50 p-3 text-sm font-semibold" role="status" data-testid="avis-provisoire">Le modèle de cette catégorie n’est pas encore validé. <Link href="/administration/titulaires/modeles" class="underline">Personnalisation des cartes</Link></p>
       </header>
 
       <p v-if="holder.status === 'clos'" class="rounded-xl border bg-white p-5 font-semibold" data-testid="titulaire-clos">Ce titulaire est clos : aucune carte ne peut être émise ou imprimée.</p>
@@ -57,24 +59,24 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
           <h2 class="text-heading font-bold">Préparation</h2>
           <ul class="list-disc space-y-1 pl-6" data-testid="preparation">
             <li :data-ok="category !== null">Catégorie institutionnelle : <strong>{{ category ? category.code + ' · ' + category.label : 'à choisir dans la fiche du titulaire' }}</strong></li>
-            <li :data-ok="permanentContext">Contexte permanent : <strong>{{ permanentContext ? 'créé' : 'à créer depuis l’écran Titulaires' }}</strong></li>
-            <li>Portrait : <strong>{{ holder.has_photo ? (holder.photo_print_allowed ? 'présent, impression autorisée' : 'présent, non imprimé') : 'aucun (facultatif)' }}</strong></li>
+            <li :data-ok="permanentContext">Registre des cartes : <strong>{{ permanentContext ? 'prêt' : 'à créer depuis la page Registre des personnes' }}</strong></li>
+            <li :data-ok="holder.has_photo">Photo : <strong>{{ holder.has_photo ? (holder.photo_print_allowed ? 'présente, imprimée sur la carte' : 'présente, non imprimée') : 'obligatoire pour préparer la carte' }}</strong></li>
           </ul>
           <form class="space-y-3 border-t pt-3" @submit.prevent="sendPortrait">
-            <h3 class="font-bold">Portrait (facultatif)</h3>
-            <p class="text-sm">Image JPEG ou PNG, 5 Mo au plus, recadrée en 3:4. Elle est stockée chiffrée et n’est imprimée que si vous l’autorisez ici.</p>
+            <h3 class="font-bold">Photo</h3>
+            <p class="text-sm">Image JPEG ou PNG, 5 Mo au plus. Elle est stockée chiffrée et n’est imprimée que si vous l’autorisez ici.</p>
             <label class="block font-semibold">Fichier<input type="file" accept="image/png,image/jpeg" class="block" data-testid="fichier-portrait" @change="pick"></label>
-            <label class="flex items-center gap-2 font-semibold"><input v-model="portrait.print_allowed" type="checkbox" class="size-6" data-testid="autoriser-impression-portrait"> Autoriser l’impression du portrait sur la carte</label>
+            <label class="flex items-center gap-2 font-semibold"><input v-model="portrait.print_allowed" type="checkbox" class="size-6" data-testid="autoriser-impression-portrait"> Imprimer la photo sur la carte</label>
             <p v-if="portrait.errors.photo" class="font-semibold text-red-800" role="alert">{{ portrait.errors.photo }}</p>
-            <div class="flex flex-wrap gap-3"><button type="submit" class="btn-soft" :disabled="!portrait.photo || portrait.processing" data-testid="envoyer-portrait">Enregistrer le portrait</button><button v-if="holder.has_photo" type="button" class="btn-soft" data-testid="retirer-portrait" @click="removePortrait">Retirer le portrait</button></div>
+            <div class="flex flex-wrap gap-3"><button type="submit" class="btn-soft" :disabled="!portrait.photo || portrait.processing" data-testid="envoyer-portrait">Enregistrer la photo</button><button v-if="holder.has_photo" type="button" class="btn-soft" data-testid="retirer-portrait" @click="removePortrait">Retirer la photo</button></div>
           </form>
         </section>
 
         <section v-if="card === null && cards.length === 0" class="space-y-3 rounded-xl border bg-white p-5" aria-label="Création de la carte">
           <h2 class="text-heading font-bold">Préparer la carte</h2>
-          <p>Crée la carte de ce titulaire : un badge technique est fabriqué, non associé à aucun événement. L’identifiant <strong>{{ holder.identifier }}</strong> n’est pas modifié.</p>
+          <p>La carte est préparée mais ne sert pas encore : elle sera utilisable après « Remettre et activer ». L’identifiant <strong>{{ holder.identifier }}</strong> ne change pas.</p>
           <p v-if="$page.props.errors?.holder" class="font-semibold text-red-800" role="alert" data-testid="erreur-carte">{{ $page.props.errors.holder }}</p>
-          <button type="button" class="admin-primary" data-testid="preparer-carte" :disabled="category === null || !permanentContext" @click="prepare">Préparer la carte</button>
+          <button type="button" class="admin-primary" data-testid="preparer-carte" :disabled="category === null || !permanentContext || !holder.has_photo" @click="prepare">Préparer la carte</button>
         </section>
 
         <section v-else-if="card === null && cards.length > 0" class="space-y-3 rounded-xl border-2 border-red-700 bg-white p-5" aria-label="Aucune carte active" data-testid="aucune-carte-active">
@@ -95,8 +97,18 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
             </div>
           </section>
 
+          <section v-if="card.activated_at === null" class="space-y-3 rounded-xl border-2 border-blue-600 bg-white p-5" aria-label="Remise" data-testid="remise-carte">
+            <h2 class="text-heading font-bold">Remettre et activer</h2>
+            <p>Quand la carte est imprimée et remise à la personne, activez-la : elle pourra alors être utilisée au contrôle. Avant cela, elle est refusée.</p>
+            <label class="flex items-center gap-2 font-semibold"><input v-model="activation.confirmation" type="checkbox" class="size-6" data-testid="confirmer-remise"> La carte est remise à la personne</label>
+            <p v-if="$page.props.errors?.holder || activation.errors.confirmation" class="font-semibold text-red-800" role="alert">{{ $page.props.errors?.holder ?? activation.errors.confirmation }}</p>
+            <button type="button" class="admin-primary" :disabled="!activation.confirmation || activation.processing" data-testid="activer-carte" @click="activate">Remettre et activer</button>
+          </section>
+          <p v-else class="rounded-xl border-2 border-green-700 bg-green-50 p-4 font-semibold" data-testid="carte-activee">Carte remise et activée le {{ when(card.activated_at) }}.</p>
+
           <section class="space-y-3 rounded-xl border bg-white p-5" aria-label="Impression">
-            <h2 class="text-heading font-bold">{{ reprinting ? 'Réimprimer la carte' : 'Générer et imprimer la carte' }}</h2>
+            <h2 class="text-heading font-bold">{{ reprinting ? 'Réimprimer la carte' : 'Imprimer la carte' }}</h2>
+            <p class="text-sm">Pour imprimer plusieurs cartes à la fois, utilisez <Link href="/administration/atelier?mode=cartes" class="font-semibold underline" data-testid="lien-atelier-cartes">l’Atelier des badges</Link>.</p>
             <p v-if="reprinting">Réimprimer conserve le même badge, le même QR et le même identifiant. Un motif est obligatoire et reste dans l’historique.</p>
             <p v-else>Le premier tirage est l’émission de la carte. Faites d’abord un essai sur la <a href="/administration/titulaires/alignement" target="_blank" rel="noopener" class="font-semibold underline" data-testid="lien-alignement">page d’alignement</a>.</p>
             <form method="post" :action="base + '/carte/imprimer'" target="_blank" class="space-y-3" data-testid="formulaire-impression">
@@ -112,7 +124,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
             <ol v-else class="space-y-2" data-testid="historique-tirages">
               <li v-for="p in card.prints" :key="p.id" class="rounded-lg border p-3"><strong>{{ p.kind === 'emission' ? 'Émission' : 'Réimpression' }}</strong> · {{ when(p.created_at) }}<span v-if="p.by"> · {{ p.by }}</span><span v-if="p.reason" class="block text-sm">Motif : {{ p.reason }}</span></li>
             </ol>
-            <p class="text-sm">Le navigateur ne confirme pas le tirage physique : l’historique enregistre la génération du document.</p>
+            <p class="text-sm"></p>
           </section>
         </template>
       </template>
@@ -122,8 +134,10 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
         <p class="text-sm">Titulaire, carte physique, identifiant imprimé, jeton QR et habilitation sont cinq choses distinctes. Une carte perdue, volée ou révoquée est refusée tout de suite et ne se réactive jamais.</p>
         <ol class="space-y-2" data-testid="liste-cartes">
           <li v-for="c in cards" :key="c.id" class="rounded-lg border p-3" :data-testid="'carte-' + c.rank">
-            <p class="flex flex-wrap items-center gap-2"><strong>Carte n° {{ c.rank }}</strong> · badge {{ c.badge_code }}
-              <span class="rounded px-2 py-1 text-sm font-bold" :class="c.status === 'active' ? 'bg-green-100 text-green-900' : 'bg-red-100 text-red-900'" :data-testid="'statut-carte-' + c.rank">{{ statusLabel[c.status] ?? c.status }}</span></p>
+            <p class="flex flex-wrap items-center gap-2">
+<strong>Carte n° {{ c.rank }}</strong> · badge {{ c.badge_code }}
+              <span class="rounded px-2 py-1 text-sm font-bold" :class="c.status === 'active' ? 'bg-green-100 text-green-900' : 'bg-red-100 text-red-900'" :data-testid="'statut-carte-' + c.rank">{{ statusLabel[c.status] ?? c.status }}</span>
+</p>
             <p class="text-sm">Émise le {{ when(c.issued_at) }}<span v-if="c.revoked_at"> · {{ statusLabel[c.status] }} le {{ when(c.revoked_at) }}<span v-if="c.revoked_by"> par {{ c.revoked_by }}</span><span v-if="c.revocation_note"> : {{ c.revocation_note }}</span></span><span v-if="c.replaced_by_card_id"> · remplacée</span></p>
             <p v-if="c.prints.length" class="text-sm">{{ c.prints.length }} tirage(s) : {{ c.prints.map(p => (p.kind === 'emission' ? 'émission' : 'réimpression') + ' ' + when(p.created_at)).join(' ; ') }}</p>
           </li>

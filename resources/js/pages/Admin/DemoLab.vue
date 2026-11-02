@@ -90,7 +90,7 @@ function resetAll() {
             </div>
           </li>
         </ul>
-        <form v-if="selectedDemo" class="space-y-3 rounded-lg border border-red-600 p-4" @submit.prevent="deleteDemo" data-testid="demo-delete-confirmation">
+        <form v-if="selectedDemo" class="space-y-3 rounded-lg border border-red-600 p-4" data-testid="demo-delete-confirmation" @submit.prevent="deleteDemo">
           <h3 class="font-bold">Effacer : {{ selectedDemo.name }}</h3>
           <p>Cette action supprime définitivement ce scénario et ses données, même si vous l'avez utilisé pour des essais. Les autres événements ne seront pas supprimés.</p>
           <label class="block">Recopiez SUPPRIMER DEMO
@@ -121,10 +121,10 @@ function resetAll() {
           <div class="rounded-lg bg-slate-50 p-3"><dt>Scénarios DÉMO</dt><dd class="text-2xl font-bold">{{ totals.demo_events }}</dd></div>
         </dl>
         <p class="admin-muted">Ton compte administrateur, son mot de passe, la configuration technique, les migrations et la trace de sécurité du reset sont conservés. Les tablettes ayant des copies hors ligne doivent aussi être vidées ou réenrôlées avant de les réutiliser.</p>
-        <button v-if="!resetOpen" type="button" class="btn-soft border-red-600 text-red-800" @click="resetOpen = true" data-testid="business-reset-open">
+        <button v-if="!resetOpen" type="button" class="btn-soft border-red-600 text-red-800" data-testid="business-reset-open" @click="resetOpen = true">
           Préparer la remise à zéro totale
         </button>
-        <form v-else class="space-y-4 rounded-lg border border-red-600 p-4" @submit.prevent="resetAll" data-testid="business-reset-confirmation">
+        <form v-else class="space-y-4 rounded-lg border border-red-600 p-4" data-testid="business-reset-confirmation" @submit.prevent="resetAll">
           <h3 class="font-bold text-red-800">Attention : cette opération est irréversible</h3>
           <p>Elle supprimera {{ totals.events }} événement(s), {{ totals.visitors }} personne(s) et {{ totals.badges }} badge(s), y compris vos éléments « seminaire » s'ils existent encore.</p>
           <label class="flex items-start gap-2">
