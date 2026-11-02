@@ -278,3 +278,30 @@ it('écarte le contexte permanent des écrans et des opérations ordinaires (imp
     $category = DB::table('categories')->insertGetId(['id' => $id = (string) Str::uuid(), 'event_id' => $context->id, 'name' => 'Cat test', 'color' => '#336699', 'priority_circuit' => false, 'created_at' => now(), 'updated_at' => now()]) ? $id : $id;
     expect(fn () => app(BadgeLots::class)->generate($context->id, $category, 5, $this->admin))->toThrow(BadgeRefused::class);
 });
+
+it('compte les cartes par étape (préparer, imprimer, remettre) et prépare toutes les cartes des personnes avec photo, sans rien activer', function () {
+    $this->actingAs($this->admin);
+    $withPhoto = [cardHolder('AILCT-01'), cardHolder('AILCT-02'), cardHolder('AILCT-03')];
+    foreach ($withPhoto as $id) {
+        DB::table('permanent_holders')->where('id', $id)->update(['photo_file' => 'holder-portraits/fictif.enc']);
+    }
+    $noPhoto = cardHolder('AILCT-04');
+    $before = $this->cards->pipeline();
+    expect($before['sans_carte'])->toBe(3)->and($before['sans_photo'])->toBeGreaterThanOrEqual(1)->and($before['a_imprimer'])->toBe(0);
+
+    $this->post('/administration/titulaires/cartes/preparer-toutes')->assertRedirect('/administration/titulaires')->assertSessionHas('status', fn ($m) => str_contains($m, '3 carte(s) préparée(s)'));
+    $after = $this->cards->pipeline();
+    expect($after['sans_carte'])->toBe(0)->and($after['a_imprimer'])->toBe(3)->and($after['a_remettre'])->toBe(0)->and($after['actives'])->toBe(0)
+        ->and(DB::table('holder_cards')->where('holder_id', $noPhoto)->exists())->toBeFalse()
+        ->and(DB::table('holder_cards')->whereIn('holder_id', $withPhoto)->whereNotNull('activated_at')->count())->toBe(0);
+
+    // Rejouer ne crée rien de plus ; après impression, la carte passe à « à remettre » ; après remise, « active ».
+    $this->post('/administration/titulaires/cartes/preparer-toutes')->assertRedirect();
+    expect(DB::table('holder_cards')->whereIn('holder_id', $withPhoto)->count())->toBe(3);
+    $this->cards->recordPrint($withPhoto[0], null, $this->admin);
+    $mid = $this->cards->pipeline();
+    expect($mid['a_imprimer'])->toBe(2)->and($mid['a_remettre'])->toBe(1)->and($mid['prochaine_remise'])->toBe($withPhoto[0]);
+    $this->cards->activate($withPhoto[0], $this->admin);
+    expect($this->cards->pipeline()['actives'])->toBe(1);
+    $this->get('/administration/titulaires')->assertInertia(fn ($p) => $p->where('pipeline.actives', 1)->where('pipeline.a_imprimer', 2));
+});
