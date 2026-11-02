@@ -570,3 +570,8 @@ Constat de recette sur tablette : une carte active avec une habilitation en cour
 - **Fiche de la carte :** avant « Remettre et activer », un avertissement indique si aucune habilitation n'est en cours (et à partir de quand la carte ouvrira quelque chose).
 - **Conséquence à connaître :** une personne dont la fin d'engagement est passée garde son accès tant que ses habilitations courent et qu'elle n'est pas clôturée ; la fin d'une habilitation ou la clôture du titulaire reste le moyen de couper l'accès.
 - **Non fait :** proposer par défaut aux nouvelles habilitations les dates d'engagement de la personne.
+
+
+## Poste d'accueil — bandeau de réinitialisation retiré de l'écran de travail (2 novembre 2026)
+
+Demande du dirigeant : le bandeau blanc « Réinitialiser ce navigateur et changer de poste » en haut de l'écran de travail n'est pas professionnel. Il est retiré de l'écran ouvert. La réinitialisation locale reste disponible depuis l'écran verrouillé (« Ancien poste ? Réinitialiser ce navigateur pour le réenrôler »), qui est le chemin documenté (RESET_POSTE_CAMERA.md). Aucune règle ni donnée modifiée.
