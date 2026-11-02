@@ -24,7 +24,7 @@ final class AdminVisitorsController
     {
         Gate::authorize('listes.importer');
         $input = $request->validate(['event_id' => 'nullable|uuid|exists:events,id', 'q' => 'nullable|string|max:160', 'withdrawn' => 'nullable|boolean', 'page' => 'nullable|integer|min:1|max:100000', 'visitor' => 'nullable|uuid|exists:visitors,id']);
-        $visitor = isset($input['visitor']) ? Visitor::findOrFail($input['visitor']) : null;
+        $visitor = isset($input['visitor']) ? Visitor::whereNull('holder_id')->findOrFail($input['visitor']) : null;
         $event = $visitor->event_id ?? ($input['event_id'] ?? DB::table('events')->where('is_permanent', false)->orderBy('name')->value('id'));
         $editable = $visitor?->withdrawn_at === null;
         if ($visitor) {
@@ -36,7 +36,7 @@ final class AdminVisitorsController
         }
 
         $list = $event ? DB::table('visitors')
-            ->where('event_id', $event)->whereNull('withdrawn_at')
+            ->where('event_id', $event)->whereNull('withdrawn_at')->whereNull('holder_id')
             ->orderByRaw('full_name COLLATE "C" ASC')->orderBy('id')
             ->paginate(20, ['id', 'full_name', 'organisation'], 'page', (int) ($input['page'] ?? 1)) : null;
 
@@ -45,7 +45,7 @@ final class AdminVisitorsController
             'hosts' => DB::table('hosts')->orderBy('name')->get(['id', 'event_id', 'name']), 'categories' => DB::table('categories')->orderBy('name')->get(['id', 'event_id', 'name']),
             'groups' => DB::table('groups')->orderBy('name')->get(['id', 'event_id', 'name']),
             'visitor' => $visitor ? [...$visitor->only(['id', 'event_id', 'full_name', 'organisation', 'position', 'category_id', 'host_id', 'group_id', 'valid_from', 'valid_until', 'profile_photo_print_allowed', 'withdrawn_at']), 'has_photo' => (bool) $visitor->profile_photo_file, 'revision' => (string) $visitor->updated_at] : null,
-            'withdrawn' => $request->boolean('withdrawn'), 'withdrawnVisitors' => $event && $request->boolean('withdrawn') ? DB::table('visitors')->where('event_id', $event)->whereNotNull('withdrawn_at')->orderByRaw('full_name COLLATE "C" ASC')->orderBy('id')->limit(200)->get(['id', 'full_name', 'organisation']) : [],
+            'withdrawn' => $request->boolean('withdrawn'), 'withdrawnVisitors' => $event && $request->boolean('withdrawn') ? DB::table('visitors')->where('event_id', $event)->whereNotNull('withdrawn_at')->whereNull('holder_id')->orderByRaw('full_name COLLATE "C" ASC')->orderBy('id')->limit(200)->get(['id', 'full_name', 'organisation']) : [],
             'list' => $list, 'searchQuery' => $input['q'] ?? '',
             'editable' => $editable, 'feedback' => $request->session()->get('visitor_feedback'),
             'results' => $event && ! empty($input['q']) ? app(VisitorSearch::class)->searchDetailed($event, $input['q']) : [],
@@ -64,11 +64,13 @@ final class AdminVisitorsController
             'photo' => 'nullable|file|mimes:jpeg,jpg,png|max:5120|dimensions:max_width=6000,max_height=6000', 'remove_photo' => 'required|boolean', 'photo_print_allowed' => 'required|boolean',
         ]);
         if ($visitor) {
-            abort_unless(Visitor::where('id', $visitor)->where('event_id', $data['event_id'])->exists(), 422, 'La fiche appartient à un autre événement.');
+            // Une fiche de participation d'un titulaire permanent n'est jamais une fiche d'invité : elle n'est ni modifiable ni retirable ici.
+            abort_if(Visitor::where('id', $visitor)->whereNotNull('holder_id')->exists(), 404);
+            abort_unless(Visitor::where('id', $visitor)->whereNull('holder_id')->where('event_id', $data['event_id'])->exists(), 422, 'La fiche appartient à un autre événement.');
         }
         $result = DB::transaction(function () use ($request, $guests, $portraits, $data, $visitor) {
             $result = $guests->save($request->user(), $data, $visitor, true);
-            $v = Visitor::lockForUpdate()->findOrFail($result['id']);
+            $v = Visitor::whereNull('holder_id')->lockForUpdate()->findOrFail($result['id']);
             if (($data['group_id'] ?? null) !== $v->group_id) {
                 Gate::authorize('groupes.gerer');
                 if ($v->group_id) {
@@ -89,7 +91,7 @@ final class AdminVisitorsController
     public function destroy(Request $request, string $visitor, HostGuests $guests): RedirectResponse
     {
         Gate::authorize('listes.importer');
-        $v = Visitor::findOrFail($visitor);
+        $v = Visitor::whereNull('holder_id')->findOrFail($visitor);
         try {
             $guests->withdraw($request->user(), $visitor, true);
         } catch (DeskRefused $e) {
@@ -106,7 +108,7 @@ final class AdminVisitorsController
     public function portrait(string $visitor, ProfilePortrait $portraits): \Illuminate\Http\Response
     {
         Gate::authorize('listes.importer');
-        $v = Visitor::findOrFail($visitor);
+        $v = Visitor::whereNull('holder_id')->findOrFail($visitor);
         $jpeg = $portraits->read($v);
         abort_if($jpeg === null, 404);
 

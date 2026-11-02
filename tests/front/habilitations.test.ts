@@ -7,10 +7,18 @@ vi.mock('@inertiajs/vue3', () => ({
   usePage: () => ({ props: { auth: { name: 'IKOMA ADMIN', permissions: ['listes.importer', 'zones.gerer', 'postes.gerer'] } } }),
   router: { get: vi.fn(), put, post: vi.fn(), delete: vi.fn() },
   Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
-  useForm: (data: object) => reactive({ ...data, errors: {}, processing: false, post, put, reset: vi.fn(), clearErrors: vi.fn() }),
+  useForm: (data: object) => {
+    const form = reactive({
+      ...data, errors: {}, processing: false, put, reset: vi.fn(), clearErrors: vi.fn(), _transform: null as null | ((d: Record<string, unknown>) => Record<string, unknown>),
+      transform(fn: (d: Record<string, unknown>) => Record<string, unknown>) { form._transform = fn; return form; },
+      post(url: string, options?: object) { const { _transform, errors, processing, ...fields } = form as Record<string, unknown>; void errors; void processing; return post(url, (_transform as typeof form._transform)?.(fields) ?? fields, options); },
+    });
+    return form;
+  },
 }));
 
 import Habilitations from '../../resources/js/pages/Admin/Habilitations.vue';
+import { toUtcIso } from '../../resources/js/utils/localDateTime';
 
 const base = {
   events: [{ id: 'e1', name: 'Événement fictif' }], eventId: 'e1',
@@ -47,5 +55,23 @@ describe('habilitations des titulaires permanents', () => {
     expect(ro.find('[data-testid=retirer-h1]').exists()).toBe(false);
     const none = mount(Habilitations, { props: { ...base, events: [], eventId: null, zones: [], entitlements: [], decisions: [], devices: [] } });
     expect(none.find('[data-testid=aucun-evenement]').exists()).toBe(true);
+  });
+
+  it('envoie les dates d’habilitation en UTC explicite, quel que soit le fuseau du navigateur', async () => {
+    process.env.TZ = 'Europe/Paris';
+    expect(toUtcIso('2027-01-10T10:00')).toBe('2027-01-10T09:00:00.000Z');
+    process.env.TZ = 'America/Abidjan';
+    expect(toUtcIso('2027-01-10T10:00')).toBe('2027-01-10T10:00:00.000Z');
+    expect(toUtcIso('')).toBe('');
+    expect(toUtcIso('pas une date')).toBe('pas une date');
+    process.env.TZ = 'Europe/Paris';
+    post.mockClear();
+    const wrapper = mount(Habilitations, { props: base });
+    await wrapper.get('[data-testid=hab-titulaire]').setValue('t1');
+    await wrapper.get('[data-testid=hab-zone]').setValue('z2');
+    await wrapper.get('[data-testid=hab-debut]').setValue('2027-01-10T10:00');
+    await wrapper.get('[data-testid=hab-fin]').setValue('2027-01-10T18:30');
+    await wrapper.get('form').trigger('submit');
+    expect(post).toHaveBeenCalledWith('/administration/habilitations', expect.objectContaining({ valid_from: '2027-01-10T09:00:00.000Z', valid_until: '2027-01-10T17:30:00.000Z', zone_id: 'z2', holder_id: 't1' }), expect.anything());
   });
 });
