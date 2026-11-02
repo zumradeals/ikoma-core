@@ -1,4 +1,5 @@
 import type { ArrivalResult, GroupSummary, GroupView } from './local/group';
+import type { PermanentResult } from './local/permanent';
 import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
@@ -14,6 +15,8 @@ export interface PosteRepository {
   listPostes(): Promise<Poste[]>;
   context(): Promise<DeskContext>;
   search(query: string): Promise<SearchResult[]>;
+  /** Recherche d'une personne permanente, en lecture seule ; absent quand le poste travaille directement sur le serveur. */
+  searchPermanent?(query: string): Promise<PermanentResult[]>;
   visitor(id: string): Promise<Fiche>;
   saveIdentity(operationId: string, visitorId: string, photo: Blob, doc?: IdentityDocument): Promise<void>;
   validate(operationId: string, visitorId: string, avis?: Avis): Promise<void>;

@@ -587,3 +587,22 @@ it('accorde l’accès à plusieurs personnes et zones d’un coup : un accès i
     $this->post('/administration/habilitations/groupe', $payload)->assertForbidden();
     expect(DB::table('audit_logs')->where('action', 'habilitation.accordee')->count())->toBeGreaterThanOrEqual(4);
 });
+
+it('publie un annuaire en lecture seule des personnes permanentes pour la recherche à l’accueil, sans photo ni jeton', function () {
+    [$a] = pxCard('AILCT-01');
+    $b = app(PermanentHolders::class)->create(['full_name' => 'Personne Sans Carte', 'institutional_category' => 'AILCT-02'], $this->admin);
+    $c = app(PermanentHolders::class)->create(['full_name' => 'Personne Préparée', 'institutional_category' => 'AILCT-03'], $this->admin);
+    app(HolderCards::class)->issue($c, $this->admin, false);
+    DB::table('permanent_holders')->where('id', $a)->update(['photo_file' => 'holder-portraits/fictif.enc']);
+    $snapshot = app(PermanentAccess::class)->snapshot($this->event);
+    $byId = collect($snapshot['directory'])->keyBy('id');
+    expect($byId[$a]['card'])->toBe('active')->and($byId[$b]['card'])->toBe('aucune')->and($byId[$c]['card'])->toBe('non_activee')
+        ->and($byId[$a]['category']['name'])->toBe('Personnel AILCT')
+        ->and(array_keys($byId[$a]))->toEqualCanonicalizing(['id', 'identifier', 'name', 'organisation', 'category', 'card']);
+    $json = json_encode($snapshot['directory'], JSON_THROW_ON_ERROR);
+    expect($json)->not->toContain('holder-portraits')->and($json)->not->toContain(pxToken($a));
+    // Une carte perdue est signalée ; l'annuaire n'ouvre jamais d'accès (aucune habilitation créée).
+    app(CardLifecycle::class)->revoke($a, 'perdue', null, $this->admin);
+    expect(collect(app(PermanentAccess::class)->snapshot($this->event)['directory'])->firstWhere('id', $a)['card'])->toBe('perdue')
+        ->and(DB::table('holder_entitlements')->count())->toBe(0);
+});
