@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Atelier\BadgePrinting;
 use App\Services\Audit;
 use App\Services\BadgeArtwork;
 use App\Services\BadgePreparation;
@@ -11,38 +12,15 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
-use Inertia\Inertia;
-use stdClass;
 
 final class BadgeWorkshopController
 {
-    public function index(Request $request): \Inertia\Response
+    /** Ancien lien conservé : l'atelier d'impression est devenu l'Atelier des badges. */
+    public function index(Request $request): RedirectResponse
     {
         Gate::authorize('badges.gerer');
-        $personInput = $request->validate(['person' => 'nullable|uuid|exists:visitors,id']);
-        $person = null;
-        if (! empty($personInput['person'])) {
-            Gate::authorize('listes.importer');
-            $person = DB::table('visitors')->where('id', $personInput['person'])->whereNull('withdrawn_at')->first(['id', 'event_id', 'category_id', 'full_name']);
-        }
-        $events = DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name']);
-        $preferences = [];
-        $settings = DB::table('settings')->where('key', 'like', 'badge_atelier_%')->pluck('value', 'key');
-        foreach ($events as $event) {
-            $preferences[$event->id] = BadgeArtwork::defaults();
-            foreach ($preferences[$event->id] as $key => $default) {
-                $preferences[$event->id][$key] = $settings->get('badge_atelier_'.$event->id.'_'.$key, $default);
-            }
-        }
-        $number = "CASE WHEN code ~ '^B-[0-9]+\$' THEN substring(code from 3)::integer END";
 
-        return Inertia::render('Admin/BadgeWorkshop', [
-            'events' => $events, 'preferences' => $preferences, 'person' => $person,
-            'batches' => DB::table('badge_batches as batch')->leftJoin('categories as c', 'c.id', '=', 'batch.category_id')
-                ->selectRaw("batch.id, batch.event_id, batch.name, c.name as category, (SELECT min($number) FROM badges WHERE badge_batch_id = batch.id) as first_number, (SELECT max($number) FROM badges WHERE badge_batch_id = batch.id) as last_number")
-                ->orderBy('batch.name')->get(),
-        ]);
+        return redirect('/administration/atelier'.($request->query() === [] ? '' : '?'.http_build_query($request->query())));
     }
 
     public function preview(Request $request, BadgeArtwork $artwork): JsonResponse
@@ -108,53 +86,13 @@ final class BadgeWorkshopController
         return back()->with('status', 'Le modèle est enregistré pour cet événement.');
     }
 
-    public function print(Request $request, BadgeArtwork $artwork): Response
+    /** Ancien lien conservé : génère un tirage tracé puis affiche le même document que l'Atelier. */
+    public function print(Request $request, BadgePrinting $printing): Response
     {
         Gate::authorize('badges.gerer');
-        $options = $artwork->validate($request);
-        $badges = $artwork->select($options);
-        $perSheet = $options['format'] === 'pvc' ? 1 : (int) $options['cols'] * (int) $options['rows'];
-        $cards = $badges->map(fn (stdClass $badge) => $artwork->card($badge, $options))->all();
-        $nonce = base64_encode(random_bytes(16));
-        $request->attributes->set('csp_style_nonce', $nonce);
-        // Il s’agit d’une préparation : le navigateur ne permet pas de confirmer le tirage physique.
-        DB::transaction(function () use ($options, $badges): void {
-            $runId = (string) Str::uuid();
-            $operatorId = auth()->id();
-            $now = now();
-            DB::table('badge_print_runs')->insert([
-                'id' => $runId,
-                'event_id' => $options['event'],
-                'batch_id' => $options['batch'],
-                'operator_id' => $operatorId,
-                'model' => $options['design'],
-                'format' => $options['format'],
-                'face' => $options['side'],
-                'badge_count' => $badges->count(),
-                'first_code' => $badges->firstOrFail()->code,
-                'last_code' => $badges->last()->code,
-                'generated_at' => $now,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-            DB::table('badge_print_events')->insert([
-                'id' => (string) Str::uuid(),
-                'print_run_id' => $runId,
-                'operator_id' => $operatorId,
-                'event_type' => 'generated',
-                'created_at' => $now,
-            ]);
-            app(Audit::class)->append('badge.impression_preparee', $operatorId, [
-                'print_run_id' => $runId,
-                'event_id' => $options['event'], 'batch_id' => $options['batch'], 'modele' => $options['design'],
-                'format' => $options['format'], 'face' => $options['side'], 'nombre' => $badges->count(),
-                'premier' => $badges->firstOrFail()->code, 'dernier' => $badges->last()->code,
-            ]);
-        });
+        $reason = $request->input('reason');
+        $run = $printing->planBadges($request->user(), $request->all(), is_string($reason) ? $reason : null);
 
-        return response()->view('badges.artwork-print', [
-            'options' => $options, 'sheets' => array_chunk($cards, $perSheet), 'count' => count($cards),
-            'dimensions' => BadgeArtwork::dimensions($options['orientation']), 'nonce' => $nonce,
-        ])->header('Cache-Control', 'no-store, private')->header('Referrer-Policy', 'no-referrer');
+        return $printing->document($request, $run);
     }
 }

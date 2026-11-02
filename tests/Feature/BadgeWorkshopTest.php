@@ -36,7 +36,7 @@ beforeEach(function () {
 });
 
 it('présente les événements et lots sans transmettre les jetons ou les titulaires dans les props', function () {
-    $this->get('/administration/atelier')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/BadgeWorkshop')->has('events')->has('batches')->missing('badges')->missing('visitors'));
+    $this->get('/administration/atelier')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/Atelier')->has('runs')->has('events')->has('batches')->missing('badges')->missing('visitors'));
 });
 
 it('imprime 200 badges sans changer les jetons, statuts, réservations ou associations', function () {
@@ -130,8 +130,10 @@ it('applique les permissions à toutes les entrées de l’atelier', function (s
 
 it('exige la connexion sans OTP de l’administrateur', function () {
     auth()->logout();
+    $this->get('/administration/atelier')->assertRedirect('/login');
     $this->get('/administration/badges/modeles')->assertRedirect('/login');
     $this->admin->forceFill(['two_factor_confirmed_at' => null])->save();
     $this->actingAs($this->admin)->get('/administration/atelier')->assertOk();
-    $this->get('/administration/badges/modeles?person=00000000-0000-0000-0000-000000000000')->assertRedirect('/administration/atelier?person=00000000-0000-0000-0000-000000000000');
+    // Ancien lien conservé : redirection vers l'Atelier, avec les paramètres.
+    $this->get('/administration/badges/modeles?person=abc')->assertRedirect('/administration/atelier?person=abc');
 });

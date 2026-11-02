@@ -55,3 +55,6 @@
 .access-card--portrait.access-card--photo .access-card__personal { font-size: 1.8mm; }
 .access-card .access-card__name-long { font-size: 1.8mm; }
 .access-card--nominatif .access-card__name.access-card__name-long { font-size: 1.6mm; }
+
+/* Badge d'exemple : mention visible, jamais confondu avec un badge réel. */
+.access-card__specimen { position: absolute; top: .6mm; right: 2mm; z-index: 1; font-size: 1.8mm; font-weight: 700; letter-spacing: .2mm; color: #92400e; }

@@ -27,15 +27,15 @@ describe('navigation d’administration', () => {
     }
   });
 
-  it('sépare les badges visiteurs et les cartes permanentes, avec des sous-entrées visibles seulement dans leur rubrique', () => {
+  it('sépare les badges visiteurs et les cartes permanentes ; l’Atelier des badges est une entrée de premier niveau toujours visible, les autres sous-entrées seulement dans leur rubrique', () => {
     expect(menu('tableau', ALL).ids).toEqual(expect.arrayContaining(['badges', 'titulaires']));
-    expect(menu('tableau', ALL).ids).not.toEqual(expect.arrayContaining(['atelier', 'modeles-cartes', 'habilitations', 'categories-institutionnelles']));
+    expect(menu('tableau', ALL).ids).not.toEqual(expect.arrayContaining(['modeles-cartes', 'habilitations', 'categories-institutionnelles']));
     const badges = menu('badges', ALL);
     expect(badges.ids).toContain('atelier'); expect(badges.ids).not.toContain('modeles-cartes');
     expect(badges.wrapper.get('[data-testid="menu-badges"]').text()).toBe('Badges visiteurs');
     for (const active of ['titulaires', 'modeles-cartes', 'habilitations', 'categories-institutionnelles']) {
       const ids = menu(active, ALL).ids;
-      expect(ids, active).toEqual(expect.arrayContaining(['titulaires', 'modeles-cartes', 'habilitations', 'categories-institutionnelles'])); expect(ids).not.toContain('atelier');
+      expect(ids, active).toEqual(expect.arrayContaining(['titulaires', 'modeles-cartes', 'habilitations', 'categories-institutionnelles'])); expect(ids).toContain('atelier');
     }
     expect(menu('atelier', ALL).ids).toContain('atelier');
   });
