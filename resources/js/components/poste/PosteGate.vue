@@ -159,7 +159,6 @@ onBeforeUnmount(() => {
   </main>
 
   <template v-else>
-    <div v-if="agent" class="mx-auto max-w-4xl px-4 py-2"><button type="button" class="btn-soft" data-testid="reinitialiser-tablette-ouverte" @click="requestLocalReset">Réinitialiser ce navigateur et changer de poste</button></div>
     <GroupeApp v-if="app === 'groupe' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <ControleApp v-else-if="app === 'controle' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as SitePosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <PosteApp v-else :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
