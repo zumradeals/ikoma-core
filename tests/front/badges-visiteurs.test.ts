@@ -38,7 +38,7 @@ describe('page Badges visiteurs en trois temps', () => {
     const rows = wrapper.findAll('[data-testid^="badge-B-"]');
     expect(rows).toHaveLength(3);
     expect(rows[0].text()).toContain('Sans réservation');
-    expect(rows[1].text()).toContain('Poste : Accueil');
+    expect(rows[1].text()).toContain('Poste réservé : Accueil');
     expect(rows[2].text()).not.toContain('inutilisable');
   });
 

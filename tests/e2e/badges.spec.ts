@@ -42,7 +42,7 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   await filter.getByLabel('Réservation').selectOption('oui');
   await filter.getByRole('button', { name: 'Filtrer les badges', exact: true }).click();
   await expect(page.getByText('Poste réservé : Poste fictif A').first()).toBeVisible();
-  await expect(page.locator('ol li').first()).toContainText(lotName);
+  await expect(page.locator('[data-testid="table-badges"] tbody tr').first()).toContainText(lotName);
   await expect(page.getByText('5 badge(s) correspondant aux filtres')).toBeVisible();
   await page.screenshot({ path: 'test-results/l4-reservation.png', fullPage: true });
 

@@ -46,7 +46,7 @@ const available = computed(() => Object.values(props.batchCounts ?? {}).flat().f
 <tr v-for="badge in badges.data" :key="badge.id" class="border-b align-top" :data-testid="'badge-' + badge.code">
 <th scope="row" class="p-3 font-bold">{{ badge.code }}</th>
 <td class="p-3"><CategorySwatch v-if="badge.category_name" :name="badge.category_name" :color="badge.category_color || ''" :priority="!!badge.category_priority" /><span v-else>Sans catégorie (lot hérité)</span></td><td class="p-3"><BadgeState :status="badge.status" /></td><td class="p-3">{{ badge.batch_name }}</td>
-<td class="p-3" :class="!badge.reserved_station && !badge.reserved_group && badge.status === 'Disponible' ? 'font-bold text-amber-800' : ''">{{ badge.reserved_station ? `Poste : ${badge.reserved_station}` : badge.reserved_group ? `Groupe : ${badge.reserved_group}` : (badge.status === 'Disponible' ? 'Sans réservation : inutilisable sur tablette' : '—') }}</td>
+<td class="p-3" :class="!badge.reserved_station && !badge.reserved_group && badge.status === 'Disponible' ? 'font-bold text-amber-800' : ''">{{ badge.reserved_station ? `Poste réservé : ${badge.reserved_station}` : badge.reserved_group ? `Groupe réservé : ${badge.reserved_group}` : (badge.status === 'Disponible' ? 'Sans réservation : inutilisable sur tablette' : '—') }}</td>
 <td class="p-3"><Link class="btn-soft" :href="`/administration/badges/${badge.id}`">Consulter les détails</Link></td>
 </tr>
 </tbody>
