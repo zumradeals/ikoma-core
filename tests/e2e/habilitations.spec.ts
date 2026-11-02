@@ -6,6 +6,8 @@ import { loginWithSecondFactor } from './otp';
 type Account = { email: string; password: string; secret: string };
 const admin = JSON.parse(readFileSync('.secrets/screen-permanents.json', 'utf8')) as Account;
 
+const local = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+
 async function noHorizontalScroll(page: Page, label: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), label).toBe(true);
 }
@@ -51,7 +53,9 @@ test('titulaires permanents : habilitations par zone, perte, révocation et remp
   await page.getByTestId('chercher-personne').fill(name);
   await page.getByTestId('personne-' + identifier).check();
   await page.getByTestId('choisir-zone-' + zoneId).check();
-  await page.getByTestId('periode-evenement').check();
+  await page.getByTestId('periode-dates').check();
+  await page.getByTestId('hab-debut').fill(local(new Date(Date.now() - 3_600_000)));
+  await page.getByTestId('hab-fin').fill(local(new Date(Date.now() + 86_400_000)));
   await page.getByTestId('hab-accorder').click();
   const entitlement = page.getByTestId('acces-' + identifier);
   await expect(page.getByTestId('liste-habilitations')).toContainText(name);
