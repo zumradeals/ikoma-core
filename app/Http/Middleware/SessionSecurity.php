@@ -28,6 +28,9 @@ class SessionSecurity
             }
             $request->session()->put('last_interaction', now()->timestamp);
         }
+        if ($user && $user->requiresTwoFactor() && $request->isMethod('DELETE') && $request->is('user/two-factor-authentication')) {
+            abort(403, 'La double authentification est obligatoire pour ce rôle.');
+        }
         $response = $next($request);
         app(AccessAudit::class)->record($request, $response);
         if ($request->path() !== '/' && ! str_starts_with($request->path(), 'build/')) {
