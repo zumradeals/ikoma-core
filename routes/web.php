@@ -100,7 +100,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
         Route::get('/administration/badges', BadgesController::class)->middleware('can:badges.gerer');
-        Route::get('/administration/badges/modeles', [BadgeWorkshopController::class, 'index'])->middleware('can:badges.gerer');
+        Route::get('/administration/atelier', [BadgeWorkshopController::class, 'index'])->middleware('can:badges.gerer');
+        Route::get('/administration/badges/modeles', fn (\Illuminate\Http\Request $request) => redirect('/administration/atelier'.($request->getQueryString() ? '?'.$request->getQueryString() : ''), 302))->middleware('can:badges.gerer');
         Route::post('/administration/badges/modeles/apercu', [BadgeWorkshopController::class, 'preview'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/modeles/personnes', [BadgeWorkshopController::class, 'people'])->middleware(['can:badges.gerer', 'can:listes.importer']);
         Route::post('/administration/badges/modeles/preparer', [BadgeWorkshopController::class, 'prepare'])->middleware(['can:badges.gerer', 'can:listes.importer']);
