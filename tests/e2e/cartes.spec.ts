@@ -87,11 +87,11 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   await expect(page.getByTestId('apercu-carte')).toBeVisible();
   await expect(page.getByTestId('aucun-tirage')).toBeVisible();
 
-  // Dimensions CR80 réelles de l'aperçu (53,98 × 85,60 mm) et contenu.
+  // Aperçu agrandi pour la lecture ; dimensions physiques inchangées à l'impression.
   for (const side of ['recto', 'verso']) {
     const box = await page.locator(`[data-testid="apercu-${side}"] .hc`).boundingBox();
-    expect(Math.abs(box!.width - 53.98 * MM), `largeur ${side}`).toBeLessThan(1.5);
-    expect(Math.abs(box!.height - 85.6 * MM), `hauteur ${side}`).toBeLessThan(1.5);
+    expect(Math.abs(box!.width - 53.98 * MM * 1.6), `largeur agrandie ${side}`).toBeLessThan(1.5);
+    expect(Math.abs(box!.height - 85.6 * MM * 1.6), `hauteur agrandie ${side}`).toBeLessThan(1.5);
   }
   await expect(page.getByTestId('apercu-recto')).toContainText(name);
   await expect(page.getByTestId('apercu-recto')).toContainText(identifier);
@@ -105,14 +105,32 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   const [popup] = await Promise.all([context.waitForEvent('page'), page.getByTestId('generer-impression').click()]);
   await popup.waitForLoadState('domcontentloaded');
   await expect(popup.locator('.sheet')).toHaveCount(2);
+  expect((await popup.locator('.sheet').first().boundingBox())!.width).toBeCloseTo(53.98 * MM * 1.6, 0);
+  for (const selector of ['.hc', '.hc__institution', '.hc__name', '.hc__role', '.hc__mention', '.hc__line', '.hc__notice']) {
+    for (const node of await popup.locator(selector).all()) {
+      expect(await node.evaluate(t => t.scrollHeight <= t.clientHeight + 1 && t.scrollWidth <= t.clientWidth + 1), `contenu lisible ${selector}`).toBe(true);
+    }
+  }
+  const nameTop = await popup.locator('.hc__name').evaluate(t => t.getBoundingClientRect().top);
+  const photoBottom = await popup.locator('.hc__photo').evaluate(t => t.getBoundingClientRect().bottom);
+  expect(nameTop - photoBottom).toBeGreaterThan(0);
   expect(await decode(popup, '.sheet:nth-of-type(2)')).toBe(previewPayload);
+  await popup.emulateMedia({ media: 'print' });
+  const printBox = await popup.locator('.sheet').first().boundingBox();
+  expect(Math.abs(printBox!.width - 53.98 * MM)).toBeLessThan(1);
+  expect(Math.abs(printBox!.height - 85.6 * MM)).toBeLessThan(1);
   const pdf = await popup.pdf({ preferCSSPageSize: true, printBackground: true });
   const text = pdf.toString('latin1');
   expect((text.match(/\/Type\s*\/Page[^s]/g) ?? []).length, 'deux pages : recto puis verso').toBe(2);
   const media = text.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
   expect(Math.abs(Number(media![1]) - 53.98 * 72 / 25.4)).toBeLessThan(1);
   expect(Math.abs(Number(media![2]) - 85.6 * 72 / 25.4)).toBeLessThan(1);
+  await popup.emulateMedia({ media: 'screen' });
   await popup.screenshot({ path: 'test-results/a05-carte-impression.png', fullPage: true });
+  // Un texte trop long reste bloquant, même avec l'aperçu agrandi.
+  await popup.locator('.hc__name').evaluate(t => { t.textContent = 'Nom fictif très long '.repeat(30); });
+  await popup.getByRole('button', { name: 'Imprimer', exact: true }).click();
+  await expect(popup.locator('#layout-error')).toBeVisible();
   await popup.close();
 
   // Réimpression : motif obligatoire, même QR, historique.
