@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   postgres-parity:
@@ -114,10 +115,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Construire PostgreSQL et créer le laboratoire Git isolé
+      - name: Authentifier la lecture de l'image PostgreSQL vérifiée par digest exact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          docker build --pull -f docker/qualification/postgres-gosu-go127-alpine.Dockerfile -t ikoma-qualification-postgres:18.6-alpine3.24 .
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin > /dev/null
+      - name: Créer le laboratoire Git isolé (PostgreSQL Alpine vérifié, tel qu'utilisé par le dépôt)
+        run: |
+          set -euo pipefail
           dir="$RUNNER_TEMP/ikoma-e2e-alpine"
           git worktree add --detach "$dir" HEAD
           python3 scripts/security/prepare-alpine-e2e.py "$dir"
