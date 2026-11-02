@@ -81,7 +81,7 @@ it('exige un aperçu frais une référence exacte et le mot de passe avant suppr
         ->and(DB::table('audit_logs')->where('action', 'gestion.suppression_refusee')->exists())->toBeTrue();
 });
 
-it('refuse un aperçu expiré et un compte non habilité, sans imposer de 2FA', function () {
+it('refuse un aperçu expiré et un compte non habilité ou sans 2FA', function () {
     $this->actingAs($this->admin)->get('/administration/donnees?entity=personne&id='.$this->personId)->assertOk();
     $this->travel(11)->minutes();
     $this->post('/administration/donnees/supprimer', ['reference' => $this->personId, 'password' => 'Fictif-L33!01234'])->assertSessionHasErrors('operation');
@@ -90,7 +90,7 @@ it('refuse un aperçu expiré et un compte non habilité, sans imposer de 2FA', 
     $agent->assignRole('agent_accueil');
     $this->actingAs($agent)->get('/administration/donnees')->assertForbidden();
     $this->admin->update(['two_factor_confirmed_at' => null]);
-    $this->actingAs($this->admin)->get('/administration/donnees')->assertOk();
+    $this->actingAs($this->admin)->get('/administration/donnees')->assertRedirect('/securite');
 });
 
 it('supprime seulement un lot inutilisé et ne réattribue jamais ses numéros', function () {
