@@ -3,7 +3,7 @@
 @import "./agent.css";
 @source "../js";
 /* Couleurs de la marque : valeurs d'IKOMA ACCESS par défaut ; une identité institutionnelle les redéfinit (/institution/theme.css). */
-:root { --inst-primary: #0B3C6B; --inst-secondary: #0F5AA6; --inst-accent: #F75C03; }
+:root { --inst-primary: #0B3C6B; --inst-secondary: #0F5AA6; --inst-accent: #F75C03; --inst-accent-ui: #FF6B16; --inst-accent-alt: #F26B21; }
 @theme {
   --color-ikoma-blue: #0F5AA6;
   --color-ikoma-navy: #0B3C6B;
@@ -74,7 +74,7 @@ html { scroll-padding-bottom: 6rem; }
 .admin-nav-link { display:flex; align-items:center; gap:20px; min-height:56px; padding:10px 20px; border-radius:10px; font-weight:650; color:#00469c; }
 .admin-nav-link svg { flex:none; }
 .admin-nav-link:hover { background:#eef5ff; }
-.admin-nav-link[aria-current=page] { background:#ff6b16; color:#172e4b; font-weight:750; }
+.admin-nav-link[aria-current=page] { background:var(--inst-accent-ui); color:#172e4b; font-weight:750; }
 .admin-main { min-width:0; padding:20px 24px 28px; }
 .admin-main h1 { font-size:30px; line-height:1.2; font-weight:850; letter-spacing:-.5px; }
 .admin-main h2 { font-size:21px; line-height:1.3; font-weight:800; letter-spacing:-.3px; }
@@ -97,7 +97,7 @@ html { scroll-padding-bottom: 6rem; }
 .admin-card { border:1px solid #e0ebf7; border-radius:12px; background:white; padding:20px; min-width:0; }
 .admin-muted { color:#506d94; font-size:14px; }
 .admin-section-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
-.admin-primary { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:48px; border-radius:8px; padding:10px 20px; background:#ff6b16; color:#172e4b; font-weight:750; }
+.admin-primary { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:48px; border-radius:8px; padding:10px 20px; background:var(--inst-accent-ui); color:#172e4b; font-weight:750; }
 .admin-outline { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:8px 14px; border:1px solid #397bd4; border-radius:5px; color:#00469c; font-size:13px; font-weight:650; background:white; }
 .admin-primary:disabled { opacity:.6; }
 @media (max-width:1199px) { .admin-header { padding:12px 20px; gap:16px; flex-wrap:wrap; } .admin-event { order:3; max-width:100%; width:100%; } .admin-frame { grid-template-columns:230px minmax(0,1fr); } .admin-main { padding:20px; } .admin-nav-link { padding:10px 12px; gap:14px; } }

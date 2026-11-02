@@ -126,7 +126,7 @@ final class Institution
             return '';
         }
 
-        return ":root{--inst-primary:{$p['primary']};--inst-secondary:{$p['secondary']};--inst-accent:{$p['accent']};"
+        return ":root{--inst-primary:{$p['primary']};--inst-secondary:{$p['secondary']};--inst-accent:{$p['accent']};--inst-accent-ui:{$p['accent']};--inst-accent-alt:{$p['accent']};"
             ."--color-ikoma-navy:{$p['primary']};--color-ikoma-blue:{$p['secondary']};--color-ikoma-orange:{$p['accent']}}\n";
     }
 
