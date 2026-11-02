@@ -95,6 +95,38 @@ final class HolderEntitlements
         });
     }
 
+    /**
+     * Accorde le même accès à plusieurs personnes et plusieurs zones : une habilitation INDIVIDUELLE par couple (personne, zone), jamais une règle de catégorie.
+     * Un couple déjà couvert sur la période est ignoré (compté), sans rien modifier. Tout ou rien en cas d'autre erreur.
+     *
+     * @param  list<string>  $holderIds
+     * @param  list<string>  $zoneIds
+     * @return array{accordees: int, deja_couvertes: int}
+     */
+    public function grantMany(array $holderIds, string $eventId, array $zoneIds, string $from, string $until, User $actor): array
+    {
+        $created = 0;
+        $skipped = 0;
+        DB::transaction(function () use ($holderIds, $eventId, $zoneIds, $from, $until, $actor, &$created, &$skipped): void {
+            foreach ($holderIds as $holder) {
+                foreach ($zoneIds as $zone) {
+                    try {
+                        // Savepoint : un chevauchement est ignoré sans annuler les autres accès de la demande.
+                        DB::transaction(fn () => $this->grant($holder, $eventId, $zone, $from, $until, $actor));
+                        $created++;
+                    } catch (ValidationException $e) {
+                        if (! array_key_exists('valid_from', $e->errors())) {
+                            throw $e;
+                        }
+                        $skipped++;
+                    }
+                }
+            }
+        });
+
+        return ['accordees' => $created, 'deja_couvertes' => $skipped];
+    }
+
     public function revoke(string $id, string $reason, User $actor): void
     {
         $reason = trim($reason);

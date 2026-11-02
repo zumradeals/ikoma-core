@@ -562,3 +562,28 @@ it('imprime plusieurs cartes depuis l’Atelier avec un tirage tracé et exige u
     $this->actingAs($this->agent);
     $this->getJson('/administration/atelier/cartes')->assertForbidden();
 });
+
+it('accorde l’accès à plusieurs personnes et zones d’un coup : un accès individuel par couple, doublons ignorés, jamais par catégorie', function () {
+    $this->actingAs($this->admin);
+    $zone2 = (string) Str::uuid();
+    DB::table('zones')->insert(['id' => $zone2, 'event_id' => $this->event, 'name' => 'Zone Q', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    [$a] = pxCard('AILCT-01');
+    [$b] = pxCard('AILCT-02');
+    $payload = ['event_id' => $this->event, 'holders' => [$a, $b], 'zones' => [$this->zone, $zone2], 'whole_event' => true];
+    $this->post('/administration/habilitations/groupe', $payload)->assertRedirect();
+    $rows = DB::table('holder_entitlements')->where('event_id', $this->event)->get();
+    $event = DB::table('events')->where('id', $this->event)->first(['starts_at', 'ends_at']);
+    expect($rows)->toHaveCount(4)
+        ->and($rows->every(fn ($r) => strtotime((string) $r->valid_from) === strtotime((string) $event->starts_at) && strtotime((string) $r->valid_until) === strtotime((string) $event->ends_at)))->toBeTrue();
+    // Rejouer la même demande n'ajoute rien : les couples déjà couverts sont ignorés.
+    $this->post('/administration/habilitations/groupe', $payload)->assertRedirect()->assertSessionHas('status', fn ($m) => str_contains($m, '0 accès accordé(s), 4 déjà en place'));
+    expect(DB::table('holder_entitlements')->where('event_id', $this->event)->count())->toBe(4);
+    // Dates précises ; les entrées invalides n'écrivent rien.
+    $this->post('/administration/habilitations/groupe', ['event_id' => $this->event, 'holders' => [], 'zones' => [$this->zone], 'whole_event' => true])->assertSessionHasErrors('holders');
+    $this->post('/administration/habilitations/groupe', ['event_id' => $this->event, 'holders' => [$a], 'zones' => [$this->zone], 'whole_event' => false])->assertSessionHasErrors('valid_from');
+    expect(DB::table('holder_entitlements')->where('event_id', $this->event)->count())->toBe(4);
+    // Seuls les droits « personnes » et « zones » accordent.
+    $this->actingAs($this->agent);
+    $this->post('/administration/habilitations/groupe', $payload)->assertForbidden();
+    expect(DB::table('audit_logs')->where('action', 'habilitation.accordee')->count())->toBeGreaterThanOrEqual(4);
+});
