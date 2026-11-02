@@ -17,6 +17,7 @@ final class DemoLab
         'entreprise' => 'Accueil d’entreprise',
         'evenement' => 'Événement et VIP',
         'formation' => 'Formation et groupes',
+        'permanents' => 'Personnes permanentes et cartes',
     ];
 
     /**
@@ -53,6 +54,9 @@ final class DemoLab
         self::authorize($actor);
         if (! isset(self::SCENARIOS[$scenario]) || ! in_array($quantity, [20, 100, 300, 1000], true)) {
             throw ValidationException::withMessages(['scenario' => 'Choisissez un scénario et 20, 100, 300 ou 1 000 personnes.']);
+        }
+        if ($scenario === 'permanents') {
+            return $this->generatePermanent($quantity, $actor);
         }
         if ($scenario === 'formation' && ! app(FoundingModules::class)->f06Active()) {
             throw ValidationException::withMessages(['scenario' => 'Activez d’abord F06 dans Administration → Modules pour créer une démonstration de groupes et de cars.']);
@@ -215,10 +219,6 @@ final class DemoLab
     public function clearBusiness(User $actor, bool $clearAccounts = false): array
     {
         self::authorize($actor);
-        // Les titulaires permanents, leurs cartes et leur historique ne font pas partie des données de démonstration : refus net, avant toute suppression.
-        if (DB::table('events')->where('is_permanent', true)->exists() || DB::table('permanent_holders')->exists() || DB::table('holder_cards')->exists()) {
-            throw ValidationException::withMessages(['confirmation' => 'Remise à zéro refusée : le contexte permanent, les titulaires et leurs cartes sont protégés et ne s’effacent jamais ici. Aucune donnée n’a été supprimée.']);
-        }
         $counts = [];
         DB::transaction(function () use ($actor, $clearAccounts, &$counts): void {
             $counts = $this->totals();
@@ -230,5 +230,42 @@ final class DemoLab
         app(FileDeletionQueue::class)->drain();
 
         return $counts;
+    }
+
+    private const FIRST_NAMES = ['Aminata', 'Moussa', 'Fatoumata', 'Ibrahim', 'Awa', 'Seydou', 'Mariam', 'Issouf', 'Salimata', 'Kader', 'Nafissatou', 'Yacouba', 'Djénéba', 'Lassina', 'Kadidja', 'Adama'];
+
+    private const LAST_NAMES = ['Koné', 'Traoré', 'Coulibaly', 'Ouattara', 'Diabaté', 'Fofana', 'Sylla', 'Bamba', 'Touré', 'Soro', 'Camara', 'Dosso', 'Cissé', 'Diallo', 'Sanogo', 'Yao'];
+
+    /**
+     * Personnes permanentes fictives : prénom et nom, catégorie institutionnelle répartie sur les huit familles, une carte par personne
+     * (les trois quarts sont remises et activées, le reste est seulement préparé, pour essayer le bouton « Remettre et activer »). Aucune habilitation.
+     */
+    private function generatePermanent(int $quantity, User $actor): string
+    {
+        $categories = app(InstitutionalCategories::class);
+        $holders = app(PermanentHolders::class);
+        $cards = app(HolderCards::class);
+        if (! $categories->initialized()) {
+            $categories->initialize($actor);
+        }
+        if ($holders->permanentContext() === null) {
+            $holders->createPermanentContext($actor);
+        }
+        $codes = DB::table('institutional_categories')->orderBy('sort_order')->pluck('code')->all();
+        $tag = Str::upper(Str::random(3));
+        DB::transaction(function () use ($quantity, $actor, $holders, $cards, $codes, $tag): void {
+            for ($i = 0; $i < $quantity; $i++) {
+                $first = self::FIRST_NAMES[$i % count(self::FIRST_NAMES)];
+                $last = self::LAST_NAMES[intdiv($i, count(self::FIRST_NAMES)) % count(self::LAST_NAMES)];
+                $id = $holders->create([
+                    'first_name' => $first, 'last_name' => $last.' [DÉMO '.$tag.']', 'full_name' => $first.' '.$last.' [DÉMO '.$tag.']',
+                    'organisation' => 'Organisation fictive', 'institutional_category' => $codes[$i % count($codes)],
+                ], $actor, true);
+                $cards->issue($id, $actor, $i % 4 !== 3);
+            }
+        });
+        app(Audit::class)->append('demo.permanents_generes', $actor->id, ['nombre' => $quantity]);
+
+        return (string) $holders->permanentContext()?->id;
     }
 }
