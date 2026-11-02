@@ -50,9 +50,9 @@ final class CardLifecycle
      *
      * @return string identifiant de la nouvelle carte
      */
-    public function replace(string $holderId, string $reason, ?string $note, User $actor): string
+    public function replace(string $holderId, string $reason, ?string $note, User $actor, bool $activate = true): string
     {
-        return DB::transaction(function () use ($holderId, $reason, $note, $actor): string {
+        return DB::transaction(function () use ($holderId, $reason, $note, $actor, $activate): string {
             $holder = DB::table('permanent_holders')->where('id', $holderId)->lockForUpdate()->first();
             abort_unless($holder !== null, 404);
             if ($holder->status === 'clos') {
@@ -65,7 +65,7 @@ final class CardLifecycle
                 throw ValidationException::withMessages(['holder' => 'Aucune carte à remplacer : émettez d’abord la carte.']);
             }
             $previous = DB::table('holder_cards')->where('holder_id', $holderId)->whereNull('replaced_by_card_id')->where('status', '<>', 'active')->orderByDesc('rank')->value('id');
-            $new = $this->cards->issue($holderId, $actor);
+            $new = $this->cards->issue($holderId, $actor, $activate);
             if ($previous !== null) {
                 DB::table('holder_cards')->where('id', $previous)->update(['replaced_by_card_id' => $new, 'updated_at' => now()]);
             }

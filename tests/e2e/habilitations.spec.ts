@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { fakePhoto } from './photo';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 
@@ -70,6 +71,8 @@ test('titulaires permanents : habilitations par zone, perte, révocation et remp
   await page.getByTestId('recherche-titulaires').fill(name);
   await page.getByTestId('lancer-recherche').click();
   await page.locator('[data-testid^="titulaire-"]').filter({ hasText: name }).getByRole('link', { name: 'Carte' }).click();
+  await page.getByTestId('fichier-portrait').setInputFiles({ name: 'photo-fictive.png', mimeType: 'image/png', buffer: fakePhoto() });
+  await page.getByTestId('envoyer-portrait').click();
   await page.getByTestId('preparer-carte').click();
   await expect(page.getByTestId('statut-carte-1')).toContainText('Active');
   await expect(page.getByTestId('aucune-habilitation-titulaire')).toHaveCount(0);

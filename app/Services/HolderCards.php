@@ -32,7 +32,7 @@ final class HolderCards
 
     // --- Réglages du verso et validation du modèle ----------------------------------------------------------------------------
 
-    /** @return array{ligne1: string, ligne2: string, contact: string, avis: string, valide: bool} */
+    /** @return array{ligne1: string, ligne2: string, contact: string, avis: string} */
     public function settings(): array
     {
         $raw = DB::table('settings')->where('key', 'like', 'carte\\_%')->pluck('value', 'key');
@@ -43,7 +43,6 @@ final class HolderCards
             'ligne2' => trim((string) ($raw['carte_verso_ligne2'] ?? '')),
             'contact' => trim((string) ($raw['carte_verso_contact'] ?? '')),
             'avis' => trim((string) ($raw['carte_verso_avis'] ?? '')) ?: self::DEFAULT_NOTICE,
-            'valide' => ($raw['carte_modele_valide'] ?? '0') === '1',
         ];
     }
 
@@ -58,13 +57,12 @@ final class HolderCards
             }
             $values[$key] = $value;
         }
-        $values['carte_modele_valide'] = ! empty($data['valide']) ? '1' : '0';
         DB::transaction(function () use ($values, $actor): void {
             foreach ($values as $key => $value) {
                 DB::table('settings')->upsert([['key' => $key, 'value' => $value]], ['key'], ['value']);
             }
-            // Les textes ne sont pas recopiés dans le journal : seule la validation du modèle est un fait notable.
-            $this->audit->append('carte.reglages_modifies', $actor->id, ['modele_valide' => $values['carte_modele_valide'] === '1']);
+            // Les textes ne sont pas recopiés dans le journal.
+            $this->audit->append('carte.reglages_modifies', $actor->id, ['champs' => array_keys($values)]);
         });
     }
 
@@ -135,25 +133,58 @@ final class HolderCards
     public function activeCard(string $holderId): ?array
     {
         $card = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')
-            ->where('k.holder_id', $holderId)->where('k.status', 'active')->first(['k.id', 'k.issued_at', 'b.id as badge_id', 'b.code', 'b.status as badge_status']);
+            ->where('k.holder_id', $holderId)->where('k.status', 'active')->first(['k.id', 'k.issued_at', 'k.activated_at', 'k.activation_source', 'b.id as badge_id', 'b.code', 'b.status as badge_status']);
         if ($card === null) {
             return null;
         }
         $prints = DB::table('holder_card_prints as p')->leftJoin('users as u', 'u.id', '=', 'p.printed_by')->where('p.card_id', $card->id)
             ->orderByRaw("p.kind = 'emission' DESC")->orderBy('p.created_at')->orderBy('p.id')->get(['p.id', 'p.kind', 'p.reason', 'p.created_at', 'u.name as by'])->all();
 
-        return ['id' => $card->id, 'issued_at' => $card->issued_at, 'badge_code' => $card->code, 'badge_status' => $card->badge_status, 'associated' => $card->badge_status === 'Associé', 'prints' => $prints];
+        return ['id' => $card->id, 'issued_at' => $card->issued_at, 'activated_at' => $card->activated_at, 'activation_source' => $card->activation_source, 'badge_code' => $card->code, 'badge_status' => $card->badge_status, 'associated' => $card->badge_status === 'Associé', 'prints' => $prints];
+    }
+
+    /** Une nouvelle carte exige la photographie du titulaire (jamais pour enregistrer la personne). */
+    public function requirePhoto(string $holderId): void
+    {
+        $photo = DB::table('permanent_holders')->where('id', $holderId)->value('photo_file');
+        if ($photo === null) {
+            throw ValidationException::withMessages(['holder' => 'Ajoutez d’abord la photo de cette personne dans le registre : une carte ne se prépare pas sans photo.']);
+        }
+    }
+
+    /**
+     * Remise de la carte au titulaire : elle devient utilisable au contrôle (toujours soumise aux habilitations). Action explicite, une seule fois.
+     */
+    public function activate(string $holderId, User $actor): void
+    {
+        DB::transaction(function () use ($holderId, $actor): void {
+            $holder = DB::table('permanent_holders')->where('id', $holderId)->lockForUpdate()->first();
+            abort_unless($holder !== null, 404);
+            if ($holder->status === 'clos') {
+                throw ValidationException::withMessages(['holder' => 'Cette personne est clôturée : sa carte ne peut plus être remise.']);
+            }
+            $card = DB::table('holder_cards')->where('holder_id', $holderId)->where('status', 'active')->lockForUpdate()->first();
+            if ($card === null) {
+                throw ValidationException::withMessages(['holder' => 'Aucune carte à remettre : préparez d’abord la carte.']);
+            }
+            if ($card->activated_at !== null) {
+                throw ValidationException::withMessages(['holder' => 'Cette carte est déjà remise et active.']);
+            }
+            DB::table('holder_cards')->where('id', $card->id)->update(['activated_at' => now(), 'activated_by' => $actor->id, 'activation_source' => 'remise', 'updated_at' => now()]);
+            $this->audit->append('carte.activee', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier, 'carte_rang' => $card->rank]);
+        });
     }
 
     /**
      * Émet la carte d'un titulaire actif : badge technique dans le contexte permanent, rattaché à une fiche de participation (non associée).
+     * $activate = false (parcours de l'administration) : la carte n'ouvre rien tant qu'elle n'a pas été remise et activée ; true (données de démonstration, essais) : carte utilisable.
      *
      * @return string identifiant de la carte
      */
-    public function issue(string $holderId, User $actor): string
+    public function issue(string $holderId, User $actor, bool $activate = true): string
     {
         try {
-            return DB::transaction(function () use ($holderId, $actor): string {
+            return DB::transaction(function () use ($holderId, $actor, $activate): string {
                 $holder = DB::table('permanent_holders')->where('id', $holderId)->lockForUpdate()->first();
                 abort_unless($holder !== null, 404);
                 if ($holder->status === 'clos') {
@@ -172,7 +203,7 @@ final class HolderCards
                 $id = (string) Str::uuid();
                 DB::table('holder_cards')->insert([
                     'id' => $id, 'holder_id' => $holderId, 'badge_id' => $badge['id'], 'event_id' => $context->id, 'status' => 'active',
-                    'issued_by' => $actor->id, 'issued_at' => now(), 'rank' => (int) DB::table('holder_cards')->where('holder_id', $holderId)->max('rank') + 1, 'created_at' => now(), 'updated_at' => now(),
+                    'issued_by' => $actor->id, 'issued_at' => now(), 'activated_at' => $activate ? now() : null, 'activation_source' => $activate ? 'ancienne' : null, 'rank' => (int) DB::table('holder_cards')->where('holder_id', $holderId)->max('rank') + 1, 'created_at' => now(), 'updated_at' => now(),
                 ]);
                 $this->audit->append('carte.emise', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier, 'code_badge' => $badge['code']]);
 
@@ -232,8 +263,9 @@ final class HolderCards
         abort_if($card === null, 404);
 
         return $this->compose([
-            'name' => $holder->full_name, 'identifier' => $holder->identifier, 'code' => $holder->institutional_category,
+            'name' => $holder->full_name, 'role' => implode(' · ', array_filter([$holder->position, $holder->quality])), 'identifier' => $holder->identifier, 'code' => $holder->institutional_category,
             'label' => $holder->category_label, 'color' => $holder->category_color, 'symbol' => $holder->category_symbol,
+            'from' => $holder->engagement_starts_on, 'until' => $holder->engagement_ends_on,
             'portrait' => $withPortrait ? $this->portraitDataUri($holder) : null,
             'qr' => app(QrSvg::class)->render(QrSvg::payload($card->qr_token), 'QR de la carte '.$holder->identifier),
             'badge_code' => $card->code, 'card_id' => $card->id, 'rank' => $card->rank, 'specimen' => false,
@@ -242,16 +274,20 @@ final class HolderCards
 
     /**
      * Modèle d'exemple pour une catégorie : données fictives, QR qui ne correspond à aucun badge.
+     * $override : valeurs du modèle pas encore enregistrées (aperçu en direct de la page de personnalisation).
      *
+     * @param  array<string, mixed>|null  $override
      * @return array<string, mixed>
      */
-    public function specimen(object $category): array
+    public function specimen(object $category, ?array $override = null): array
     {
         $format = $this->holders->formatIdentifier(0);
 
         return $this->compose([
-            'name' => 'Prénom NOM (exemple)', 'identifier' => $format, 'code' => $category->code, 'label' => $category->label, 'color' => $category->color, 'symbol' => $category->symbol,
+            'name' => 'Prénom NOM (exemple)', 'role' => 'Fonction · Qualité (exemple)', 'identifier' => $format, 'code' => $category->code, 'label' => $category->label, 'color' => $category->color, 'symbol' => $category->symbol,
+            'from' => now()->startOfYear()->toDateString(), 'until' => now()->endOfYear()->toDateString(),
             'portrait' => null, 'qr' => app(QrSvg::class)->render(QrSvg::payload(str_repeat('0', 64)), 'QR d’exemple, sans valeur'), 'badge_code' => null, 'card_id' => null, 'rank' => 1, 'specimen' => true,
+            'model_override' => $override,
         ]);
     }
 
@@ -266,14 +302,26 @@ final class HolderCards
         if ($institution['logoUrl'] !== null && is_file(app(Institution::class)->logoPath())) {
             $logo = 'data:image/png;base64,'.base64_encode((string) file_get_contents(app(Institution::class)->logoPath()));
         }
-        $color = Institution::validColor((string) $card['color']) ? strtoupper((string) $card['color']) : InstitutionalCategories::NEUTRAL_COLOR;
+        $code = $card['code'] ?? null;
+        $model = $code === null
+            ? ['color' => InstitutionalCategories::NEUTRAL_COLOR, 'mention' => mb_strtoupper((string) ($card['label'] ?? 'Titulaire permanent')), 'show_validity' => true, 'qr_side' => 'verso', 'version' => 1, 'validated' => false]
+            : app(CardModels::class)->forCategory((string) $code);
+        foreach ((array) ($card['model_override'] ?? []) as $key => $value) {
+            if ($key === 'color' ? $value !== null : true) {
+                $model[$key] = $value;
+            }
+        }
+        $color = Institution::validColor((string) $model['color']) ? strtoupper((string) $model['color']) : InstitutionalCategories::NEUTRAL_COLOR;
         $settings = $this->settings();
+        $from = ($card['from'] ?? null) ? date('d/m/Y', (int) strtotime((string) $card['from'])) : null;
+        $until = ($card['until'] ?? null) ? date('d/m/Y', (int) strtotime((string) $card['until'])) : null;
+        $validity = ! $model['show_validity'] || ($from === null && $until === null) ? null : ($from !== null && $until !== null ? 'Valable du '.$from.' au '.$until : ($until !== null ? 'Valable jusqu’au '.$until : 'Valable depuis le '.$from));
 
         return $card + [
             'institution' => ['name' => $institution['name'], 'fullName' => $institution['fullName'], 'logo' => $logo],
             'tone' => ['color' => $color, 'ink' => self::inkFor($color)],
-            'verso' => $settings,
-            'provisional' => ! $settings['valide'],
+            'verso' => $settings, 'mention' => (string) $model['mention'], 'validity' => $validity, 'qrSide' => (string) $model['qr_side'], 'modelVersion' => (int) $model['version'],
+            'provisional' => ! $model['validated'],
             'nameClass' => mb_strlen((string) $card['name']) > 38 ? 'long' : (mb_strlen((string) $card['name']) > 24 ? 'medium' : ''),
         ];
     }
@@ -310,7 +358,8 @@ final class HolderCards
             if (! $first && ($reason === null || $reason === '' || mb_strlen($reason) > 200 || preg_match('/[\x00-\x1F\x7F<>]/u', $reason) === 1)) {
                 throw ValidationException::withMessages(['reason' => 'Indiquez le motif de la réimpression (200 caractères au plus).']);
             }
-            DB::table('holder_card_prints')->insert(['id' => (string) Str::uuid(), 'card_id' => $card->id, 'kind' => $first ? 'emission' : 'reimpression', 'reason' => $first ? null : $reason, 'printed_by' => $actor->id, 'created_at' => now()]);
+            $version = $holder->institutional_category === null ? null : app(CardModels::class)->forCategory($holder->institutional_category)['version'];
+            DB::table('holder_card_prints')->insert(['id' => (string) Str::uuid(), 'card_id' => $card->id, 'kind' => $first ? 'emission' : 'reimpression', 'reason' => $first ? null : $reason, 'printed_by' => $actor->id, 'model_version' => $version, 'created_at' => now()]);
             // Le motif peut contenir des informations personnelles : il reste dans l'historique des tirages, pas dans le journal d'audit.
             $this->audit->append($first ? 'carte.imprimee' : 'carte.reimprimee', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier]);
             // Le QR est exposé sur un support imprimable : le lot du badge est marqué comme exposé (même protection que l'atelier de badges).

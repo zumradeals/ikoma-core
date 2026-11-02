@@ -433,6 +433,8 @@ it('révoque et remplace par HTTP et ne touche à rien sans confirmation', funct
     $this->actingAs($admin);
     $this->post('/administration/titulaires/'.$holder.'/carte/revoquer', ['reason' => 'volee'])->assertSessionHasErrors('confirmation');
     expect(DB::table('holder_cards')->where('holder_id', $holder)->value('status'))->toBe('active');
+    $this->post('/administration/titulaires/'.$holder.'/carte/remplacer', ['reason' => 'volee', 'note' => 'Vol (fictif)', 'confirmation' => true])->assertSessionHasErrors('holder');
+    DB::table('permanent_holders')->where('id', $holder)->update(['photo_file' => 'holder-portraits/fictif.enc']);
     $this->post('/administration/titulaires/'.$holder.'/carte/remplacer', ['reason' => 'volee', 'note' => 'Vol (fictif)', 'confirmation' => true])->assertRedirect('/administration/titulaires/'.$holder.'/carte');
     expect(DB::table('holder_cards')->where('holder_id', $holder)->orderBy('rank')->pluck('status')->all())->toBe(['volee', 'active']);
     $this->get('/administration/titulaires/'.$holder.'/carte')->assertInertia(fn ($p) => $p->has('cards', 2)->where('cards.0.rank', 2)->where('cards.1.status', 'volee'));
@@ -469,4 +471,94 @@ it('rejoue hors ligne la sortie d’une carte volée, après une confiance expir
         ->and(DB::table('access_events')->where('event_id', $this->event)->where('type', 'sortie')->where('details->carte_statut', 'volee')->count())->toBe(1)
         ->and(DB::table('alerts')->where('event_id', $this->event)->where('severity', 'critique')->where('message', 'like', '%présentée à la sortie%')->count())->toBe(1);
     $this->actingAs(pxUser('superviseur'))->getJson('/pilotage/api/evacuation?event='.$this->event)->assertOk()->assertJsonPath('total', 0);
+});
+
+// --- Cartes simplifiées : remise explicite, modèles, Atelier ------------------------------------------------------------------
+
+function pxPhoto(string $holder): void
+{
+    DB::table('permanent_holders')->where('id', $holder)->update(['photo_file' => 'holder-portraits/fictif.enc']);
+}
+
+it('refuse une carte préparée tant qu’elle n’est pas remise, puis l’accepte après « Remettre et activer »', function () {
+    $this->actingAs($this->admin);
+    $holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive Remise', 'organisation' => 'Organisation fictive', 'institutional_category' => 'AILCT-01'], $this->admin);
+    $this->post('/administration/titulaires/'.$holder.'/carte')->assertSessionHasErrors('holder');
+    pxPhoto($holder);
+    $this->post('/administration/titulaires/'.$holder.'/carte')->assertRedirect();
+    $token = pxToken($holder);
+    pxGrant($holder, $this->event, $this->zone);
+    $this->actingAs($this->agent);
+    pxControl($token)->assertOk()->assertJson(['valid' => false, 'reason' => 'carte_non_activee']);
+    $this->actingAs($this->admin);
+    $this->post('/administration/titulaires/'.$holder.'/carte/activer')->assertSessionHasErrors('confirmation');
+    $this->post('/administration/titulaires/'.$holder.'/carte/activer', ['confirmation' => true])->assertRedirect();
+    $row = DB::table('holder_cards')->where('holder_id', $holder)->first();
+    expect($row->activated_at)->not->toBeNull()->and($row->activation_source)->toBe('remise');
+    $this->actingAs($this->agent);
+    pxControl($token)->assertOk()->assertJson(['valid' => true])->assertJsonPath('category.color', fn ($c) => preg_match('/^#[0-9A-F]{6}$/', $c) === 1);
+    $this->actingAs($this->admin);
+    // Une seconde remise est refusée.
+    $this->post('/administration/titulaires/'.$holder.'/carte/activer', ['confirmation' => true])->assertSessionHasErrors('holder');
+});
+
+it('marque « non_activee » dans la liste hors ligne une carte préparée et non remise', function () {
+    $holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive Hors ligne', 'institutional_category' => 'AILCT-02'], $this->admin);
+    app(HolderCards::class)->issue($holder, $this->admin, false);
+    pxGrant($holder, $this->event, $this->zone);
+    $snapshot = app(PermanentAccess::class)->snapshot($this->event);
+    $hash = hash('sha256', pxToken($holder));
+    expect(collect($snapshot['cards'])->firstWhere('hash', $hash)['status'])->toBe('non_activee');
+    app(HolderCards::class)->activate($holder, $this->admin);
+    $snapshot = app(PermanentAccess::class)->snapshot($this->event);
+    expect(collect($snapshot['cards'])->firstWhere('hash', $hash)['status'])->toBe('active')
+        ->and(collect($snapshot['holders'])->firstWhere('id', $holder)['category']['name'])->toBe('Partenaires permanents');
+});
+
+it('enregistre, valide et fait évoluer un modèle de carte par catégorie', function () {
+    $this->actingAs($this->admin);
+    $this->post('/administration/titulaires/modeles/AILCT-03/apercu', ['color' => '#112233', 'mention' => 'INTERVENANT TEST', 'show_validity' => true, 'qr_side' => 'recto'])
+        ->assertOk()->assertJsonStructure(['recto', 'verso']);
+    expect(DB::table('card_models')->count())->toBe(0);
+    $this->put('/administration/titulaires/modeles/AILCT-03', ['color' => '#112233', 'mention' => 'INTERVENANT TEST', 'show_validity' => true, 'qr_side' => 'recto'])->assertRedirect();
+    $this->put('/administration/titulaires/modeles/AILCT-03', ['color' => 'rouge', 'mention' => 'X', 'show_validity' => true, 'qr_side' => 'verso'])->assertSessionHasErrors();
+    $this->post('/administration/titulaires/modeles/AILCT-03/valider')->assertRedirect();
+    $model = DB::table('card_models')->where('category_code', 'AILCT-03')->first();
+    expect($model->status)->toBe('valide')->and($model->version)->toBe(1)->and(strtoupper($model->color))->toBe('#112233');
+    $this->put('/administration/titulaires/modeles/AILCT-03', ['color' => '#445566', 'mention' => 'INTERVENANT TEST', 'show_validity' => false, 'qr_side' => 'verso'])->assertRedirect();
+    $model = DB::table('card_models')->where('category_code', 'AILCT-03')->first();
+    expect($model->version)->toBe(2)->and($model->status)->toBe('a_valider');
+    foreach (['carte.modele_enregistre', 'carte.modele_valide'] as $action) {
+        expect(DB::table('audit_logs')->where('action', $action)->exists())->toBeTrue();
+    }
+    $this->actingAs($this->agent);
+    $this->put('/administration/titulaires/modeles/AILCT-03', ['color' => '#445566', 'mention' => 'X', 'show_validity' => true, 'qr_side' => 'verso'])->assertForbidden();
+});
+
+it('imprime plusieurs cartes depuis l’Atelier avec un tirage tracé et exige un motif à la réimpression', function () {
+    $this->actingAs($this->admin);
+    $ids = [];
+    foreach (['AILCT-01', 'AILCT-04'] as $category) {
+        $ids[] = $holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive '.Str::random(6), 'institutional_category' => $category], $this->admin);
+        app(HolderCards::class)->issue($holder, $this->admin, false);
+    }
+    $this->getJson('/administration/atelier/cartes')->assertOk()->assertJsonCount(2, 'cards')->assertJsonPath('cards.0.activated', false);
+    $this->post('/administration/atelier/cartes', ['holders' => []])->assertSessionHasErrors('holders');
+    $response = $this->post('/administration/atelier/cartes', ['holders' => $ids])->assertOk();
+    expect(substr_count($response->getContent(), 'data-side="recto"'))->toBe(2);
+    $run = DB::table('badge_print_runs')->where('kind', 'permanent')->first();
+    expect($run->badge_count)->toBe(2)->and($run->format)->toBe('cr80')->and($run->batch_id)->toBeNull()
+        ->and(DB::table('badge_print_events')->where('print_run_id', $run->id)->where('event_type', 'generated')->count())->toBe(1);
+    expect(DB::table('holder_card_prints')->whereIn('card_id', DB::table('holder_cards')->whereIn('holder_id', $ids)->pluck('id'))->count())->toBe(2);
+    // Réimpression : le motif est obligatoire, et rien n'est écrit sans lui.
+    $this->post('/administration/atelier/cartes', ['holders' => $ids])->assertSessionHasErrors('reason');
+    expect(DB::table('badge_print_runs')->where('kind', 'permanent')->count())->toBe(1);
+    $this->post('/administration/atelier/cartes', ['holders' => $ids, 'reason' => 'Carte abîmée (fictif)'])->assertOk();
+    expect(DB::table('badge_print_runs')->where('kind', 'permanent')->count())->toBe(2);
+    // L'impression n'active rien.
+    expect(DB::table('holder_cards')->whereIn('holder_id', $ids)->whereNotNull('activated_at')->count())->toBe(0);
+    $this->actingAs($this->agent);
+    $this->post('/administration/atelier/cartes', ['holders' => $ids])->assertForbidden();
+    $this->actingAs($this->agent);
+    $this->getJson('/administration/atelier/cartes')->assertForbidden();
 });

@@ -182,7 +182,7 @@ final class SiteControl
 
         return [
             'valid' => $valid, 'reason' => $decision['reason'], 'message' => $decision['message'], 'badge_code' => $card->identifier, 'zone_ok' => $valid && $checkpoint['type'] === 'zone' ? true : null, 'point' => $checkpoint['name'],
-            'person' => $valid ? ['name' => $card->full_name] : null, 'organisation' => $valid ? $card->organisation : null, 'category' => null, 'zones' => $decision['zones'], 'source' => 'serveur',
+            'person' => $valid ? ['name' => $card->full_name] : null, 'organisation' => $valid ? $card->organisation : null, 'category' => $valid ? $this->permanent->categoryOf($card->institutional_category) : null, 'zones' => $decision['zones'], 'source' => 'serveur',
             'permanent' => ['identifier' => $card->identifier, 'entered' => $type === 'entree'],
         ];
     }

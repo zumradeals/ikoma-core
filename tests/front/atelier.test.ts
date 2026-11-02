@@ -105,9 +105,14 @@ describe('Atelier des badges (parcours visiteurs)', () => {
     expect(wrapper.get('[data-testid="choix-lot"]').text()).not.toContain('Visiteur');
   });
 
-  it('renvoie les cartes permanentes vers leur fiche sans les mélanger au parcours visiteurs', async () => {
+  it('propose les cartes permanentes dans un mode séparé du parcours visiteurs', async () => {
     const wrapper = render(); await flushPromises();
-    expect(wrapper.get('[data-testid="type-permanents"]').text()).toContain('depuis leur fiche');
+    expect(wrapper.find('[data-testid="cartes-permanentes"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="type-permanents"]').trigger('click');
+    expect(wrapper.get('[data-testid="cartes-permanentes"]').text()).toContain('Aucune carte préparée');
+    expect(wrapper.find('[data-testid="etape-modele"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="type-visiteurs"]').trigger('click');
+    expect(wrapper.find('[data-testid="etape-modele"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="rappel-trace"]').text()).toContain('jamais la preuve');
   });
 });

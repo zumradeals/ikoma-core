@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 import jsQR from 'jsqr';
+import { fakePhoto } from './photo';
 
 type Account = { email: string; password: string; secret: string };
 const admin = JSON.parse(readFileSync('.secrets/screen-cartes.json', 'utf8')) as Account;
@@ -27,6 +28,7 @@ async function decode(page: Page, scope: string): Promise<string | null> {
 
 const MM = 96 / 25.4;
 
+
 test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisible, impression, réimpression et historique (ordinateur et tablette)', async ({ page, context }) => {
   test.setTimeout(300_000);
   const stamp = Date.now();
@@ -41,8 +43,19 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   // Huit modèles (un par catégorie), exemples fictifs.
   await page.goto('/administration/titulaires/modeles');
   await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
-  for (let i = 1; i <= 8; i++) await expect(page.getByTestId(`modele-AILCT-0${i}`)).toBeVisible();
-  await expect(page.getByTestId('modele-provisoire')).toBeVisible();
+  await expect(page.getByTestId('choix-categorie').locator('option')).toHaveCount(8);
+  await page.getByTestId('choix-categorie').selectOption('AILCT-04');
+  await expect(page).toHaveURL(/categorie=AILCT-04/);
+  await expect(page.getByTestId('modele-mention')).not.toHaveValue('');
+  await expect(page.getByTestId('apercu-recto')).toBeVisible();
+  // L'aperçu suit les réglages en direct.
+  await page.getByTestId('modele-mention').fill('DÉLÉGATION OFFICIELLE');
+  await page.getByTestId('modele-couleur').fill('#' + (0xc00000 + (stamp % 0x3fffff)).toString(16).padStart(6, '0'));
+  await expect(page.getByTestId('apercu-recto')).toContainText('DÉLÉGATION OFFICIELLE');
+  await page.getByTestId('enregistrer-modele').click();
+  await expect(page.getByTestId('modele-etat')).toContainText('À valider');
+  await page.getByTestId('valider-modele').click();
+  await expect(page.getByTestId('modele-etat')).toContainText('Validé');
   await noHorizontalScroll(page, 'modèles 1440');
   await page.screenshot({ path: 'test-results/a05-modeles-1440.png', fullPage: true });
 
@@ -65,6 +78,11 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   await row.getByRole('link', { name: 'Carte' }).click();
   await expect(page.getByTestId('page-carte-titulaire')).toBeVisible();
   await expect(page.getByTestId('avis-acces')).toContainText('aucun droit d’accès');
+  // La carte ne se prépare pas sans photo.
+  await expect(page.getByTestId('preparer-carte')).toBeDisabled();
+  await page.getByTestId('fichier-portrait').setInputFiles({ name: 'photo-fictive.png', mimeType: 'image/png', buffer: fakePhoto() });
+  await page.getByTestId('envoyer-portrait').click();
+  await expect(page.getByTestId('preparer-carte')).toBeEnabled();
   await page.getByTestId('preparer-carte').click();
   await expect(page.getByTestId('apercu-carte')).toBeVisible();
   await expect(page.getByTestId('aucun-tirage')).toBeVisible();
@@ -77,7 +95,7 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   }
   await expect(page.getByTestId('apercu-recto')).toContainText(name);
   await expect(page.getByTestId('apercu-recto')).toContainText(identifier);
-  await expect(page.getByTestId('apercu-recto')).toContainText('Délégations officielles');
+  await expect(page.getByTestId('apercu-recto')).toContainText('DÉLÉGATION OFFICIELLE');
   await expect(page.getByTestId('apercu-verso')).toContainText(identifier);
   const previewPayload = await decode(page, '[data-testid="apercu-verso"]');
   expect(previewPayload).toMatch(/^IKOMA1:[0-9a-f]{64}$/);
@@ -109,6 +127,28 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   await expect(page.getByTestId('historique-tirages').locator('li')).toHaveCount(2);
   await expect(page.getByTestId('historique-tirages')).toContainText('Réimpression');
   expect(await decode(page, '[data-testid="apercu-verso"]')).toBe(previewPayload);
+
+  // Atelier, mode « Cartes permanentes » : choix de la personne, motif obligatoire (déjà imprimée), document tracé.
+  await page.goto('/administration/atelier?mode=cartes');
+  await expect(page.getByTestId('cartes-permanentes')).toBeVisible();
+  await page.getByTestId(`carte-${identifier}`).check();
+  await expect(page.getByTestId('motif-cartes')).toBeVisible();
+  await page.getByTestId('motif-cartes').fill('Essai depuis l’Atelier');
+  const [atelierDoc] = await Promise.all([context.waitForEvent('page'), page.getByTestId('imprimer-cartes').click()]);
+  await atelierDoc.waitForLoadState('domcontentloaded');
+  await expect(atelierDoc.locator('.sheet')).toHaveCount(2);
+  await atelierDoc.close();
+  await page.screenshot({ path: 'test-results/r5b-atelier-cartes-1440.png', fullPage: true });
+  await page.goto('/administration/titulaires');
+  await page.getByTestId('recherche-titulaires').fill(name);
+  await page.getByTestId('lancer-recherche').click();
+  await page.locator('[data-testid^="titulaire-"]').filter({ hasText: name }).getByRole('link', { name: 'Carte' }).click();
+
+  // Remise : tant que la carte n'est pas remise et activée, elle n'ouvre rien.
+  await expect(page.getByTestId('activer-carte')).toBeDisabled();
+  await page.getByTestId('confirmer-remise').check();
+  await page.getByTestId('activer-carte').click();
+  await expect(page.getByTestId('carte-activee')).toBeVisible();
 
   // Page d'essai d'alignement : deux pages CR80, aucun QR.
   const align = await context.newPage();
