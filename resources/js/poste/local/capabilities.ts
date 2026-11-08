@@ -6,10 +6,10 @@ export type PosteRefusal = { reason: 'poste_non_identifie' | 'poste_non_habilite
 /**
  * Classement des opérations de la file hors ligne (S02).
  *  - `capability` : capacité de poste exigée (identique côté serveur, PostCapabilities) ;
- *  - `favorable` : l'opération produit une DÉCISION D'ACCÈS (contrôle valide, validation, badge, entrée, remise de badge de groupe, arrivée d'un car).
+ *  - `favorable` : l'opération produit une DÉCISION D'ACCÈS (contrôle valide, validation, badge, entrée, remise de badge de groupe, embarquement individuel, arrivée d'un car).
  *    Sans réseau, elle n'est permise que sous un délai approuvé et sur une copie assez récente.
  * Ne produisent aucune décision d'accès, donc jamais bloquées par la péremption : refus, identité, non listé, sortie (jamais soumise à la confiance), et les
- * opérations de car groupe_controle, groupe_depart et groupe_arrivee_fin (aucune porte de capacité non plus).
+ * opérations de car groupe_controle, groupe_absent, groupe_depart et groupe_arrivee_fin (aucune porte de capacité non plus). L'embarquement individuel est favorable : sans réseau, il exige une tablette authentifiée, une liste synchronisée et un délai de confiance approuvé.
  * Cars : la préparation du transport (appel), la remise des badges de groupe et le départ se font à l'HÔTEL, hors des postes de l'Académie : ils relèvent de
  * leurs permissions de rôle (capability null), jamais d'un point de contrôle ; l'arrivée est un scan physique à un poste de l'Académie (capacité scan).
  */
@@ -18,7 +18,7 @@ export const OP_POLICY: Record<string, OpPolicy> = {
   identite: { capability: 'accueil', favorable: false }, valider: { capability: 'accueil', favorable: true }, refuser: { capability: 'accueil', favorable: false },
   badge: { capability: 'accueil', favorable: true }, entree: { capability: 'accueil', favorable: true }, non_liste: { capability: 'accueil', favorable: false },
   controle: { capability: 'scan', favorable: true }, sortie: { capability: 'sortie', favorable: false },
-  groupe_badge: { capability: null, favorable: true }, groupe_arrivee: { capability: 'scan', favorable: true },
+  groupe_badge: { capability: null, favorable: true }, groupe_embarquer: { capability: null, favorable: true }, groupe_arrivee: { capability: 'scan', favorable: true },
 };
 
 /**

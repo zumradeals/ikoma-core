@@ -4,7 +4,7 @@ import { posteGate, OP_POLICY } from './capabilities';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
 import { sha256Hex } from './crypto';
 import { getMeta } from './db';
-import { applyGroupOp, groupSummaries, groupView, type ArrivalResult, type GroupSummary, type GroupView } from './group';
+import { applyGroupOp, groupSummaries, groupView, type ArrivalResult, type BoardResult, type GroupSummary, type GroupView } from './group';
 import { LocalList, type Snapshot } from './list';
 import { PERMANENT_PREFIX, searchPermanentDirectory, type PermanentResult } from './permanent';
 import { checkpointsOf, controlLocal, exitLocal, refusedControl, refusedExit, resolveBadge } from './site';
@@ -164,6 +164,12 @@ export class LocalPosteRepository implements GroupPosteRepository {
     if (!printed) throw new ApiError('badge_inconnu', 'Badge inconnu : vérifiez le code imprimé ou prenez un autre badge.', 'Saisissez le code imprimé ou prenez un autre badge.', 422);
     return { badge_code: (await this.enqueue(operationId, 'groupe_badge', { group_id: groupId, visitor_id: visitorId, code: printed })).badge_code as string };
   }
+  async groupBoard(operationId: string, groupId: string, code: string): Promise<BoardResult> {
+    const printed = await resolveBadge(this.list, code);
+    if (!printed) throw new ApiError('badge_inconnu', 'Badge inconnu : vérifiez le code ou scannez à nouveau.', null, 422);
+    return (await this.enqueue(operationId, 'groupe_embarquer', { group_id: groupId, code: printed })).boarding as BoardResult;
+  }
+  async groupAbsent(operationId: string, groupId: string, visitorId: string, reason: string): Promise<void> { await this.enqueue(operationId, 'groupe_absent', { group_id: groupId, visitor_id: visitorId, reason }); }
   async groupDepart(operationId: string, groupId: string): Promise<{ boarded: number; absent: number }> {
     const r = await this.enqueue(operationId, 'groupe_depart', { group_id: groupId });
     return { boarded: r.boarded ?? 0, absent: r.absent ?? 0 };

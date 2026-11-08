@@ -94,6 +94,19 @@ async function progress(page: Page, done: number, total: number): Promise<void> 
   }
 }
 const pendingOps = (page: Page) => page.getByTestId('en-attente');
+/** Embarquement individuel : un scan (ici le code imprimé saisi) par passager. */
+async function boardPassenger(page: Page, code: string): Promise<void> {
+  await page.getByTestId('code-embarquement').fill(code);
+  await page.getByTestId('valider-embarquement').click();
+  await expect(page.getByTestId('dernier-embarque')).toContainText(code, { timeout: 15_000 });
+}
+async function markAbsent(page: Page, name: string, reason: string): Promise<void> {
+  const row = page.getByTestId('a-embarquer').filter({ hasText: name });
+  await row.getByTestId('noter-absent').click();
+  await row.getByTestId('motif-absence').fill(reason);
+  await row.getByTestId('confirmer-absence').click();
+  await expect(page.getByTestId('a-embarquer').filter({ hasText: name })).toHaveCount(0);
+}
 
 test('car de 50 stagiaires : appel, correspondance et remise du badge en moins de 20 s par personne (caméra simulée)', async () => {
   test.setTimeout(360_000);
@@ -117,7 +130,13 @@ test('car de 50 stagiaires : appel, correspondance et remise du badge en moins d
   const average = (Date.now() - started) / 50 / 1000;
   expect(average, `${average.toFixed(1)} s par stagiaire`).toBeLessThan(20);
   test.info().annotations.push({ type: 'moyenne', description: `${average.toFixed(2)} s par stagiaire` });
-  await button(page, 'Fermer le car (embarquement)').click(); await button(page, 'Oui, fermer le car').click();
+  // Embarquement individuel : chaque passager est scanné séparément, puis le car est fermé.
+  await page.getByTestId('onglet-embarquement').click();
+  for (let i = 0; i < 50; i++) await boardPassenger(page, car.badges[i]);
+  await expect(page.getByTestId('places-car')).toContainText('50 embarqués');
+  await expect(page.getByTestId('appel-complet')).toBeVisible();
+  await button(page, 'Fermer le car (départ)').click(); await button(page, 'Oui, fermer le car').click();
+  await page.getByTestId('onglet-appel').click();
   await expect(page.getByTestId('bilan-car')).toContainText('Groupe complet'); await expect(page.getByTestId('bilan-car')).toContainText('50 stagiaires embarqués');
   await shot(page, 'groupe-complet');
   await expect(pendingOps(page)).toHaveText('0', { timeout: 60_000 });
@@ -152,8 +171,14 @@ test('car avec absents : confirmation de l’encadreur en direct, absents signal
     await progress(page, i + 1, 6);
   }
   await expect(page.getByTestId('personne-courante')).toHaveText(car.members[4]); await expect(page.getByTestId('attente-encadreur')).toBeVisible();
-  await button(page, 'Fermer le car (embarquement)').click(); await shot(page, 'groupe-fermeture');
-  await button(page, 'Oui, fermer le car').click();
+  // Appel complet exigé : les quatre badgés embarquent un par un, les deux autres sont notés absents avec un motif ; le départ est refusé avant.
+  await page.getByTestId('onglet-embarquement').click();
+  for (let i = 0; i < 4; i++) await boardPassenger(page, car.badges[i]);
+  await expect(button(page, 'Fermer le car (départ)')).toBeDisabled(); await expect(page.getByTestId('appel-incomplet')).toBeVisible();
+  await markAbsent(page, car.members[4], 'Malade'); await markAbsent(page, car.members[5], 'Transport personnel');
+  await shot(page, 'groupe-fermeture');
+  await button(page, 'Fermer le car (départ)').click(); await button(page, 'Oui, fermer le car').click();
+  await page.getByTestId('onglet-appel').click();
   const bilan = page.getByTestId('bilan-car');
   await expect(bilan).toContainText('Car parti avec des absents'); await expect(page.getByTestId('liste-absents').locator('li')).toHaveText([car.members[4], car.members[5]]);
   await shot(page, 'groupe-absents');

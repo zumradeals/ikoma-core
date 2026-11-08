@@ -69,23 +69,80 @@ describe('règles des groupes sur la copie locale', () => {
     expect(list.members.get('s3')?.checked).toBe(true);
   });
 
-  it('fermeture du car : les badgés embarquent, les autres sont absents, plus rien ne se remet ensuite', async () => {
+  /** Appel + badge pour les personnes données (s1 → B-001, s2 → B-002, …). */
+  const call = (list: LocalList, ids: string[]) => ids.forEach((id, i) => { op(list, 'groupe_controle', { group_id: 'g1', visitor_id: id }); op(list, 'groupe_badge', { group_id: 'g1', visitor_id: id, code: `B-00${i + 1}` }); });
+
+  it('embarquement individuel : exige l’appel et le badge de la personne, et se rejoue sans effet', async () => {
     const list = new LocalList(await snapshot());
-    for (const [i, id] of ['s1', 's2'].entries()) { op(list, 'groupe_controle', { group_id: 'g1', visitor_id: id }); op(list, 'groupe_badge', { group_id: 'g1', visitor_id: id, code: `B-00${i + 1}` }); }
-    expect(op(list, 'groupe_depart', { group_id: 'g1' })).toEqual({ boarded: 2, absent: 2 });
-    expect(op(list, 'groupe_depart', { group_id: 'g1' })).toEqual({ boarded: 2, absent: 2 });
-    expect(refused(() => op(list, 'groupe_badge', { group_id: 'g1', visitor_id: 's3', code: 'B-003' }))).toBe('car_ferme');
-    const view = groupView(list, 'g1');
-    expect(view.members.filter(m => m.absent).map(m => m.name)).toEqual(['Coulibaly Fictif', 'Diomandé Fictif']);
+    expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-404' }))).toBe('badge_inconnu');
+    expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }))).toBe('non_associe');
+    call(list, ['s1', 's2']);
+    expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-900' }))).toBe('non_associe'); // badge du lot d'un autre groupe, personne n'en est porteur
+    expect(op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }).boarding).toMatchObject({ boarded: true, already: false, places_restantes: null });
+    expect(op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }).boarding).toMatchObject({ already: true });
+    expect(list.members.get('s1')?.boarded).toBe(true);
+    expect(list.members.get('s2')?.boarded).toBe(false);
+    // la personne dont l'appel n'est pas fait ne peut pas embarquer
+    list.members.get('s2')!.checked = false;
+    expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-002' }))).toBe('controle_requis');
   });
 
-  it('arrivée : passage à « arrivé », écart pour un badge non embarqué, bilan des manquants', async () => {
+  it('capacité bloquante : impossible d’embarquer au-delà des places, absent levé par l’embarquement', async () => {
+    const snap = await snapshot();
+    snap.groups![0].capacity = 1;
+    const list = new LocalList(snap);
+    call(list, ['s1', 's2']);
+    expect(groupView(list, 'g1').progress).toMatchObject({ capacity: 1, free: 1 });
+    expect(op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }).boarding).toMatchObject({ places_restantes: 0 });
+    expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-002' }))).toBe('car_complet');
+    expect(list.members.get('s2')?.boarded).toBe(false);
+    expect(groupView(list, 'g1').progress).toMatchObject({ boarded: 1, free: 0 });
+  });
+
+  it('absence tracée : motif obligatoire, refusée pour un embarqué, levée par l’embarquement avant le départ', async () => {
     const list = new LocalList(await snapshot());
-    for (const [i, id] of ['s1', 's2'].entries()) { op(list, 'groupe_controle', { group_id: 'g1', visitor_id: id }); op(list, 'groupe_badge', { group_id: 'g1', visitor_id: id, code: `B-00${i + 1}` }); }
+    call(list, ['s1', 's2']);
+    expect(refused(() => op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's3', reason: '  ' }))).toBe('motif_absence_obligatoire');
+    op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's3', reason: 'Malade' });
+    expect(list.members.get('s3')?.absent).toBe(true);
+    op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' });
+    expect(refused(() => op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's1', reason: 'Erreur' }))).toBe('deja_embarque');
+    // une personne notée absente qui se présente est appelée puis embarquée : l'absence est levée
+    list.members.get('s3')!.confirmed = true; // confirmation de l'encadreur
+    op(list, 'groupe_controle', { group_id: 'g1', visitor_id: 's3' });
+    op(list, 'groupe_badge', { group_id: 'g1', visitor_id: 's3', code: 'B-003' });
+    op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-003' });
+    expect(list.members.get('s3')).toMatchObject({ boarded: true, absent: false });
+  });
+
+  it('départ : refusé tant que l’appel nominal est incomplet, sans embarquement déduit, puis plus rien ne change', async () => {
+    const list = new LocalList(await snapshot());
+    call(list, ['s1', 's2']);
+    op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' });
+    expect(refused(() => op(list, 'groupe_depart', { group_id: 'g1' }))).toBe('appel_incomplet');
+    expect(groupView(list, 'g1').progress.unresolved).toBe(3);
+    op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-002' });
+    op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's3', reason: 'Malade' });
+    op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's4', reason: 'Transport personnel' });
+    expect(op(list, 'groupe_depart', { group_id: 'g1' })).toEqual({ boarded: 2, absent: 2 });
+    expect(op(list, 'groupe_depart', { group_id: 'g1' })).toEqual({ boarded: 2, absent: 2 });
+    expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-002' }))).toBe('car_ferme');
+    expect(refused(() => op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's3', reason: 'x' }))).toBe('car_ferme');
+    expect(groupView(list, 'g1').members.filter(m => m.absent).map(m => m.name)).toEqual(['Coulibaly Fictif', 'Diomandé Fictif']);
+  });
+
+  it('arrivée : débarquement individuel sans présence déduite, écart pour un badge non embarqué, bilan des manquants', async () => {
+    const list = new LocalList(await snapshot());
+    call(list, ['s1', 's2']);
+    op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' });
+    op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-002' });
+    op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's3', reason: 'Malade' });
+    op(list, 'groupe_absent', { group_id: 'g1', visitor_id: 's4', reason: 'Malade' });
     op(list, 'groupe_depart', { group_id: 'g1' });
     expect(op(list, 'groupe_arrivee', { code: 'B-001' }).arrival).toMatchObject({ name: 'Aka Fictif', ecart: null, already: false });
     expect(op(list, 'groupe_arrivee', { code: 'B-001' }).arrival).toMatchObject({ already: true });
-    expect(list.visitors.get('s1')?.status).toBe('present');
+    expect(list.members.get('s1')?.arrived).toBe(true);
+    expect(list.visitors.get('s1')?.status).toBe('attendu'); // l'arrivée du car n'établit pas la présence physique
     expect(refused(() => op(list, 'groupe_arrivee', { code: 'B-003' }))).toBe('non_associe');
     expect(op(list, 'groupe_arrivee_fin', { group_id: 'g1' })).toEqual({ arrived: 1, missing: 1 });
   });
@@ -113,9 +170,15 @@ describe('dépôt local : file d’opérations des groupes', () => {
     await expect(repo.groupDeliver('op-4', 'g1', 's2', 'ff'.repeat(32))).rejects.toMatchObject({ code: 'badge_inconnu' });
     expect(await store.count('pending')).toBe(2);
     expect((await repo.groupView('g1')).progress.badged).toBe(1);
-    await repo.groupDepart('op-5', 'g1');
-    expect(await repo.arrive('op-6', 'B-001')).toMatchObject({ name: 'Aka Fictif', ecart: null });
-    expect(await repo.arriveFinish('op-7', 'g1')).toEqual({ arrived: 1, missing: 0 });
-    expect(await store.count('pending')).toBe(5);
+    await expect(repo.groupDepart('op-5', 'g1')).rejects.toMatchObject({ code: 'appel_incomplet' });
+    expect(await repo.groupBoard('op-6', 'g1', 'IKOMA1:' + '1'.repeat(64))).toMatchObject({ boarded: true, already: false });
+    expect(await repo.groupBoard('op-6', 'g1', 'B-001')).toMatchObject({ already: true }); // rejeu : une seule opération en file
+    await repo.groupAbsent('op-7', 'g1', 's2', 'Malade');
+    await repo.groupAbsent('op-8', 'g1', 's3', 'Malade');
+    await repo.groupAbsent('op-9', 'g1', 's4', 'Malade');
+    expect(await repo.groupDepart('op-10', 'g1')).toEqual({ boarded: 1, absent: 3 });
+    expect(await repo.arrive('op-11', 'B-001')).toMatchObject({ name: 'Aka Fictif', ecart: null });
+    expect(await repo.arriveFinish('op-12', 'g1')).toEqual({ arrived: 1, missing: 0 });
+    expect(await store.count('pending')).toBe(9);
   });
 });

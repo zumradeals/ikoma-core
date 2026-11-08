@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'; import { Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
-type Group = { id: string; name: string; bus_number: string | null; supervisor_id: string | null; supervisor_name: string | null; departed_at: string | null; members: { id: string; full_name: string; category: string }[]; badges_reserves: number; badges_libres: number };
+type Group = { id: string; name: string; bus_number: string | null; capacity: number | null; supervisor_id: string | null; supervisor_name: string | null; departed_at: string | null; members: { id: string; full_name: string; category: string }[]; badges_reserves: number; badges_libres: number };
 const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; groups: Group[]; mode: 'identite' | 'encadreur'; encadreurs: { id: string; name: string }[]; search: string; candidates: { id: string; full_name: string; organisation: string | null }[] }>();
-const create = useForm({ event_id: props.event?.id ?? '', name: '', bus_number: '', supervisor_id: '' });
+const create = useForm({ event_id: props.event?.id ?? '', name: '', bus_number: '', capacity: '', supervisor_id: '' });
 const mode = useForm({ mode: props.mode });
 const q = ref(props.search);
 const opened = ref<string | null>(null);
-function submitCreate() { create.transform(d => ({ ...d, supervisor_id: d.supervisor_id || null, bus_number: d.bus_number || null })).post('/administration/groupes', { onSuccess: () => create.reset('name', 'bus_number', 'supervisor_id') }); }
+function submitCreate() { create.transform(d => ({ ...d, supervisor_id: d.supervisor_id || null, bus_number: d.bus_number || null, capacity: d.capacity ? Number(d.capacity) : null })).post('/administration/groupes', { onSuccess: () => create.reset('name', 'bus_number', 'capacity', 'supervisor_id') }); }
+function setCapacity(g: Group, value: string) { router.put(`/administration/groupes/${g.id}/capacite`, { capacity: value ? Number(value) : null }, { preserveScroll: true }); }
 function designate(g: Group, id: string) { router.put(`/administration/groupes/${g.id}/encadreur`, { supervisor_id: id || null }, { preserveScroll: true }); }
 function attach(g: Group, visitor: string) { router.post(`/administration/groupes/${g.id}/stagiaires`, { visitor_id: visitor }, { preserveScroll: true }); }
 function detach(g: Group, visitor: string) { router.delete(`/administration/groupes/${g.id}/stagiaires/${visitor}`, { preserveScroll: true }); }
@@ -34,6 +35,7 @@ function look() { router.get('/administration/groupes', { event: props.event?.id
 <label class="block">Événement<select v-model="create.event_id" class="field" required><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select></label>
 <label class="block">Nom du groupe<input v-model="create.name" class="field" maxlength="120" required autocomplete="off"></label>
 <label class="block">Numéro du car<input v-model="create.bus_number" class="field" maxlength="60" autocomplete="off"></label>
+<label class="block">Places du car (bloquantes)<input v-model="create.capacity" type="number" min="1" max="200" class="field" data-testid="capacite-creation"></label>
 <label class="block">Encadreur<select v-model="create.supervisor_id" class="field"><option value="">Aucun pour le moment</option><option v-for="u in encadreurs" :key="u.id" :value="u.id">{{ u.name }}</option></select></label>
 <p v-for="error in create.errors" :key="error" role="alert">{{ error }}</p><FormButton :busy="create.processing">Créer le groupe</FormButton>
 </form>
@@ -41,6 +43,8 @@ function look() { router.get('/administration/groupes', { event: props.event?.id
 <BaseCard v-for="g in groups" :key="g.id">
 <h2 class="text-heading font-bold">{{ g.bus_number ?? g.name }} · {{ g.name }}</h2>
 <p class="mb-2">{{ g.members.length }} stagiaire(s) · {{ g.badges_reserves }} badge(s) réservé(s) dont {{ g.badges_libres }} libre(s)<template v-if="g.departed_at"> · car parti</template></p>
+<p v-if="g.capacity === null" role="status" class="mb-2 font-semibold text-amber-900" data-testid="capacite-absente">Places du car non renseignées : aucune limite n’est appliquée à l’embarquement.</p>
+<label class="mb-4 block">Places du car (bloquantes)<input class="field" type="number" min="1" max="200" :value="g.capacity ?? ''" data-testid="capacite" @change="setCapacity(g, ($event.target as HTMLInputElement).value)"></label>
 <label class="mb-4 block">Encadreur<select class="field" :value="g.supervisor_id ?? ''" @change="designate(g, ($event.target as HTMLSelectElement).value)"><option value="">Aucun</option><option v-for="u in encadreurs" :key="u.id" :value="u.id">{{ u.name }}</option></select></label>
 <button type="button" class="action" :aria-expanded="opened === g.id" @click="opened = opened === g.id ? null : g.id">{{ opened === g.id ? 'Fermer les stagiaires' : 'Gérer les stagiaires' }}</button>
 <div v-if="opened === g.id" class="mt-5 space-y-4">

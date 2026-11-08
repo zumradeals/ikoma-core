@@ -266,6 +266,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/groupes', [GroupesController::class, 'store'])->middleware(['can:groupes.gerer', EnsureF06Active::class]);
         Route::put('/administration/groupes/reglage', [GroupesController::class, 'mode'])->middleware(['can:groupes.gerer', EnsureF06Active::class]);
         Route::put('/administration/groupes/{group}/encadreur', [GroupesController::class, 'designate'])->whereUuid('group')->middleware(['can:groupes.gerer', EnsureF06Active::class]);
+        Route::put('/administration/groupes/{group}/capacite', [GroupesController::class, 'capacity'])->whereUuid('group')->middleware(['can:groupes.gerer', EnsureF06Active::class]);
         Route::post('/administration/groupes/{group}/stagiaires', [GroupesController::class, 'attach'])->whereUuid('group')->middleware(['can:groupes.gerer', EnsureF06Active::class]);
         Route::delete('/administration/groupes/{group}/stagiaires/{visitor}', [GroupesController::class, 'detach'])->whereUuid(['group', 'visitor'])->middleware(['can:groupes.gerer', EnsureF06Active::class]);
         Route::get('/mon-groupe', [MonGroupeController::class, 'index'])->middleware(['can:groupes.confirmer_presence', EnsureF06Active::class]);

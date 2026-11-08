@@ -172,6 +172,14 @@ class DeskFixtures extends Command
                 $groups->deliver($deviceCars, $agent, $cars[4]['id'], $vid, $cars[4]['badges'][$i]);
             }
         }
+        // Embarquement individuel des cinq badgés, absence tracée des autres (l'appel nominal est complet), puis départ.
+        foreach ($car4 as $i => $vid) {
+            if ($i < 5) {
+                $groups->board($deviceCars, $agent, $cars[4]['id'], $cars[4]['badges'][$i]);
+            } else {
+                $groups->markAbsent($agent, $cars[4]['id'], $vid, 'Absent à l\'appel (données fictives)');
+            }
+        }
         $groups->depart($agent, $cars[4]['id']);
         app(BadgeService::class)->associer(Badge::where('event_id', $event)->where('code', $cars[4]['badges'][5])->firstOrFail(), $car4[5], $agent, $deviceCars);
         $enrolCode4 = app(Devices::class)->issueCode($deviceCars, $admin);

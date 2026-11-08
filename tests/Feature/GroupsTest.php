@@ -152,14 +152,36 @@ function deliverTo(int $count): void
     }
 }
 
-it('signale les absents au départ du car sans nom dans les alertes ni le journal', function () {
+/** Embarque (scan individuel) les $count premiers stagiaires badgés par deliverTo(). */
+function boardFirst(int $count): void
+{
+    foreach (range(1, $count) as $n) {
+        test()->groups->board(test()->device, test()->agent, test()->group->id, 'B-'.str_pad((string) $n, 3, '0', STR_PAD_LEFT));
+    }
+}
+
+/** Note absents, avec motif, les stagiaires du groupe à partir du rang $from. */
+function absentFrom(int $from, string $reason = 'Absent à l\'appel'): void
+{
+    foreach (array_slice(test()->members, $from) as $v) {
+        test()->groups->markAbsent(test()->agent, test()->group->id, $v, $reason);
+    }
+}
+
+it('refuse le départ tant que l\'appel nominal est incomplet, puis trace les absents sans nom dans les alertes ni le journal', function () {
     reserveForGroup($this->group, 40);
     deliverTo(38);
+    boardFirst(38);
+    // deux personnes ne sont ni embarquées ni notées absentes : le départ est refusé et ne déduit aucun embarquement
+    expect(refusal(fn () => $this->groups->depart($this->agent, $this->group->id))?->code_)->toBe('appel_incomplet');
+    expect(DB::table('groups')->where('id', $this->group->id)->value('departed_at'))->toBeNull();
+    absentFrom(38, 'Malade');
     $result = $this->groups->depart($this->agent, $this->group->id);
     expect($result)->toBe(['boarded' => 38, 'absent' => 2]);
     expect($this->groups->depart($this->agent, $this->group->id))->toBe(['boarded' => 38, 'absent' => 2]);
     expect(DB::table('alerts')->where('type', 'groupe_incomplet')->count())->toBe(1)
         ->and(DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'groupe.absent')->count())->toBe(2)
+        ->and(DB::table('group_members')->where('group_id', $this->group->id)->whereNotNull('absent_at')->whereNotNull('absence_reason')->whereNotNull('absent_by')->count())->toBe(2)
         ->and(refusal(fn () => $this->groups->deliver($this->device, $this->agent, $this->group->id, $this->members[39], 'B-040'))?->code_)->toBe('car_ferme');
     $names = DB::table('visitors')->where('group_id', $this->group->id)->pluck('full_name')->all();
     $text = DB::table('audit_logs')->where('id', '>', $this->auditStart)->get()->map(fn ($r) => json_encode($r))->implode(' ').DB::table('alerts')->get()->map(fn ($r) => json_encode($r))->implode(' ');
@@ -168,12 +190,83 @@ it('signale les absents au départ du car sans nom dans les alertes ni le journa
     }
 });
 
-it('contrôle l\'arrivée : scan, statut présent, événement d\'entrée et écarts signalés', function () {
+it('embarque chaque passager séparément : badge connu, attribué, du groupe, appel fait, rejouable, un mouvement par embarquement', function () {
+    reserveForGroup($this->group, 40);
+    deliverTo(3);
+    expect(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-404'))?->code_)->toBe('badge_inconnu')
+        ->and(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-030'))?->code_)->toBe('non_associe');
+    $first = $this->groups->board($this->device, $this->agent, $this->group->id, 'B-001');
+    expect($first)->toMatchArray(['boarded' => true, 'already' => false, 'badge_code' => 'B-001', 'places_restantes' => null]);
+    expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-001')['already'])->toBeTrue();
+    $token = DB::table('badges')->where('event_id', $this->group->event_id)->where('code', 'B-002')->value('qr_token');
+    expect($this->groups->board($this->device, $this->agent, $this->group->id, 'IKOMA1:'.$token)['already'])->toBeFalse();
+    expect(DB::table('group_members')->where('visitor_id', $this->members[0])->value('boarded_by'))->toBe($this->agent->id);
+    expect(DB::table('access_events')->where('type', 'embarquement')->count())->toBe(2)
+        ->and(DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'groupe.embarque_individuel')->count())->toBe(2);
+    // la personne n'est ni « présente » ni « entrée » du fait de l'embarquement
+    expect(DB::table('access_events')->where('type', 'entree')->count())->toBe(0);
+    // le départ reste refusé tant que le reste du groupe n'est ni embarqué ni noté absent
+    expect(refusal(fn () => $this->groups->depart($this->agent, $this->group->id))?->code_)->toBe('appel_incomplet');
+});
+
+it('rend la capacité du car bloquante : impossible d\'embarquer plus de personnes que de places', function () {
+    reserveForGroup($this->group, 40);
+    deliverTo(6);
+    $this->groups->setCapacity($this->group->id, 4, $this->admin);
+    boardFirst(4);
+    $full = refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-005'));
+    expect($full?->code_)->toBe('car_complet')->and($full?->status)->toBe(409);
+    expect(DB::table('group_members')->where('group_id', $this->group->id)->whereNotNull('boarded_at')->count())->toBe(4);
+    expect($this->groups->state($this->group->id)['group']['capacity'])->toBe(4);
+    // déjà embarqué : le rejeu ne consomme pas de place
+    expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-001')['already'])->toBeTrue();
+    // la capacité ne peut pas descendre sous le nombre d'embarqués, ni sortir de 1 à 200
+    expect(refusal(fn () => $this->groups->setCapacity($this->group->id, 3, $this->admin))?->code_)->toBe('capacite_insuffisante')
+        ->and(refusal(fn () => $this->groups->setCapacity($this->group->id, 0, $this->admin))?->code_)->toBe('capacite_invalide');
+    $this->groups->setCapacity($this->group->id, 6, $this->admin);
+    expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-005')['places_restantes'])->toBe(1);
+    // sans capacité renseignée, aucune limite n'est appliquée
+    $this->groups->setCapacity($this->group->id, null, $this->admin);
+    expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-006')['places_restantes'])->toBeNull();
+});
+
+it('trace chaque absence (motif, auteur, journal), la refuse pour un embarqué, la lève par l\'embarquement avant le départ', function () {
+    reserveForGroup($this->group, 40);
+    deliverTo(2);
+    [$a, $b, $c] = $this->members;
+    expect(refusal(fn () => $this->groups->markAbsent($this->agent, $this->group->id, $c, '   '))?->code_)->toBe('motif_absence_obligatoire');
+    $this->groups->markAbsent($this->agent, $this->group->id, $c, 'Malade');
+    $this->groups->markAbsent($this->agent, $this->group->id, $c, 'Malade'); // rejeu sans effet
+    expect(DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'groupe.absent')->count())->toBe(1);
+    $this->groups->board($this->device, $this->agent, $this->group->id, 'B-001');
+    expect(refusal(fn () => $this->groups->markAbsent($this->agent, $this->group->id, $a, 'Erreur'))?->code_)->toBe('deja_embarque');
+    // la personne notée absente arrive finalement : appel, badge, embarquement ; l'absence est levée et tracée
+    $this->groups->confirm($this->encadreur, $this->group->id, $c);
+    $this->groups->check($this->agent, $this->group->id, $c);
+    $this->groups->deliver($this->device, $this->agent, $this->group->id, $c, 'B-003');
+    $this->groups->board($this->device, $this->agent, $this->group->id, 'B-003');
+    $row = DB::table('group_members')->where('visitor_id', $c)->first();
+    expect($row->absent_at)->toBeNull()->and($row->absence_reason)->toBeNull()->and($row->boarded_at)->not->toBeNull();
+    expect(DB::table('access_events')->where('type', 'embarquement')->whereRaw("details->>'absence_levee' = 'true'")->count())->toBe(1);
+    // le départ fermé : plus d'absence ni d'embarquement
+    $this->groups->markAbsent($this->agent, $this->group->id, $b, 'Malade');
+    foreach (array_slice($this->members, 3) as $v) {
+        $this->groups->markAbsent($this->agent, $this->group->id, $v, 'Absent');
+    }
+    $this->groups->depart($this->agent, $this->group->id);
+    expect(refusal(fn () => $this->groups->markAbsent($this->agent, $this->group->id, $a, 'Trop tard'))?->code_)->toBe('car_ferme')
+        ->and(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-002'))?->code_)->toBe('car_ferme');
+    // la base interdit d'être à la fois embarqué et absent
+    expect(fn () => DB::transaction(fn () => DB::table('group_members')->where('visitor_id', $a)->update(['absent_at' => now(), 'absent_by' => $this->agent->id, 'absence_reason' => 'x'])))->toThrow(Exception::class);
+});
+
+it('enregistre le débarquement individuel à l\'arrivée sans entrée ni présence déduites, avec les écarts signalés', function () {
     reserveForGroup($this->group, 40);
     deliverTo(10);
-    // un 11e badge remis après coup n'est pas possible : on simule un badge scanné sans embarquement avant le départ
+    boardFirst(10);
+    absentFrom(10);
     $this->groups->depart($this->agent, $this->group->id);
-    $codes = DB::table('badges')->whereIn('code', array_map(fn ($i) => 'B-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT), range(1, 10)))->orderBy('code')->pluck('code')->all();
+    $codes = array_map(fn ($i) => 'B-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT), range(1, 10));
     foreach (array_slice($codes, 0, 9) as $code) {
         expect($this->groups->arrive($this->device, $this->agent, $code)['ecart'])->toBeNull();
     }
@@ -183,8 +276,11 @@ it('contrôle l\'arrivée : scan, statut présent, événement d\'entrée et éc
     $this->groups->finishArrival($this->agent, $this->group->id);
     expect(DB::table('alerts')->where('type', 'groupe_ecart')->count())->toBe(1)
         ->and(DB::table('alerts')->where('type', 'car_arrive')->count())->toBe(1)
-        ->and(DB::table('access_events')->where('type', 'entree')->whereRaw("details->>'arrivee_groupe' = 'true'")->count())->toBe(9)
-        ->and(DB::table('visitors')->where('group_id', $this->group->id)->where('status', 'present')->count())->toBe(9);
+        ->and(DB::table('access_events')->where('type', 'debarquement')->count())->toBe(9)
+        ->and(DB::table('access_events')->where('type', 'embarquement')->count())->toBe(10)
+        // l'arrivée du car ne déduit jamais la présence physique
+        ->and(DB::table('access_events')->where('type', 'entree')->count())->toBe(0)
+        ->and(DB::table('visitors')->where('group_id', $this->group->id)->where('status', 'present')->count())->toBe(0);
 });
 
 it('signale un badge scanné à l\'arrivée alors que la personne n\'était pas embarquée', function () {
@@ -193,15 +289,27 @@ it('signale un badge scanné à l\'arrivée alors que la personne n\'était pas 
     DB::table('groups')->where('id', $this->group->id)->update(['departed_at' => now()]);
     $result = $this->groups->arrive($this->device, $this->agent, 'B-002');
     expect($result['ecart'])->toBe('non_embarque')
-        ->and(DB::table('alerts')->where('type', 'groupe_ecart')->count())->toBe(1);
+        ->and(DB::table('alerts')->where('type', 'groupe_ecart')->count())->toBe(1)
+        ->and(DB::table('access_events')->where('type', 'debarquement')->count())->toBe(1);
 });
 
 it('journalise le parcours avec des identifiants et des nombres uniquement', function () {
     reserveForGroup($this->group, 40);
     deliverTo(2);
+    boardFirst(2);
+    absentFrom(2);
     $this->groups->depart($this->agent, $this->group->id);
     $actions = DB::table('audit_logs')->where('id', '>', $this->auditStart)->pluck('action')->unique()->all();
-    expect($actions)->toContain('groupe.ouvert', 'groupe.badge_remis', 'groupe.embarque', 'groupe.absent', 'groupe.confirme_par_encadreur');
+    expect($actions)->toContain('groupe.ouvert', 'groupe.badge_remis', 'groupe.embarque_individuel', 'groupe.depart', 'groupe.absent', 'groupe.confirme_par_encadreur');
+});
+
+it('règle la capacité d\'un car depuis l\'administration, administrateur seulement', function () {
+    $this->actingAs($this->agent)->put("/administration/groupes/{$this->group->id}/capacite", ['capacity' => 40])->assertForbidden();
+    $this->actingAs($this->admin)->put("/administration/groupes/{$this->group->id}/capacite", ['capacity' => 40])->assertRedirect();
+    expect(DB::table('groups')->where('id', $this->group->id)->value('capacity'))->toBe(40);
+    $this->actingAs($this->admin)->put("/administration/groupes/{$this->group->id}/capacite", ['capacity' => 0])->assertSessionHasErrors('capacity');
+    $this->actingAs($this->admin)->get('/administration/groupes')->assertOk()->assertInertia(fn ($page) => $page->where('groups.0.capacity', 40));
+    expect(DB::table('audit_logs')->where('action', 'groupe.capacite_modifiee')->count())->toBe(1);
 });
 
 it('enregistre la règle de contrôle depuis l\'administration et l\'affiche au rechargement', function () {

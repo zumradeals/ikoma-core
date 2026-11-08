@@ -3,7 +3,7 @@ import type { LocalList, SnapVisitor } from './list';
 import { applyGroupOp, type GroupDelta } from './group';
 import { searchIndex } from './search';
 
-export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie' | 'groupe_controle' | 'groupe_badge' | 'groupe_depart' | 'groupe_arrivee' | 'groupe_arrivee_fin';
+export type OpType = 'identite' | 'valider' | 'refuser' | 'badge' | 'entree' | 'non_liste' | 'controle' | 'sortie' | 'groupe_controle' | 'groupe_badge' | 'groupe_embarquer' | 'groupe_absent' | 'groupe_depart' | 'groupe_arrivee' | 'groupe_arrivee_fin';
 export type LocalOp = {
   id: string; seq: number; type: OpType; agent_id: string; client_time: string; visitor_rev: string | null; payload: Record<string, unknown>; photoId?: string;
   result?: { code: string; message: string } | null;
@@ -120,7 +120,7 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
       v.status = 'present'; list.touch();
       return { zones: list.zonesFor(v) };
     }
-    case 'groupe_controle': case 'groupe_badge': case 'groupe_depart': case 'groupe_arrivee': case 'groupe_arrivee_fin':
+    case 'groupe_controle': case 'groupe_badge': case 'groupe_embarquer': case 'groupe_absent': case 'groupe_depart': case 'groupe_arrivee': case 'groupe_arrivee_fin':
       return applyGroupOp(list, op.type, p);
     case 'controle':
       return {}; // un contrôle ne change rien à la copie locale ; l'événement est écrit par le serveur au rejeu

@@ -4,13 +4,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import StatusBar from './StatusBar.vue';
 import { startScan, type ScanHandle } from '../../poste/media';
 import type { GroupPosteRepository } from '../../poste/repository';
-import type { ArrivalResult, GroupMemberView, GroupSummary, GroupView } from '../../poste/local/group';
+import type { ArrivalResult, BoardResult, GroupMemberView, GroupSummary, GroupView } from '../../poste/local/group';
 import type { SyncState } from '../../poste/local/sync';
 import { ApiError } from '../../poste/types';
 
 const props = defineProps<{ agent: string; repository: GroupPosteRepository; sync?: SyncState | null }>();
 const emit = defineEmits<{ sync: []; lock: [] }>();
-type Tab = 'appel' | 'arrivee';
+type Tab = 'appel' | 'embarquement' | 'arrivee';
 
 const tab = ref<Tab>('appel');
 const groups = ref<GroupSummary[]>([]);
@@ -29,6 +29,9 @@ const video = ref<HTMLVideoElement | null>(null);
 const scanError = ref('');
 const last = ref<ArrivalResult | null>(null);
 const arrivedNow = ref(0);
+const boardedLast = ref<(BoardResult & { name: string }) | null>(null);
+const absenceFor = ref<string | null>(null); // personne dont on note l'absence
+const absenceReason = ref('');
 const finish = ref<{ group: string; arrived: number; missing: number } | null>(null);
 let handle: ScanHandle | null = null;
 let waitTimer: number | undefined;
@@ -48,6 +51,9 @@ const filtered = computed(() => {
 const absents = computed(() => members.value.filter(m => m.absent));
 const percent = computed(() => (view.value && view.value.progress.total ? Math.round((view.value.progress.badged / view.value.progress.total) * 100) : 0));
 const departable = computed(() => view.value !== null && !departed.value && view.value.progress.total > 0);
+const unresolved = computed(() => view.value?.progress.unresolved ?? 0); // ni embarqués ni notés absents : l'appel n'est pas complet
+const full = computed(() => view.value?.progress.free === 0);
+const toBoard = computed(() => members.value.filter(m => !m.boarded && !m.absent));
 const arrivalGroups = computed(() => groups.value.filter(g => g.departed && !g.arrival_closed));
 
 async function refresh() {
@@ -86,6 +92,28 @@ async function deliver(raw: string): Promise<boolean> {
   return true;
 }
 
+async function board(raw: string): Promise<boolean> {
+  const value = raw.trim();
+  if (!value || !groupId.value || busy.value) return false;
+  busy.value = true; error.value = null;
+  try {
+    const r = await props.repository.groupBoard(crypto.randomUUID(), groupId.value, value);
+    await refresh();
+    boardedLast.value = { ...r, name: members.value.find(m => m.badge_code === r.badge_code)?.name ?? '' };
+    code.value = '';
+  } catch (e) { error.value = explain(e); }
+  finally { busy.value = false; }
+  return true;
+}
+
+async function markAbsent(m: GroupMemberView) {
+  if (!groupId.value || busy.value || !absenceReason.value.trim()) return;
+  busy.value = true; error.value = null;
+  try { await props.repository.groupAbsent(crypto.randomUUID(), groupId.value, m.visitor_id, absenceReason.value.trim()); absenceFor.value = null; absenceReason.value = ''; await refresh(); }
+  catch (e) { error.value = explain(e); }
+  finally { busy.value = false; }
+}
+
 async function depart() {
   if (!groupId.value || busy.value) return;
   busy.value = true; error.value = null;
@@ -120,8 +148,8 @@ async function endArrival(g: GroupSummary) {
 function onCode(text: string): boolean {
   const person = current.value;
   // Retour immédiat « pas prêt » (opération en cours, correspondance pas encore validée) : le lecteur renverra la même lecture à l'image suivante.
-  if (busy.value || (tab.value !== 'arrivee' && !person?.checked)) return false;
-  void (tab.value === 'arrivee' ? arrive(text) : deliver(text));
+  if (busy.value || (tab.value === 'appel' && !person?.checked)) return false;
+  void (tab.value === 'arrivee' ? arrive(text) : tab.value === 'embarquement' ? board(text) : deliver(text));
   return true;
 }
 async function startCamera() {
@@ -164,8 +192,9 @@ function statusOf(m: GroupMemberView): string {
     <template #header-context><span v-if="view?.group.bus_number ?? view?.group.name ?? null">Groupe : {{ view?.group.bus_number ?? view?.group.name ?? null }}</span></template>
     <template #status><StatusBar context-label="Groupe" :poste="view?.group.bus_number ?? view?.group.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" /></template>
     <div class="agent-workspace agent-groupe-workspace" :data-busy="busy">
-      <div class="grid grid-cols-2 gap-3" role="group" aria-label="Mode">
+      <div class="grid grid-cols-3 gap-3" role="group" aria-label="Mode">
         <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="tab === 'appel' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="tab === 'appel'" data-testid="onglet-appel" @click="tab = 'appel'">Appel et badges</button>
+        <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="tab === 'embarquement' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="tab === 'embarquement'" data-testid="onglet-embarquement" @click="tab = 'embarquement'">Embarquement</button>
         <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="tab === 'arrivee' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="tab === 'arrivee'" data-testid="onglet-arrivee" @click="tab = 'arrivee'">Arrivée du car</button>
       </div>
       <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="hors-ligne"><span aria-hidden="true">⚠</span> Hors ligne : tout est enregistré sur la tablette et sera envoyé dès le retour du réseau.</p>
@@ -229,28 +258,19 @@ function statusOf(m: GroupMemberView): string {
           </section>
           <ul class="space-y-2" aria-label="Stagiaires du groupe" data-testid="liste-stagiaires">
             <li v-for="m in filtered" :key="m.visitor_id">
-              <button type="button" class="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-2 text-left text-lg" :class="current?.visitor_id === m.visitor_id ? 'border-2 border-ikoma-blue' : 'border-slate-300'" :disabled="departed || !!m.badge_code || m.absent" data-testid="stagiaire" @click="chosen = m.visitor_id; idChecked = false">
+              <button type="button" class="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-2 text-left text-lg" :class="current?.visitor_id === m.visitor_id ? 'border-2 border-ikoma-blue' : 'border-slate-300'" :disabled="departed || !!m.badge_code" data-testid="stagiaire" @click="chosen = m.visitor_id; idChecked = false">
                 <span class="font-semibold">{{ m.name }}</span>
                 <span class="text-base"><span aria-hidden="true">{{ m.absent ? '✕' : m.badge_code ? '✓' : m.confirmed ? '●' : '○' }}</span> {{ statusOf(m) }}</span>
               </button>
             </li>
           </ul>
-
-          <section v-if="departable" class="space-y-3">
-            <button v-if="!confirmClose" type="button" class="btn-main !bg-ikoma-navy" data-testid="fermer-car" @click="confirmClose = true">Fermer le car (embarquement)</button>
-            <div v-else class="space-y-3 rounded-2xl border-2 border-ikoma-navy bg-white p-5" role="alertdialog" aria-label="Fermer le car">
-              <p class="text-xl font-bold">{{ view.progress.badged }} stagiaire{{ view.progress.badged > 1 ? 's' : '' }} badgé{{ view.progress.badged > 1 ? 's' : '' }} embarqueront. {{ view.progress.total - view.progress.badged }} sera{{ view.progress.total - view.progress.badged > 1 ? 'ont' : '' }} déclaré{{ view.progress.total - view.progress.badged > 1 ? 's' : '' }} absent{{ view.progress.total - view.progress.badged > 1 ? 's' : '' }} et signalé{{ view.progress.total - view.progress.badged > 1 ? 's' : '' }} à l’encadreur et au superviseur.</p>
-              <button type="button" class="btn-main" :disabled="busy" data-testid="confirmer-fermeture" @click="depart">Oui, fermer le car</button>
-              <button type="button" class="btn-soft w-full" @click="confirmClose = false">Non, continuer l’appel</button>
-            </div>
-          </section>
         </template>
       </template>
 
-      <template v-else>
+      <template v-else-if="tab === 'arrivee'">
         <section class="space-y-4" aria-labelledby="arrivee-titre" data-testid="arrivee">
           <h1 id="arrivee-titre" class="text-display font-bold">Arrivée du car</h1>
-          <p>Scannez les badges des stagiaires un par un : chacun passe à « arrivé » et entre sur le site. Les écarts avec la liste d’embarquement sont signalés au superviseur.</p>
+          <p>Scannez les badges des stagiaires un par un : chacun est enregistré « débarqué ». Cela ne vaut pas entrée sur le site : la présence est établie à l’accueil ou au contrôle. Les écarts avec la liste d’embarquement sont signalés au superviseur.</p>
           <div class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[35vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
           <p v-if="scanError" role="alert" class="font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ scanError }}</p>
           <form class="space-y-3" aria-label="Saisir le code du badge" @submit.prevent="arrive(code)">
@@ -260,7 +280,7 @@ function statusOf(m: GroupMemberView): string {
           <p class="text-xl font-bold" data-testid="compteur-arrivee">Arrivés pendant cette séance : {{ arrivedNow }}</p>
           <div v-if="last" class="rounded-2xl border-2 p-4" :class="last.ecart ? 'border-amber-700 bg-amber-50' : 'border-green-700 bg-green-50'" role="status" data-testid="dernier-arrive">
             <p class="text-2xl font-bold"><span aria-hidden="true">{{ last.ecart ? '⚠' : '✓' }}</span> {{ last.name }}</p>
-            <p class="text-lg">{{ last.group }} · badge {{ last.badge_code }}<template v-if="last.already"> · déjà arrivé</template></p>
+            <p class="text-lg">{{ last.group }} · badge {{ last.badge_code }}<template v-if="last.already"> · déjà débarqué</template></p>
             <p v-if="last.ecart" class="text-lg font-semibold text-amber-950" data-testid="ecart">Écart : cette personne n’était pas dans la liste d’embarquement. Le superviseur est prévenu.</p>
           </div>
           <div v-if="arrivalGroups.length" class="space-y-3">
@@ -268,6 +288,58 @@ function statusOf(m: GroupMemberView): string {
             <ul class="space-y-2"><li v-for="g in arrivalGroups" :key="g.id"><button type="button" class="btn-soft w-full !justify-between" :disabled="busy" data-testid="terminer-arrivee" @click="endArrival(g)"><span>{{ g.bus_number ?? g.name }}</span><span>Terminer</span></button></li></ul>
           </div>
           <p v-if="finish" role="status" class="rounded-2xl border-2 p-4 text-xl font-bold" :class="finish.missing ? 'border-amber-700 bg-amber-50 text-amber-950' : 'border-green-700 bg-green-50 text-green-900'" data-testid="bilan-arrivee"><span aria-hidden="true">{{ finish.missing ? '⚠' : '✓' }}</span> {{ finish.group }} : {{ finish.arrived }} arrivé{{ finish.arrived > 1 ? 's' : '' }}<template v-if="finish.missing"> · {{ finish.missing }} embarqué{{ finish.missing > 1 ? 's' : '' }} non scanné{{ finish.missing > 1 ? 's' : '' }} (écart signalé au superviseur)</template><template v-else> · aucun écart</template></p>
+        </section>
+      </template>
+      <template v-else>
+        <section class="space-y-4" aria-labelledby="embarquement-titre" data-testid="embarquement">
+          <h1 id="embarquement-titre" class="text-display font-bold">Embarquement</h1>
+          <template v-if="!view">
+            <p>Choisissez d’abord un groupe dans l’onglet « Appel et badges ».</p>
+          </template>
+          <template v-else>
+            <p class="text-xl font-bold" data-testid="places-car">
+              <template v-if="view.progress.capacity !== null">{{ view.progress.boarded }} / {{ view.progress.capacity }} place{{ view.progress.capacity > 1 ? 's' : '' }} occupée{{ view.progress.boarded > 1 ? 's' : '' }} · {{ view.progress.free }} libre{{ (view.progress.free ?? 0) > 1 ? 's' : '' }}</template>
+              <template v-else>{{ view.progress.boarded }} embarqué{{ view.progress.boarded > 1 ? 's' : '' }} · places du car non renseignées (aucune limite)</template>
+            </p>
+            <p v-if="full && !departed" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 text-lg font-bold text-red-900" data-testid="car-complet"><span aria-hidden="true">⚠</span> Car complet : plus personne ne peut embarquer.</p>
+            <template v-if="!departed">
+              <p>Scannez le badge de chaque passager, un par un. Seules les personnes dont l’appel nominal est fait peuvent embarquer ; les absents sont notés avec leur motif.</p>
+              <div class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[35vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
+              <p v-if="scanError" role="alert" class="font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ scanError }}</p>
+              <form class="space-y-3" aria-label="Saisir le code du badge" @submit.prevent="board(code)">
+                <label class="block text-xl font-semibold">QR illisible ? Saisissez le code imprimé<input v-model="code" class="field !min-h-16 !text-2xl uppercase" autocomplete="off" maxlength="100" data-testid="code-embarquement"></label>
+                <button type="submit" class="btn-main" :disabled="!code.trim() || busy" data-testid="valider-embarquement">Embarquer ce passager</button>
+              </form>
+              <div v-if="boardedLast" class="rounded-2xl border-2 border-green-700 bg-green-50 p-4" role="status" data-testid="dernier-embarque">
+                <p class="text-2xl font-bold"><span aria-hidden="true">✓</span> {{ boardedLast.name || 'Passager' }}</p>
+                <p class="text-lg">Badge {{ boardedLast.badge_code }}<template v-if="boardedLast.already"> · déjà embarqué</template></p>
+              </div>
+              <section class="space-y-2" aria-labelledby="restants-titre">
+                <h2 id="restants-titre" class="text-xl font-bold">À embarquer ou à noter absents ({{ toBoard.length }})</h2>
+                <ul class="space-y-2" data-testid="liste-a-embarquer">
+                  <li v-for="m in toBoard" :key="m.visitor_id" class="rounded-xl border border-slate-300 bg-white p-3" data-testid="a-embarquer">
+                    <p class="flex flex-wrap items-center justify-between gap-2"><span class="font-semibold">{{ m.name }}</span><span class="text-base">{{ m.checked ? 'Appelé' : 'À appeler' }}{{ m.badge_code ? ' · badge ' + m.badge_code : ' · sans badge' }}</span></p>
+                    <button v-if="absenceFor !== m.visitor_id" type="button" class="btn-soft mt-2" data-testid="noter-absent" @click="absenceFor = m.visitor_id; absenceReason = ''">Noter absent</button>
+                    <form v-else class="mt-2 space-y-2" @submit.prevent="markAbsent(m)">
+                      <label class="block font-semibold">Motif de l’absence<input v-model="absenceReason" class="field" maxlength="200" autocomplete="off" data-testid="motif-absence"></label>
+                      <div class="grid grid-cols-2 gap-2"><button type="submit" class="btn-main" :disabled="!absenceReason.trim() || busy" data-testid="confirmer-absence">Enregistrer l’absence</button><button type="button" class="btn-soft" @click="absenceFor = null">Annuler</button></div>
+                    </form>
+                  </li>
+                </ul>
+                <p v-if="!toBoard.length" class="rounded-xl bg-white p-3" data-testid="appel-complet">Appel complet : chaque personne est embarquée ou notée absente.</p>
+              </section>
+              <section v-if="departable" class="space-y-3">
+                <p v-if="unresolved > 0" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="appel-incomplet">{{ unresolved }} personne{{ unresolved > 1 ? 's' : '' }} ni embarquée{{ unresolved > 1 ? 's' : '' }} ni notée{{ unresolved > 1 ? 's' : '' }} absente{{ unresolved > 1 ? 's' : '' }} : le car ne peut pas encore partir.</p>
+                <button v-if="!confirmClose" type="button" class="btn-main !bg-ikoma-navy" :disabled="unresolved > 0" data-testid="fermer-car" @click="confirmClose = true">Fermer le car (départ)</button>
+                <div v-else class="space-y-3 rounded-2xl border-2 border-ikoma-navy bg-white p-5" role="alertdialog" aria-label="Fermer le car">
+                  <p class="text-xl font-bold">{{ view.progress.boarded }} embarqué{{ view.progress.boarded > 1 ? 's' : '' }} · {{ view.progress.absent }} absent{{ view.progress.absent > 1 ? 's' : '' }} (motifs enregistrés). Fermer le car ?</p>
+                  <button type="button" class="btn-main" :disabled="busy" data-testid="confirmer-fermeture" @click="depart">Oui, fermer le car</button>
+                  <button type="button" class="btn-soft w-full" @click="confirmClose = false">Non, continuer</button>
+                </div>
+              </section>
+            </template>
+            <p v-else class="rounded-2xl border-2 border-green-700 bg-green-50 p-4 text-lg font-semibold" data-testid="car-parti">Le car est parti : {{ view.progress.boarded }} embarqué{{ view.progress.boarded > 1 ? 's' : '' }}, {{ view.progress.absent }} absent{{ view.progress.absent > 1 ? 's' : '' }}.</p>
+          </template>
         </section>
       </template>
     </div>
