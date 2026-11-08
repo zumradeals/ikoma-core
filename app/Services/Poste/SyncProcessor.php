@@ -281,6 +281,7 @@ final class SyncProcessor
      * S02 / C2 : une décision favorable prise HORS LIGNE n'est acceptée que si l'institution a approuvé un délai (PostCapabilities::offlineTrustHours : délai nul,
      * absent ou non approuvé = refus, jamais « illimité ») et si la copie utilisée n'était pas plus ancienne que ce délai. Aucune durée n'est fixée dans le code.
      * Une opération qui ne déclare pas l'âge de sa copie (known_at) est traitée comme hors ligne et refusée par défaut. Les cartes permanentes gardent leur règle propre.
+     * La déclaration « en ligne » du client ne suffit jamais : voir decidedOffline.
      *
      * @param  array<string, mixed>  $p
      */
@@ -293,17 +294,39 @@ final class SyncProcessor
             return; // un refus local n'accorde rien ; une carte permanente suit PermanentAccess::offlineRefusal
         }
         $known = $this->time($p['known_at'] ?? null);
-        if (($p['offline'] ?? null) === false && $known !== null) {
-            return; // décision prise en ligne : le serveur la juge lui-même à la réception
+        [$offline, $contradicted] = $this->decidedOffline($p, $known, $clientTime);
+        if (! $offline) {
+            return; // décision prise en ligne, recoupée par le serveur : il la juge lui-même à la réception
         }
         $hours = PostCapabilities::offlineTrustHours();
         if ($hours <= 0) {
-            throw new DeskRefused('politique_non_approuvee', 'Aucun délai hors ligne n’est approuvé : une décision favorable prise sans réseau n’est pas acceptée. Elle est mise en quarantaine et signalée.', 409);
+            throw new DeskRefused($contradicted ? 'declaration_en_ligne_contredite' : 'politique_non_approuvee', 'Aucun délai hors ligne n’est approuvé : une décision favorable prise sans réseau n’est pas acceptée. Elle est mise en quarantaine et signalée.', 409);
         }
         $decided = $clientTime ?? now()->utc()->format('Y-m-d H:i:s.uP');
         if ($known === null || Carbon::parse($decided)->getTimestamp() - Carbon::parse($known)->getTimestamp() > $hours * 3600) {
-            throw new DeskRefused('politique_perimee', 'La copie utilisée hors ligne était trop ancienne pour autoriser ce passage : il est mis en quarantaine et signalé.', 409);
+            throw new DeskRefused($contradicted ? 'declaration_en_ligne_contredite' : 'politique_perimee', 'La copie utilisée hors ligne était trop ancienne pour autoriser ce passage : il est mis en quarantaine et signalé.', 409);
         }
+    }
+
+    /**
+     * Une décision n'est tenue pour « en ligne » que si le serveur peut le recouper : la seule déclaration du client (`offline = false`) ne prouve rien.
+     * Le serveur mesure lui-même le délai entre l'heure déclarée de la décision et sa réception ; au-delà de poste_delai_appel_minutes (délai DÉJÀ validé à partir
+     * duquel une tablette est considérée coupée du réseau), la décision a attendu dans la file : elle est traitée comme hors ligne, quoi que le client déclare.
+     * Une opération sans heure déclarée, sans âge de copie ou déclarée hors ligne est hors ligne. Aucune preuve cryptographique ni protocole nouveau : cette règle ne
+     * protège pas contre un client qui falsifie AUSSI ses heures (risque résiduel documenté), mais le serveur rejuge de toute façon chaque opération sur l'état courant.
+     *
+     * @param  array<string, mixed>  $p
+     * @return array{0: bool, 1: bool} [hors ligne, déclaration « en ligne » contredite par le serveur]
+     */
+    private function decidedOffline(array $p, ?string $known, ?string $clientTime): array
+    {
+        if (($p['offline'] ?? null) !== false || $known === null || $clientTime === null) {
+            return [true, false];
+        }
+        $cutoff = max(1, (int) (DB::table('settings')->where('key', 'poste_delai_appel_minutes')->value('value') ?? 15)) * 60;
+        $delay = now()->getTimestamp() - Carbon::parse($clientTime)->getTimestamp();
+
+        return abs($delay) > $cutoff ? [true, true] : [false, false];
     }
 
     /**

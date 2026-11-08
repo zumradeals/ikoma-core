@@ -149,7 +149,7 @@ it('détecte les séquences incompatibles, révoque et alerte sans confondre un 
     $device = Device::findOrFail(DemoSeeder::id('device'));
     $token = bin2hex(random_bytes(32));
     $device->update(['token_hash' => hash('sha256', $token)]);
-    $operation = ['id' => (string) Str::uuid(), 'agent_id' => $agent->id, 'seq' => 1, 'type' => 'valider', 'payload' => ['visitor_id' => DemoSeeder::id('visitor1'), 'known_at' => now()->subMinute()->toIso8601String(), 'offline' => false]];
+    $operation = ['id' => (string) Str::uuid(), 'agent_id' => $agent->id, 'seq' => 1, 'type' => 'valider', 'client_time' => now()->toIso8601String(), 'payload' => ['visitor_id' => DemoSeeder::id('visitor1'), 'known_at' => now()->subMinute()->toIso8601String(), 'offline' => false]];
     $processor = app(SyncProcessor::class);
     $processor->process($device, $agent, [$operation], null);
     expect($processor->process($device, $agent, [$operation], null)['results'][0]['replayed'])->toBeTrue();
