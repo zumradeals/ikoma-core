@@ -36,6 +36,11 @@ function syncHeaders(string $token = SYNC_TOKEN_A): array
 /** Une opération de la file locale, telle que la tablette l'envoie. */
 function syncOp(string $type, array $payload, User $agent, int $seq, ?string $id = null, array $extra = []): array
 {
+    // S02 : une décision d'accès (validation, badge, entrée) déclare l'âge de sa copie et si elle a été prise sans réseau ; ici, prise en ligne.
+    if (in_array($type, ['valider', 'badge', 'entree'], true)) {
+        $payload = ['known_at' => now()->subMinute()->toIso8601String(), 'offline' => false, ...$payload];
+    }
+
     return ['id' => $id ?? (string) Str::uuid(), 'seq' => $seq, 'type' => $type, 'agent_id' => $agent->id, 'client_time' => now()->toIso8601String(), 'payload' => $payload, ...$extra];
 }
 

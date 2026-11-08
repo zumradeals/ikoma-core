@@ -83,10 +83,10 @@ it('refuse chaque écran et chaque action du pilotage à tout autre rôle, et au
             test()->json($method, $url, [])->assertForbidden();
         }
     }
-    // S02 : l'administrateur CONSULTE la supervision (pilotage, présents, évacuation) mais n'en exerce aucune action (alertes, annulation, litiges, cars).
+    // S02 : l'administrateur CONSULTE la supervision (pilotage, alertes, présents, évacuation) mais n'en exerce aucune action (prise en compte, annulation, litiges, cars).
     $admin = supUser('administrateur');
     supAs($admin);
-    $consult = ['/pilotage', '/pilotage/presents', '/pilotage/visiteurs/'.supVisitor(1), '/pilotage/evacuation', '/pilotage/api/evacuation', '/api/presences?event_id='.$this->event];
+    $consult = ['/pilotage', '/pilotage/alertes', '/pilotage/presents', '/pilotage/visiteurs/'.supVisitor(1), '/pilotage/evacuation', '/pilotage/api/evacuation', '/api/presences?event_id='.$this->event];
     foreach ($routes as [$method, $url]) {
         if ($method === 'get' && in_array($url, $consult, true)) {
             expect(test()->json($method, $url, [])->status())->not->toBeIn([401, 403]);

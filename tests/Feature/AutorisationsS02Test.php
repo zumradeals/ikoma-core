@@ -3,8 +3,10 @@
 use App\Models\Badge;
 use App\Models\Device;
 use App\Models\User;
+use App\Services\Alerts;
 use App\Services\BadgeLots;
 use App\Services\BadgeService;
+use App\Services\Groups;
 use App\Services\Poste\Desk;
 use App\Services\Poste\DeskRefused;
 use App\Services\Poste\Devices;
@@ -77,26 +79,46 @@ beforeEach(function () {
 
 // --- Rôles : supervision consultée par l'administrateur, jamais agie ------------------------------------------------------------------
 
-it('donne à l’administrateur la seule consultation de supervision, sans aucune action du superviseur', function () {
+it('donne à l’administrateur la seule consultation de supervision, alertes comprises, sans aucune action du superviseur', function () {
     $admin = s02User('administrateur');
     $event = DemoSeeder::id('event');
     $uuid = (string) Str::uuid();
-    expect($admin->can('pilotage.consulter'))->toBeTrue()->and($admin->can('presences.consulter'))->toBeTrue();
-    foreach (['alertes.consulter', 'badges.annuler', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'badges.controler', 'badges.associer', 'visiteurs.valider'] as $permission) {
+    foreach (['pilotage.consulter', 'presences.consulter', 'alertes.consulter'] as $permission) {
+        expect($admin->can($permission))->toBeTrue();
+    }
+    foreach (['alertes.prendre_en_compte', 'badges.annuler', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'badges.controler', 'badges.associer', 'visiteurs.valider'] as $permission) {
         expect($admin->can($permission))->toBeFalse();
     }
+    // le superviseur garde les deux : consulter ET prendre en compte
+    $supervisor = s02User('superviseur');
+    expect($supervisor->can('alertes.consulter'))->toBeTrue()->and($supervisor->can('alertes.prendre_en_compte'))->toBeTrue();
     $this->actingAs($admin);
-    foreach (['/pilotage', '/pilotage/presents', '/pilotage/evacuation', '/api/presences?event_id='.$event] as $url) {
+    foreach (['/pilotage', '/pilotage/alertes', '/pilotage/presents', '/pilotage/evacuation', '/api/presences?event_id='.$event] as $url) {
         expect($this->get($url)->status())->not->toBeIn([401, 403]);
     }
-    foreach ([['get', '/pilotage/alertes'], ['post', "/pilotage/alertes/$uuid/prendre-en-compte"], ['post', '/pilotage/badges/annuler'], ['get', '/pilotage/litiges'], ['post', "/pilotage/litiges/$uuid/decision"], ['get', '/pilotage/groupes']] as [$method, $url]) {
+    foreach ([['post', "/pilotage/alertes/$uuid/prendre-en-compte"], ['post', '/pilotage/badges/annuler'], ['get', '/pilotage/litiges'], ['post', "/pilotage/litiges/$uuid/decision"], ['get', '/pilotage/groupes']] as [$method, $url]) {
         $this->json($method, $url, [])->assertForbidden();
     }
-    // le superviseur et l'agent gardent leur périmètre : l'agent ne consulte toujours pas la supervision.
+    // l'agent ne consulte toujours pas la supervision
     $this->actingAs(s02User('agent_accueil'));
-    foreach (['/pilotage', '/pilotage/presents', '/pilotage/evacuation'] as $url) {
+    foreach (['/pilotage', '/pilotage/alertes', '/pilotage/presents', '/pilotage/evacuation'] as $url) {
         $this->get($url)->assertForbidden();
     }
+});
+
+it('réserve la prise en compte d’une alerte au superviseur, même par appel direct au service', function () {
+    $event = DemoSeeder::id('event');
+    app(Alerts::class)->raise($event, 'controle_refuse', 'haute', null, null, 'Alerte fictive S02', 's02-alerte');
+    $alert = DB::table('alerts')->where('message', 'Alerte fictive S02')->value('id');
+    expect($alert)->not->toBeNull();
+    foreach (['administrateur', 'agent_accueil', 'hote'] as $role) {
+        $user = s02User($role);
+        expect(fn () => app(Alerts::class)->acknowledge($alert, $user))->toThrow(DeskRefused::class);
+        $this->actingAs($user)->post("/pilotage/alertes/{$alert}/prendre-en-compte")->assertForbidden();
+    }
+    expect(DB::table('alerts')->where('id', $alert)->whereNotNull('acknowledged_at')->exists())->toBeFalse();
+    $this->actingAs(s02User('superviseur'))->post("/pilotage/alertes/{$alert}/prendre-en-compte")->assertRedirect();
+    expect(DB::table('alerts')->where('id', $alert)->whereNotNull('acknowledged_at')->exists())->toBeTrue();
 });
 
 it('ne fait pas d’un superviseur ou d’un administrateur un agent, par les routes comme par les services', function () {
@@ -296,29 +318,125 @@ it('remet à la tablette son point de contrôle et ses capacités, et change de 
     expect(app(ListSnapshot::class)->version(Device::findOrFail(DemoSeeder::id('device'))))->not->toBe($before);
 });
 
-it('met en quarantaine une décision favorable hors ligne prise sur une copie plus ancienne que la limite déjà validée', function () {
-    $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
-    // badge réellement valide côté serveur : seule la fraîcheur de la copie locale est en cause
+/** Opération hors ligne telle que la tablette l'enverrait : décision déclarée hors ligne, avec l'âge de la copie utilisée. */
+function s02Offline(User $agent, int $seq, string $type, array $payload, ?string $knownAt = null): array
+{
+    return ['id' => (string) Str::uuid(), 'seq' => $seq, 'type' => $type, 'agent_id' => $agent->id, 'client_time' => now()->toIso8601String(), 'payload' => [...$payload, 'offline' => true, ...($knownAt === null ? [] : ['known_at' => $knownAt])]];
+}
+
+function s02Sync(array $operations)
+{
+    return test()->postJson('/poste/api/sync', ['operations' => $operations], ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json']);
+}
+
+function s02Approve(int $hours, bool $approved): void
+{
+    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => (string) $hours]);
+    DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->update(['value' => $approved ? '1' : '0']);
+}
+
+it('refuse par défaut toute décision favorable hors ligne : délai non approuvé, nul ou absent ne signifie jamais « illimité »', function () {
     app(BadgeService::class)->associer($this->badges[0], DemoSeeder::id('visitor1'), $this->agent, DemoSeeder::id('device'));
     $code = $this->badges[0]->code;
-    $op = fn (int $seq, array $payload) => ['id' => (string) Str::uuid(), 'seq' => $seq, 'type' => 'controle', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => $code, 'local_valid' => true, ...$payload]];
-    $fresh = $op(1, ['known_at' => now()->subHours(2)->toIso8601String()]);
-    $stale = $op(2, ['known_at' => now()->subHours(13)->toIso8601String()]);
-    $unknown = $op(3, []);
-    $response = $this->postJson('/poste/api/sync', ['operations' => [$fresh, $stale, $unknown]], $headers)->assertOk()->json();
-    $byId = collect($response['results'])->keyBy('id');
+    $favorable = fn (int $seq) => [
+        s02Offline($this->agent, $seq, 'controle', ['code' => $code, 'local_valid' => true], now()->subMinute()->toIso8601String()),
+        s02Offline($this->agent, $seq + 1, 'valider', ['visitor_id' => DemoSeeder::id('visitor4')], now()->subMinute()->toIso8601String()),
+        s02Offline($this->agent, $seq + 2, 'badge', ['visitor_id' => DemoSeeder::id('visitor4'), 'code' => $code], now()->subMinute()->toIso8601String()),
+        s02Offline($this->agent, $seq + 3, 'entree', ['visitor_id' => DemoSeeder::id('visitor4'), 'duration_ms' => 1000], now()->subMinute()->toIso8601String()),
+    ];
+    // état de départ (migration) : délai de 12 h présent mais NON approuvé
+    expect(PostCapabilities::offlineTrustHours())->toBe(0);
+    $seq = 1;
+    foreach ([[12, false], [0, true], [0, false]] as [$hours, $approved]) {
+        s02Approve($hours, $approved);
+        expect(PostCapabilities::offlineTrustHours())->toBe(0);
+        $ops = $favorable($seq);
+        $seq += 4;
+        $codes = collect(s02Sync($ops)->assertOk()->json('results'))->pluck('code')->all();
+        expect($codes)->toBe(array_fill(0, 4, 'politique_non_approuvee'));
+    }
+    // valeur absente : jamais « illimité »
+    DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->delete();
+    expect(PostCapabilities::offlineTrustHours())->toBe(0);
+    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->delete();
+    expect(PostCapabilities::offlineTrustHours())->toBe(0);
+    expect(DB::table('access_events')->whereIn('type', ['entree', 'validation'])->where('visitor_id', DemoSeeder::id('visitor4'))->count())->toBe(0);
+});
+
+it('n’accepte une décision favorable hors ligne que sous le délai approuvé et sur une copie assez récente', function () {
+    app(BadgeService::class)->associer($this->badges[0], DemoSeeder::id('visitor1'), $this->agent, DemoSeeder::id('device'));
+    $code = $this->badges[0]->code;
+    s02Approve(12, true);
+    expect(PostCapabilities::offlineTrustHours())->toBe(12);
+    $fresh = s02Offline($this->agent, 1, 'controle', ['code' => $code, 'local_valid' => true], now()->subHours(2)->toIso8601String());
+    $stale = s02Offline($this->agent, 2, 'controle', ['code' => $code, 'local_valid' => true], now()->subHours(13)->toIso8601String());
+    $unknown = s02Offline($this->agent, 3, 'controle', ['code' => $code, 'local_valid' => true]);
+    $byId = collect(s02Sync([$fresh, $stale, $unknown])->assertOk()->json('results'))->keyBy('id');
     expect($byId[$fresh['id']]['status'])->toBe('applique')
         ->and($byId[$stale['id']])->toMatchArray(['status' => 'conflit', 'code' => 'politique_perimee'])
         ->and($byId[$unknown['id']])->toMatchArray(['status' => 'conflit', 'code' => 'politique_perimee']);
     expect(DB::table('sync_conflicts')->where('reason', 'politique_perimee')->count())->toBe(2);
-    // limite désactivée (réglage existant à 0) : comportement inchangé, aucune durée nouvelle
-    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '0']);
-    $old = $op(4, ['known_at' => now()->subHours(40)->toIso8601String()]);
-    $this->postJson('/poste/api/sync', ['operations' => [$old]], $headers)->assertOk()->assertJsonPath('results.0.status', 'applique');
-    // un refus local n'est jamais requalifié : il n'accorde rien
-    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '12']);
-    $refused = ['id' => (string) Str::uuid(), 'seq' => 5, 'type' => 'controle', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => 'B-999999', 'local_valid' => false, 'known_at' => now()->subHours(40)->toIso8601String()]];
-    $this->postJson('/poste/api/sync', ['operations' => [$refused]], $headers)->assertOk()->assertJsonPath('results.0.status', 'applique');
+    // un refus local n'accorde rien : il n'est jamais requalifié, même sur une copie ancienne et sans délai approuvé
+    s02Approve(12, false);
+    $refused = s02Offline($this->agent, 4, 'controle', ['code' => 'B-999999', 'local_valid' => false], now()->subHours(40)->toIso8601String());
+    s02Sync([$refused])->assertOk()->assertJsonPath('results.0.status', 'applique');
+    // une décision prise EN LIGNE (déclarée telle, avec l'âge de sa copie) est jugée par le serveur lui-même, sans délai
+    $online = ['id' => (string) Str::uuid(), 'seq' => 5, 'type' => 'controle', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => now()->subMinute()->toIso8601String()]];
+    s02Sync([$online])->assertOk()->assertJsonPath('results.0.status', 'applique');
+});
+
+it('ne soumet ni la sortie ni le refus à la péremption : ils n’accordent aucun accès', function () {
+    s02Approve(12, false); // le pire cas : aucun délai approuvé
+    $ops = [
+        s02Offline($this->agent, 1, 'sortie', ['code' => 'B-999999']),
+        s02Offline($this->agent, 2, 'refuser', ['visitor_id' => DemoSeeder::id('visitor4'), 'motif' => 'essai']),
+    ];
+    $codes = collect(s02Sync($ops)->assertOk()->json('results'))->pluck('code')->filter()->all();
+    expect($codes)->not->toContain('politique_non_approuvee')->and($codes)->not->toContain('politique_perimee');
+    // la décision de refus a bien été prise
+    expect(DB::table('visitors')->where('id', DemoSeeder::id('visitor4'))->value('status'))->toBe('refuse');
+});
+
+it('applique la même protection aux opérations de car qui décident : remise de badge et arrivée, et à elles seules', function () {
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
+    $group = DemoSeeder::id('group');
+    $known = now()->subMinute()->toIso8601String();
+    $badge = s02Offline($this->agent, 1, 'groupe_badge', ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'code' => $this->badges[0]->code], $known);
+    $arrive = s02Offline($this->agent, 2, 'groupe_arrivee', ['code' => $this->badges[0]->code], $known);
+    $records = [
+        s02Offline($this->agent, 3, 'groupe_controle', ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'identity_checked' => true], $known),
+        s02Offline($this->agent, 4, 'groupe_depart', ['group_id' => $group], $known),
+        s02Offline($this->agent, 5, 'groupe_arrivee_fin', ['group_id' => $group], $known),
+    ];
+    $byId = collect(s02Sync([$badge, $arrive, ...$records])->assertOk()->json('results'))->keyBy('id');
+    // décisions d'accès : refusées hors ligne tant qu'aucun délai n'est approuvé
+    expect($byId[$badge['id']]['code'])->toBe('politique_non_approuvee')->and($byId[$arrive['id']]['code'])->toBe('politique_non_approuvee');
+    // enregistrements sans décision d'accès : jamais refusés par la politique hors ligne
+    foreach ($records as $record) {
+        expect($byId[$record['id']]['code'] ?? null)->not->toBeIn(['politique_non_approuvee', 'politique_perimee']);
+    }
+});
+
+it('refuse aux postes sans la capacité la remise de badge et l’arrivée d’un car, par le service comme par le rejeu', function () {
+    DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
+    $group = DemoSeeder::id('group');
+    $known = now()->subMinute()->toIso8601String();
+    foreach (['poste_1' => ['poste_non_habilite', 'poste_non_habilite'], 'poste_3' => ['poste_non_habilite', 'poste_non_habilite'], 'soute' => ['poste_non_habilite', null]] as $point => [$badgeCode, $arriveCode]) {
+        s02Point($point);
+        $poste = Device::findOrFail(DemoSeeder::id('device'));
+        // appels directs aux services : la capacité est revérifiée même sans passer par la file
+        expect(fn () => app(Groups::class)->deliver($poste, $this->agent, $group, DemoSeeder::id('visitor270'), $this->badges[0]->code))->toThrow(DeskRefused::class);
+        if ($arriveCode !== null) {
+            expect(fn () => app(Groups::class)->arrive($poste, $this->agent, $this->badges[0]->code))->toThrow(DeskRefused::class);
+        }
+    }
+    // rejeu : décisions prises EN LIGNE (âge déclaré) : la capacité du point courant les refuse
+    s02Point('poste_1');
+    $ops = [
+        ['id' => (string) Str::uuid(), 'seq' => 1, 'type' => 'groupe_arrivee', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => $this->badges[0]->code, 'offline' => false, 'known_at' => $known]],
+        ['id' => (string) Str::uuid(), 'seq' => 2, 'type' => 'groupe_badge', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'code' => $this->badges[0]->code, 'offline' => false, 'known_at' => $known]],
+    ];
+    expect(collect(s02Sync($ops)->assertOk()->json('results'))->pluck('code')->all())->toBe(['poste_non_habilite', 'poste_non_habilite']);
 });
 
 it('revérifie au rejeu le point courant du poste, même si la copie locale était plus ancienne', function () {
@@ -326,10 +444,71 @@ it('revérifie au rejeu le point courant du poste, même si la copie locale éta
     // la tablette a décidé quand le poste était un poste 2 ; l'administrateur l'a ensuite changé en poste 1
     $op = s02Op($this->agent, 1);
     $op['payload']['local_valid'] = true;
+    $op['payload']['offline'] = false;
     $op['payload']['known_at'] = now()->subMinutes(10)->toIso8601String();
     s02Point('poste_1');
     $this->postJson('/poste/api/sync', ['operations' => [$op]], $headers)->assertOk()->assertJsonPath('results.0.code', 'poste_non_habilite');
     expect(DB::table('access_events')->where('type', 'controle')->count())->toBe(0);
+});
+
+it('exige un délai strictement positif pour approuver le hors ligne, et retire l’approbation quand le délai change', function () {
+    $base = ['inactivity' => 5, 'skew' => 300, 'pin' => 15];
+    $this->actingAs(s02User('administrateur'));
+    $this->put('/administration/postes/reglages', [...$base, 'offlineMaxHours' => 0, 'offlineApproved' => true])->assertSessionHasErrors('offlineApproved');
+    expect(PostCapabilities::offlineTrustHours())->toBe(0);
+    $this->put('/administration/postes/reglages', [...$base, 'offlineMaxHours' => 8, 'offlineApproved' => true])->assertRedirect();
+    expect(PostCapabilities::offlineTrustHours())->toBe(8);
+    // changer le délai sans redonner l'approbation la retire : on n'approuve pas un autre délai que celui vu
+    $this->put('/administration/postes/reglages', [...$base, 'offlineMaxHours' => 10])->assertRedirect();
+    expect(DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->value('value'))->toBe('0')->and(PostCapabilities::offlineTrustHours())->toBe(0);
+    $this->put('/administration/postes/reglages', [...$base, 'offlineMaxHours' => 10, 'offlineApproved' => true])->assertRedirect();
+    expect(PostCapabilities::offlineTrustHours())->toBe(10);
+    // même délai, formulaire sans la case : l'approbation existante est conservée
+    $this->put('/administration/postes/reglages', [...$base, 'offlineMaxHours' => 10])->assertRedirect();
+    expect(PostCapabilities::offlineTrustHours())->toBe(10);
+    // retirer l'approbation est possible à tout moment ; un délai nul ne peut jamais rester approuvé
+    $this->put('/administration/postes/reglages', [...$base, 'offlineMaxHours' => 10, 'offlineApproved' => false])->assertRedirect();
+    expect(PostCapabilities::offlineTrustHours())->toBe(0);
+    $line = DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'poste.reglage_modifie')->orderByDesc('id')->first();
+    expect(json_decode($line->details, true))->toHaveKey('hors_ligne_approuve');
+    // un agent ne règle rien
+    $this->actingAs(s02User('agent_accueil'))->put('/administration/postes/reglages', [...$base, 'offlineMaxHours' => 99, 'offlineApproved' => true])->assertForbidden();
+    expect(DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->value('value'))->toBe('10');
+});
+
+it('remet à la tablette le délai hors ligne effectif et change de version quand l’approbation change', function () {
+    $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
+    $this->getJson('/poste/api/liste', $headers)->assertOk()->assertJsonPath('settings.offline_trust_hours', 0);
+    $before = app(ListSnapshot::class)->version(Device::findOrFail(DemoSeeder::id('device')));
+    s02Approve(12, true);
+    $this->getJson('/poste/api/liste', $headers)->assertOk()->assertJsonPath('settings.offline_trust_hours', 12);
+    expect(app(ListSnapshot::class)->version(Device::findOrFail(DemoSeeder::id('device'))))->not->toBe($before);
+    s02Approve(0, true);
+    $this->getJson('/poste/api/liste', $headers)->assertOk()->assertJsonPath('settings.offline_trust_hours', 0);
+});
+
+// --- Clôture VIP : cas actuellement bloqués (le parcours du superviseur appartient à un lot ultérieur) ----------------------------
+
+it('documente par un test les cas bloqués par la clôture réservée : sortie par le poste, rejeu hors ligne et clôture de l’activité', function () {
+    DB::table('categories')->where('id', DemoSeeder::id('category0'))->update(['closure_supervisor_only' => true]);
+    $badge = $this->vipBadges[0];
+    s02Enter($badge, 0);
+    // 1) l'agent ne peut pas clôturer : la personne reste présente, le badge reste associé
+    $this->postJson('/poste/api/sortie', ['code' => $badge->code], s02Headers())->assertOk()->assertJsonPath('reason', 'cloture_reservee_superviseur');
+    // 2) un rejeu hors ligne de cette sortie est mis en quarantaine : un conflit ouvert reste à résoudre
+    $op = s02Offline($this->agent, 1, 'sortie', ['code' => $badge->code]);
+    s02Sync([$op])->assertOk()->assertJsonPath('results.0.code', 'cloture_reservee_superviseur');
+    expect(DB::table('sync_conflicts')->where('operation_id', $op['id'])->where('reason', 'cloture_reservee_superviseur')->count())->toBe(1);
+    // 3) personne d'autre n'a de chemin : ni l'administrateur ni le superviseur n'enregistrent une sortie au poste
+    foreach (['administrateur', 'superviseur'] as $role) {
+        $this->actingAs(s02User($role))->postJson('/poste/api/sortie', ['code' => $badge->code], s02Headers())->assertForbidden();
+    }
+    // 4) conséquence : l'activité ne peut pas être clôturée (personne présente, attribution ouverte, conflit non résolu)
+    $this->actingAs(s02User('administrateur'))->post('/administration/evenements/'.DemoSeeder::id('event').'/cloturer', ['confirmation' => true])->assertSessionHasErrors('operation');
+    $message = (string) session('errors')->first('operation');
+    expect($message)->toContain('encore présentes')->and($message)->toContain('restent à résoudre');
+    expect(DB::table('events')->where('id', DemoSeeder::id('event'))->value('status'))->not->toBeIn(['clos', 'archive'])
+        ->and(DB::table('visitors')->where('id', DemoSeeder::id('visitor0'))->value('status'))->toBe('present');
 });
 
 // --- C3 : l'auteur initial ne change jamais en silence -----------------------------------------------------------------------------

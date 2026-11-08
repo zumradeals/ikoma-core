@@ -4,7 +4,8 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 
 | Permission | administrateur | superviseur | agent_accueil | hote | encadreur |
 |---|---|---|---|---|---|
-| alertes.consulter | — | Oui | — | — | — |
+| alertes.consulter | Oui (S02, lecture) | Oui | — | — | — |
+| alertes.prendre_en_compte | — | Oui | — | — | — |
 | arrivees.recevoir_notification | — | — | — | Oui | — |
 | badges.annuler | — | Oui | — | — | — |
 | badges.associer | — | — | Oui | — | — |
@@ -63,3 +64,24 @@ Validation du dirigeant : la permission `categories.gerer` est attribuée unique
 - **Auteur des opérations :** toujours le compte de la session (403 `auteur_incoherent` sinon). Une tablette garde ses opérations en attente pour l'agent qui les a saisies : un autre compte ne peut ni les effacer, ni les envoyer, ni les reprendre (voir JOURNAL_DECISIONS, S02).
 - **Clôture VIP :** indicateur explicite `categories.closure_supervisor_only`. Sortie et restitution refusées à l'agent (`cloture_reservee_superviseur`) pour ces catégories ; jamais déduit du libellé. Le chemin superviseur de la clôture appartient au lot de clôture ultérieur.
 - **Clôture globale d'une activité :** `evenements.gerer`, réservée à l'administrateur (inchangé, désormais testé).
+
+### S02 — revue d'architecture, deuxième passe
+
+- **Alertes :** `alertes.consulter` (lecture : administrateur et superviseur) est séparée de `alertes.prendre_en_compte` (action : superviseur seul). La séparation est appliquée à la route, au service (`Alerts::acknowledge`) et à l'interface (bouton masqué).
+- **Hors ligne, décisions d'accès :** une décision FAVORABLE prise sans réseau n'est permise que si l'institution a fixé un délai strictement positif (`poste_hors_reseau_max_heures`) ET l'a approuvé (`poste_hors_reseau_approuve`). Délai nul, absent ou non approuvé = refus (`politique_non_approuvee`), jamais « illimité ». Aucune durée n'est fixée dans le code ; valeur de départ : non approuvé. Au-delà du délai, la copie est périmée (`politique_perimee`).
+- **Classement des opérations hors ligne :**
+
+| Opération | Décision d'accès ? | Capacité de poste | Délai hors ligne (tablette ET serveur) |
+|---|:-:|---|:-:|
+| controle (badge temporaire) | Oui (verdict valide) | scan | Oui |
+| controle (carte permanente) | Oui | scan | Non : règle propre des cartes (`PermanentAccess`, inchangée) |
+| valider, badge, entree | Oui | accueil | Oui |
+| groupe_badge | Oui (support d'accès) | accueil | Oui |
+| groupe_arrivee | Oui (admission par scan) | scan | Oui |
+| sortie | Non (aucun accès accordé) | sortie | Non (jamais soumise à la confiance) |
+| refuser, identite, non_liste | Non | accueil | Non |
+| groupe_controle, groupe_depart, groupe_arrivee_fin | Non (enregistrements) | aucune | Non |
+
+  Une décision déclare l'âge de sa copie (`known_at`) et si elle a été prise sans réseau (`offline`). Une opération favorable qui ne déclare pas son âge est traitée comme hors ligne et refusée par défaut.
+- **Poste de l'hôtel des cars :** la remise de badge de groupe exige la capacité « accueil » et l'arrivée la capacité « scan ». Les cinq points de contrôle ne comprennent pas l'hôtel : une tablette de l'hôtel doit aujourd'hui être typée « poste 2 » pour distribuer des badges. **Décision à prendre** (point de contrôle de l'hôtel).
+- **Clôture VIP, cas bloqués tant que le parcours du superviseur n'existe pas (lot ultérieur) :** (1) sortie d'une catégorie réservée refusée à l'agent, la personne reste présente et le badge associé ; (2) rejeu hors ligne de cette sortie mis en quarantaine, un conflit reste ouvert ; (3) ni l'administrateur ni le superviseur n'ont de chemin au poste ; (4) l'activité ne peut pas être clôturée (personne présente, attribution ouverte, conflit non résolu). Aucune catégorie n'est réservée par défaut : sans action de l'administrateur, aucun de ces cas ne se produit. Ces cas sont figés par un test.

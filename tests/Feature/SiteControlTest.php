@@ -278,16 +278,17 @@ function siteOp(string $type, array $payload, int $seq, ?string $id = null): arr
 }
 
 it('rejoue les contrôles et sorties faits hors ligne, une seule fois, et met en quarantaine ce que le serveur refuse', function () {
+    DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->update(['value' => '1']); // délai hors ligne approuvé (fictif) : sans approbation, ces décisions seraient refusées
     siteEnter(1, $this->batch1[0]); // entré avant la coupure
     app(BadgeService::class)->associer($this->batch2[0], DemoSeeder::id('visitor2'), $this->agent, DemoSeeder::id('device')); // associé, jamais entré
     siteEnter(3, $this->batch0[0]);
     $id = (string) Str::uuid();
     $ops = [
-        siteOp('controle', ['code' => $this->batch1[0]->code, 'point' => siteZone(1), 'local_valid' => true, 'known_at' => now()->subMinutes(30)->toIso8601String()], 1, $id),
+        siteOp('controle', ['code' => $this->batch1[0]->code, 'point' => siteZone(1), 'local_valid' => true, 'offline' => true, 'known_at' => now()->subMinutes(30)->toIso8601String()], 1, $id),
         siteOp('sortie', ['code' => $this->batch1[0]->code, 'point' => siteZone(0)], 2),
         siteOp('sortie', ['code' => $this->batch1[0]->code], 3), // double sortie
         siteOp('sortie', ['code' => $this->batch2[0]->code], 4), // sortie sans entrée connue
-        siteOp('controle', ['code' => $this->batch0[0]->code, 'local_valid' => true, 'known_at' => now()->subMinutes(30)->toIso8601String()], 5), // badge annulé entre-temps
+        siteOp('controle', ['code' => $this->batch0[0]->code, 'local_valid' => true, 'offline' => true, 'known_at' => now()->subMinutes(30)->toIso8601String()], 5), // badge annulé entre-temps
         siteOp('controle', ['code' => $this->batch1[5]->code, 'local_valid' => false], 6), // refusé hors ligne, refusé aussi par le serveur : rien à signaler
     ];
     app(BadgeService::class)->annuler($this->batch0[0], siteUser('superviseur'), 'Perdu');
