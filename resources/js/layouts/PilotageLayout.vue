@@ -11,7 +11,7 @@ import { pilotageHref } from '../pilotage/navigation';
 defineOptions({ inheritAttrs: false });
 type EventRef = { id: string; name: string };
 type Context = { event: EventRef | null; events: EventRef[]; openAlerts: number; criticalAlerts: number };
-const props = withDefaults(defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'mouvements' | 'acces' | 'litiges' | 'evacuation' | 'plus' | 'journal'; event?: EventRef | null; events?: EventRef[]; openAlerts?: number; title?: string; bare?: boolean }>(), { event: null, events: () => [], openAlerts: 0, title: '', bare: false });
+const props = withDefaults(defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'mouvements' | 'acces' | 'attendus' | 'litiges' | 'evacuation' | 'plus' | 'journal'; event?: EventRef | null; events?: EventRef[]; openAlerts?: number; title?: string; bare?: boolean }>(), { event: null, events: () => [], openAlerts: 0, title: '', bare: false });
 const page = usePage<{ auth?: { name: string; permissions: string[] } | null; criticalAlerts?: number; f06Active?: boolean; pilotageContext?: Context | null }>();
 const currentEvent = computed(() => props.event ?? page.props.pilotageContext?.event ?? null);
 const events = computed(() => props.events.length ? props.events : page.props.pilotageContext?.events ?? []);
@@ -25,13 +25,14 @@ const items = [
   { key: 'presents', label: 'Personnes présentes', short: 'Présents', icon: 'users', href: '/pilotage/presents', permission: 'presences.consulter' },
   { key: 'mouvements', label: 'Mouvements', short: 'Mouvements', icon: 'arrow', href: '/pilotage/mouvements', permission: 'presences.consulter' },
   { key: 'acces', label: 'Accès et badges', short: 'Accès', icon: 'qr', href: '/pilotage/acces', permission: 'pilotage.consulter' },
+  { key: 'attendus', label: 'Visites annoncées', short: 'Attendus', icon: 'calendar', href: '/pilotage/attendus', permission: 'pilotage.consulter' },
   { key: 'litiges', label: 'Litiges', short: 'Litiges', icon: 'shield', href: '/pilotage/litiges', permission: 'litiges.decider' },
   { key: 'plus', label: 'Groupes et cars', short: 'Groupes', icon: 'bus', href: '/pilotage/groupes', permission: 'groupes.suivre' },
   { key: 'evacuation', label: 'Évacuation', short: 'Évacuation', icon: 'arrow', href: '/pilotage/evacuation', permission: 'presences.consulter' },
   { key: 'journal', label: 'Journal', short: 'Journal', icon: 'book', href: '/administration/journal', permission: 'journal.consulter' },
 ] as const;
 const allowed = computed(() => items.filter(item => can(item.permission) && (item.key !== 'plus' || (can('cars.suivre') && page.props.f06Active === true))));
-const bottom = computed(() => allowed.value.filter(item => !['plus', 'journal'].includes(item.key)));
+const bottom = computed(() => allowed.value.filter(item => !['plus', 'journal', 'attendus'].includes(item.key)));
 const href = (path: string) => pilotageHref(path, currentEvent.value?.id);
 function change(event: Event) {
   router.get(window.location.pathname, { ...Object.fromEntries(new URLSearchParams(window.location.search)), event: (event.target as HTMLSelectElement).value, page: undefined });

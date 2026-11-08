@@ -5,10 +5,11 @@ import { pilotageHref } from '../../pilotage/navigation';
 import PilotageLayout from '../../layouts/PilotageLayout.vue';
 import CategorySwatch from '../../components/CategorySwatch.vue';
 import CancelBadge from '../../components/pilotage/CancelBadge.vue';
+import SupervisorClosure from '../../components/pilotage/SupervisorClosure.vue';
 import { displayDate } from '../../labels';
 
 type Visitor = { id: string; full_name: string; organisation: string | null; status: string; present: boolean; source: string; access_note: string | null; host: string | null; group: string | null; valid_from: string; valid_until: string; category: { name: string; color: string; priority_circuit: boolean } };
-const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; visitor: Visitor; badge: { id: string; code: string; status: string } | null; toRebadge: { code: string; at: string; reason: string | null } | null; refusal: { id: string; reason: string; refused_at: string; decision: string | null; supervisor_decision: string | null } | null; permissions: { annuler: boolean; decider: boolean } }>();
+const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; visitor: Visitor; badge: { id: string; code: string; status: string } | null; toRebadge: { code: string; at: string; reason: string | null } | null; refusal: { id: string; reason: string; refused_at: string; decision: string | null; supervisor_decision: string | null } | null; closure: { possible: boolean; vehicles_present: number } | null; permissions: { annuler: boolean; decider: boolean; cloturer: boolean } }>();
 const page = usePage<{ errors: Record<string, string> }>();
 const statuses: Record<string, string> = { attendu: 'Attendu', present: 'Présent', sorti: 'Sorti', refuse: 'Accès refusé' };
 const label = computed(() => (props.visitor.present ? 'Présent' : statuses[props.visitor.status] ?? props.visitor.status));
@@ -33,6 +34,7 @@ function decide() { router.post(`/pilotage/litiges/${props.refusal!.id}/decision
       <p v-else>Aucun badge associé.</p>
     </section>
     <CancelBadge v-if="badge && permissions.annuler" :visitor-id="visitor.id" />
+    <SupervisorClosure v-if="closure && permissions.cloturer" :visitor-id="visitor.id" :offer="closure" />
     <section v-if="refusal" class="space-y-3 rounded-2xl border-2 border-red-700 bg-white p-4" aria-label="Refus">
       <h2 class="text-heading font-bold">Refus d’accès</h2>
       <p>Motif : {{ refusal.reason }} · {{ displayDate(refusal.refused_at) }}</p>

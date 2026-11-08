@@ -3,6 +3,7 @@ import AdminIcon from '../admin/AdminIcon.vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import CategorySwatch from '../CategorySwatch.vue';
 import PermanentSearch from './PermanentSearch.vue';
+import VehicleSearch from './VehicleSearch.vue';
 import type { PosteRepository } from '../../poste/repository';
 import { ApiError, type SearchResult } from '../../poste/types';
 const props = defineProps<{ repository: PosteRepository; refreshKey?: string | null }>();
@@ -67,5 +68,6 @@ onBeforeUnmount(() => { window.clearTimeout(timer); ++sequence; });
       <button v-if="repository.searchPermanent" type="button" class="btn-soft" :aria-expanded="showPermanent" data-testid="ouvrir-permanents" @click="showPermanent = !showPermanent">{{ showPermanent ? 'Fermer la recherche de personnes permanentes' : 'Chercher une personne permanente' }}</button>
     </div>
     <PermanentSearch v-if="showPermanent && repository.searchPermanent" :repository="repository" />
+    <VehicleSearch v-if="repository.searchVehicles" :repository="repository" />
   </section>
 </template>
