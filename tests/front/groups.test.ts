@@ -23,7 +23,7 @@ async function snapshot(mode: 'identite' | 'encadreur' = 'encadreur'): Promise<S
     version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette cars', station: 'Poste cars', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
     settings: { offline_trust_hours: 12, inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, controle_stagiaires: mode, f06_active: true }, categories: [stagiaire], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }], category_zone: [{ category_id: 'c2', zone_id: 'z1' }],
     hosts: [], postes: [{ id: 'p1', name: 'Poste cars' }], visitors, members,
-    groups: [{ id: 'g1', name: 'Groupe fictif', bus_number: 'Car 1', opened: false, departed: false, arrival_closed: false }],
+    groups: [{ id: 'g1', name: 'Groupe fictif', bus_number: 'Car 1', capacity: 10, opened: false, departed: false, arrival_closed: false }],
     badges: [
       { code: 'B-001', token_hash: await sha256Hex(token(1)), category_id: 'c2', status: 'Disponible', mine: false, group_id: 'g1' }, { code: 'B-002', token_hash: await sha256Hex(token(2)), category_id: 'c2', status: 'Disponible', mine: false, group_id: 'g1' },
       { code: 'B-003', token_hash: await sha256Hex(token(3)), category_id: 'c2', status: 'Disponible', mine: false, group_id: 'g1' }, { code: 'B-900', token_hash: await sha256Hex(token(9)), category_id: 'c2', status: 'Disponible', mine: false, group_id: 'g2' },
@@ -78,13 +78,25 @@ describe('règles des groupes sur la copie locale', () => {
     expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }))).toBe('non_associe');
     call(list, ['s1', 's2']);
     expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-900' }))).toBe('non_associe'); // badge du lot d'un autre groupe, personne n'en est porteur
-    expect(op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }).boarding).toMatchObject({ boarded: true, already: false, places_restantes: null });
+    expect(op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }).boarding).toMatchObject({ boarded: true, already: false, places_restantes: 9 });
     expect(op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }).boarding).toMatchObject({ already: true });
     expect(list.members.get('s1')?.boarded).toBe(true);
     expect(list.members.get('s2')?.boarded).toBe(false);
     // la personne dont l'appel n'est pas fait ne peut pas embarquer
     list.members.get('s2')!.checked = false;
     expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-002' }))).toBe('controle_requis');
+  });
+
+  it('capacité obligatoire : aucun embarquement sans places renseignées, jamais illimité', async () => {
+    for (const capacity of [null, 0] as const) {
+      const snap = await snapshot();
+      snap.groups![0].capacity = capacity;
+      const list = new LocalList(snap);
+      call(list, ['s1']);
+      expect(refused(() => op(list, 'groupe_embarquer', { group_id: 'g1', code: 'B-001' }))).toBe('capacite_non_renseignee');
+      expect(list.members.get('s1')?.boarded).toBe(false);
+      expect(groupView(list, 'g1').progress.capacity).toBeNull();
+    }
   });
 
   it('capacité bloquante : impossible d’embarquer au-delà des places, absent levé par l’embarquement', async () => {

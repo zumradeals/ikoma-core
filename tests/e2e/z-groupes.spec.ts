@@ -133,7 +133,7 @@ test('car de 50 stagiaires : appel, correspondance et remise du badge en moins d
   // Embarquement individuel : chaque passager est scanné séparément, puis le car est fermé.
   await page.getByTestId('onglet-embarquement').click();
   for (let i = 0; i < 50; i++) await boardPassenger(page, car.badges[i]);
-  await expect(page.getByTestId('places-car')).toContainText('50 embarqués');
+  await expect(page.getByTestId('places-car')).toContainText('50 / 50 places occupées');
   await expect(page.getByTestId('appel-complet')).toBeVisible();
   await button(page, 'Fermer le car (départ)').click(); await button(page, 'Oui, fermer le car').click();
   await page.getByTestId('onglet-appel').click();

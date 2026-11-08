@@ -8,7 +8,7 @@ const mode = useForm({ mode: props.mode });
 const q = ref(props.search);
 const opened = ref<string | null>(null);
 function submitCreate() { create.transform(d => ({ ...d, supervisor_id: d.supervisor_id || null, bus_number: d.bus_number || null, capacity: d.capacity ? Number(d.capacity) : null })).post('/administration/groupes', { onSuccess: () => create.reset('name', 'bus_number', 'capacity', 'supervisor_id') }); }
-function setCapacity(g: Group, value: string) { router.put(`/administration/groupes/${g.id}/capacite`, { capacity: value ? Number(value) : null }, { preserveScroll: true }); }
+function setCapacity(g: Group, value: string) { if (value && Number(value) >= 1) router.put(`/administration/groupes/${g.id}/capacite`, { capacity: Number(value) }, { preserveScroll: true }); }
 function designate(g: Group, id: string) { router.put(`/administration/groupes/${g.id}/encadreur`, { supervisor_id: id || null }, { preserveScroll: true }); }
 function attach(g: Group, visitor: string) { router.post(`/administration/groupes/${g.id}/stagiaires`, { visitor_id: visitor }, { preserveScroll: true }); }
 function detach(g: Group, visitor: string) { router.delete(`/administration/groupes/${g.id}/stagiaires/${visitor}`, { preserveScroll: true }); }
@@ -35,7 +35,7 @@ function look() { router.get('/administration/groupes', { event: props.event?.id
 <label class="block">Événement<select v-model="create.event_id" class="field" required><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select></label>
 <label class="block">Nom du groupe<input v-model="create.name" class="field" maxlength="120" required autocomplete="off"></label>
 <label class="block">Numéro du car<input v-model="create.bus_number" class="field" maxlength="60" autocomplete="off"></label>
-<label class="block">Places du car (bloquantes)<input v-model="create.capacity" type="number" min="1" max="200" class="field" data-testid="capacite-creation"></label>
+<label class="block">Places du car (obligatoires avant l’embarquement)<input v-model="create.capacity" type="number" min="1" max="200" class="field" data-testid="capacite-creation"></label>
 <label class="block">Encadreur<select v-model="create.supervisor_id" class="field"><option value="">Aucun pour le moment</option><option v-for="u in encadreurs" :key="u.id" :value="u.id">{{ u.name }}</option></select></label>
 <p v-for="error in create.errors" :key="error" role="alert">{{ error }}</p><FormButton :busy="create.processing">Créer le groupe</FormButton>
 </form>
@@ -43,8 +43,8 @@ function look() { router.get('/administration/groupes', { event: props.event?.id
 <BaseCard v-for="g in groups" :key="g.id">
 <h2 class="text-heading font-bold">{{ g.bus_number ?? g.name }} · {{ g.name }}</h2>
 <p class="mb-2">{{ g.members.length }} stagiaire(s) · {{ g.badges_reserves }} badge(s) réservé(s) dont {{ g.badges_libres }} libre(s)<template v-if="g.departed_at"> · car parti</template></p>
-<p v-if="g.capacity === null" role="status" class="mb-2 font-semibold text-amber-900" data-testid="capacite-absente">Places du car non renseignées : aucune limite n’est appliquée à l’embarquement.</p>
-<label class="mb-4 block">Places du car (bloquantes)<input class="field" type="number" min="1" max="200" :value="g.capacity ?? ''" data-testid="capacite" @change="setCapacity(g, ($event.target as HTMLInputElement).value)"></label>
+<p v-if="g.capacity === null" role="status" class="mb-2 font-semibold text-amber-900" data-testid="capacite-absente">Places du car non renseignées : aucun embarquement n’est possible tant qu’elles ne sont pas indiquées.</p>
+<label class="mb-4 block">Places du car (obligatoires, bloquantes)<input class="field" type="number" min="1" max="200" required :value="g.capacity ?? ''" data-testid="capacite" @change="setCapacity(g, ($event.target as HTMLInputElement).value)"></label>
 <label class="mb-4 block">Encadreur<select class="field" :value="g.supervisor_id ?? ''" @change="designate(g, ($event.target as HTMLSelectElement).value)"><option value="">Aucun</option><option v-for="u in encadreurs" :key="u.id" :value="u.id">{{ u.name }}</option></select></label>
 <button type="button" class="action" :aria-expanded="opened === g.id" @click="opened = opened === g.id ? null : g.id">{{ opened === g.id ? 'Fermer les stagiaires' : 'Gérer les stagiaires' }}</button>
 <div v-if="opened === g.id" class="mt-5 space-y-4">

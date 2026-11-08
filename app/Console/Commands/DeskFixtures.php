@@ -144,7 +144,7 @@ class DeskFixtures extends Command
         foreach ([[1, 50], [2, 6], [3, 8], [4, 6]] as [$n, $size]) {
             $group = $groups->create($event, "Groupe stagiaires {$n} {$s}", "Car {$n}", (match ($n) {
                 2 => $liveEncadreur, 4 => $encadreur2, default => $encadreur
-            })->id, $admin);
+            })->id, $admin, $size);
             $members = [];
             for ($i = 1; $i <= $size; $i++) {
                 $members[] = $name = sprintf('Stagiaire C%d %02d %s', $n, $i, $s);

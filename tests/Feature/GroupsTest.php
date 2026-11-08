@@ -57,7 +57,7 @@ beforeEach(function () {
     $this->agent = groupUser('agent_accueil');
     $this->encadreur = groupUser('encadreur');
     $this->group = Group::query()->findOrFail(DemoSeeder::id('group'));
-    DB::table('groups')->where('id', $this->group->id)->update(['supervisor_id' => $this->encadreur->id]);
+    DB::table('groups')->where('id', $this->group->id)->update(['supervisor_id' => $this->encadreur->id, 'capacity' => 50]);
     $this->groups = app(Groups::class);
     $this->device = Device::query()->findOrFail(DemoSeeder::id('device'));
     $this->members = groupMembersOf();
@@ -196,7 +196,7 @@ it('embarque chaque passager séparément : badge connu, attribué, du groupe, a
     expect(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-404'))?->code_)->toBe('badge_inconnu')
         ->and(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-030'))?->code_)->toBe('non_associe');
     $first = $this->groups->board($this->device, $this->agent, $this->group->id, 'B-001');
-    expect($first)->toMatchArray(['boarded' => true, 'already' => false, 'badge_code' => 'B-001', 'places_restantes' => null]);
+    expect($first)->toMatchArray(['boarded' => true, 'already' => false, 'badge_code' => 'B-001', 'places_restantes' => 49]);
     expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-001')['already'])->toBeTrue();
     $token = DB::table('badges')->where('event_id', $this->group->event_id)->where('code', 'B-002')->value('qr_token');
     expect($this->groups->board($this->device, $this->agent, $this->group->id, 'IKOMA1:'.$token)['already'])->toBeFalse();
@@ -209,25 +209,32 @@ it('embarque chaque passager séparément : badge connu, attribué, du groupe, a
     expect(refusal(fn () => $this->groups->depart($this->agent, $this->group->id))?->code_)->toBe('appel_incomplet');
 });
 
-it('rend la capacité du car bloquante : impossible d\'embarquer plus de personnes que de places', function () {
+it('rend la capacité du car obligatoire et bloquante : aucun embarquement sans places renseignées, jamais au-delà des places', function () {
     reserveForGroup($this->group, 40);
     deliverTo(6);
+    // sans places renseignées (ou nulles), aucun embarquement n'est possible : jamais d'embarquement illimité
+    DB::table('groups')->where('id', $this->group->id)->update(['capacity' => null]);
+    $none = refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-001'));
+    expect($none?->code_)->toBe('capacite_non_renseignee')->and($none?->status)->toBe(422);
+    expect(DB::table('group_members')->where('group_id', $this->group->id)->whereNotNull('boarded_at')->count())->toBe(0);
+    // la base refuse aussi un embarquement écrit directement sans places renseignées
+    expect(fn () => DB::transaction(fn () => DB::table('group_members')->where('visitor_id', $this->members[0])->update(['boarded_at' => now(), 'boarded_by' => $this->agent->id])))->toThrow(Exception::class);
     $this->groups->setCapacity($this->group->id, 4, $this->admin);
     boardFirst(4);
     $full = refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-005'));
     expect($full?->code_)->toBe('car_complet')->and($full?->status)->toBe(409);
     expect(DB::table('group_members')->where('group_id', $this->group->id)->whereNotNull('boarded_at')->count())->toBe(4);
     expect($this->groups->state($this->group->id)['group']['capacity'])->toBe(4);
+    // la base refuse un cinquième embarquement écrit directement
+    expect(fn () => DB::transaction(fn () => DB::table('group_members')->where('visitor_id', $this->members[4])->update(['boarded_at' => now(), 'boarded_by' => $this->agent->id])))->toThrow(Exception::class);
     // déjà embarqué : le rejeu ne consomme pas de place
     expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-001')['already'])->toBeTrue();
     // la capacité ne peut pas descendre sous le nombre d'embarqués, ni sortir de 1 à 200
     expect(refusal(fn () => $this->groups->setCapacity($this->group->id, 3, $this->admin))?->code_)->toBe('capacite_insuffisante')
-        ->and(refusal(fn () => $this->groups->setCapacity($this->group->id, 0, $this->admin))?->code_)->toBe('capacite_invalide');
+        ->and(refusal(fn () => $this->groups->setCapacity($this->group->id, 0, $this->admin))?->code_)->toBe('capacite_invalide')
+        ->and(refusal(fn () => $this->groups->setCapacity($this->group->id, 201, $this->admin))?->code_)->toBe('capacite_invalide');
     $this->groups->setCapacity($this->group->id, 6, $this->admin);
     expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-005')['places_restantes'])->toBe(1);
-    // sans capacité renseignée, aucune limite n'est appliquée
-    $this->groups->setCapacity($this->group->id, null, $this->admin);
-    expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-006')['places_restantes'])->toBeNull();
 });
 
 it('trace chaque absence (motif, auteur, journal), la refuse pour un embarqué, la lève par l\'embarquement avant le départ', function () {
@@ -283,6 +290,23 @@ it('enregistre le débarquement individuel à l\'arrivée sans entrée ni prése
         ->and(DB::table('visitors')->where('group_id', $this->group->id)->where('status', 'present')->count())->toBe(0);
 });
 
+it('notifie l\'hôte que le car est arrivé, sans jamais dire que la personne est présente', function () {
+    reserveForGroup($this->group, 40);
+    deliverTo(2);
+    boardFirst(2);
+    absentFrom(2);
+    $this->groups->depart($this->agent, $this->group->id);
+    $host = groupUser('hote');
+    DB::table('hosts')->where('id', DemoSeeder::id('host0'))->update(['user_id' => $host->id]);
+    DB::table('visitors')->where('id', $this->members[0])->update(['host_id' => DemoSeeder::id('host0')]);
+    $this->groups->arrive($this->device, $this->agent, 'B-001');
+    $notification = DB::table('notifications')->where('recipient_id', $host->id)->where('visitor_id', $this->members[0])->first();
+    expect($notification->type)->toBe('car_arrive')->and($notification->message)->toContain('car')->and($notification->message)->not->toContain('entrer');
+    expect(DB::table('notifications')->where('type', 'arrivee')->count())->toBe(0);
+    $this->groups->arrive($this->device, $this->agent, 'B-001');
+    expect(DB::table('notifications')->where('type', 'car_arrive')->count())->toBe(1);
+});
+
 it('signale un badge scanné à l\'arrivée alors que la personne n\'était pas embarquée', function () {
     reserveForGroup($this->group, 40);
     deliverTo(3);
@@ -308,6 +332,7 @@ it('règle la capacité d\'un car depuis l\'administration, administrateur seule
     $this->actingAs($this->admin)->put("/administration/groupes/{$this->group->id}/capacite", ['capacity' => 40])->assertRedirect();
     expect(DB::table('groups')->where('id', $this->group->id)->value('capacity'))->toBe(40);
     $this->actingAs($this->admin)->put("/administration/groupes/{$this->group->id}/capacite", ['capacity' => 0])->assertSessionHasErrors('capacity');
+    $this->actingAs($this->admin)->put("/administration/groupes/{$this->group->id}/capacite", [])->assertSessionHasErrors('capacity'); // la capacité ne s'efface pas
     $this->actingAs($this->admin)->get('/administration/groupes')->assertOk()->assertInertia(fn ($page) => $page->where('groups.0.capacity', 40));
     expect(DB::table('audit_logs')->where('action', 'groupe.capacite_modifiee')->count())->toBe(1);
 });

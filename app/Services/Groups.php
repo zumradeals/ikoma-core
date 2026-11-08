@@ -45,15 +45,15 @@ final class Groups
         return $id;
     }
 
-    /** Places du car : bloquantes une fois renseignées. Ne peut pas descendre sous le nombre de personnes déjà embarquées. */
-    public function setCapacity(string $groupId, ?int $capacity, User $actor): void
+    /** Places du car : OBLIGATOIRES et strictement positives avant tout embarquement (aucun embarquement illimité). Ne peuvent pas descendre sous le nombre d'embarqués. */
+    public function setCapacity(string $groupId, int $capacity, User $actor): void
     {
         app(FoundingModules::class)->requireF06();
         $capacity = $this->capacityOrFail($capacity);
         DB::transaction(function () use ($groupId, $capacity, $actor): void {
             app(FoundingModules::class)->requireF06();
             $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
-            if ($capacity !== null && $this->boardedCount($groupId) > $capacity) {
+            if ($this->boardedCount($groupId) > $capacity) {
                 throw new DeskRefused('capacite_insuffisante', 'Plus de personnes sont déjà embarquées que de places.', 422);
             }
             DB::table('groups')->where('id', $groupId)->update(['capacity' => $capacity, 'updated_at' => now()]);
@@ -301,6 +301,9 @@ final class Groups
             if ($group->departed_at !== null) {
                 throw new DeskRefused('car_ferme', 'Le car est déjà parti : plus personne ne peut embarquer.', 409);
             }
+            if ($group->capacity === null || $group->capacity < 1) {
+                throw new DeskRefused('capacite_non_renseignee', 'Le nombre de places du car n’est pas renseigné : l’embarquement est impossible.', 422, 'Demandez à l’administrateur de renseigner les places du car.');
+            }
             $input = trim($code);
             if (str_starts_with($input, QrSvg::PREFIX)) {
                 $input = substr($input, strlen(QrSvg::PREFIX));
@@ -318,12 +321,12 @@ final class Groups
                 throw new DeskRefused('participation_cloturee', 'La participation de cette personne est clôturée : elle ne peut pas embarquer.', 422);
             }
             if ($member->boarded_at !== null) {
-                return ['boarded' => true, 'already' => true, 'badge_code' => $badge->code, 'group_id' => $groupId, 'places_restantes' => $group->capacity === null ? null : max(0, $group->capacity - $this->boardedCount($groupId))];
+                return ['boarded' => true, 'already' => true, 'badge_code' => $badge->code, 'group_id' => $groupId, 'places_restantes' => max(0, $group->capacity - $this->boardedCount($groupId))];
             }
             if ($member->checked_at === null) {
                 throw new DeskRefused('controle_requis', 'Faites d’abord l’appel nominal de cette personne (correspondance contrôlée).', 422);
             }
-            if ($group->capacity !== null && $this->boardedCount($groupId) >= $group->capacity) {
+            if ($this->boardedCount($groupId) >= $group->capacity) {
                 throw new DeskRefused('car_complet', 'Le car est complet : '.$group->capacity.' place(s), toutes occupées.', 409, 'Prévenez le superviseur pour un autre car.');
             }
             $now = now();
@@ -332,7 +335,7 @@ final class Groups
                 'occurred_at' => $now, 'details' => json_encode(array_filter(['group_id' => $groupId, 'heure_declaree' => $declaredAt, 'absence_levee' => $member->absent_at !== null ? true : null], fn ($v) => $v !== null), JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
             $this->audit->append('groupe.embarque_individuel', $agent->id, ['group_id' => $groupId, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'event_id' => $group->event_id, 'device_id' => $device?->id, 'absence_levee' => $member->absent_at !== null]);
 
-            return ['boarded' => true, 'already' => false, 'badge_code' => $badge->code, 'group_id' => $groupId, 'places_restantes' => $group->capacity === null ? null : max(0, $group->capacity - $this->boardedCount($groupId))];
+            return ['boarded' => true, 'already' => false, 'badge_code' => $badge->code, 'group_id' => $groupId, 'places_restantes' => max(0, $group->capacity - $this->boardedCount($groupId))];
         });
     }
 
@@ -441,6 +444,8 @@ final class Groups
             DB::table('group_members')->where('id', $member->id)->update(['arrived_at' => $now, 'updated_at' => $now]);
             DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $device->event_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'actor_id' => $agent->id, 'type' => 'debarquement', 'checkpoint' => $device->station ?? $device->name,
                 'occurred_at' => $now, 'details' => json_encode(array_filter(['group_id' => $member->group_id, 'heure_declaree' => $declaredAt, 'ecart' => $ecart])), 'created_at' => $now, 'updated_at' => $now]);
+            // Notification « car arrivé » : distincte de « personne présente » (type « arrivee », envoyé à l'entrée à l'accueil).
+            app(HostNotifications::class)->send($visitorId, 'car_arrive', $agent, $device);
             $this->audit->append('groupe.arrive', $agent->id, ['group_id' => $member->group_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'device_id' => $device->id, 'ecart' => $ecart]);
 
             return ['arrived' => true, 'already' => false, 'badge_code' => $badge->code, 'group_id' => $member->group_id, 'ecart' => $ecart];

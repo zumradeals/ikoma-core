@@ -65,8 +65,8 @@ final class GroupesController
     public function capacity(Request $r, string $group): RedirectResponse
     {
         Gate::authorize('groupes.gerer');
-        $data = $r->validate(['capacity' => 'nullable|integer|min:1|max:200']);
-        $this->groups->setCapacity($group, isset($data['capacity']) ? (int) $data['capacity'] : null, $r->user());
+        $data = $r->validate(['capacity' => 'required|integer|min:1|max:200']);
+        $this->groups->setCapacity($group, (int) $data['capacity'], $r->user());
 
         return back();
     }

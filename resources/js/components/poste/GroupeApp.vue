@@ -53,6 +53,7 @@ const percent = computed(() => (view.value && view.value.progress.total ? Math.r
 const departable = computed(() => view.value !== null && !departed.value && view.value.progress.total > 0);
 const unresolved = computed(() => view.value?.progress.unresolved ?? 0); // ni embarqués ni notés absents : l'appel n'est pas complet
 const full = computed(() => view.value?.progress.free === 0);
+const noCapacity = computed(() => view.value !== null && view.value.progress.capacity === null); // places non renseignées : embarquement impossible
 const toBoard = computed(() => members.value.filter(m => !m.boarded && !m.absent));
 const arrivalGroups = computed(() => groups.value.filter(g => g.departed && !g.arrival_closed));
 
@@ -299,16 +300,17 @@ function statusOf(m: GroupMemberView): string {
           <template v-else>
             <p class="text-xl font-bold" data-testid="places-car">
               <template v-if="view.progress.capacity !== null">{{ view.progress.boarded }} / {{ view.progress.capacity }} place{{ view.progress.capacity > 1 ? 's' : '' }} occupée{{ view.progress.boarded > 1 ? 's' : '' }} · {{ view.progress.free }} libre{{ (view.progress.free ?? 0) > 1 ? 's' : '' }}</template>
-              <template v-else>{{ view.progress.boarded }} embarqué{{ view.progress.boarded > 1 ? 's' : '' }} · places du car non renseignées (aucune limite)</template>
+              <template v-else>{{ view.progress.boarded }} embarqué{{ view.progress.boarded > 1 ? 's' : '' }} · places du car non renseignées</template>
             </p>
-            <p v-if="full && !departed" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 text-lg font-bold text-red-900" data-testid="car-complet"><span aria-hidden="true">⚠</span> Car complet : plus personne ne peut embarquer.</p>
+            <p v-if="noCapacity && !departed" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 text-lg font-bold text-red-900" data-testid="capacite-absente"><span aria-hidden="true">⚠</span> Les places du car ne sont pas renseignées : l’embarquement est impossible. Demandez à l’administrateur de les renseigner.</p>
+            <p v-else-if="full && !departed" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 text-lg font-bold text-red-900" data-testid="car-complet"><span aria-hidden="true">⚠</span> Car complet : plus personne ne peut embarquer.</p>
             <template v-if="!departed">
               <p>Scannez le badge de chaque passager, un par un. Seules les personnes dont l’appel nominal est fait peuvent embarquer ; les absents sont notés avec leur motif.</p>
               <div class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[35vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
               <p v-if="scanError" role="alert" class="font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ scanError }}</p>
               <form class="space-y-3" aria-label="Saisir le code du badge" @submit.prevent="board(code)">
                 <label class="block text-xl font-semibold">QR illisible ? Saisissez le code imprimé<input v-model="code" class="field !min-h-16 !text-2xl uppercase" autocomplete="off" maxlength="100" data-testid="code-embarquement"></label>
-                <button type="submit" class="btn-main" :disabled="!code.trim() || busy" data-testid="valider-embarquement">Embarquer ce passager</button>
+                <button type="submit" class="btn-main" :disabled="!code.trim() || busy || noCapacity" data-testid="valider-embarquement">Embarquer ce passager</button>
               </form>
               <div v-if="boardedLast" class="rounded-2xl border-2 border-green-700 bg-green-50 p-4" role="status" data-testid="dernier-embarque">
                 <p class="text-2xl font-bold"><span aria-hidden="true">✓</span> {{ boardedLast.name || 'Passager' }}</p>

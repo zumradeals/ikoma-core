@@ -27,7 +27,7 @@ export function groupSummaries(list: LocalList): GroupSummary[] {
   if (list.snapshot.settings.f06_active !== true) return [];
   return Array.from(list.groups.values()).map(g => {
     const members = membersOf(list, g.id);
-    return { id: g.id, name: g.name, bus_number: g.bus_number, capacity: g.capacity ?? null, total: members.length, badged: members.filter(m => list.visitors.get(m.visitor_id)?.badge_code).length, boarded: members.filter(m => m.boarded).length, departed: g.departed, arrival_closed: g.arrival_closed };
+    return { id: g.id, name: g.name, bus_number: g.bus_number, capacity: g.capacity && g.capacity > 0 ? g.capacity : null, total: members.length, badged: members.filter(m => list.visitors.get(m.visitor_id)?.badge_code).length, boarded: members.filter(m => m.boarded).length, departed: g.departed, arrival_closed: g.arrival_closed };
   }).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 }
 
@@ -41,7 +41,7 @@ export function groupView(list: LocalList, groupId: string): GroupView {
   }).sort((a, b) => a.name.localeCompare(b.name, 'fr') || a.visitor_id.localeCompare(b.visitor_id));
   const badged = members.filter(m => m.badge_code).length;
   const boarded = members.filter(m => m.boarded).length;
-  const capacity = group.capacity ?? null;
+  const capacity = group.capacity && group.capacity > 0 ? group.capacity : null; // places non renseignées ou nulles : embarquement impossible
   return { group, members, progress: { total: members.length, badged, boarded, arrived: members.filter(m => m.arrived).length, absent: members.filter(m => m.absent).length, complete: members.length > 0 && badged === members.length,
     capacity, free: capacity === null ? null : Math.max(0, capacity - boarded), unresolved: members.filter(m => !m.boarded && !m.absent).length }, mode: groupMode(list) };
 }
@@ -102,6 +102,7 @@ export function applyGroupOp(list: LocalList, type: string, p: Record<string, un
       const group = typeof p.group_id === 'string' ? list.groups.get(p.group_id) : undefined;
       if (!group) throw new ApiError('groupe_inconnu', 'Groupe introuvable pour ce poste.', null, 404);
       if (group.departed) throw refuse('car_ferme', 'Le car est déjà parti : plus personne ne peut embarquer.');
+      if (!group.capacity || group.capacity < 1) throw refuse('capacite_non_renseignee', 'Le nombre de places du car n’est pas renseigné : l’embarquement est impossible.', 'Demandez à l’administrateur de renseigner les places du car.');
       group.opened = true;
       const code = String(p.code ?? '').toUpperCase();
       if (!list.badges.get(code)) throw refuse('badge_inconnu', 'Badge inconnu : vérifiez le code ou scannez à nouveau.');
