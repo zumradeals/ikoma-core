@@ -4,6 +4,8 @@ use App\Models\Badge;
 use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\BadgeService;
+use App\Services\Participations;
+use App\Services\Pilotage;
 use App\Services\SupervisorClosure;
 use App\Services\Vehicles;
 use App\Services\Visits;
@@ -309,4 +311,122 @@ it('range les véhicules dans la remise à zéro de démonstration', function ()
     foreach (['ikoma_reset_demo_business(uuid,boolean)', 'ikoma_reset_demo_event(uuid)'] as $function) {
         expect((string) DB::selectOne("SELECT pg_get_functiondef('public.{$function}'::regprocedure) AS d")->d)->toContain('public.vehicles');
     }
+});
+
+// --- Décisions définitives : droit dédié, réglage, administration, retards, séparation des actes -------------------------------------------
+
+it('réserve la clôture VIP à la permission dédiée du seul superviseur, sans réutiliser badges.annuler', function () {
+    DB::table('categories')->where('id', DemoSeeder::id('category0'))->update(['closure_supervisor_only' => true]);
+    $url = '/pilotage/visiteurs/'.s09Visitor(0).'/cloture-superviseur';
+    $body = ['reason' => 'Fin de la visite officielle', 'confirmation' => true];
+    foreach (['administrateur', 'agent_accueil', 'hote', 'encadreur'] as $role) {
+        expect(s09User($role)->can('cloture.superviseur'))->toBeFalse();
+    }
+    expect($this->sup->can('cloture.superviseur'))->toBeTrue();
+    // badges.annuler ne suffit pas : un compte qui a seulement ce droit est refusé, rien n'est écrit
+    $cancelOnly = s09User('agent_accueil');
+    $cancelOnly->givePermissionTo('badges.annuler');
+    $this->actingAs($cancelOnly)->postJson($url, $body)->assertForbidden();
+    expect(DB::table('visitors')->where('id', s09Visitor(0))->value('closed_at'))->toBeNull();
+    // le droit dédié suffit, sans badges.annuler
+    $dedicated = s09User('agent_accueil');
+    $dedicated->givePermissionTo('cloture.superviseur');
+    expect($dedicated->can('badges.annuler'))->toBeFalse();
+    $this->actingAs($dedicated)->postJson($url, $body)->assertOk();
+    expect(DB::table('visitors')->where('id', s09Visitor(0))->value('closed_by'))->toBe($dedicated->id);
+});
+
+it('sépare clôture administrative, sortie physique, restitution du badge et sortie du véhicule', function () {
+    DB::table('categories')->where('id', DemoSeeder::id('category1'))->update(['closure_supervisor_only' => false]);
+    // 1) la sortie physique par l'agent ne clôt rien, ne restitue rien et ne fait pas sortir le véhicule
+    $badges = Badge::where('badge_batch_id', app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 2, $this->admin)->id)->orderBy('code')->get();
+    s09Enter($badges[0], 1);
+    $vehicle = $this->vehicles->register($this->admin, s09Visitor(1), 'SP-100', 'voiture');
+    $this->actingAs($this->agent)->postJson('/poste/api/vehicules/entree', ['vehicle_id' => $vehicle], s09Headers())->assertOk();
+    $this->actingAs($this->agent)->postJson('/poste/api/sortie', ['code' => $badges[0]->code], s09Headers())->assertOk()->assertJsonPath('ok', true);
+    $row = DB::table('visitors')->where('id', s09Visitor(1))->first();
+    expect($row->status)->toBe('sorti')->and($row->closed_at)->toBeNull();
+    expect(DB::table('badge_assignments')->where('badge_id', $badges[0]->id)->whereNull('returned_at')->count())->toBe(1);
+    expect(DB::table('vehicles')->where('id', $vehicle)->value('status'))->toBe('present');
+    // 2) la clôture administrative d'une personne qui a encore un badge est refusée : elle ne vaut jamais restitution
+    expect(s09Refusal(fn () => app(Participations::class)->close($this->admin, s09Visitor(1), 'Fin'))?->errors())->toHaveKey('participation');
+    // 3) la restitution de l'accueil ne clôt pas la participation et ne touche pas au véhicule
+    $this->actingAs($this->agent)->postJson('/poste/api/restitution', ['code' => $badges[0]->code], s09Headers())->assertOk()->assertJsonPath('ok', true);
+    expect(DB::table('visitors')->where('id', s09Visitor(1))->value('closed_at'))->toBeNull();
+    expect(DB::table('vehicles')->where('id', $vehicle)->value('status'))->toBe('present');
+    // 4) la sortie du véhicule est un acte distinct, qui ne clôt pas la participation
+    $this->actingAs($this->agent)->postJson('/poste/api/vehicules/sortie', ['vehicle_id' => $vehicle], s09Headers())->assertOk();
+    expect(DB::table('visitors')->where('id', s09Visitor(1))->value('closed_at'))->toBeNull();
+    // 5) la clôture administrative vient en dernier, seule, avec son motif
+    app(Participations::class)->close($this->admin, s09Visitor(1), 'Fin de la participation');
+    expect(DB::table('visitors')->where('id', s09Visitor(1))->value('closure_reason'))->toBe('Fin de la participation');
+});
+
+it('journalise séparément, pour la clôture VIP, la sortie physique, la restitution, la clôture et ne fait jamais sortir un véhicule', function () {
+    DB::table('categories')->where('id', DemoSeeder::id('category0'))->update(['closure_supervisor_only' => true]);
+    s09Enter($this->vipBadges[0], 0);
+    $this->actingAs($this->sup)->postJson('/pilotage/visiteurs/'.s09Visitor(0).'/cloture-superviseur', ['reason' => 'Fin de visite', 'confirmation' => true])->assertOk();
+    $actions = DB::table('audit_logs')->where('id', '>', $this->auditStart)->whereIn('action', ['badge.restitue', 'participation.cloturee_superviseur'])->orderBy('id')->pluck('action')->all();
+    expect($actions)->toBe(['badge.restitue', 'participation.cloturee_superviseur']);
+    expect(DB::table('access_events')->where('visitor_id', s09Visitor(0))->where('type', 'sortie')->count())->toBe(1)
+        ->and(DB::table('access_events')->whereIn('type', ['vehicule_entree', 'vehicule_sortie'])->count())->toBe(0);
+});
+
+it('règle le délai de retard en Administration et refuse une valeur invalide ou un autre rôle', function () {
+    $base = ['inactivity' => 10, 'skew' => 600, 'pin' => 12];
+    $this->actingAs($this->admin)->put('/administration/postes/reglages', [...$base, 'lateMinutes' => 30])->assertRedirect();
+    expect(DB::table('settings')->where('key', 'visite_retard_minutes')->value('value'))->toBe('30')->and(Visits::lateAfterMinutes())->toBe(30);
+    foreach ([0, 1441] as $bad) {
+        $this->actingAs($this->admin)->putJson('/administration/postes/reglages', [...$base, 'lateMinutes' => $bad])->assertUnprocessable()->assertJsonValidationErrors('lateMinutes');
+    }
+    expect(DB::table('settings')->where('key', 'visite_retard_minutes')->value('value'))->toBe('30');
+    $this->actingAs($this->sup)->putJson('/administration/postes/reglages', [...$base, 'lateMinutes' => 5])->assertForbidden();
+    $this->actingAs($this->admin)->get('/administration/postes')->assertOk()->assertInertia(fn ($page) => $page->where('settings.lateMinutes', 30)->etc());
+});
+
+it('permet à l’administrateur d’annoncer une visite et d’associer puis annuler un véhicule depuis l’administration, refuse les autres rôles', function () {
+    $this->actingAs($this->admin)->postJson('/administration/participations/'.s09Visitor(0).'/annonce', ['expected_at' => '2027-01-10 14:00:00'])->assertOk();
+    expect(DB::table('visitors')->where('id', s09Visitor(0))->value('announced_by'))->toBe($this->admin->id);
+    $id = $this->actingAs($this->admin)->postJson('/administration/participations/'.s09Visitor(0).'/vehicules', ['plate' => 'AD-777', 'kind' => 'moto'])->assertOk()->json('id');
+    $this->actingAs($this->admin)->postJson('/administration/participations/'.s09Visitor(1).'/vehicules', ['plate' => 'ad 777', 'kind' => 'moto'])->assertUnprocessable()->assertJsonValidationErrors('plate');
+    $person = DB::table('visitors')->where('id', s09Visitor(0))->value('person_id');
+    $this->actingAs($this->admin)->get('/administration/personnes/'.$person)->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Admin/Personne')->has('visits.'.s09Visitor(0).'.vehicles', 1)->has('vehicleKinds')->etc());
+    $this->actingAs($this->admin)->deleteJson('/administration/vehicules/'.$id)->assertOk();
+    expect(DB::table('vehicles')->where('id', $id)->value('status'))->toBe('annule');
+    foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
+        $this->actingAs(s09User($role));
+        $this->postJson('/administration/participations/'.s09Visitor(0).'/annonce', ['expected_at' => '2027-01-10 15:00:00'])->assertForbidden();
+        $this->postJson('/administration/participations/'.s09Visitor(0).'/vehicules', ['plate' => 'XX-999', 'kind' => 'moto'])->assertForbidden();
+        $this->deleteJson('/administration/vehicules/'.$id)->assertForbidden();
+    }
+});
+
+it('compte les retards dans la vue d’ensemble du Pilotage, sans les absences constatées ni les personnes arrivées', function () {
+    $event = DemoSeeder::id('event');
+    $retards = fn () => app(Pilotage::class)->overview($event)['retards'];
+    expect($retards())->toBe(0);
+    foreach ([0, 1, 2] as $i) {
+        $this->visits->announce($this->admin, s09Visitor($i), '2027-01-10 09:00:00');
+    }
+    expect($retards())->toBe(3);
+    $this->visits->markNoShow($this->sup, s09Visitor(0), 'Prévenu');
+    DB::table('visitors')->where('id', s09Visitor(1))->update(['status' => 'present']);
+    expect($retards())->toBe(1);
+    // le délai de tolérance est celui du réglage
+    DB::table('settings')->where('key', 'visite_retard_minutes')->update(['value' => '120']);
+    expect($retards())->toBe(0);
+    $this->actingAs($this->sup)->get('/pilotage?event='.$event)->assertOk()->assertInertia(fn ($page) => $page->has('overview.retards')->etc());
+});
+
+it('refuse la clôture administrative tant qu’un véhicule est présent et annule les véhicules seulement annoncés', function () {
+    $present = $this->vehicles->register($this->admin, s09Visitor(2), 'CA-001', 'voiture');
+    $announced = $this->vehicles->register($this->admin, s09Visitor(2), 'CA-002', 'moto');
+    $this->actingAs($this->agent)->postJson('/poste/api/vehicules/entree', ['vehicle_id' => $present], s09Headers())->assertOk();
+    $close = fn () => app(Participations::class)->close($this->admin, s09Visitor(2), 'Fin de la participation');
+    expect(s09Refusal($close)?->errors()['participation'][0])->toContain('véhicule');
+    expect(DB::table('visitors')->where('id', s09Visitor(2))->value('closed_at'))->toBeNull()->and(DB::table('vehicles')->where('id', $announced)->value('status'))->toBe('annonce');
+    $this->actingAs($this->agent)->postJson('/poste/api/vehicules/sortie', ['vehicle_id' => $present], s09Headers())->assertOk();
+    $close();
+    expect(DB::table('vehicles')->where('id', $announced)->value('status'))->toBe('annule')->and(DB::table('vehicles')->where('id', $present)->value('status'))->toBe('sorti');
 });

@@ -86,7 +86,7 @@ it('donne à l’administrateur la seule consultation de supervision, alertes co
     foreach (['pilotage.consulter', 'presences.consulter', 'alertes.consulter'] as $permission) {
         expect($admin->can($permission))->toBeTrue();
     }
-    foreach (['alertes.prendre_en_compte', 'badges.annuler', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'badges.controler', 'badges.associer', 'visiteurs.valider'] as $permission) {
+    foreach (['alertes.prendre_en_compte', 'cloture.superviseur', 'badges.annuler', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'badges.controler', 'badges.associer', 'visiteurs.valider'] as $permission) {
         expect($admin->can($permission))->toBeFalse();
     }
     // le superviseur garde les deux : consulter ET prendre en compte
