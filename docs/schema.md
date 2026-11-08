@@ -203,6 +203,23 @@ Migration additive `2026_11_07_000000_harden_data_lifecycle` : aucune nouvelle t
 Les échecs de connexion ajoutent IP et empreinte SHA-256 du jeton d’appareil reçu, à défaut du User-Agent. Ce dernier est un indicateur technique non unique, pas une authentification d’appareil. Les jetons, identifiants saisis et mots de passe ne sont pas copiés au journal. Un refus d’accès est enregistré une seule fois par requête, avec le gabarit de route et le statut.
 
 
+## Évolution S03/S04 — personnes, activités, participations
+
+Migration `2026_11_25_000000_create_persons_and_activity_kind`. Contrats minimaux :
+
+- **Personne** (`persons`) : identité durable, indépendante de toute activité (`full_name`, prénom/nom facultatifs ensemble, organisation, `status` actif/archive). **Aucune unicité sur le nom** : deux personnes de même nom restent deux personnes ; la création d'un homonyme exige une confirmation explicite, et reprendre une personne connue est un choix explicite (jamais de fusion automatique).
+- **Activité** (`events`) : `kind` = evenement, stage ou visite ; « permanent » est réservé au contexte permanent (déclencheur `events_kind_sync` synchronisé avec `is_permanent`). La nature ne change plus après la création. Les activités restent indépendantes.
+- **Participation** (`visitors`, fiche de l'activité) : `person_id` obligatoire, **une participation par personne et par activité** (index unique), `person_id` immuable (déclencheur). Un déclencheur crée une personne neuve pour toute participation insérée sans personne : aucune écriture ne contourne l'identité. Clôture individuelle : `closed_at`, `closed_by`, `closure_reason` (cohérents) ; refusée tant que la personne est présente ou qu'un badge lui est attribué ; n'efface ni la personne, ni ses autres participations, ni ses attributions ; une participation clôturée sort des recherches, de la copie de la tablette et de toute attribution ou contrôle de badge.
+- **Titulaire permanent** (`permanent_holders`) : profil d'engagement (carte, identifiant imprimé) d'UNE personne (`person_id` obligatoire, unique, immuable). Le registre des titulaires reste le parcours de création des permanents ; il ne duplique pas l'identité.
+- **Écrans** : Administration > Personnes (recherche, création explicite) ; fiche d'une personne (participations de toutes les activités, historique des badges, inscription à une activité, clôture d'une participation). La saisie d'un invité accepte une personne connue (`person_id`).
+- **Reconstruction** : tout est dans les migrations ; la remise à zéro de démonstration efface aussi les personnes.
+- **Conservation** : la durée de conservation de l'identité d'une personne (au-delà de l'anonymisation des fiches d'une activité) n'est pas définie par le cahier des charges (§11, §13) : décision à prendre ; aucune purge automatique des personnes n'est faite.
+
+## Évolution S05 — badges inter-activités
+- `badge_assignments.badge_id`, `access_events.badge_id`, `badges.badge_batch_id` : clés étrangères simples (plus de clé composite avec `event_id`).
+- `badges.event_id` = activité de rattachement courante (mobile uniquement par mise à disposition d'un badge Disponible, garde-fou `badges_event_guard`).
+- `badge_transfers` (id, badge_id, from_event_id, to_event_id, actor_id, reservation_released, timestamps) : historique des mises à disposition, non modifiable.
+
 ## Évolution S02 — capacités de poste et clôture réservée
 
 Migration `2026_11_24_000000_add_poste_point_and_closure_flag` (additive, sans donnée à reprendre) : `devices.point_code` (CHECK : poste_1, poste_2, poste_3, poste_4, soute, hotel ; nul = poste non identifié, sans aucune capacité ; contrainte `devices_enrolled_has_point` : un appareil muni d'un jeton a obligatoirement un point) et `categories.closure_supervisor_only` (booléen, faux par défaut). Journal : `sync.auteur_refuse`, et `point_code` dans `poste.cree`. Réglage ajouté dans `settings` : `poste_hors_reseau_approuve` (0 : aucun délai hors ligne approuvé, donc aucune décision favorable hors ligne).

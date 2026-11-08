@@ -32,6 +32,12 @@ describe('création des événements dans IKOMA ACCESS', () => {
     expect(post).toHaveBeenCalledWith('/administration/evenements', expect.any(Object));
   });
 
+  it('propose la nature de l’activité (événement, stage, visite) et l’affiche dans la liste', () => {
+    const wrapper = mount(Evenements, { props: { events: [{ id: 'e1', name: 'Stage de sécurité', site: null, kind: 'stage', starts_at: '2030-11-10T08:00:00Z', ends_at: '2030-11-14T18:00:00Z' }] } });
+    expect(wrapper.findAll('[data-testid=nature-evenement] option').map(o => o.text())).toEqual(['Événement', 'Stage', 'Visite']);
+    expect(wrapper.get('[data-testid=nature-activite]').text()).toBe('Stage');
+  });
+
   it('liste plusieurs événements sans mélanger leurs identifiants', () => {
     const wrapper = mount(Evenements, {
       props: {

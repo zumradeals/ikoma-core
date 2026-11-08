@@ -58,7 +58,7 @@ final class ListSnapshot
             EXISTS (SELECT 1 FROM photos p WHERE p.visitor_id = v.id) AS photo_done,
             EXISTS (SELECT 1 FROM access_events a WHERE a.visitor_id = v.id AND a.type = 'validation') AS validated,
             (SELECT b.code FROM badge_assignments x JOIN badges b ON b.id = x.badge_id WHERE x.visitor_id = v.id AND x.returned_at IS NULL AND x.cancelled_at IS NULL LIMIT 1) AS badge_code
-            FROM visitors v WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND v.holder_id IS NULL ORDER BY v.full_name, v.id", [$e]);
+            FROM visitors v WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND v.holder_id IS NULL AND v.closed_at IS NULL ORDER BY v.full_name, v.id", [$e]);
         $iso = fn (?string $value): ?string => $value === null ? null : Carbon::parse($value)->utc()->format('Y-m-d\TH:i:s.u\Z');
 
         return [

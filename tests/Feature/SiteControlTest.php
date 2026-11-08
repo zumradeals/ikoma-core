@@ -144,22 +144,46 @@ it('rejoue le même contrôle sans doublon et refuse un identifiant réutilisé 
     $this->postJson('/poste/api/controle', ['code' => $this->batch1[1]->code], siteHeaders($id))->assertStatus(409);
 });
 
-it('enregistre une sortie, passe le visiteur à « sorti » et restitue le badge selon le réglage', function (string $reusable, string $final) {
-    DB::table('settings')->where('key', 'badge_reutilisable')->update(['value' => $reusable]);
+it('enregistre une sortie sans restituer le badge : la restitution est un acte distinct', function () {
     siteEnter(1, $this->batch1[0]);
     siteEnter(2, $this->batch2[0]);
     expect(app(Presence::class)->count(DemoSeeder::id('event')))->toBe(2);
     $out = $this->postJson('/poste/api/sortie', ['code' => 'IKOMA1:'.DB::table('badges')->where('id', $this->batch1[0]->id)->value('qr_token'), 'point' => siteZone(0)], siteHeaders())->assertOk()->json();
-    expect($out)->toMatchArray(['ok' => true, 'badge_status' => $final, 'presents' => 1, 'point' => 'Accueil']);
+    expect($out)->toMatchArray(['ok' => true, 'badge_status' => 'Associé', 'badge_a_restituer' => true, 'presents' => 1, 'point' => 'Accueil']);
     expect(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('status'))->toBe('sorti')
-        ->and(DB::table('badges')->where('id', $this->batch1[0]->id)->value('status'))->toBe($final)
+        ->and(DB::table('badges')->where('id', $this->batch1[0]->id)->value('status'))->toBe('Associé')
         ->and(DB::table('access_events')->where('type', 'sortie')->count())->toBe(1)
-        ->and(DB::table('badge_assignments')->where('badge_id', $this->batch1[0]->id)->whereNotNull('returned_at')->count())->toBe(1);
+        ->and(DB::table('badge_assignments')->where('badge_id', $this->batch1[0]->id)->whereNotNull('returned_at')->count())->toBe(0);
     $line = siteAudit()->where('action', 'sortie.enregistree')->first();
-    expect(json_decode($line->details, true))->toMatchArray(['statut_badge' => $final, 'presents' => 1])->and($line->details)->not->toContain(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('full_name'));
-    // le badge sorti n'est plus valable en contrôle
+    expect(json_decode($line->details, true))->toMatchArray(['statut_badge' => 'Associé', 'presents' => 1])->and($line->details)->not->toContain(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('full_name'));
+    // la personne est sortie : le badge, encore associé, ne donne plus accès
+    expect(siteControl($this->batch1[0]->code)->json())->toMatchArray(['valid' => false, 'reason' => 'personne_sortie']);
+});
+
+it('restitue explicitement un badge après la sortie, selon le réglage de réutilisation, et refuse une personne présente ou un badge non associé', function (string $reusable, string $final) {
+    DB::table('settings')->where('key', 'badge_reutilisable')->update(['value' => $reusable]);
+    siteEnter(1, $this->batch1[0]);
+    $giveBack = fn (string $code) => $this->postJson('/poste/api/restitution', ['code' => $code], siteHeaders())->assertOk()->json();
+    expect($giveBack($this->batch1[0]->code))->toMatchArray(['ok' => false, 'reason' => 'personne_presente']);
+    $this->postJson('/poste/api/sortie', ['code' => $this->batch1[0]->code, 'point' => siteZone(0)], siteHeaders())->assertOk();
+    expect($giveBack($this->batch1[0]->code))->toMatchArray(['ok' => true, 'badge_status' => $final]);
+    expect(DB::table('badges')->where('id', $this->batch1[0]->id)->value('status'))->toBe($final)
+        ->and(DB::table('badge_assignments')->where('badge_id', $this->batch1[0]->id)->whereNotNull('returned_at')->count())->toBe(1)
+        ->and(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('status'))->toBe('sorti');
+    // une seconde restitution est refusée, et le badge restitué reste invalide au contrôle
+    expect($giveBack($this->batch1[0]->code))->toMatchArray(['ok' => false, 'reason' => 'non_associe']);
     expect(siteControl($this->batch1[0]->code)->json()['valid'])->toBeFalse();
+    expect(siteAudit()->where('action', 'badge.restitue')->count())->toBe(1);
 })->with([['oui', 'Disponible'], ['non', 'Clos']]);
+
+it('réserve la restitution aux agents autorisés à associer un badge', function () {
+    siteEnter(1, $this->batch1[0]);
+    foreach (['administrateur', 'superviseur', 'hote', 'encadreur'] as $role) {
+        $this->actingAs(siteUser($role));
+        $this->postJson('/poste/api/restitution', ['code' => $this->batch1[0]->code], siteHeaders())->assertForbidden();
+    }
+    expect(DB::table('badges')->where('id', $this->batch1[0]->id)->value('status'))->toBe('Associé');
+});
 
 it('refuse une sortie sans entrée, une deuxième sortie, un badge non associé, annulé ou inconnu, sans rien écrire de plus', function () {
     $sortie = fn (string $code) => $this->postJson('/poste/api/sortie', ['code' => $code], siteHeaders())->assertOk()->json();

@@ -145,7 +145,7 @@ test('sortie : le compteur baisse, le badge n’est plus valable, une deuxième 
   await next(page);
   await expect.poll(() => presents(page)).toBe(before - 1);
   await scan(page, 'controle', fx.controlBadges[0]);
-  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('raison')).toContainText('restitué');
+  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('raison')).toContainText('Personne sortie');
   await next(page);
   await scan(page, 'sortie', fx.controlBadges[0]);
   await expect(page.getByTestId('verdict')).toContainText('SORTIE REFUSÉE'); await expect(page.getByTestId('raison')).toContainText('Déjà sorti'); await shot(page, 'l7-sortie-refusee');

@@ -21,6 +21,8 @@ export type ControlResult = {
   permanent?: { identifier: string; entered?: boolean } | null;
 };
 export type ExitResult = { ok: boolean; reason?: string; message?: string; badge_code: string | null; badge_status?: string; person?: { name: string }; point?: string; presents?: number | null; warning?: string | null; source: 'serveur' | 'local'; known_at?: string | null; permanent?: { identifier: string; card_kept?: boolean } | null };
+/** Restitution d'un badge (en ligne uniquement) : vérification sans écriture, puis restitution confirmée. */
+export type GiveBackResult = { ok: boolean; reason?: string; message?: string; badge_code: string | null; badge_status?: string; person?: { name: string }; source: 'serveur' };
 export type Avis = 'hote' | 'superviseur';
 /** Chiffres du poste d'accueil, calculés sur la copie de la tablette (donc disponibles sans réseau). */
 export type DeskSummary = {

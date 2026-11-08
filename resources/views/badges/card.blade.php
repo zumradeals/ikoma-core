@@ -19,5 +19,5 @@
             <div class="access-card__qr">{!! $svg !!}</div>
         </div>
     @endif
-    <footer class="access-card__footer">Badge à restituer à la sortie</footer>
+    <footer class="access-card__footer">Badge à restituer à l’accueil</footer>
 </article>

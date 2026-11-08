@@ -577,6 +577,30 @@ Constat de recette sur tablette : une carte active avec une habilitation en cour
 Demande du dirigeant : le bandeau blanc « Réinitialiser ce navigateur et changer de poste » en haut de l'écran de travail n'est pas professionnel. Il est retiré de l'écran ouvert. La réinitialisation locale reste disponible depuis l'écran verrouillé (« Ancien poste ? Réinitialiser ce navigateur pour le réenrôler »), qui est le chemin documenté (RESET_POSTE_CAMERA.md). Aucune règle ni donnée modifiée.
 
 
+## S03/S04 — Personnes, activités et participations (novembre 2026)
+
+Branche issue de `main` (S02 n'est pas fusionnée ; à réaligner dès son intégration). Aucune donnée de production à migrer : structure propre, sans mécanisme de compatibilité.
+
+- **Une identité, des participations :** `persons` est l'identité durable ; les fiches `visitors` sont les participations (une par personne et par activité). Les titulaires permanents sont des personnes avec un profil d'engagement. Pas de second registre : la saisie d'un invité, l'inscription depuis la fiche et les cartes permanentes passent par la même identité.
+- **Jamais de fusion automatique :** aucune unicité sur le nom ; l'homonyme est signalé et sa création confirmée ; les importations créent une personne par ligne (pas de rapprochement implicite). Le rapprochement de doublons reste une décision humaine (lot ultérieur).
+- **Garanties en base :** participation sans personne impossible (déclencheur), `person_id` immuable, une participation par personne et par activité, nature d'activité cohérente avec le contexte permanent.
+- **Clôture d'une participation :** individuelle, motivée, refusée si présente ou badge attribué (jamais valant restitution), sans effet sur la personne ni sur ses autres participations. Clôtures collectives et VIP : hors périmètre.
+- **Points à valider :** conservation de l'identité (non définie) ; rapprochement de doublons ; importations (un homonyme d'une personne existante n'est pas repris automatiquement).
+
+## S05 — Sortie physique ≠ restitution (étape 2 de la branche S03–S05)
+
+- **Décision** : l'enregistrement d'une sortie (`SiteControl::exit`, en ligne comme rejoué hors ligne) ne restitue plus le badge. Le badge reste « Associé » à la participation jusqu'à une restitution explicite. La réponse de sortie porte `badge_a_restituer: true`.
+- **Restitution explicite** : `POST /poste/api/restitution` (droits `badges.controler` et `badges.associer`, idempotente via `Operations::run`) → `SiteControl::giveBack` → `BadgeService::restituer` (inchangé : badge Disponible ou Clos selon `badge_reutilisable`). Refusée si la personne est encore présente (`personne_presente`) ou si le badge n'est associé à personne (`non_associe`). Elle est volontairement **en ligne uniquement** (pas de nouvel opération de synchronisation hors périmètre).
+- **Contrôle** : un badge associé à une personne sortie est refusé (`personne_sortie`) côté serveur et dans la copie locale de la tablette ; la sortie hors ligne ne marque plus le badge « Restitué » localement.
+- **Protections conservées** : index d'attribution ouverte unique, trigger de statut, `Participations::close` refuse tant qu'un badge n'est pas restitué, règles des cartes permanentes inchangées (la carte permanente n'est ni associée ni restituée).
+- **Réutilisation inter-activités (décision du dirigeant : pas de S05b séparé)** : un badge physique ne reste plus lié à son activité d'origine.
+  - Migration `2026_11_26_000000` : les clés étrangères composites `(badge_id, event_id)` de `badge_assignments` et `access_events`, et `(badge_batch_id, event_id)` de `badges`, deviennent des clés simples. `badge_assignments.event_id` garde l'activité de CHAQUE attribution : l'historique d'un badge traverse les activités. Le lot et l'activité d'émission restent des données de provenance.
+  - `badges.event_id` devient « activité de rattachement courante ». Elle ne change que par `BadgeRegistry::transfer` (mise à disposition explicite, administrateur `badges.gerer`), jamais pour un badge attribué ou non Disponible (garde-fou SQL `badges_event_guard` + contrôles PHP), ni carte permanente, ni badge imprimé pour une personne, ni si le code existe déjà dans l'activité cible. La catégorie est celle choisie dans l'activité cible (le support physique doit porter la nouvelle catégorie : réimpression ou étiquette — à traiter par l'atelier), les réservations de l'ancienne activité sont levées, un poste de la nouvelle activité peut être réservé dans le même geste.
+  - Historique : table `badge_transfers` (immuable en modification), ligne d'audit `badge.mis_a_disposition`, page de détail du badge avec attributions (activité + personne) et mises à disposition. Page « Registre commun » : `/administration/badges/registre`.
+  - Écart assumé : `badges.event_id` existe toujours (il porte la réservation, la catégorie, l'impression et les codes uniques par activité). Le supprimer complètement exigerait de refondre ces mécanismes ; il est donc redéfini comme rattachement courant, mobile et tracé, et non plus comme appartenance définitive.
+  - Remise à zéro de démonstration : les deux fonctions SQL sont adaptées (transferts, attributions d'autres activités sur les badges supprimés).
+- **Écran de restitution du poste** : mode « Restitution » de l'écran de contrôle (poste de contrôle/sortie ; sur cette branche le typage `poste_2` de la PR #93 n'existe pas encore). Parcours en deux temps : `POST /poste/api/restitution/verifier` (lecture seule : détenteur du badge) → confirmation de l'agent → `POST /poste/api/restitution` (idempotent) qui refait TOUS les contrôles côté serveur (personne sortie, attribution dans l'activité du poste, droits). **En ligne uniquement (V1)** : hors ligne, le bouton est désactivé et le dépôt local lève `hors_ligne`, sans file d'attente.
+
 ## S02 — Sécurisation des autorisations et de la traçabilité (novembre 2026)
 
 Lot de sécurité ciblé, issu de la qualification S01 (aucun remodelage du domaine : personnes, participations, cycle des badges et clôtures collectives appartiennent aux lots suivants). Le projet n'est pas en production ; aucune reprise de données.

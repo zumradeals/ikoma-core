@@ -27,14 +27,14 @@ final class EventsController
         return Inertia::render('Admin/Evenements', [
             'archives' => $request->boolean('archives'),
             'events' => Event::query()->when($request->boolean('archives'), fn ($q) => $q->where('status', 'archive'), fn ($q) => $q->where(fn ($q) => $q->whereNull('status')->orWhere('status', '<>', 'archive')))->orderByDesc('starts_at')
-                ->get(['id', 'name', 'site', 'starts_at', 'ends_at', 'status']),
+                ->get(['id', 'name', 'site', 'kind', 'starts_at', 'ends_at', 'status']),
         ]);
     }
 
     public function update(Request $request, string $event): RedirectResponse
     {
         Gate::authorize('evenements.gerer');
-        $data = $request->validate(['name' => 'required|string|max:160', 'site' => 'nullable|string|max:255', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at']);
+        $data = $request->validate(['name' => 'required|string|max:160', 'site' => 'nullable|string|max:255', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at']); // la nature d'une activité ne change plus après sa création
         DB::transaction(function () use ($event, $data): void {
             app(DataLifecycle::class)->lock();
             if (in_array(DB::table('events')->where('id', $event)->value('status'), ['clos', 'archive'], true)) {
@@ -65,6 +65,7 @@ final class EventsController
         $data = $request->validate([
             'name' => 'bail|required|string|max:160',
             'site' => 'nullable|string|max:255',
+            'kind' => 'sometimes|in:evenement,stage,visite',
             'starts_at' => 'bail|required|date',
             'ends_at' => 'bail|required|date|after:starts_at',
         ]);
@@ -73,6 +74,7 @@ final class EventsController
             $event = Event::create([
                 'name' => trim($data['name']),
                 'site' => isset($data['site']) && trim($data['site']) !== '' ? trim($data['site']) : null,
+                'kind' => $data['kind'] ?? 'evenement',
                 'starts_at' => $data['starts_at'],
                 'ends_at' => $data['ends_at'],
             ]);
@@ -80,7 +82,7 @@ final class EventsController
             Zone::create(['event_id' => $event->id, 'name' => 'Accueil', 'est_accueil' => true]);
             app(Audit::class)->append('evenement.cree', auth()->id(), [
                 'id' => $event->id,
-                'fields' => ['name', 'site', 'starts_at', 'ends_at'],
+                'fields' => ['name', 'site', 'kind', 'starts_at', 'ends_at'],
             ]);
 
             return $event;

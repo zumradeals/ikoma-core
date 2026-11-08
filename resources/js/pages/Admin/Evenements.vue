@@ -7,13 +7,14 @@ import { displayDate } from '../../labels';
 
 defineProps<{
   archives?: boolean;
-  events: { id: string; name: string; site: string | null; starts_at: string; ends_at: string; status?: string | null }[];
+  events: { id: string; name: string; site: string | null; kind?: string; starts_at: string; ends_at: string; status?: string | null }[];
 }>();
 
 const editing = ref<string | null>(null);
 const operationError = ref('');
 function transition(id: string, action: string) { if (window.confirm(action === 'cloturer' ? 'Clôturer cet événement ? Les présences, tablettes et opérations en attente seront vérifiées.' : 'Archiver cet événement clôturé ?')) router.post(`/administration/evenements/${id}/${action}`, { confirmation: true }, { onError: errors => { operationError.value = Object.values(errors).join(' '); } }); }
-const form = useForm({ name: '', site: '', starts_at: '', ends_at: '' });
+const form = useForm({ name: '', site: '', kind: 'evenement', starts_at: '', ends_at: '' });
+const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite', permanent: 'Permanent' };
 function createEvent() {
   const options = { preserveScroll: true, onSuccess: () => { form.reset(); editing.value = null; } };
   if (editing.value) form.put('/administration/evenements/' + editing.value, options);
@@ -40,6 +41,11 @@ function createEvent() {
             <label for="nom-evenement" class="block font-semibold">Nom de l’événement <span aria-hidden="true">*</span></label>
             <input id="nom-evenement" v-model="form.name" class="field" type="text" maxlength="160" placeholder="Ex. Forum des entreprises" required autocomplete="off" :aria-invalid="!!form.errors.name">
             <p v-if="form.errors.name" class="mt-1 text-sm text-red-700" role="alert">{{ form.errors.name }}</p>
+          </div>
+          <div>
+            <label for="nature-evenement" class="block font-semibold">Nature de l’activité</label>
+            <select id="nature-evenement" v-model="form.kind" class="field" :disabled="!!editing" data-testid="nature-evenement"><option value="evenement">Événement</option><option value="stage">Stage</option><option value="visite">Visite</option></select>
+            <p class="mt-1 text-sm text-slate-600">Chaque activité est indépendante : une même personne peut participer à plusieurs stages, événements ou visites.</p>
           </div>
           <div>
             <label for="site-evenement" class="block font-semibold">Lieu / site (facultatif)</label>
@@ -72,7 +78,7 @@ function createEvent() {
         <ul v-else class="mt-4 space-y-3" data-testid="liste-evenements">
           <li v-for="event in events" :key="event.id" class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div class="min-w-0">
-              <h3 class="font-bold">{{ event.name }}</h3><p>{{ event.status === 'archive' ? 'Archivé' : event.status === 'clos' ? 'Clôturé' : 'Ouvert' }}</p>
+              <h3 class="font-bold">{{ event.name }}</h3><p v-if="event.kind" class="text-sm text-slate-600" data-testid="nature-activite">{{ kinds[event.kind] ?? event.kind }}</p><p>{{ event.status === 'archive' ? 'Archivé' : event.status === 'clos' ? 'Clôturé' : 'Ouvert' }}</p>
               <p v-if="event.site" class="text-sm text-slate-600">{{ event.site }}</p>
               <p class="mt-1 text-sm text-slate-600">{{ displayDate(event.starts_at) }} – {{ displayDate(event.ends_at) }}</p>
             </div>

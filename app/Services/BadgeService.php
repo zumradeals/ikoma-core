@@ -50,6 +50,9 @@ final class BadgeService
             if ($visitor->withdrawn_at !== null) {
                 throw new BadgeRefused('invite_retire', 'Cet invité a été retiré de la liste.');
             }
+            if ($visitor->closed_at !== null) {
+                throw new BadgeRefused('participation_cloturee', 'La participation de cette personne est clôturée : aucun badge ne peut lui être attribué.');
+            }
             if ($visitor->status === 'refuse') {
                 throw new BadgeRefused('visiteur_refuse', 'Accès refusé à ce visiteur : aucun badge ne peut lui être associé.');
             }
@@ -143,7 +146,7 @@ final class BadgeService
         $query = DB::table('badges as b')->leftJoin('categories as c', 'c.id', '=', 'b.category_id')
             ->leftJoin('badge_assignments as a', fn ($j) => $j->on('a.badge_id', '=', 'b.id')->whereNull('a.returned_at')->whereNull('a.cancelled_at'))
             ->leftJoin('visitors as v', 'v.id', '=', 'a.visitor_id')
-            ->select('b.id', 'b.event_id', 'b.status', 'c.id as category_id', 'c.name as category_name', 'c.color as category_color', 'v.id as visitor_id', 'v.full_name', 'v.organisation', 'v.valid_from', 'v.valid_until', 'v.category_id as visitor_category_id', 'v.withdrawn_at');
+            ->select('b.id', 'b.event_id', 'b.status', 'c.id as category_id', 'c.name as category_name', 'c.color as category_color', 'v.id as visitor_id', 'v.closed_at', 'v.full_name', 'v.organisation', 'v.valid_from', 'v.valid_until', 'v.category_id as visitor_category_id', 'v.withdrawn_at', 'v.status as visitor_status');
         if (preg_match('/^[0-9a-f]{64}$/i', $input) === 1) {
             $query->where('b.qr_token', strtolower($input));
         } else {
@@ -169,6 +172,12 @@ final class BadgeService
         }
         if ($status === BadgeStatus::Available || $row->visitor_id === null) {
             return $this->refuse('non_associe', 'Badge non associé à une personne.', $row->id, $row->event_id, $actor, $journaliser);
+        }
+        if ($row->closed_at !== null) {
+            return $this->refuse('participation_cloturee', 'La participation de cette personne est clôturée.', $row->id, $row->event_id, $actor, $journaliser);
+        }
+        if ($row->visitor_status === 'sorti') {
+            return $this->refuse('personne_sortie', 'Cette personne est sortie : le badge est à restituer et ne donne plus accès.', $row->id, $row->event_id, $actor, $journaliser);
         }
         if ($row->withdrawn_at !== null) {
             return $this->refuse('invite_retire', 'Cet invité a été retiré de la liste.', $row->id, $row->event_id, $actor, $journaliser);

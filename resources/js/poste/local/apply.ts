@@ -126,7 +126,7 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
       return {}; // un contrôle ne change rien à la copie locale ; l'événement est écrit par le serveur au rejeu
     case 'sortie': {
       const holder = Array.from(list.visitors.values()).find(x => x.badge_code === String(p.code).toUpperCase());
-      if (holder) { holder.status = 'sorti'; list.touch(); const badge = list.badges.get(String(p.code).toUpperCase()); if (badge) badge.status = 'Restitué'; }
+      if (holder) { holder.status = 'sorti'; list.touch(); } // la sortie ne restitue pas le badge
       return {};
     }
     case 'non_liste': {

@@ -79,6 +79,18 @@ final class HostGuests
             if ($name === '' || mb_strlen($name) > 160 || mb_strlen($org) > 160) {
                 throw ValidationException::withMessages(['full_name' => 'Indiquez un nom de 1 à 160 caractères et une organisation de 160 caractères au plus.']);
             }
+            // S03/S04 : l'administration peut inscrire une PERSONNE CONNUE (identité unique) plutôt que d'en créer une nouvelle ; jamais de rapprochement automatique sur le nom.
+            $personId = ! $v && $administration ? ($data['person_id'] ?? null) : null;
+            if ($personId !== null) {
+                $person = DB::table('persons')->where('id', $personId)->lockForUpdate()->first();
+                if ($person === null || $person->status !== 'actif') {
+                    throw ValidationException::withMessages(['person_id' => 'Personne introuvable ou archivée.']);
+                }
+                if (DB::table('visitors')->where('person_id', $personId)->where('event_id', $eventId)->exists()) {
+                    throw ValidationException::withMessages(['full_name' => 'Cette personne participe déjà à cette activité.']);
+                }
+                $name = $person->full_name;
+            }
             $category = DB::table('categories')->where('event_id', $eventId)->where('id', $data['category_id'])->first();
             if (! $category || (! $administration && $category->id !== $v?->category_id && DB::selectOne('SELECT public.ikoma_normalize(?) AS n', [$category->name])->n !== 'visiteur')) {
                 throw ValidationException::withMessages(['category_id' => 'Seule la catégorie Visiteur est autorisée.']);
@@ -114,7 +126,7 @@ final class HostGuests
             $at = now()->format('Y-m-d H:i:s.uP');
             $visitorId = $id ?? (string) Str::uuid();
             if (! $v) {
-                DB::table('visitors')->insert(['id' => $visitorId, 'event_id' => $eventId, 'host_id' => $host?->id, ...$values, 'source' => 'listé', 'status' => 'attendu', 'created_at' => $at, 'updated_at' => $at]);
+                DB::table('visitors')->insert(['id' => $visitorId, 'event_id' => $eventId, 'person_id' => $personId, 'host_id' => $host?->id, ...$values, 'source' => 'listé', 'status' => 'attendu', 'created_at' => $at, 'updated_at' => $at]);
             } elseif ($fields) {
                 DB::table('visitors')->where('id', $id)->update([...$values, 'updated_at' => $at]);
             }
