@@ -370,7 +370,7 @@ describe('S02 — restrictions de poste appliquées avant toute décision locale
   it('refuse les capacités absentes du point tenu par la tablette (poste 1, poste 3, poste 4, soute)', async () => {
     for (const [point, capabilities] of [['poste_1', []], ['poste_3', []], ['poste_4', []], ['soute', ['scan']]] as [string, string[]][]) {
       const { repo, store } = await repoFor({ point_code: point, capabilities, trustHours: 12 });
-      const scan = await repo.control('c-' + point, 'B-001', null);
+      const scan = await repo.control('c-' + point, 'B-001', null, point === 'soute' ? 'entree' : undefined); // à la soute le sens est obligatoire (S10)
       if (capabilities.includes('scan')) expect(gateReasons).not.toContain(scan.reason);
       else expect(scan.reason).toBe('poste_non_habilite');
       expect((await repo.exit('x-' + point, 'B-001', null)).reason).toBe('poste_non_habilite');
@@ -421,10 +421,32 @@ describe('S02 — restrictions de poste appliquées avant toute décision locale
     const token = 'a'.repeat(64);
     const hash = await sha256Hex(token);
     const { repo } = await repoFor({ point_code: 'soute', capabilities: ['scan'], trustHours: 0, permanentHash: hash });
-    const result = await repo.control('p1', 'IKOMA1:' + token, null);
+    const result = await repo.control('p1', 'IKOMA1:' + token, null, 'entree');
     expect(gateReasons).not.toContain(result.reason); // la carte est jugée par sa propre règle (PermanentAccess), pas par le délai des badges temporaires
     const none = await repoFor({ point_code: 'poste_1', capabilities: [], trustHours: 12, permanentHash: hash });
     expect((await none.repo.control('p2', 'IKOMA1:' + token, null)).reason).toBe('poste_non_habilite');
+  });
+
+  // S10 — sens du passage à la soute : choisi avant le scan, obligatoire, consigné avec l'opération.
+  it('exige Entrée ou Sortie avant tout scan à la soute, sans rien consigner', async () => {
+    const { repo, store } = await repoFor({ point_code: 'soute', capabilities: ['scan'], trustHours: 12 });
+    expect(repo.requiresDirection()).toBe(true);
+    await expect(repo.control('s1', 'B-001', null)).rejects.toMatchObject({ code: 'sens_requis' });
+    expect(await store.count('pending')).toBe(0);
+  });
+
+  it('consigne le sens choisi avec le contrôle hors ligne, pour qu’il atteigne le journal à la synchronisation', async () => {
+    const { repo, store } = await repoFor({ point_code: 'soute', capabilities: ['scan'], trustHours: 12 });
+    const out = await repo.control('s2', 'B-001', null, 'sortie');
+    expect(out.direction).toBe('sortie');
+    expect(await store.count('pending')).toBe(1);
+  });
+
+  it('n’impose aucun sens hors de la soute', async () => {
+    const { repo } = await repoFor({ point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'], trustHours: 12 });
+    expect(repo.requiresDirection()).toBe(false);
+    const result = await repo.control('s3', 'B-001', null);
+    expect(result.direction ?? null).toBeNull();
   });
 });
 

@@ -173,3 +173,61 @@ describe('navigation de l’agent selon le poste', () => {
     expect(items(['accueil'])).not.toContain('/controle');
   });
 });
+
+describe('soute : sens du passage choisi avant le scan', () => {
+  const valid = { valid: true, reason: null, message: 'Badge valide.', badge_code: 'B-001', zone_ok: true, point: 'Soute', person: { name: 'Koné Mariam' }, organisation: 'Org fictive', category: { id: 'c', name: 'Visiteur', color: '#0F5AA6', priority_circuit: false }, zones: ['Soute'], source: 'serveur' as const };
+  const souteRepo = () => {
+    const control = vi.fn(async (_op: string, _code: string, _point: unknown, direction?: string) => ({ ...valid, direction: (direction ?? null) as 'entree' | 'sortie' | null }));
+    const repository = { checkpoints: async () => [{ type: 'zone' as const, id: 'z1', name: 'Soute' }], control, exit: vi.fn(), giveBackCheck: vi.fn(), giveBack: vi.fn(), presentCount: vi.fn(async () => 4), pendingCount: async () => 0,
+      capabilities: () => ['scan'], requiresDirection: () => true } as unknown as SitePosteRepository;
+    return { repository, control };
+  };
+  const open = async (repository: SitePosteRepository) => {
+    window.localStorage.setItem('ikoma.controle.point', JSON.stringify({ type: 'zone', id: 'z1' }));
+    const wrapper = mount(ControleApp, { props: { agent: 'Agent fictif', repository } });
+    await flushPromises();
+    return wrapper;
+  };
+
+  it('bloque le scan tant que ni Entrée ni Sortie n’est choisi, et le dit', async () => {
+    const { repository, control } = souteRepo();
+    const wrapper = await open(repository);
+    expect(wrapper.get('[data-testid=sens-requis]').text()).toContain('Choisissez Entrée ou Sortie');
+    await wrapper.get('[data-testid=code-manuel]').setValue('B-001');
+    expect(wrapper.get('[data-testid=valider-code]').attributes('disabled')).toBeDefined();
+    await wrapper.get('form[aria-label="Saisir le code du badge"]').trigger('submit');
+    await flushPromises();
+    expect(control).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid=erreur]').text()).toContain('Choisissez Entrée ou Sortie');
+  });
+
+  it('envoie le sens choisi avec le scan et l’affiche dans le résultat', async () => {
+    const { repository, control } = souteRepo();
+    const wrapper = await open(repository);
+    await wrapper.get('[data-testid=sens-entree]').trigger('click');
+    expect(wrapper.get('[data-testid=sens-entree]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[data-testid=sens-choisi]').text()).toContain('Entrée');
+    await wrapper.get('[data-testid=code-manuel]').setValue('B-001');
+    await wrapper.get('form[aria-label="Saisir le code du badge"]').trigger('submit');
+    await flushPromises();
+    expect(control).toHaveBeenCalledWith(expect.any(String), 'B-001', { type: 'zone', id: 'z1' }, 'entree');
+    expect(wrapper.get('[data-testid=sens-resultat]').text()).toBe('Entrée');
+    await wrapper.get('[data-testid=suivant]').trigger('click');
+    await wrapper.get('[data-testid=sens-sortie]').trigger('click');
+    await wrapper.get('[data-testid=code-manuel]').setValue('B-002');
+    await wrapper.get('form[aria-label="Saisir le code du badge"]').trigger('submit');
+    await flushPromises();
+    expect(control).toHaveBeenLastCalledWith(expect.any(String), 'B-002', { type: 'zone', id: 'z1' }, 'sortie');
+    expect(wrapper.get('[data-testid=sens-resultat]').text()).toBe('Sortie');
+  });
+
+  it('n’offre pas ce choix au poste d’accueil ni aucune fonction d’accueil à la soute', async () => {
+    const { repository } = souteRepo();
+    const soute = await open(repository);
+    expect(soute.find('[data-testid=mode-sortie]').exists()).toBe(false);
+    expect(soute.find('[data-testid=mode-restitution]').exists()).toBe(false);
+    expect(soute.find('a[href="/poste"]').exists()).toBe(false);
+    const accueil = await open({ ...(repository as object), capabilities: () => ['accueil', 'scan', 'sortie'], requiresDirection: () => false } as unknown as SitePosteRepository);
+    expect(accueil.find('[data-testid=sens-passage]').exists()).toBe(false);
+  });
+});

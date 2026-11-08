@@ -4,6 +4,8 @@ use App\Models\Badge;
 use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\BadgeService;
+use App\Services\ParticipationEntitlements;
+use App\Services\Presence;
 use App\Services\Visits;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
@@ -191,4 +193,134 @@ it('ne compte pas les badges des cartes permanentes parmi les badges visiteurs',
     $before = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->count();
     $this->actingAs($this->admin)->get('/administration/atelier/parcours')->assertOk()->assertInertia(fn ($page) => $page->where('visitors.badges.Disponible', DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->where('b.status', 'Disponible')->count())->etc());
     expect($before)->toBeGreaterThan(0);
+});
+
+// --- Soute (P5) : sens du passage choisi avant le scan --------------------------------------------------------------------------------
+
+function s10Scan(string $code, ?string $direction, ?array $point = null)
+{
+    $body = array_filter(['code' => $code, 'point' => $point, 'direction' => $direction], fn ($v) => $v !== null);
+
+    return test()->postJson('/poste/api/controle', $body, s10Headers());
+}
+
+it('exige le sens Entrée ou Sortie à la soute avant tout scan et n’écrit rien sans lui', function () {
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'soute']);
+    s10Enter($this->visitorBadges[0], 1);
+    $before = DB::table('access_events')->where('type', 'controle')->count();
+    $this->actingAs($this->agent);
+    s10Scan($this->visitorBadges[0]->code, null)->assertStatus(422)->assertJsonPath('code', 'sens_requis');
+    s10Scan($this->visitorBadges[0]->code, 'nord')->assertStatus(422)->assertJsonValidationErrors('direction');
+    expect(DB::table('access_events')->where('type', 'controle')->count())->toBe($before);
+});
+
+it('inscrit le sens dans le mouvement et l’expose au journal de supervision, sans changer la présence', function () {
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'soute']);
+    s10Enter($this->visitorBadges[0], 1);
+    $presence = app(Presence::class);
+    $present = $presence->count($this->event);
+    $this->actingAs($this->agent);
+    $zone = ['type' => 'zone', 'id' => DemoSeeder::id('zone1')];
+    s10Scan($this->visitorBadges[0]->code, 'entree', $zone)->assertOk()->assertJsonPath('valid', true)->assertJsonPath('direction', 'entree');
+    $this->travel(5)->seconds();
+    s10Scan($this->visitorBadges[0]->code, 'sortie', $zone)->assertOk()->assertJsonPath('valid', true)->assertJsonPath('direction', 'sortie');
+    $events = DB::table('access_events')->where('type', 'controle')->orderBy('occurred_at')->get();
+    expect($events->map(fn ($e) => json_decode($e->details, true)['direction'])->all())->toBe(['entree', 'sortie']);
+    // un passage à la soute n'est ni une entrée ni une sortie du site
+    expect($presence->count($this->event))->toBe($present)->and(DB::table('access_events')->whereIn('type', ['entree', 'sortie'])->where('checkpoint', '<>', 'Poste fictif')->count())->toBe(0);
+    $this->actingAs($this->sup)->get('/pilotage/mouvements?event='.$this->event.'&type=controle')->assertOk()
+        ->assertInertia(fn ($page) => $page->where('rows.0.direction', 'sortie')->where('rows.1.direction', 'entree')->etc());
+});
+
+it('applique les habilitations dans les deux sens, y compris la zone refusée', function () {
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'soute']);
+    s10Enter($this->visitorBadges[0], 1);
+    $this->actingAs($this->agent);
+    $denied = ['type' => 'zone', 'id' => DemoSeeder::id('zone2')];
+    foreach (['entree', 'sortie'] as $direction) {
+        s10Scan($this->visitorBadges[0]->code, $direction, $denied)->assertOk()->assertJson(['valid' => true, 'zone_ok' => false, 'direction' => $direction]);
+        $this->travel(5)->seconds();
+    }
+    // une habilitation exceptionnelle de participation ouvre la zone, dans les deux sens
+    app(ParticipationEntitlements::class)->grant(s10Visitor(1), DemoSeeder::id('zone2'), 'exceptionnelle', 'Visite autorisée', now()->subMinute()->toIso8601String(), now()->addHour()->toIso8601String(), $this->admin);
+    foreach (['entree', 'sortie'] as $direction) {
+        s10Scan($this->visitorBadges[0]->code, $direction, $denied)->assertOk()->assertJson(['valid' => true, 'zone_ok' => true, 'direction' => $direction]);
+        $this->travel(5)->seconds();
+    }
+    // un badge annulé est refusé dans les deux sens, avec son sens consigné
+    app(BadgeService::class)->annuler($this->visitorBadges[0], $this->sup, 'Perdu');
+    foreach (['entree', 'sortie'] as $direction) {
+        s10Scan($this->visitorBadges[0]->code, $direction)->assertOk()->assertJson(['valid' => false, 'direction' => $direction]);
+        $this->travel(5)->seconds();
+    }
+    expect(DB::table('access_events')->where('type', 'controle')->whereRaw("details->>'direction' IS NOT NULL")->count())->toBe(6);
+});
+
+it('ne demande aucun sens au poste d’accueil mais accepte celui qu’on lui donne', function () {
+    s10Enter($this->visitorBadges[0], 1);
+    $this->actingAs($this->agent);
+    s10Scan($this->visitorBadges[0]->code, null)->assertOk()->assertJsonPath('valid', true)->assertJsonPath('direction', null);
+});
+
+// --- Atelier : gestion des modèles de badges -------------------------------------------------------------------------------------------
+
+function s10OtherEvent(): string
+{
+    $id = (string) Str::uuid();
+    DB::table('events')->insert(['id' => $id, 'name' => 'Autre activité fictive', 'starts_at' => '2027-02-01 08:00:00+00', 'ends_at' => '2027-02-02 20:00:00+00', 'created_at' => now(), 'updated_at' => now()]);
+
+    return $id;
+}
+
+function s10SaveModel(string $event, array $values): void
+{
+    foreach ($values as $key => $value) {
+        DB::table('settings')->updateOrInsert(['key' => 'badge_atelier_'.$event.'_'.$key], ['value' => $value]);
+    }
+}
+
+it('rétablit le modèle par défaut d’un événement sans toucher à celui des autres', function () {
+    $other = s10OtherEvent();
+    $vip = ['design' => 'vip', 'title' => 'TITRE FICTIF', 'primary' => '#0B3C6B', 'accent' => '#C9962B', 'orientation' => 'portrait'];
+    s10SaveModel($this->event, $vip);
+    s10SaveModel($other, $vip);
+    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reinitialiser', ['event' => $this->event])->assertOk()->assertJsonPath('model.design', 'visiteur')->assertJsonPath('model.title', 'IKOMA ACCESS');
+    expect(DB::table('settings')->where('key', 'like', 'badge_atelier\_'.$this->event.'\_%')->count())->toBe(0);
+    expect(DB::table('settings')->where('key', 'like', 'badge_atelier\_'.$other.'\_%')->count())->toBe(5);
+    expect(DB::table('audit_logs')->where('action', 'badge.modele_reinitialise')->count())->toBe(1);
+    // la page de l'atelier propose de nouveau les valeurs par défaut
+    $this->get('/administration/atelier')->assertOk()->assertInertia(fn ($page) => $page->where('preferences.'.$this->event.'.design', 'visiteur')->where('preferences.'.$other.'.design', 'vip')->etc());
+});
+
+it('reprend le modèle d’une autre activité sans modifier la source, et lui transmet les défauts si elle n’en a pas', function () {
+    $other = s10OtherEvent();
+    $vip = ['design' => 'vip', 'title' => 'TITRE REPRIS', 'primary' => '#0B3C6B', 'accent' => '#C9962B', 'orientation' => 'portrait'];
+    s10SaveModel($other, $vip);
+    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $other])->assertOk()->assertJsonPath('model.title', 'TITRE REPRIS');
+    foreach ($vip as $key => $value) {
+        expect(DB::table('settings')->where('key', 'badge_atelier_'.$this->event.'_'.$key)->value('value'))->toBe($value);
+        expect(DB::table('settings')->where('key', 'badge_atelier_'.$other.'_'.$key)->value('value'))->toBe($value);
+    }
+    $log = DB::table('audit_logs')->where('action', 'badge.modele_repris')->first();
+    expect(json_decode($log->details, true))->toMatchArray(['event_id' => $this->event, 'source_event_id' => $other]);
+    // une source sans modèle enregistré transmet les défauts de l'installation
+    $blank = s10OtherEvent();
+    $this->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $blank])->assertOk()->assertJsonPath('model.design', 'visiteur');
+    expect(DB::table('settings')->where('key', 'badge_atelier_'.$this->event.'_title')->value('value'))->toBe('IKOMA ACCESS');
+});
+
+it('refuse de reprendre un modèle de l’événement lui-même ou d’un contexte permanent, et réserve ces opérations à l’administrateur du badge', function () {
+    $other = s10OtherEvent();
+    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $this->event])->assertUnprocessable()->assertJsonValidationErrors('source');
+    $permanent = DB::table('events')->where('is_permanent', true)->value('id');
+    if ($permanent !== null) {
+        $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $permanent])->assertUnprocessable()->assertJsonValidationErrors('source');
+        $this->postJson('/administration/atelier/modeles/reinitialiser', ['event' => $permanent])->assertUnprocessable()->assertJsonValidationErrors('event');
+    }
+    foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
+        $this->actingAs(s10User($role));
+        $this->postJson('/administration/atelier/modeles/reinitialiser', ['event' => $this->event])->assertForbidden();
+        $this->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $other])->assertForbidden();
+    }
+    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reinitialiser', ['event' => 'pas-un-uuid'])->assertUnprocessable();
 });
