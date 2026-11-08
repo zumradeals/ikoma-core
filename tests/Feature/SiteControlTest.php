@@ -242,9 +242,11 @@ it('expose le compteur au superviseur et à l’agent, jamais aux autres rôles'
     $event = DemoSeeder::id('event');
     $this->getJson('/poste/api/presents', siteHeaders())->assertOk()->assertJson(['count' => 2]);
     $this->actingAs(siteUser('superviseur'))->getJson('/api/presences?event_id='.$event)->assertOk()->assertJson(['event_id' => $event, 'count' => 2]);
-    foreach (['administrateur', 'agent_accueil', 'hote'] as $role) {
+    foreach (['agent_accueil', 'hote'] as $role) {
         $this->actingAs(siteUser($role))->getJson('/api/presences?event_id='.$event)->assertForbidden();
     }
+    // S02 : l'administrateur consulte les présences (lecture seule), il n'agit pas
+    $this->actingAs(siteUser('administrateur'))->getJson('/api/presences?event_id='.$event)->assertOk()->assertJson(['count' => 2]);
     $this->actingAs(siteUser('superviseur'))->getJson('/api/presences')->assertStatus(422);
 });
 

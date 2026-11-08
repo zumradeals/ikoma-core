@@ -221,14 +221,23 @@ it('refuse en bloc des opérations attribuées à un autre compte, sans rien enr
     $this->postJson('/poste/api/sync', ['operations' => [$own]], $headers)->assertOk()->assertJsonPath('summary.applied', 1);
 });
 
-it('refuse un auteur inconnu, vide ou falsifié, sans rien écrire', function (?string $declared) {
-    $op = s02Op($this->agent, 1, $declared ?? '');
-    if ($declared === null) {
-        unset($op['agent_id']);
-    }
+it('refuse un auteur falsifié ou inconnu, sans rien écrire', function (string $declared) {
+    $op = s02Op($this->agent, 1, $declared);
     $this->postJson('/poste/api/sync', ['operations' => [$op]], ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'])->assertForbidden()->assertJsonPath('code', 'auteur_incoherent');
     expect(DB::table('sync_operations')->where('id', $op['id'])->exists())->toBeFalse();
-})->with([[null], [''], ['pas-un-uuid'], ['00000000-0000-4000-8000-000000000000']]);
+})->with(['pas-un-uuid', '00000000-0000-4000-8000-000000000000']);
+
+it('traite une opération sans auteur comme invalide, une à une, sans l’exécuter ni refuser les autres', function (bool $empty) {
+    $anonymous = s02Op($this->agent, 1);
+    $anonymous['agent_id'] = $empty ? '' : null;
+    if (! $empty) {
+        unset($anonymous['agent_id']);
+    }
+    $own = s02Op($this->agent, 2);
+    $response = $this->postJson('/poste/api/sync', ['operations' => [$anonymous, $own]], ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'])->assertOk();
+    expect($response->json('results.0.code'))->toBe('operation_invalide')->and($response->json('results.1.status'))->toBe('applique');
+    expect(DB::table('sync_operations')->where('id', $anonymous['id'])->exists())->toBeFalse();
+})->with([true, false]);
 
 it('refuse l’usurpation même par appel direct au service, et laisse un second agent envoyer ses propres opérations (tablette partagée)', function () {
     $poste = Device::findOrFail(DemoSeeder::id('device'));

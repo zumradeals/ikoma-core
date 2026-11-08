@@ -43,7 +43,8 @@ final class SyncProcessor
         // Un lot contenant une opération attribuée à un autre compte est refusé en bloc, avant toute écriture : aucune opération n'est
         // consommée, aucune séquence n'avance (un refus partiel ferait passer l'appareil pour un clone).
         $declared = array_map(static fn (array $op): string => (string) ($op['agent_id'] ?? ''), $operations);
-        $foreign = array_values(array_filter($declared, static fn (string $id): bool => $id !== $session->id));
+        // Une opération SANS auteur n'est pas une usurpation : elle reste une opération invalide jugée une à une (rien n'est exécuté). Un auteur différent de la session, lui, refuse le lot.
+        $foreign = array_values(array_filter($declared, static fn (string $id): bool => $id !== '' && $id !== $session->id));
         if ($foreign !== []) {
             $this->audit->append('sync.auteur_refuse', $session->id, [
                 'device_id' => $device->id, 'event_id' => $device->event_id, 'operations' => count($operations), 'incoherentes' => count($foreign),
