@@ -21,11 +21,15 @@ final class Devices
 
     public function __construct(private readonly Audit $audit) {}
 
-    public function create(string $eventId, string $name, ?string $station, User $actor): Device
+    public function create(string $eventId, string $name, ?string $station, User $actor, ?string $pointCode = null): Device
     {
-        return DB::transaction(function () use ($eventId, $name, $station, $actor): Device {
-            $device = Device::create(['event_id' => $eventId, 'name' => $name, 'station' => $station]);
-            $this->audit->append('poste.cree', $actor->id, ['device_id' => $device->id, 'event_id' => $eventId]);
+        if ($pointCode !== null && ! array_key_exists($pointCode, PostCapabilities::POINTS)) {
+            throw new DeskRefused('point_inconnu', 'Point de contrôle inconnu.', 422);
+        }
+
+        return DB::transaction(function () use ($eventId, $name, $station, $actor, $pointCode): Device {
+            $device = Device::create(['event_id' => $eventId, 'name' => $name, 'station' => $station, 'point_code' => $pointCode]);
+            $this->audit->append('poste.cree', $actor->id, ['device_id' => $device->id, 'event_id' => $eventId, 'point_code' => $pointCode]);
 
             return $device;
         });

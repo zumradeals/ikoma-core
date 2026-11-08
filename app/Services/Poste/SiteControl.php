@@ -31,6 +31,7 @@ final class SiteControl
      */
     public function control(Device $poste, User $agent, string $code, ?array $point, ?string $declaredAt = null, ?bool $localValid = null, ?string $knownAt = null): array
     {
+        PostCapabilities::require($poste, $agent, 'scan');
         $checkpoint = $this->point($poste, $point);
         if (($card = $this->permanent->resolveCard($code)) !== null) {
             return $this->permanentControl($poste, $agent, $card, $checkpoint, $declaredAt, $localValid, $knownAt);
@@ -86,6 +87,7 @@ final class SiteControl
      */
     public function exit(Device $poste, User $agent, string $code, ?array $point, ?string $declaredAt = null): array
     {
+        PostCapabilities::require($poste, $agent, 'sortie');
         $checkpoint = $this->point($poste, $point);
         if (($card = $this->permanent->resolveCard($code)) !== null) {
             return $this->permanentExit($poste, $agent, $card, $checkpoint, $declaredAt);
@@ -121,6 +123,10 @@ final class SiteControl
 
         return DB::transaction(function () use ($poste, $agent, $badge, $active, $checkpoint, $declaredAt): array {
             $visitor = DB::table('visitors')->where('id', $active)->lockForUpdate()->first();
+            // S02 : clôture réservée au superviseur (indicateur explicite de la catégorie, jamais son libellé). L'agent est refusé ; rien n'est restitué.
+            if (DB::table('categories')->where('id', $visitor->category_id)->value('closure_supervisor_only')) {
+                return $this->refused($poste, $agent, $badge->id, 'cloture_reservee_superviseur', 'La sortie de cette personne est réservée au superviseur : prévenez-le.');
+            }
             if ($visitor->status !== 'present') {
                 $map = ['sorti' => ['deja_sorti', 'Sortie déjà enregistrée pour cette personne.'], 'refuse' => ['visiteur_refuse', 'Accès refusé à cette personne : aucune sortie à enregistrer.']];
                 [$reason, $message] = $map[$visitor->status] ?? ['sortie_sans_entree', 'Aucune entrée enregistrée pour cette personne : la sortie est refusée.'];

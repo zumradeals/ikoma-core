@@ -15,7 +15,7 @@ class Category extends Model
 
     protected function casts(): array
     {
-        return ['priority_circuit' => 'boolean'];
+        return ['priority_circuit' => 'boolean', 'closure_supervisor_only' => 'boolean'];
     }
 
     /** @return BelongsTo<Event, $this> */

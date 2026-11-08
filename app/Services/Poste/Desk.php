@@ -88,6 +88,7 @@ final class Desk
      */
     public function saveIdentity(Device $poste, User $agent, string $visitorId, bool $identityChecked, string $jpeg, ?string $documentType = null, ?string $documentNumber = null, ?string $documentJpeg = null): array
     {
+        PostCapabilities::require($poste, $agent, 'accueil');
         $visitor = $this->openVisitor($poste, $visitorId);
         if (! $identityChecked) {
             throw new DeskRefused('identite_non_cochee', 'Cochez « pièce d’identité contrôlée » après avoir vérifié la pièce.');
@@ -138,6 +139,7 @@ final class Desk
     /** @return array<string, mixed> */
     public function validate(Device $poste, User $agent, string $visitorId, ?string $avis, ?string $declaredAt = null): array
     {
+        PostCapabilities::require($poste, $agent, 'accueil');
         $visitor = $this->openVisitor($poste, $visitorId, true);
         if ($visitor->source === 'non listé' && $visitor->host_validation !== 'accepte') {
             throw new DeskRefused('hote_en_attente', $visitor->host_validation === 'refuse' ? 'L’hôte a refusé cette visite : l’entrée est impossible.' : 'En attente de l’accord de l’hôte : la validation et l’entrée sont impossibles pour le moment.', 422, 'Attendez la réponse de l’hôte ou appelez-le.');
@@ -170,6 +172,7 @@ final class Desk
     /** @return array<string, mixed> */
     public function refuse(Device $poste, User $agent, string $visitorId, string $motif): array
     {
+        PostCapabilities::require($poste, $agent, 'accueil');
         $visitor = $this->openVisitor($poste, $visitorId, true);
         $motif = trim($motif);
         if ($motif === '') {
@@ -195,6 +198,7 @@ final class Desk
      */
     public function assignBadge(Device $poste, User $agent, string $visitorId, string $code): array
     {
+        PostCapabilities::require($poste, $agent, 'accueil');
         $visitor = $this->openVisitor($poste, $visitorId, true);
         $validation = $this->validation($visitor) ?? throw new DeskRefused('validation_requise', 'Validez d’abord le visiteur avant de lui remettre un badge.');
         $input = trim($code);
@@ -240,6 +244,7 @@ final class Desk
      */
     public function enter(Device $poste, User $agent, string $visitorId, int $durationMs, bool $strict = false, ?string $declaredAt = null): array
     {
+        PostCapabilities::require($poste, $agent, 'accueil');
         $visitor = $this->openVisitor($poste, $visitorId, true, true);
         $badgeId = DB::table('badge_assignments')->where('visitor_id', $visitor->id)->whereNull('returned_at')->whereNull('cancelled_at')->value('badge_id');
         if ($this->validation($visitor) === null || $badgeId === null) {
@@ -265,6 +270,7 @@ final class Desk
      */
     public function createUnlisted(Device $poste, User $agent, string $name, ?string $organisation, string $hostId, string $categoryId, ?string $id = null): array
     {
+        PostCapabilities::require($poste, $agent, 'accueil');
         $name = trim($name);
         if ($name === '' || ! DB::table('hosts')->where('id', $hostId)->where('event_id', $poste->event_id)->exists() || ! DB::table('categories')->where('id', $categoryId)->where('event_id', $poste->event_id)->exists()) {
             throw new DeskRefused('fiche_invalide', 'Fiche incomplète : indiquez le nom, la personne à voir et la catégorie.');

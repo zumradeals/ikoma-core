@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Device;
 use App\Services\Audit;
 use App\Services\Poste\Devices;
+use App\Services\Poste\PostCapabilities;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,8 +20,8 @@ final class PostesController
     public function index(): Response
     {
         Gate::authorize('postes.gerer');
-        $postes = DB::table('devices as d')->join('events as e', 'e.id', '=', 'd.event_id')->orderBy('e.name')->orderBy('d.name')->get(['d.id', 'd.name', 'd.station', 'd.event_id', 'e.name as event_name', 'd.token_hash', 'd.revoked_at', 'd.enrolled_at', 'd.last_synced_at', 'd.enrollment_expires_at', 'd.wipe_acknowledged_at'])
-            ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'station' => $d->station, 'event_id' => $d->event_id, 'event_name' => $d->event_name, 'state' => $d->revoked_at ? 'revoque' : ($d->token_hash ? 'enrole' : 'non_enrole'), 'enrolled_at' => $d->enrolled_at, 'last_synced_at' => $d->last_synced_at, 'wipe_acknowledged_at' => $d->wipe_acknowledged_at, 'code_pending' => $d->enrollment_expires_at !== null && $d->enrollment_expires_at > now()->toDateTimeString()]);
+        $postes = DB::table('devices as d')->join('events as e', 'e.id', '=', 'd.event_id')->orderBy('e.name')->orderBy('d.name')->get(['d.id', 'd.name', 'd.station', 'd.point_code', 'd.event_id', 'e.name as event_name', 'd.token_hash', 'd.revoked_at', 'd.enrolled_at', 'd.last_synced_at', 'd.enrollment_expires_at', 'd.wipe_acknowledged_at'])
+            ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'station' => $d->station, 'point_code' => $d->point_code, 'event_id' => $d->event_id, 'event_name' => $d->event_name, 'state' => $d->revoked_at ? 'revoque' : ($d->token_hash ? 'enrole' : 'non_enrole'), 'enrolled_at' => $d->enrolled_at, 'last_synced_at' => $d->last_synced_at, 'wipe_acknowledged_at' => $d->wipe_acknowledged_at, 'code_pending' => $d->enrollment_expires_at !== null && $d->enrollment_expires_at > now()->toDateTimeString()]);
         $counts = DB::table('sync_operations')->selectRaw('device_id, count(*) AS received, count(*) FILTER (WHERE status_code = 200) AS applied, count(*) FILTER (WHERE status_code IS NOT NULL AND status_code <> 200) AS conflicts')->groupBy('device_id')->get()->keyBy('device_id');
         $postes = $postes->map(fn ($p) => [...$p, 'received' => (int) ($counts[$p['id']]->received ?? 0), 'applied' => (int) ($counts[$p['id']]->applied ?? 0), 'conflicts' => (int) ($counts[$p['id']]->conflicts ?? 0)]);
         $setting = fn (string $key) => (int) DB::table('settings')->where('key', $key)->value('value');
@@ -37,8 +39,8 @@ final class PostesController
     public function store(Request $r, Devices $devices): RedirectResponse
     {
         Gate::authorize('postes.gerer');
-        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120']);
-        $devices->create($data['event_id'], $data['name'], $data['station'] ?? null, $r->user());
+        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120', 'point_code' => ['nullable', Rule::in(array_keys(PostCapabilities::POINTS))]]);
+        $devices->create($data['event_id'], $data['name'], $data['station'] ?? null, $r->user(), $data['point_code'] ?? null);
 
         return back();
     }
