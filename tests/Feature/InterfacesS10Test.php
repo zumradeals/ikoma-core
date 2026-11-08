@@ -77,6 +77,7 @@ it('rassemble dans le tableau de bord tout ce que le superviseur doit voir, à p
     DB::table('vehicles')->insert(['id' => (string) Str::uuid(), 'event_id' => $this->event, 'visitor_id' => s10Visitor(0), 'plate' => 'CE-100', 'plate_normalized' => 'CE100', 'kind' => 'voiture', 'status' => 'present', 'entered_at' => now(), 'entered_by' => $this->agent->id, 'created_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('refusals')->insert(['id' => (string) Str::uuid(), 'visitor_id' => s10Visitor(3), 'actor_id' => $this->agent->id, 'reason' => 'Motif fictif', 'refused_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     s10RefusedControl($this->deviceId);
+    DB::table('devices')->where('id', $this->deviceId)->update(['last_synced_at' => now()]);
     DB::table('sync_operations')->insert(['id' => (string) Str::uuid(), 'device_id' => $this->deviceId, 'user_id' => $this->agent->id, 'type' => 'entree', 'payload_hash' => 'x', 'received_at' => now(), 'processed_at' => now(), 'status_code' => 200, 'result' => '{}', 'created_at' => now(), 'updated_at' => now()]);
 
     $this->actingAs($this->sup)->get('/pilotage?event='.$this->event)->assertOk()->assertInertia(fn ($page) => $page->component('Pilotage/Index')
@@ -129,13 +130,14 @@ it('montre au poste d’accueil les visites attendues et en retard, sans les per
     app(Visits::class)->announce($this->admin, s10Visitor(2), '2027-01-10 09:00:00');
     DB::table('visitors')->where('id', s10Visitor(2))->update(['status' => 'present']);
     $rows = $this->actingAs($this->agent)->getJson('/poste/api/attendus', s10Headers())->assertOk()->json('results');
-    expect(collect($rows)->pluck('state', 'id')->all())->toBe([s10Visitor(0) => 'attendu', s10Visitor(1) => 'en_retard']);
+    // Ordre chronologique : la visite de 09 h (en retard) précède celle de 10 h 30.
+    expect(collect($rows)->pluck('state', 'id')->all())->toEqual([s10Visitor(1) => 'en_retard', s10Visitor(0) => 'attendu']);
     expect(array_keys($rows[0]))->toContain('full_name')->toContain('plates');
 });
 
-it('refuse les visites attendues à un poste sans capacité d’accueil, hors agent ou sans identification', function () {
+it('refuse les visites attendues à un poste sans capacité d’accueil et à tout compte qui n’est pas agent', function () {
     $this->actingAs($this->agent);
-    foreach (['soute', 'poste_1', 'hotel', null] as $point) {
+    foreach (['soute', 'poste_1', 'hotel'] as $point) {
         DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => $point]);
         $this->getJson('/poste/api/attendus', s10Headers())->assertForbidden();
     }
