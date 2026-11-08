@@ -71,7 +71,7 @@ beforeEach(function () {
     $this->actingAs($this->agent);
     $this->deviceA = DemoSeeder::id('device');
     $this->deviceB = (string) Str::uuid();
-    DB::table('devices')->insert(['id' => $this->deviceB, 'event_id' => DemoSeeder::id('event'), 'name' => 'Tablette fictive B', 'station' => 'Poste fictif B', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('devices')->insert(['id' => $this->deviceB, 'event_id' => DemoSeeder::id('event'), 'name' => 'Tablette fictive B', 'station' => 'Poste fictif B', 'point_code' => 'poste_2', 'created_at' => now(), 'updated_at' => now()]);
     DB::table('devices')->where('id', $this->deviceA)->update(['token_hash' => hash('sha256', SYNC_TOKEN_A)]);
     DB::table('devices')->where('id', $this->deviceB)->update(['token_hash' => hash('sha256', SYNC_TOKEN_B)]);
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 12, syncUser('administrateur'));
@@ -338,7 +338,7 @@ it('gère les postes depuis l’administration : création, code affiché une fo
     foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
         $this->actingAs(syncUser($role))->get('/administration/postes')->assertForbidden();
     }
-    $this->actingAs($admin)->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive C', 'station' => 'Poste fictif C'])->assertRedirect();
+    $this->actingAs($admin)->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive C', 'station' => 'Poste fictif C', 'point_code' => 'poste_2'])->assertRedirect();
     $device = DB::table('devices')->where('name', 'Tablette fictive C')->first();
     $this->post('/administration/postes/'.$device->id.'/code')->assertRedirect();
     $page = $this->get('/administration/postes')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->component('Admin/Postes')->where('newCode.device_id', $device->id)->has('newCode.code')->has('postes', 3)->where('settings.inactivity', 5));

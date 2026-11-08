@@ -7,11 +7,14 @@ use App\Services\BadgeLots;
 use App\Services\BadgeService;
 use App\Services\Poste\Desk;
 use App\Services\Poste\DeskRefused;
+use App\Services\Poste\Devices;
+use App\Services\Poste\ListSnapshot;
 use App\Services\Poste\PostCapabilities;
 use App\Services\Poste\SiteControl;
 use App\Services\Poste\SyncProcessor;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -150,9 +153,6 @@ it('limite la soute au contrôle individuel et le poste 2 à l’ensemble des op
     foreach (['accueil', 'scan', 'sortie'] as $capability) {
         expect(PostCapabilities::allows($poste, $capability))->toBeTrue();
     }
-    // poste non typé : comportement hérité inchangé
-    s02Point(null);
-    $this->postJson('/poste/api/controle', ['code' => 'B-999999'], s02Headers())->assertOk();
 });
 
 it('applique les mêmes limites de poste au rejeu hors ligne : mise en quarantaine, aucun mouvement enregistré', function () {
@@ -164,11 +164,14 @@ it('applique les mêmes limites de poste au rejeu hors ligne : mise en quarantai
         ->and(DB::table('access_events')->where('type', 'controle')->count())->toBe(0);
 });
 
-it('rejette un point de contrôle inconnu à la création d’un poste et l’enregistre sinon', function () {
+it('exige un point de contrôle identifié à la création d’un poste et rejette un point inconnu', function () {
     $admin = s02User('administrateur');
     $this->actingAs($admin);
     $event = DemoSeeder::id('event');
+    $this->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive S02', 'station' => 'Poste fictif'])->assertSessionHasErrors('point_code');
+    $this->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive S02', 'station' => 'Poste fictif', 'point_code' => ''])->assertSessionHasErrors('point_code');
     $this->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive S02', 'station' => 'Poste fictif', 'point_code' => 'poste_9'])->assertSessionHasErrors('point_code');
+    expect(DB::table('devices')->where('name', 'Tablette fictive S02')->exists())->toBeFalse();
     $this->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive S02', 'station' => 'Poste fictif', 'point_code' => 'poste_2'])->assertRedirect();
     expect(DB::table('devices')->where('name', 'Tablette fictive S02')->value('point_code'))->toBe('poste_2');
     // un agent ne règle pas son propre poste
@@ -234,6 +237,127 @@ it('refuse le rejeu d’un autre agent sur l’identifiant d’une opération d�
     $other = s02User();
     $this->actingAs($other)->postJson('/poste/api/sync', ['operations' => [$op]], ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'])->assertForbidden()->assertJsonPath('code', 'auteur_incoherent');
     expect(DB::table('sync_operations')->where('id', $op['id'])->value('user_id'))->toBe($this->agent->id);
+});
+
+// --- C1 : refus par défaut, point de contrôle obligatoire ------------------------------------------------------------------------------
+
+it('refuse toute capacité à un poste non identifié (refus par défaut), côté serveur', function () {
+    // Un appareil enrôlé sans point ne peut pas exister en base (contrainte) ; on vérifie donc la règle elle-même, qui protège aussi tout appel direct.
+    $untyped = new Device(['event_id' => DemoSeeder::id('event'), 'point_code' => null]);
+    expect(PostCapabilities::capabilities($untyped))->toBe([]);
+    foreach (['accueil', 'scan', 'sortie'] as $capability) {
+        expect(PostCapabilities::allows($untyped, $capability))->toBeFalse();
+        expect(fn () => PostCapabilities::require($untyped, $this->agent, $capability))->toThrow(DeskRefused::class, 'Ce poste n’est pas identifié');
+    }
+    // aucune des opérations de poste ne s'exécute pour un poste non identifié, même avec le rôle d'agent
+    expect(fn () => app(SiteControl::class)->control($untyped, $this->agent, 'B-999999', null))->toThrow(DeskRefused::class)
+        ->and(fn () => app(SiteControl::class)->exit($untyped, $this->agent, 'B-999999', null))->toThrow(DeskRefused::class)
+        ->and(fn () => app(Desk::class)->refuse($untyped, $this->agent, DemoSeeder::id('visitor1'), 'essai'))->toThrow(DeskRefused::class);
+    expect(DB::table('access_events')->count())->toBe(0);
+});
+
+it('refuse l’enrôlement et l’émission d’un code pour un poste sans point, et interdit en base un appareil enrôlé sans point', function () {
+    $admin = s02User('administrateur');
+    $untyped = (string) Str::uuid();
+    DB::table('devices')->insert(['id' => $untyped, 'event_id' => DemoSeeder::id('event'), 'name' => 'Tablette sans point', 'created_at' => now(), 'updated_at' => now()]);
+    expect(fn () => app(Devices::class)->issueCode(Device::findOrFail($untyped), $admin))->toThrow(DeskRefused::class, 'Précisez d’abord le point');
+    // même un code déjà émis (avant le typage) ne permet pas d'enrôler un poste sans point
+    DB::table('devices')->where('id', $untyped)->update(['enrollment_hash' => Devices::hash('ABCD-EFGH-2345'), 'enrollment_expires_at' => now()->addMinutes(10)]);
+    expect(fn () => app(Devices::class)->enrol('ABCD-EFGH-2345', $this->agent))->toThrow(DeskRefused::class, 'pas de point de contrôle identifié');
+    expect(DB::table('devices')->where('id', $untyped)->whereNotNull('token_hash')->exists())->toBeFalse();
+    // garantie de base : aucun jeton sans point, ni à l'insertion ni en retirant le point d'un poste enrôlé
+    expect(fn () => DB::transaction(fn () => DB::table('devices')->where('id', $untyped)->update(['token_hash' => hash('sha256', 'x')])))->toThrow(QueryException::class);
+    expect(fn () => DB::transaction(fn () => DB::table('devices')->where('id', DemoSeeder::id('device'))->update(['point_code' => null])))->toThrow(QueryException::class);
+    expect(DB::table('devices')->where('id', DemoSeeder::id('device'))->value('point_code'))->toBe('poste_2');
+    // un point hors liste est refusé en base
+    expect(fn () => DB::transaction(fn () => DB::table('devices')->where('id', $untyped)->update(['point_code' => 'poste_9'])))->toThrow(QueryException::class);
+});
+
+it('enrôle un poste identifié et lui donne ses capacités dans la réponse du serveur', function () {
+    $admin = s02User('administrateur');
+    $device = app(Devices::class)->create(DemoSeeder::id('event'), 'Tablette fictive S02c', 'Poste fictif', $admin, 'soute');
+    $code = app(Devices::class)->issueCode($device, $admin);
+    $enrolled = app(Devices::class)->enrol($code, $this->agent);
+    expect($enrolled['device_token'])->toMatch('/^[0-9a-f]{64}$/');
+    expect(DB::table('devices')->where('id', $device->id)->value('point_code'))->toBe('soute');
+});
+
+// --- C2 : restrictions revérifiées à la copie locale et au rejeu --------------------------------------------------------------------
+
+it('remet à la tablette son point de contrôle et ses capacités, et change de version quand le point change', function () {
+    $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
+    foreach (['poste_1' => [], 'poste_2' => ['accueil', 'scan', 'sortie'], 'poste_3' => [], 'poste_4' => [], 'soute' => ['scan']] as $point => $capabilities) {
+        s02Point($point);
+        $this->getJson('/poste/api/liste', $headers)->assertOk()->assertJsonPath('poste.point_code', $point)->assertJsonPath('poste.capabilities', $capabilities);
+    }
+    s02Point('poste_2');
+    $before = app(ListSnapshot::class)->version(Device::findOrFail(DemoSeeder::id('device')));
+    s02Point('soute');
+    expect(app(ListSnapshot::class)->version(Device::findOrFail(DemoSeeder::id('device'))))->not->toBe($before);
+});
+
+it('met en quarantaine une décision favorable hors ligne prise sur une copie plus ancienne que la limite déjà validée', function () {
+    $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
+    // badge réellement valide côté serveur : seule la fraîcheur de la copie locale est en cause
+    app(BadgeService::class)->associer($this->badges[0], DemoSeeder::id('visitor1'), $this->agent, DemoSeeder::id('device'));
+    $code = $this->badges[0]->code;
+    $op = fn (int $seq, array $payload) => ['id' => (string) Str::uuid(), 'seq' => $seq, 'type' => 'controle', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => $code, 'local_valid' => true, ...$payload]];
+    $fresh = $op(1, ['known_at' => now()->subHours(2)->toIso8601String()]);
+    $stale = $op(2, ['known_at' => now()->subHours(13)->toIso8601String()]);
+    $unknown = $op(3, []);
+    $response = $this->postJson('/poste/api/sync', ['operations' => [$fresh, $stale, $unknown]], $headers)->assertOk()->json();
+    $byId = collect($response['results'])->keyBy('id');
+    expect($byId[$fresh['id']]['status'])->toBe('applique')
+        ->and($byId[$stale['id']])->toMatchArray(['status' => 'conflit', 'code' => 'politique_perimee'])
+        ->and($byId[$unknown['id']])->toMatchArray(['status' => 'conflit', 'code' => 'politique_perimee']);
+    expect(DB::table('sync_conflicts')->where('reason', 'politique_perimee')->count())->toBe(2);
+    // limite désactivée (réglage existant à 0) : comportement inchangé, aucune durée nouvelle
+    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '0']);
+    $old = $op(4, ['known_at' => now()->subHours(40)->toIso8601String()]);
+    $this->postJson('/poste/api/sync', ['operations' => [$old]], $headers)->assertOk()->assertJsonPath('results.0.status', 'applique');
+    // un refus local n'est jamais requalifié : il n'accorde rien
+    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '12']);
+    $refused = ['id' => (string) Str::uuid(), 'seq' => 5, 'type' => 'controle', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => 'B-999999', 'local_valid' => false, 'known_at' => now()->subHours(40)->toIso8601String()]];
+    $this->postJson('/poste/api/sync', ['operations' => [$refused]], $headers)->assertOk()->assertJsonPath('results.0.status', 'applique');
+});
+
+it('revérifie au rejeu le point courant du poste, même si la copie locale était plus ancienne', function () {
+    $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
+    // la tablette a décidé quand le poste était un poste 2 ; l'administrateur l'a ensuite changé en poste 1
+    $op = s02Op($this->agent, 1);
+    $op['payload']['local_valid'] = true;
+    $op['payload']['known_at'] = now()->subMinutes(10)->toIso8601String();
+    s02Point('poste_1');
+    $this->postJson('/poste/api/sync', ['operations' => [$op]], $headers)->assertOk()->assertJsonPath('results.0.code', 'poste_non_habilite');
+    expect(DB::table('access_events')->where('type', 'controle')->count())->toBe(0);
+});
+
+// --- C3 : l'auteur initial ne change jamais en silence -----------------------------------------------------------------------------
+
+it('refuse qu’un autre agent renvoie sous son nom une opération déjà enregistrée par un autre, sans changer son auteur', function () {
+    $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
+    $op = s02Op($this->agent, 1);
+    $this->postJson('/poste/api/sync', ['operations' => [$op]], $headers)->assertOk()->assertJsonPath('results.0.status', 'applique');
+    $other = s02User();
+    // le second agent réécrit l'auteur à son propre nom pour passer le contrôle de session : l'identifiant d'opération est déjà pris par une autre action
+    $rewritten = [...$op, 'agent_id' => $other->id];
+    $this->actingAs($other)->postJson('/poste/api/sync', ['operations' => [$rewritten]], $headers)->assertOk()->assertJsonPath('results.0.code', 'operation_conflit');
+    expect(DB::table('sync_operations')->where('id', $op['id'])->value('user_id'))->toBe($this->agent->id)
+        ->and(DB::table('sync_operations')->where('id', $op['id'])->count())->toBe(1);
+    // le renvoi légitime par l'auteur initial rejoue le résultat sans rien refaire
+    $count = DB::table('access_events')->where('type', 'controle')->count();
+    $this->actingAs($this->agent)->postJson('/poste/api/sync', ['operations' => [$op]], $headers)->assertOk()->assertJsonPath('results.0.replayed', true);
+    expect(DB::table('access_events')->where('type', 'controle')->count())->toBe($count);
+});
+
+it('ne perd aucune opération quand un refus d’auteur survient : le lot est rejouable tel quel sous la bonne session', function () {
+    $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
+    $mine = [s02Op($this->agent, 1), s02Op($this->agent, 2)];
+    $other = s02User();
+    $this->actingAs($other)->postJson('/poste/api/sync', ['operations' => $mine], $headers)->assertForbidden()->assertJsonPath('code', 'auteur_incoherent');
+    expect(DB::table('sync_operations')->whereIn('id', array_column($mine, 'id'))->count())->toBe(0);
+    $this->actingAs($this->agent)->postJson('/poste/api/sync', ['operations' => $mine], $headers)->assertOk()->assertJsonPath('summary.applied', 2);
+    expect(DB::table('sync_operations')->whereIn('id', array_column($mine, 'id'))->count())->toBe(2);
 });
 
 // --- Clôture VIP : indicateur explicite, jamais le libellé --------------------------------------------------------------------------

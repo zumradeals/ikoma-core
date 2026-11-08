@@ -56,8 +56,10 @@ Validation du dirigeant : la permission `categories.gerer` est attribuée unique
 | poste_2 (accès terrestre) | Oui | Oui | Oui |
 | poste_3, poste_4 (procédures « à confirmer ») | — | — | — |
 | soute | — | Oui | — |
-| non typé (poste hérité) | Oui | Oui | Oui |
+| non identifié (point_code nul) | — | — | — |
 
-  Postes 3 et 4 : aucune capacité tant que leurs procédures ne sont pas décidées (cahier des charges §13). Poste non typé : comportement antérieur conservé, à typer avant toute mise en service réelle.
+  Postes 3 et 4 : aucune capacité tant que leurs procédures ne sont pas décidées (cahier des charges §13). **Refus par défaut** : un poste sans point de contrôle identifié n'a aucune capacité. Le point est obligatoire à la création du poste, à l'émission du code d'enrôlement, à l'enrôlement et, en base, pour tout appareil muni d'un jeton (contrainte `devices_enrolled_has_point`).
+- **Hors ligne :** la copie de la tablette porte `poste.point_code` et `poste.capabilities` (calculées par le serveur, source unique). La tablette applique localement la porte AVANT tout résultat favorable : poste non identifié, capacité absente, ou copie plus ancienne que la limite déjà validée `poste_hors_reseau_max_heures` (0 = désactivée) → refus, rien n'est mis en file. Le serveur revérifie au rejeu : capacités du point COURANT, et péremption de la copie pour toute décision favorable d'un badge temporaire (`politique_perimee`, quarantaine). Les cartes permanentes gardent leur règle de confiance propre.
+- **Auteur des opérations :** toujours le compte de la session (403 `auteur_incoherent` sinon). Une tablette garde ses opérations en attente pour l'agent qui les a saisies : un autre compte ne peut ni les effacer, ni les envoyer, ni les reprendre (voir JOURNAL_DECISIONS, S02).
 - **Clôture VIP :** indicateur explicite `categories.closure_supervisor_only`. Sortie et restitution refusées à l'agent (`cloture_reservee_superviseur`) pour ces catégories ; jamais déduit du libellé. Le chemin superviseur de la clôture appartient au lot de clôture ultérieur.
 - **Clôture globale d'une activité :** `evenements.gerer`, réservée à l'administrateur (inchangé, désormais testé).
