@@ -76,7 +76,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/api/presences', PresencesController::class)->middleware('can:presences.consulter');
         Route::get('/pilotage', [PilotageController::class, 'index'])->middleware('can:pilotage.consulter');
         Route::get('/pilotage/alertes', [PilotageController::class, 'alertes'])->middleware('can:alertes.consulter');
-        Route::post('/pilotage/alertes/{alert}/prendre-en-compte', [PilotageController::class, 'prendreEnCompte'])->whereUuid('alert')->middleware('can:alertes.consulter');
+        Route::post('/pilotage/alertes/{alert}/prendre-en-compte', [PilotageController::class, 'prendreEnCompte'])->whereUuid('alert')->middleware('can:alertes.prendre_en_compte');
         Route::get('/pilotage/presents', [PilotageController::class, 'presents'])->middleware('can:presences.consulter');
         Route::get('/pilotage/visiteurs/{visitor}', [PilotageController::class, 'visiteur'])->whereUuid('visitor')->middleware('can:pilotage.consulter');
         Route::post('/pilotage/badges/annuler', [PilotageController::class, 'annulerBadge'])->middleware('can:badges.annuler');

@@ -41,7 +41,7 @@ function a07Participation(): array
     DB::table('zones')->insert(['id' => $zone, 'event_id' => $event, 'name' => 'Hall fictif', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('zone_policies')->insert(['zone_id' => $zone, 'event_id' => $event, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
     $device = (string) Str::uuid();
-    DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'token_hash' => hash('sha256', A07_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', A07_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     $admin = test()->admin;
     $holder = app(PermanentHolders::class)->create(['full_name' => 'Titulaire Fictif Recette '.Str::random(5), 'institutional_category' => 'AILCT-01'], $admin);
     app(HolderCards::class)->issue($holder, $admin);
@@ -108,7 +108,7 @@ it('refuse côté serveur, pour chaque rôle, toute route dont une permission re
     // Les routes /poste/api exigent d'abord un poste enrôlé : on en fournit un pour que ce soit bien la permission qui tranche.
     $event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $event, 'name' => 'Événement fictif matrice', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('devices')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'name' => 'Poste fictif matrice', 'token_hash' => hash('sha256', A07_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('devices')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'name' => 'Poste fictif matrice', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', A07_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     $headers = ['HTTP_X_DEVICE_TOKEN' => A07_TOKEN, 'HTTP_X_OPERATION_ID' => (string) Str::uuid(), 'HTTP_ACCEPT' => 'application/json'];
     $violations = [];
     foreach (['administrateur', 'superviseur', 'agent_accueil', 'hote', 'encadreur'] as $role) {

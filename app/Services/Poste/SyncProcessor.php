@@ -23,14 +23,37 @@ final class SyncProcessor
 
     private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler'];
 
+    /**
+     * Opérations hors ligne qui produisent une DÉCISION D'ACCÈS (favorable) et sont donc soumises à la politique hors ligne :
+     * contrôle valide, validation, remise de badge, entrée (accueil) et, pour les cars, remise de badge de groupe et arrivée (admission par scan).
+     * Les autres opérations n'accordent rien : refus, identité, non listé, sortie (jamais soumise à la confiance, comme pour les cartes permanentes),
+     * appel nominal, départ et fin d'arrivée d'un car.
+     */
+    private const FAVORABLE = ['controle', 'valider', 'badge', 'entree', 'groupe_badge', 'groupe_arrivee'];
+
     public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups) {}
 
     /**
      * @param  list<array<string, mixed>>  $operations
-     * @return array{revoked:true}|array{results:list<array<string,mixed>>,summary:array<string,int>,clock_skew_seconds:?int}
+     * @return array{revoked:true}|array{author_mismatch:true}|array{results:list<array<string,mixed>>,summary:array<string,int>,clock_skew_seconds:?int}
      */
     public function process(Device $device, User $session, array $operations, ?string $sentAt): array
     {
+        // S02 / R-04 : l'auteur d'une opération est TOUJOURS le compte authentifié de la session, jamais une valeur fournie par le client.
+        // Un lot contenant une opération attribuée à un autre compte est refusé en bloc, avant toute écriture : aucune opération n'est
+        // consommée, aucune séquence n'avance (un refus partiel ferait passer l'appareil pour un clone).
+        $declared = array_map(static fn (array $op): string => (string) ($op['agent_id'] ?? ''), $operations);
+        // Une opération SANS auteur n'est pas une usurpation : elle reste une opération invalide jugée une à une (rien n'est exécuté). Un auteur différent de la session, lui, refuse le lot.
+        $foreign = array_values(array_filter($declared, static fn (string $id): bool => $id !== '' && $id !== $session->id));
+        if ($foreign !== []) {
+            $this->audit->append('sync.auteur_refuse', $session->id, [
+                'device_id' => $device->id, 'event_id' => $device->event_id, 'operations' => count($operations), 'incoherentes' => count($foreign),
+                'auteurs_declares' => array_slice(array_values(array_unique(array_filter($foreign, static fn (string $id): bool => Str::isUuid($id)))), 0, 5),
+            ]);
+
+            return ['author_mismatch' => true];
+        }
+
         return DB::transaction(function () use ($device, $session, $operations, $sentAt): array {
             $event = DB::table('events')->where('id', $device->event_id)->sharedLock()->first(['status']);
             $locked = Device::query()->lockForUpdate()->findOrFail($device->id);
@@ -191,6 +214,7 @@ final class SyncProcessor
     private function execute(Device $device, User $agent, string $type, array $p, ?string $clientTime): array
     {
         $need = fn (string ...$keys) => array_map(fn ($k) => $p[$k] ?? throw new DeskRefused('operation_invalide', 'Opération incomplète.'), $keys);
+        $this->requireOfflinePolicy($type, $p, $clientTime);
         switch ($type) {
             case 'identite':
                 [$visitor, $photo] = $need('visitor_id', 'photo_b64');
@@ -251,6 +275,58 @@ final class SyncProcessor
 
                 return $this->desk->createUnlisted($device, $agent, (string) $name, $p['organisation'] ?? null, (string) $host, (string) $category, (string) $visitor);
         }
+    }
+
+    /**
+     * S02 / C2 : une décision favorable prise HORS LIGNE n'est acceptée que si l'institution a approuvé un délai (PostCapabilities::offlineTrustHours : délai nul,
+     * absent ou non approuvé = refus, jamais « illimité ») et si la copie utilisée n'était pas plus ancienne que ce délai. Aucune durée n'est fixée dans le code.
+     * Une opération qui ne déclare pas l'âge de sa copie (known_at) est traitée comme hors ligne et refusée par défaut. Les cartes permanentes gardent leur règle propre.
+     * La déclaration « en ligne » du client ne suffit jamais : voir decidedOffline.
+     *
+     * @param  array<string, mixed>  $p
+     */
+    private function requireOfflinePolicy(string $type, array $p, ?string $clientTime): void
+    {
+        if (! in_array($type, self::FAVORABLE, true)) {
+            return;
+        }
+        if ($type === 'controle' && (($p['local_valid'] ?? null) !== true || str_starts_with((string) ($p['code'] ?? ''), 'PC:'))) {
+            return; // un refus local n'accorde rien ; une carte permanente suit PermanentAccess::offlineRefusal
+        }
+        $known = $this->time($p['known_at'] ?? null);
+        [$offline, $contradicted] = $this->decidedOffline($p, $known, $clientTime);
+        if (! $offline) {
+            return; // décision prise en ligne, recoupée par le serveur : il la juge lui-même à la réception
+        }
+        $hours = PostCapabilities::offlineTrustHours();
+        if ($hours <= 0) {
+            throw new DeskRefused($contradicted ? 'declaration_en_ligne_contredite' : 'politique_non_approuvee', 'Aucun délai hors ligne n’est approuvé : une décision favorable prise sans réseau n’est pas acceptée. Elle est mise en quarantaine et signalée.', 409);
+        }
+        $decided = $clientTime ?? now()->utc()->format('Y-m-d H:i:s.uP');
+        if ($known === null || Carbon::parse($decided)->getTimestamp() - Carbon::parse($known)->getTimestamp() > $hours * 3600) {
+            throw new DeskRefused($contradicted ? 'declaration_en_ligne_contredite' : 'politique_perimee', 'La copie utilisée hors ligne était trop ancienne pour autoriser ce passage : il est mis en quarantaine et signalé.', 409);
+        }
+    }
+
+    /**
+     * Une décision n'est tenue pour « en ligne » que si le serveur peut le recouper : la seule déclaration du client (`offline = false`) ne prouve rien.
+     * Le serveur mesure lui-même le délai entre l'heure déclarée de la décision et sa réception ; au-delà de poste_delai_appel_minutes (délai DÉJÀ validé à partir
+     * duquel une tablette est considérée coupée du réseau), la décision a attendu dans la file : elle est traitée comme hors ligne, quoi que le client déclare.
+     * Une opération sans heure déclarée, sans âge de copie ou déclarée hors ligne est hors ligne. Aucune preuve cryptographique ni protocole nouveau : cette règle ne
+     * protège pas contre un client qui falsifie AUSSI ses heures (risque résiduel documenté), mais le serveur rejuge de toute façon chaque opération sur l'état courant.
+     *
+     * @param  array<string, mixed>  $p
+     * @return array{0: bool, 1: bool} [hors ligne, déclaration « en ligne » contredite par le serveur]
+     */
+    private function decidedOffline(array $p, ?string $known, ?string $clientTime): array
+    {
+        if (($p['offline'] ?? null) !== false || $known === null || $clientTime === null) {
+            return [true, false];
+        }
+        $cutoff = max(1, (int) (DB::table('settings')->where('key', 'poste_delai_appel_minutes')->value('value') ?? 15)) * 60;
+        $delay = now()->getTimestamp() - Carbon::parse($clientTime)->getTimestamp();
+
+        return abs($delay) > $cutoff ? [true, true] : [false, false];
     }
 
     /**

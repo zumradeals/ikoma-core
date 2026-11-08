@@ -56,6 +56,10 @@ final class Alerts
 
     public function acknowledge(string $alertId, User $actor): void
     {
+        // S02 : consulter une alerte (administrateur, superviseur) n'est pas la prendre en compte (superviseur seul), même par appel direct au service.
+        if (! $actor->can('alertes.prendre_en_compte')) {
+            throw new DeskRefused('non_autorise', 'La prise en compte d’une alerte est réservée au superviseur.', 403);
+        }
         DB::transaction(function () use ($alertId, $actor): void {
             $alert = DB::table('alerts')->where('id', $alertId)->lockForUpdate()->first() ?? throw new DeskRefused('alerte_inconnue', 'Alerte introuvable.', 404);
             if ($alert->acknowledged_at !== null) {

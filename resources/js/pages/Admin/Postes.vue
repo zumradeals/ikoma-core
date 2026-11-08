@@ -2,13 +2,14 @@
 import { router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
 import { displayDate } from '../../labels';
-type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string; wipe_acknowledged_at?: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
+type Poste = { id: string; name: string; station: string | null; point_code?: string | null; event_id: string; event_name: string; wipe_acknowledged_at?: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
 const props = defineProps<{
-  events: { id: string; name: string }[]; postes: Poste[]; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; escalationMinutes: number; identityDocument: boolean };
+  events: { id: string; name: string }[]; postes: Poste[]; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; offlineApproved: boolean; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; escalationMinutes: number; identityDocument: boolean };
   newCode: { device_id: string; code: string } | null; conflicts: { id: string; kind: string; reason: string; operation_type: string | null; created_at: string; device_name: string }[];
 }>();
-const create = useForm({ event_id: props.events[0]?.id || '', name: '', station: '' });
-const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, escalationMinutes: props.settings.escalationMinutes, identityDocument: props.settings.identityDocument });
+const create = useForm({ event_id: props.events[0]?.id || '', name: '', station: '', point_code: '' });
+const points: Record<string, string> = { poste_1: 'Poste 1 — entrée principale (aucun scan en V1)', poste_2: 'Poste 2 — accès terrestre', poste_3: 'Poste 3 — chef du village (procédure à confirmer : aucune opération)', poste_4: 'Poste 4 — Porton (procédure à confirmer : aucune opération)', soute: 'Soute (point 5) — contrôle individuel', hotel: 'Hôtel — regroupement et départ des cars (hors postes de l’Académie : aucun contrôle ni accueil)' };
+const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, offlineApproved: props.settings.offlineApproved, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, escalationMinutes: props.settings.escalationMinutes, identityDocument: props.settings.identityDocument });
 const states = { non_enrole: ['○', 'Non enrôlé'], enrole: ['●', 'Enrôlé'], revoque: ['⛔', 'Révoqué'] } as const;
 const reasons: Record<string, string> = { deja_associe: 'Badge déjà associé', autre_poste: 'Badge réservé à un autre poste', deja_present: 'Visiteur déjà entré', agent_desactive: 'Agent désactivé', fiche_modifiee: 'Fiche modifiée entre-temps', horloge_suspecte: 'Horloge de la tablette décalée', hote_en_attente: 'Accord de l’hôte manquant', visiteur_refuse: 'Visiteur refusé', annule: 'Badge annulé' };
 function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station || poste.name} » ? La tablette sera effacée à sa prochaine connexion.`)) router.post(`/administration/postes/${poste.id}/revoquer`); }
@@ -25,16 +26,17 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <div class="space-y-6">
 <BaseCard>
 <h2 class="mb-5 text-heading font-bold">Créer un poste</h2>
-<form class="space-y-5" aria-label="Créer un poste" @submit.prevent="create.post('/administration/postes', { onSuccess: () => create.reset('name', 'station') })">
+<form class="space-y-5" aria-label="Créer un poste" @submit.prevent="create.post('/administration/postes', { onSuccess: () => create.reset('name', 'station', 'point_code') })">
 <label class="block">Événement<select v-model="create.event_id" class="field" required><option v-for="event in events" :key="event.id" :value="event.id">{{ event.name }}</option></select></label>
 <label class="block">Nom de la tablette<input v-model="create.name" class="field" maxlength="120" required></label>
 <label class="block">Nom du poste d’accueil<input v-model="create.station" class="field" maxlength="120"></label>
+<label class="block">Point de contrôle tenu par cette tablette<select v-model="create.point_code" class="field"><option value="">Non précisé (poste hérité : aucune restriction)</option><option v-for="(label, code) in points" :key="code" :value="code">{{ label }}</option></select></label>
 <p v-for="error in create.errors" :key="error" role="alert">{{ error }}</p>
 <FormButton :busy="create.processing">Créer le poste</FormButton>
 </form>
 </BaseCard>
 <BaseCard v-for="poste in postes" :key="poste.id">
-<h2 class="text-heading font-bold">{{ poste.station || poste.name }}</h2><p>{{ poste.name }} · {{ poste.event_name }}</p>
+<h2 class="text-heading font-bold">{{ poste.station || poste.name }}</h2><p>{{ poste.name }} · {{ poste.event_name }}<template v-if="poste.point_code"> · {{ points[poste.point_code] || poste.point_code }}</template></p>
 <p v-if="poste.state === 'revoque'" class="my-3">{{ poste.wipe_acknowledged_at ? 'Effacement déclaré par la tablette.' : poste.enrolled_at ? 'Effacement en attente : reconnectez la tablette.' : 'Poste retiré sans enrôlement antérieur.' }}</p><p class="my-3"><span class="inline-flex items-center gap-2 rounded-full border-2 border-ikoma-blue px-4 py-2 font-semibold"><span aria-hidden="true">{{ states[poste.state][0] }}</span>{{ states[poste.state][1] }}</span><span v-if="poste.code_pending" class="ml-3">Un code d’enrôlement est en attente.</span></p>
 <p>Dernière synchronisation : {{ poste.last_synced_at ? displayDate(poste.last_synced_at) : 'jamais' }}</p>
 <p data-testid="compteurs">Opérations reçues : <strong>{{ poste.received }}</strong> · appliquées : <strong>{{ poste.applied }}</strong> · en conflit : <strong>{{ poste.conflicts }}</strong></p>
@@ -61,7 +63,8 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <fieldset class="space-y-5 rounded-xl border border-slate-300 p-4">
 <legend class="px-2 font-semibold">Hors réseau, badges et supervision</legend>
 <label class="block">Sans réseau depuis (minutes), la tablette invite l’agent à prévenir le superviseur<input v-model.number="settings.offlineCall" type="number" min="1" max="240" class="field" required data-testid="reglage-appel"></label>
-<label class="block">Sans synchronisation depuis (heures), la tablette exige le réseau avant de reprendre le travail (0 : jamais)<input v-model.number="settings.offlineMaxHours" type="number" min="0" max="168" class="field" required data-testid="reglage-hors-reseau-max"></label>
+<label class="block">Sans synchronisation depuis (heures), la tablette exige le réseau avant de reprendre le travail (0 : jamais) ; c’est aussi le délai pendant lequel une décision favorable peut être prise sans réseau<input v-model.number="settings.offlineMaxHours" type="number" min="0" max="168" class="field" required data-testid="reglage-hors-reseau-max"></label>
+<label class="flex min-h-14 items-center gap-3"><input v-model="settings.offlineApproved" type="checkbox" class="h-6 w-6" data-testid="reglage-hors-reseau-approuve">J’approuve ce délai pour les décisions prises sans réseau. Sans approbation, ou avec 0 heure, aucun badge ni aucune admission n’est accepté hors ligne.</label>
 <label class="block">« Il reste peu de badges » sous (pourcentage du lot du poste)<input v-model.number="settings.lowBadgesPercent" type="number" min="1" max="90" class="field" required data-testid="reglage-badges-pourcent"></label>
 <label class="block">… ou sous (nombre de badges)<input v-model.number="settings.lowBadgesMin" type="number" min="0" max="1000" class="field" required data-testid="reglage-badges-minimum"></label>
 <label class="block">Une tablette sans nouvelles depuis (minutes) est signalée au superviseur<input v-model.number="settings.silentMinutes" type="number" min="1" max="1440" class="field" required data-testid="reglage-silencieuse"></label>

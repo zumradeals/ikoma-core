@@ -107,7 +107,7 @@ final class DemoLab
 
             $deviceId = (string) Str::uuid();
             DB::table('devices')->insert(['id' => $deviceId, 'event_id' => $event,
-                'name' => 'Tablette de démonstration', 'station' => 'Accueil fictif',
+                'name' => 'Tablette de démonstration', 'station' => 'Accueil fictif', 'point_code' => 'poste_2',
                 'created_at' => $now, 'updated_at' => $now]);
 
             $groupId = null;

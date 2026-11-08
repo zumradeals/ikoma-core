@@ -61,7 +61,7 @@ function pxEvent(string $token, bool $policy = true, bool $offline = false): arr
         DB::table('zone_policies')->insert(['zone_id' => $zone, 'event_id' => $event, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => $offline, 'created_at' => now(), 'updated_at' => now()]);
     }
     $device = (string) Str::uuid();
-    DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'token_hash' => hash('sha256', $token), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', $token), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
 
     return [$event, $zone, $device];
 }

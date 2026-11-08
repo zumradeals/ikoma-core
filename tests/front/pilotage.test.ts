@@ -65,6 +65,16 @@ describe('copie locale chiffrée de la liste d’évacuation', () => {
 describe('composants du pilotage', () => {
   beforeEach(() => { post.mockClear(); reload.mockClear(); });
 
+  it('n’offre pas la prise en compte à qui ne fait que consulter les alertes (S02) : l’administrateur voit, le superviseur agit', async () => {
+    const alert = { id: 'a2', type: 'badge_annule', severity: 'haute' as const, message: 'Badge annulé.', created_at: '2027-01-10T10:00:00Z', acknowledged_at: null, resolved_at: null, link: null };
+    const reader = mount(AlertCard, { props: { alert, canAcknowledge: false } });
+    expect(reader.text()).toContain('Badge annulé');
+    expect(reader.find('[data-testid="prendre-en-compte"]').exists()).toBe(false);
+    const actor = mount(AlertCard, { props: { alert, canAcknowledge: true } });
+    expect(actor.find('[data-testid="prendre-en-compte"]').exists()).toBe(true);
+    expect(post).not.toHaveBeenCalled();
+  });
+
   it('affiche gravité en mot et symbole, lien vers l’élément, et prend l’alerte en compte', async () => {
     const wrapper = mount(AlertCard, { props: { alert: { id: 'a1', type: 'badge_annule', severity: 'haute', message: 'Badge annulé : la personne est à rebadger par l’accueil.', created_at: '2027-01-10T10:00:00Z', acknowledged_at: null, resolved_at: null, link: '/pilotage/visiteurs/v1' } } });
     expect(wrapper.text()).toContain('Haute'); expect(wrapper.text()).toContain('▲'); expect(wrapper.text()).toContain('Badge annulé');

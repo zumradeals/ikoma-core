@@ -122,7 +122,10 @@ export class SyncManager {
         await this.hooks.onRevoked(error.code);
         return;
       }
-      if (error.code === 'session_expiree') this.emit({ needsLogin: true, lastError: 'Votre session a expiré : reconnectez-vous pour envoyer vos opérations.' });
+      // S02 / R-04 : le serveur refuse en bloc des opérations saisies par un autre compte. La file reste intacte (rien n'est enregistré) ;
+      // on n'insiste pas : il faut se reconnecter avec le compte qui les a saisies.
+      if (error.code === 'auteur_incoherent') this.emit({ lastError: error.message });
+      else if (error.code === 'session_expiree') this.emit({ needsLogin: true, lastError: 'Votre session a expiré : reconnectez-vous pour envoyer vos opérations.' });
       else {
         this.failures++;
         this.emit({ lastError: error.code === 'reseau' ? null : error.message });

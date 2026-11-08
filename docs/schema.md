@@ -201,3 +201,8 @@ Migration additive `2026_11_07_000000_harden_data_lifecycle` : aucune nouvelle t
 - settings.value passe de varchar(255) à text pour les reçus signés (rétrocompatible pour les réglages existants). Réglages : conservation_{visiteurs,evenements,photos,synchronisations,alertes,notifications,audit}_jours (30/90/7/30/30/7/365 proposés), conservation_validee=0, journal_export_max_lignes=10000. Après une purge du journal seulement : audit_checkpoint contient le point de reprise signé, vérifiable par une clé publique indépendante ; aucune clé privée dans la base.
 
 Les échecs de connexion ajoutent IP et empreinte SHA-256 du jeton d’appareil reçu, à défaut du User-Agent. Ce dernier est un indicateur technique non unique, pas une authentification d’appareil. Les jetons, identifiants saisis et mots de passe ne sont pas copiés au journal. Un refus d’accès est enregistré une seule fois par requête, avec le gabarit de route et le statut.
+
+
+## Évolution S02 — capacités de poste et clôture réservée
+
+Migration `2026_11_24_000000_add_poste_point_and_closure_flag` (additive, sans donnée à reprendre) : `devices.point_code` (CHECK : poste_1, poste_2, poste_3, poste_4, soute, hotel ; nul = poste non identifié, sans aucune capacité ; contrainte `devices_enrolled_has_point` : un appareil muni d'un jeton a obligatoirement un point) et `categories.closure_supervisor_only` (booléen, faux par défaut). Journal : `sync.auteur_refuse`, et `point_code` dans `poste.cree`. Réglage ajouté dans `settings` : `poste_hors_reseau_approuve` (0 : aucun délai hors ligne approuvé, donc aucune décision favorable hors ligne).
