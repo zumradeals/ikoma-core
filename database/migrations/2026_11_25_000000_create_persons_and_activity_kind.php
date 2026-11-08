@@ -44,6 +44,9 @@ BEGIN
     IF NEW.is_permanent THEN
         NEW.kind := 'permanent';
     ELSIF NEW.kind = 'permanent' THEN
+        IF TG_OP = 'UPDATE' AND OLD.is_permanent THEN
+            RETURN NEW; -- laisse la garde du contexte permanent refuser ce changement avec son propre message
+        END IF;
         RAISE EXCEPTION 'La nature « permanent » est réservée au contexte permanent.' USING ERRCODE = 'check_violation';
     END IF;
     RETURN NEW;

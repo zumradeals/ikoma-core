@@ -95,7 +95,7 @@ it('garantit en base une seule participation par personne et par activité, et r
 it('exige une confirmation explicite pour créer un homonyme et ne journalise aucun nom', function () {
     $persons = app(Persons::class);
     $first = $persons->create($this->admin, ['first_name' => 'Awa', 'last_name' => 'Traoréxx', 'organisation' => 'Atelier fictif']);
-    expect(DB::table('persons')->where('id', $first)->value('full_name'))->toBe('Awa Traoré');
+    expect(DB::table('persons')->where('id', $first)->value('full_name'))->toBe('Awa Traoréxx');
     expect(fn () => $persons->create($this->admin, ['full_name' => 'awa traoréxx']))->toThrow(ValidationException::class, 'de même nom');
     expect(DB::table('persons')->whereRaw("public.ikoma_normalize(full_name) = 'awa traorexx'")->count())->toBe(1);
     $second = $persons->create($this->admin, ['full_name' => 'Awa Traoréxx'], true);
