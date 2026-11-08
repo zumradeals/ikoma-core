@@ -31,18 +31,48 @@ final class Groups
         return in_array($mode, self::MODES, true) ? $mode : 'encadreur';
     }
 
-    public function create(string $eventId, string $name, ?string $bus, ?string $supervisorId, User $actor): string
+    public function create(string $eventId, string $name, ?string $bus, ?string $supervisorId, User $actor, ?int $capacity = null): string
     {
         app(FoundingModules::class)->requireF06();
         $this->assertSupervisor($supervisorId);
         $id = (string) Str::uuid();
-        DB::transaction(function () use ($id, $eventId, $name, $bus, $supervisorId, $actor): void {
+        DB::transaction(function () use ($id, $eventId, $name, $bus, $supervisorId, $actor, $capacity): void {
             app(FoundingModules::class)->requireF06();
-            DB::table('groups')->insert(['id' => $id, 'event_id' => $eventId, 'name' => mb_substr(trim($name), 0, 120), 'bus_number' => $bus !== null && trim($bus) !== '' ? mb_substr(trim($bus), 0, 60) : null, 'supervisor_id' => $supervisorId, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('groups')->insert(['id' => $id, 'event_id' => $eventId, 'name' => mb_substr(trim($name), 0, 120), 'bus_number' => $bus !== null && trim($bus) !== '' ? mb_substr(trim($bus), 0, 60) : null, 'supervisor_id' => $supervisorId, 'created_at' => now(), 'updated_at' => now(), 'capacity' => $this->capacityOrFail($capacity)]);
             $this->audit->append('groupe.cree', $actor->id, ['group_id' => $id, 'event_id' => $eventId, 'encadreur_id' => $supervisorId]);
         });
 
         return $id;
+    }
+
+    /** Places du car : OBLIGATOIRES et strictement positives avant tout embarquement (aucun embarquement illimité). Ne peuvent pas descendre sous le nombre d'embarqués. */
+    public function setCapacity(string $groupId, int $capacity, User $actor): void
+    {
+        app(FoundingModules::class)->requireF06();
+        $capacity = $this->capacityOrFail($capacity);
+        DB::transaction(function () use ($groupId, $capacity, $actor): void {
+            app(FoundingModules::class)->requireF06();
+            $group = DB::table('groups')->where('id', $groupId)->lockForUpdate()->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
+            if ($this->boardedCount($groupId) > $capacity) {
+                throw new DeskRefused('capacite_insuffisante', 'Plus de personnes sont déjà embarquées que de places.', 422);
+            }
+            DB::table('groups')->where('id', $groupId)->update(['capacity' => $capacity, 'updated_at' => now()]);
+            $this->audit->append('groupe.capacite_modifiee', $actor->id, ['group_id' => $groupId, 'event_id' => $group->event_id, 'capacite' => $capacity]);
+        });
+    }
+
+    private function capacityOrFail(?int $capacity): ?int
+    {
+        if ($capacity !== null && ($capacity < 1 || $capacity > 200)) {
+            throw new DeskRefused('capacite_invalide', 'Le nombre de places doit être compris entre 1 et 200.', 422);
+        }
+
+        return $capacity;
+    }
+
+    private function boardedCount(string $groupId): int
+    {
+        return (int) $this->activeMembers($groupId)->whereNotNull('boarded_at')->count();
     }
 
     public function designate(string $groupId, ?string $supervisorId, User $actor): void
@@ -113,7 +143,7 @@ final class Groups
         $this->ensureMembers($groupId);
         $group = DB::table('groups')->where('id', $groupId)->first() ?? throw new DeskRefused('groupe_inconnu', 'Groupe introuvable.', 404);
         $members = DB::select(
-            'SELECT m.visitor_id, v.full_name, v.organisation, m.called_at, m.checked_at, m.check_mode, m.confirmed_at, m.absent_at, m.boarded_at, m.arrived_at,
+            'SELECT m.visitor_id, v.full_name, v.organisation, m.called_at, m.checked_at, m.check_mode, m.confirmed_at, m.absent_at, m.absence_reason, m.boarded_at, m.arrived_at,
                 (SELECT b.code FROM badge_assignments a JOIN badges b ON b.id = a.badge_id WHERE a.visitor_id = v.id AND a.returned_at IS NULL AND a.cancelled_at IS NULL LIMIT 1) AS badge_code
              FROM group_members m JOIN visitors v ON v.id = m.visitor_id WHERE m.group_id = ? AND v.withdrawn_at IS NULL ORDER BY v.full_name, v.id',
             [$groupId],
@@ -122,7 +152,7 @@ final class Groups
         $badged = count(array_filter($members, fn ($m) => $m->badge_code !== null));
 
         return [
-            'group' => ['id' => $group->id, 'name' => $group->name, 'bus_number' => $group->bus_number, 'opened_at' => $group->opened_at, 'departed_at' => $group->departed_at, 'arrival_closed_at' => $group->arrival_closed_at],
+            'group' => ['id' => $group->id, 'name' => $group->name, 'bus_number' => $group->bus_number, 'capacity' => $group->capacity, 'opened_at' => $group->opened_at, 'departed_at' => $group->departed_at, 'arrival_closed_at' => $group->arrival_closed_at],
             'members' => array_map(fn ($m) => (array) $m, $members),
             'progress' => ['total' => $total, 'badged' => $badged, 'boarded' => count(array_filter($members, fn ($m) => $m->boarded_at !== null)), 'arrived' => count(array_filter($members, fn ($m) => $m->arrived_at !== null)), 'absent' => count(array_filter($members, fn ($m) => $m->absent_at !== null)), 'complete' => $total > 0 && $badged === $total],
             'mode' => $this->mode(),
@@ -168,7 +198,7 @@ final class Groups
             $this->open($groupId, $agent);
             $member = $this->member($groupId, $visitorId);
             $mode = $this->mode();
-            if ($member->absent_at !== null || DB::table('groups')->where('id', $groupId)->value('departed_at') !== null) {
+            if (DB::table('groups')->where('id', $groupId)->value('departed_at') !== null) {
                 throw new DeskRefused('car_ferme', 'Le car est déjà parti : plus aucun contrôle de ce groupe n’est possible.', 409);
             }
             if ($member->checked_at !== null) {
@@ -255,7 +285,92 @@ final class Groups
     }
 
     /**
-     * Fermeture du car : les stagiaires badgés sont embarqués, les autres sont absents (signalés au superviseur). Rejouable sans effet.
+     * Embarquement INDIVIDUEL : chaque passager est vérifié et enregistré séparément, par le scan de son badge. Conditions : le car n'est pas parti, la personne
+     * est de ce groupe, son appel nominal est fait (correspondance contrôlée), son badge est le sien, et il reste une place (capacité bloquante, sous verrou du groupe).
+     * Une personne notée absente peut encore embarquer avant le départ (l'absence est alors levée et tracée). Rejouable sans effet.
+     *
+     * @return array<string, mixed>
+     */
+    public function board(?Device $device, User $agent, string $groupId, string $code, ?string $declaredAt = null): array
+    {
+        app(FoundingModules::class)->requireF06();
+
+        return DB::transaction(function () use ($device, $agent, $groupId, $code, $declaredAt): array {
+            app(FoundingModules::class)->requireF06();
+            $group = $this->open($groupId, $agent);
+            if ($group->departed_at !== null) {
+                throw new DeskRefused('car_ferme', 'Le car est déjà parti : plus personne ne peut embarquer.', 409);
+            }
+            if ($group->capacity === null || $group->capacity < 1) {
+                throw new DeskRefused('capacite_non_renseignee', 'Le nombre de places du car n’est pas renseigné : l’embarquement est impossible.', 422, 'Demandez à l’administrateur de renseigner les places du car.');
+            }
+            $input = trim($code);
+            if (str_starts_with($input, QrSvg::PREFIX)) {
+                $input = substr($input, strlen(QrSvg::PREFIX));
+            }
+            $query = DB::table('badges')->select('id', 'code', 'event_id');
+            preg_match('/^[0-9a-f]{64}$/i', $input) === 1 ? $query->where('qr_token', strtolower($input)) : $query->where('event_id', $group->event_id)->whereRaw('upper(code) = ?', [mb_strtoupper($input)]);
+            $badge = $query->first();
+            if ($badge === null || $badge->event_id !== $group->event_id) {
+                throw new DeskRefused('badge_inconnu', 'Badge inconnu : vérifiez le code ou scannez à nouveau.', 422);
+            }
+            $visitorId = DB::table('badge_assignments')->where('badge_id', $badge->id)->whereNull('returned_at')->whereNull('cancelled_at')->value('visitor_id')
+                ?? throw new DeskRefused('non_associe', 'Badge non associé à une personne : remettez-lui d’abord son badge.', 422);
+            $member = $this->member($groupId, (string) $visitorId);
+            if (DB::table('visitors')->where('id', $visitorId)->whereNotNull('closed_at')->exists()) {
+                throw new DeskRefused('participation_cloturee', 'La participation de cette personne est clôturée : elle ne peut pas embarquer.', 422);
+            }
+            if ($member->boarded_at !== null) {
+                return ['boarded' => true, 'already' => true, 'badge_code' => $badge->code, 'group_id' => $groupId, 'places_restantes' => max(0, $group->capacity - $this->boardedCount($groupId))];
+            }
+            if ($member->checked_at === null) {
+                throw new DeskRefused('controle_requis', 'Faites d’abord l’appel nominal de cette personne (correspondance contrôlée).', 422);
+            }
+            if ($this->boardedCount($groupId) >= $group->capacity) {
+                throw new DeskRefused('car_complet', 'Le car est complet : '.$group->capacity.' place(s), toutes occupées.', 409, 'Prévenez le superviseur pour un autre car.');
+            }
+            $now = now();
+            DB::table('group_members')->where('id', $member->id)->update(['boarded_at' => $now, 'boarded_by' => $agent->id, 'absent_at' => null, 'absent_by' => null, 'absence_reason' => null, 'updated_at' => $now]);
+            DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $group->event_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'actor_id' => $agent->id, 'type' => 'embarquement', 'checkpoint' => $group->bus_number ?? $group->name,
+                'occurred_at' => $now, 'details' => json_encode(array_filter(['group_id' => $groupId, 'heure_declaree' => $declaredAt, 'absence_levee' => $member->absent_at !== null ? true : null], fn ($v) => $v !== null), JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
+            $this->audit->append('groupe.embarque_individuel', $agent->id, ['group_id' => $groupId, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'event_id' => $group->event_id, 'device_id' => $device?->id, 'absence_levee' => $member->absent_at !== null]);
+
+            return ['boarded' => true, 'already' => false, 'badge_code' => $badge->code, 'group_id' => $groupId, 'places_restantes' => max(0, $group->capacity - $this->boardedCount($groupId))];
+        });
+    }
+
+    /**
+     * Absence constatée à l'appel nominal : permise, mais toujours tracée (motif obligatoire, auteur, journal). Une personne déjà embarquée n'est pas absente ;
+     * une absence ne se note plus une fois le car parti. Rejouable sans effet.
+     */
+    public function markAbsent(User $agent, string $groupId, string $visitorId, string $reason): void
+    {
+        app(FoundingModules::class)->requireF06();
+        $reason = trim($reason);
+        if ($reason === '' || mb_strlen($reason) > 200 || preg_match('/[\x00-\x1F\x7F<>]/u', $reason) === 1) {
+            throw new DeskRefused('motif_absence_obligatoire', 'Indiquez le motif de l’absence (200 caractères au plus).', 422);
+        }
+        DB::transaction(function () use ($agent, $groupId, $visitorId, $reason): void {
+            app(FoundingModules::class)->requireF06();
+            $group = $this->open($groupId, $agent);
+            $member = $this->member($groupId, $visitorId);
+            if ($group->departed_at !== null) {
+                throw new DeskRefused('car_ferme', 'Le car est déjà parti : une absence ne peut plus être notée.', 409);
+            }
+            if ($member->boarded_at !== null) {
+                throw new DeskRefused('deja_embarque', 'Cette personne est déjà embarquée : elle n’est pas absente.', 409);
+            }
+            if ($member->absent_at !== null) {
+                return;
+            }
+            DB::table('group_members')->where('id', $member->id)->update(['absent_at' => now(), 'absent_by' => $agent->id, 'absence_reason' => $reason, 'called_at' => $member->called_at ?? now(), 'updated_at' => now()]);
+            $this->audit->append('groupe.absent', $agent->id, ['group_id' => $groupId, 'visitor_id' => $visitorId, 'event_id' => $group->event_id]);
+        });
+    }
+
+    /**
+     * Fermeture du car. L'APPEL NOMINAL DOIT ÊTRE COMPLET : chaque personne du groupe est soit embarquée (scan individuel), soit notée absente avec son motif.
+     * Aucun embarquement n'est déduit du départ. Un départ avec des absents signale le groupe incomplet au superviseur. Rejouable sans effet.
      *
      * @return array{boarded:int,absent:int}
      */
@@ -268,17 +383,17 @@ final class Groups
             $group = $this->open($groupId, $agent);
             $this->ensureMembers($groupId);
             if ($group->departed_at !== null) {
-                return ['boarded' => (int) $this->activeMembers($groupId)->whereNotNull('boarded_at')->count(), 'absent' => (int) $this->activeMembers($groupId)->whereNotNull('absent_at')->count()];
+                return ['boarded' => $this->boardedCount($groupId), 'absent' => (int) $this->activeMembers($groupId)->whereNotNull('absent_at')->count()];
+            }
+            $unresolved = (int) $this->activeMembers($groupId)->whereNull('boarded_at')->whereNull('absent_at')->count();
+            if ($unresolved > 0) {
+                throw new DeskRefused('appel_incomplet', $unresolved.' personne(s) ne sont ni embarquées ni notées absentes : terminez l’appel nominal avant le départ.', 422, 'Embarquez chaque personne ou notez son absence avec un motif.');
             }
             $now = now();
-            $boarded = $this->activeMembers($groupId)->whereExists(fn ($q) => $q->selectRaw('1')->from('badge_assignments as a')->whereColumn('a.visitor_id', 'group_members.visitor_id')->whereNull('a.returned_at')->whereNull('a.cancelled_at'))->update(['boarded_at' => $now, 'updated_at' => $now]);
-            $absentIds = $this->activeMembers($groupId)->whereNull('boarded_at')->pluck('visitor_id')->all();
-            $this->activeMembers($groupId)->whereNull('boarded_at')->update(['absent_at' => $now, 'updated_at' => $now]);
+            $absentIds = $this->activeMembers($groupId)->whereNotNull('absent_at')->pluck('visitor_id')->all();
             DB::table('groups')->where('id', $groupId)->update(['departed_at' => $now, 'departed_by' => $agent->id, 'updated_at' => $now]);
-            foreach ($absentIds as $visitorId) {
-                $this->audit->append('groupe.absent', $agent->id, ['group_id' => $groupId, 'visitor_id' => $visitorId]);
-            }
-            $this->audit->append('groupe.embarque', $agent->id, ['group_id' => $groupId, 'embarques' => $boarded, 'absents' => count($absentIds), 'event_id' => $group->event_id]);
+            $boarded = $this->boardedCount($groupId);
+            $this->audit->append('groupe.depart', $agent->id, ['group_id' => $groupId, 'embarques' => $boarded, 'absents' => count($absentIds), 'event_id' => $group->event_id]);
             if ($absentIds !== []) {
                 $this->alerts->raise($group->event_id, 'groupe_incomplet', 'haute', 'groupe', $groupId, count($absentIds).' absent(s) au départ du car '.($group->bus_number ?? $group->name).' ; l’encadreur est prévenu.', 'groupe_incomplet:'.$groupId);
             }
@@ -288,8 +403,9 @@ final class Groups
     }
 
     /**
-     * Arrivée sur le site : un badge scanné marque son porteur « arrivé » (statut présent et événement d'entrée). Un badge de stagiaire non embarqué
-     * (ou d'un groupe dont le car n'est pas parti) est un écart signalé ; il est tout de même accepté, c'est une personne réellement présente.
+     * Arrivée / débarquement individuel : un badge scanné au poste de l'Académie enregistre le DÉBARQUEMENT de son porteur (mouvement « debarquement »).
+     * L'arrivée du car ne déduit JAMAIS la présence physique : aucune « entrée » n'est écrite et le statut de la personne ne change pas ; sa présence est établie
+     * par l'accueil ou le contrôle. Un badge de stagiaire non embarqué est un écart signalé au superviseur ; le débarquement est tout de même enregistré.
      *
      * @return array<string, mixed>
      */
@@ -326,9 +442,10 @@ final class Groups
                 $this->alerts->raise($member->group_event, 'groupe_ecart', 'haute', 'groupe', $member->group_id, 'Un badge du car '.($member->bus_number ?? $member->group_name).' a été scanné à l’arrivée alors que la personne n’était pas embarquée.', 'ecart_non_embarque:'.$visitorId);
             }
             DB::table('group_members')->where('id', $member->id)->update(['arrived_at' => $now, 'updated_at' => $now]);
-            DB::table('visitors')->where('id', $visitorId)->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'attendu'))->update(['status' => 'present', 'updated_at' => $now]);
-            DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $device->event_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'actor_id' => $agent->id, 'type' => 'entree', 'checkpoint' => $device->station ?? $device->name, 'occurred_at' => $now, 'details' => json_encode(array_filter(['arrivee_groupe' => true, 'group_id' => $member->group_id, 'heure_declaree' => $declaredAt, 'ecart' => $ecart])), 'created_at' => $now, 'updated_at' => $now]);
-            app(HostNotifications::class)->send($visitorId, 'arrivee', $agent, $device);
+            DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $device->event_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'actor_id' => $agent->id, 'type' => 'debarquement', 'checkpoint' => $device->station ?? $device->name,
+                'occurred_at' => $now, 'details' => json_encode(array_filter(['group_id' => $member->group_id, 'heure_declaree' => $declaredAt, 'ecart' => $ecart])), 'created_at' => $now, 'updated_at' => $now]);
+            // Notification « car arrivé » : distincte de « personne présente » (type « arrivee », envoyé à l'entrée à l'accueil).
+            app(HostNotifications::class)->send($visitorId, 'car_arrive', $agent, $device);
             $this->audit->append('groupe.arrive', $agent->id, ['group_id' => $member->group_id, 'visitor_id' => $visitorId, 'badge_id' => $badge->id, 'device_id' => $device->id, 'ecart' => $ecart]);
 
             return ['arrived' => true, 'already' => false, 'badge_code' => $badge->code, 'group_id' => $member->group_id, 'ecart' => $ecart];

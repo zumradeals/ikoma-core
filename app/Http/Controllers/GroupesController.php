@@ -24,7 +24,7 @@ final class GroupesController
         Gate::authorize('groupes.gerer');
         $event = $this->pilotage->event($r->query('event') ? (string) $r->query('event') : null);
         $q = trim((string) $r->query('q', ''));
-        $groups = $event ? DB::table('groups as g')->leftJoin('users as u', 'u.id', '=', 'g.supervisor_id')->where('g.event_id', $event->id)->orderBy('g.name')->get(['g.id', 'g.name', 'g.bus_number', 'g.supervisor_id', 'u.name as supervisor_name', 'g.badge_batch_id', 'g.departed_at'])
+        $groups = $event ? DB::table('groups as g')->leftJoin('users as u', 'u.id', '=', 'g.supervisor_id')->where('g.event_id', $event->id)->orderBy('g.name')->get(['g.id', 'g.name', 'g.bus_number', 'g.capacity', 'g.supervisor_id', 'u.name as supervisor_name', 'g.badge_batch_id', 'g.departed_at'])
             ->map(function ($g) {
                 $members = DB::table('visitors as v')->join('categories as c', 'c.id', '=', 'v.category_id')->where('v.group_id', $g->id)->orderByRaw('v.full_name COLLATE "C" ASC')->orderBy('v.id')->get(['v.id', 'v.full_name', 'c.name as category']);
 
@@ -47,8 +47,8 @@ final class GroupesController
     public function store(Request $r): RedirectResponse
     {
         Gate::authorize('groupes.gerer');
-        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'bus_number' => 'nullable|string|max:60', 'supervisor_id' => 'nullable|uuid|exists:users,id']);
-        $this->groups->create($data['event_id'], $data['name'], $data['bus_number'] ?? null, $data['supervisor_id'] ?? null, $r->user());
+        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'bus_number' => 'nullable|string|max:60', 'supervisor_id' => 'nullable|uuid|exists:users,id', 'capacity' => 'nullable|integer|min:1|max:200']);
+        $this->groups->create($data['event_id'], $data['name'], $data['bus_number'] ?? null, $data['supervisor_id'] ?? null, $r->user(), isset($data['capacity']) ? (int) $data['capacity'] : null);
 
         return back();
     }
@@ -58,6 +58,15 @@ final class GroupesController
         Gate::authorize('groupes.gerer');
         $data = $r->validate(['supervisor_id' => 'nullable|uuid|exists:users,id']);
         $this->groups->designate($group, $data['supervisor_id'] ?? null, $r->user());
+
+        return back();
+    }
+
+    public function capacity(Request $r, string $group): RedirectResponse
+    {
+        Gate::authorize('groupes.gerer');
+        $data = $r->validate(['capacity' => 'required|integer|min:1|max:200']);
+        $this->groups->setCapacity($group, (int) $data['capacity'], $r->user());
 
         return back();
     }

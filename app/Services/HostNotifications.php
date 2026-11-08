@@ -29,7 +29,7 @@ final class HostNotifications
         $id = (string) Str::uuid();
         $at = now();
         $created = DB::table('notifications')->insertOrIgnore(['id' => $id, 'recipient_id' => $v->user_id, 'event_id' => $v->event_id, 'visitor_id' => $visitorId, 'requester_id' => $requester?->id, 'device_id' => $device?->id, 'type' => $type, 'message' => match ($type) {
-            'arrivee' => 'Votre invité vient d’entrer.','non_liste' => 'Un visiteur non listé attend votre réponse.',default => 'L’accueil demande votre avis pour une visite hors période.'
+            'arrivee' => 'Votre invité vient d’entrer.','car_arrive' => 'Le car de votre invité est arrivé à l’Académie. Sa présence sera confirmée à l’accueil.','non_liste' => 'Un visiteur non listé attend votre réponse.',default => 'L’accueil demande votre avis pour une visite hors période.'
         }, 'dedupe_key' => $key, 'created_at' => $at, 'updated_at' => $at]);
         if ($created) {
             $this->audit->append('notification.creee', $requester?->id, ['notification_id' => $id, 'recipient_id' => $v->user_id, 'visitor_id' => $visitorId, 'event_id' => $v->event_id]);
@@ -75,7 +75,7 @@ final class HostNotifications
             $v = app(HostGuests::class)->owned($actor, $request->visitor_id, true);
             $n = DB::table('notifications')->where('id', $id)->where('recipient_id', $actor->id)->lockForUpdate()->first();
             abort_unless($n !== null, 403);
-            if ($n->type === 'arrivee' || $n->decided_at !== null) {
+            if (in_array($n->type, ['arrivee', 'car_arrive'], true) || $n->decided_at !== null) {
                 throw new DeskRefused('deja_traite', 'Cette demande a déjà été traitée.', 409);
             }
             if ($n->type === 'non_liste') {

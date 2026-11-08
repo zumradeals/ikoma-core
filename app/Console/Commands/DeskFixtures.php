@@ -144,7 +144,7 @@ class DeskFixtures extends Command
         foreach ([[1, 50], [2, 6], [3, 8], [4, 6]] as [$n, $size]) {
             $group = $groups->create($event, "Groupe stagiaires {$n} {$s}", "Car {$n}", (match ($n) {
                 2 => $liveEncadreur, 4 => $encadreur2, default => $encadreur
-            })->id, $admin);
+            })->id, $admin, $size);
             $members = [];
             for ($i = 1; $i <= $size; $i++) {
                 $members[] = $name = sprintf('Stagiaire C%d %02d %s', $n, $i, $s);
@@ -170,6 +170,14 @@ class DeskFixtures extends Command
             $groups->check($agent, $cars[4]['id'], $vid);
             if ($i < 5) {
                 $groups->deliver($deviceCars, $agent, $cars[4]['id'], $vid, $cars[4]['badges'][$i]);
+            }
+        }
+        // Embarquement individuel des cinq badgés, absence tracée des autres (l'appel nominal est complet), puis départ.
+        foreach ($car4 as $i => $vid) {
+            if ($i < 5) {
+                $groups->board($deviceCars, $agent, $cars[4]['id'], $cars[4]['badges'][$i]);
+            } else {
+                $groups->markAbsent($agent, $cars[4]['id'], $vid, 'Absent à l\'appel (données fictives)');
             }
         }
         $groups->depart($agent, $cars[4]['id']);

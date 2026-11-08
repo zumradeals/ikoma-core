@@ -21,15 +21,15 @@ final class SyncProcessor
 {
     public const MAX_OPERATIONS = 50;
 
-    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler'];
+    private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_embarquer' => 'groupes.appel_nominal', 'groupe_absent' => 'groupes.appel_nominal', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler'];
 
     /**
      * Opérations hors ligne qui produisent une DÉCISION D'ACCÈS (favorable) et sont donc soumises à la politique hors ligne :
-     * contrôle valide, validation, remise de badge, entrée (accueil) et, pour les cars, remise de badge de groupe et arrivée (admission par scan).
+     * contrôle valide, validation, remise de badge, entrée (accueil) et, pour les cars, remise de badge de groupe, embarquement individuel et arrivée (admission par scan).
      * Les autres opérations n'accordent rien : refus, identité, non listé, sortie (jamais soumise à la confiance, comme pour les cartes permanentes),
      * appel nominal, départ et fin d'arrivée d'un car.
      */
-    private const FAVORABLE = ['controle', 'valider', 'badge', 'entree', 'groupe_badge', 'groupe_arrivee'];
+    private const FAVORABLE = ['controle', 'valider', 'badge', 'entree', 'groupe_badge', 'groupe_embarquer', 'groupe_arrivee'];
 
     public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups) {}
 
@@ -254,6 +254,15 @@ final class SyncProcessor
                 [$group, $visitor, $code] = $need('group_id', 'visitor_id', 'code');
 
                 return $this->groups->deliver($device, $agent, (string) $group, (string) $visitor, (string) $code);
+            case 'groupe_embarquer':
+                [$group, $code] = $need('group_id', 'code');
+
+                return $this->groups->board($device, $agent, (string) $group, (string) $code, $clientTime);
+            case 'groupe_absent':
+                [$group, $visitor, $reason] = $need('group_id', 'visitor_id', 'reason');
+                $this->groups->markAbsent($agent, (string) $group, (string) $visitor, (string) $reason);
+
+                return [];
             case 'groupe_depart':
                 [$group] = $need('group_id');
 

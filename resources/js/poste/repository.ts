@@ -1,4 +1,4 @@
-import type { ArrivalResult, GroupSummary, GroupView } from './local/group';
+import type { ArrivalResult, BoardResult, GroupSummary, GroupView } from './local/group';
 import type { PermanentResult } from './local/permanent';
 import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
@@ -54,6 +54,8 @@ export interface GroupPosteRepository extends SitePosteRepository {
   groupView(groupId: string): Promise<GroupView>;
   groupCheck(operationId: string, groupId: string, visitorId: string, identityChecked: boolean): Promise<void>;
   groupDeliver(operationId: string, groupId: string, visitorId: string, code: string): Promise<{ badge_code: string }>;
+  groupBoard(operationId: string, groupId: string, code: string): Promise<BoardResult>;
+  groupAbsent(operationId: string, groupId: string, visitorId: string, reason: string): Promise<void>;
   groupDepart(operationId: string, groupId: string): Promise<{ boarded: number; absent: number }>;
   arrive(operationId: string, code: string): Promise<ArrivalResult>;
   arriveFinish(operationId: string, groupId: string): Promise<{ arrived: number; missing: number }>;

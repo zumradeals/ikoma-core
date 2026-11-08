@@ -476,20 +476,22 @@ it('documente la limite connue : un client qui falsifie AUSSI ses heures est jug
     s02Sync([$again])->assertOk()->assertJsonPath('results.0.code', 'annule_entre_temps');
 });
 
-it('applique la même protection aux opérations de car qui décident : remise de badge et arrivée, et à elles seules', function () {
+it('applique la même protection aux opérations de car qui décident : remise de badge, embarquement individuel et arrivée, et à elles seules', function () {
     DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $group = DemoSeeder::id('group');
     $known = now()->subMinute()->toIso8601String();
     $badge = s02Offline($this->agent, 1, 'groupe_badge', ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'code' => $this->badges[0]->code], $known);
     $arrive = s02Offline($this->agent, 2, 'groupe_arrivee', ['code' => $this->badges[0]->code], $known);
+    $board = s02Offline($this->agent, 6, 'groupe_embarquer', ['group_id' => $group, 'code' => $this->badges[0]->code], $known);
     $records = [
         s02Offline($this->agent, 3, 'groupe_controle', ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'identity_checked' => true], $known),
         s02Offline($this->agent, 4, 'groupe_depart', ['group_id' => $group], $known),
         s02Offline($this->agent, 5, 'groupe_arrivee_fin', ['group_id' => $group], $known),
+        s02Offline($this->agent, 7, 'groupe_absent', ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'reason' => 'Malade'], $known),
     ];
-    $byId = collect(s02Sync([$badge, $arrive, ...$records])->assertOk()->json('results'))->keyBy('id');
+    $byId = collect(s02Sync([$badge, $arrive, $board, ...$records])->assertOk()->json('results'))->keyBy('id');
     // décisions d'accès : refusées hors ligne tant qu'aucun délai n'est approuvé
-    expect($byId[$badge['id']]['code'])->toBe('politique_non_approuvee')->and($byId[$arrive['id']]['code'])->toBe('politique_non_approuvee');
+    expect($byId[$badge['id']]['code'])->toBe('politique_non_approuvee')->and($byId[$arrive['id']]['code'])->toBe('politique_non_approuvee')->and($byId[$board['id']]['code'])->toBe('politique_non_approuvee');
     // enregistrements sans décision d'accès : jamais refusés par la politique hors ligne
     foreach ($records as $record) {
         expect($byId[$record['id']]['code'] ?? null)->not->toBeIn(['politique_non_approuvee', 'politique_perimee']);

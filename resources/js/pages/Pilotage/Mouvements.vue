@@ -11,7 +11,7 @@ const props = defineProps<{
 }>();
 const q = ref(props.filters.q); const type = ref(props.filters.type); const point = ref(props.filters.point); const outcome = ref(props.filters.outcome);
 const pages = computed(() => Math.max(1, Math.ceil(props.total / props.perPage)));
-const labels: Record<string, string> = { entree: 'Entrée', sortie: 'Sortie', controle: 'Contrôle', correction: 'Correction' };
+const labels: Record<string, string> = { entree: 'Entrée', sortie: 'Sortie', controle: 'Contrôle', correction: 'Correction', embarquement: 'Embarquement', debarquement: 'Débarquement' };
 let timer: number | undefined;
 function go(page = 1) {
   router.get('/pilotage/mouvements', { q: q.value || undefined, type: type.value || undefined, point: point.value || undefined, outcome: outcome.value || undefined, page: page > 1 ? page : undefined, event: props.events.length > 1 ? props.event?.id : undefined }, { preserveState: true, replace: true });
