@@ -14,6 +14,7 @@ use App\Services\Poste\ListSnapshot;
 use App\Services\Poste\PostCapabilities;
 use App\Services\Poste\SiteControl;
 use App\Services\Poste\SyncProcessor;
+use App\Services\SupervisorClosure;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
@@ -161,7 +162,7 @@ it('refuse tout scan, toute sortie et toute opération d’accueil aux points sa
     $this->postJson('/poste/api/refuser', ['visitor_id' => DemoSeeder::id('visitor1'), 'motif' => 'essai'], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
     expect(DB::table('access_events')->count())->toBe(0)
         ->and(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('status'))->not->toBe('refuse');
-})->with(['poste_1', 'poste_3', 'poste_4']);
+})->with(['poste_1', 'poste_3', 'poste_4', 'hotel']);
 
 it('limite la soute au contrôle individuel et le poste 2 à l’ensemble des opérations d’agent', function () {
     s02Point('soute');
@@ -317,7 +318,7 @@ it('enrôle un poste identifié et lui donne ses capacités dans la réponse du 
 
 it('remet à la tablette son point de contrôle et ses capacités, et change de version quand le point change', function () {
     $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
-    foreach (['poste_1' => [], 'poste_2' => ['accueil', 'scan', 'sortie'], 'poste_3' => [], 'poste_4' => [], 'soute' => ['scan']] as $point => $capabilities) {
+    foreach (['poste_1' => [], 'poste_2' => ['accueil', 'scan', 'sortie'], 'poste_3' => [], 'poste_4' => [], 'soute' => ['scan'], 'hotel' => []] as $point => $capabilities) {
         s02Point($point);
         $this->getJson('/poste/api/liste', $headers)->assertOk()->assertJsonPath('poste.point_code', $point)->assertJsonPath('poste.capabilities', $capabilities);
     }
@@ -406,6 +407,75 @@ it('ne soumet ni la sortie ni le refus à la péremption : ils n’accordent auc
     expect(DB::table('visitors')->where('id', DemoSeeder::id('visitor4'))->value('status'))->toBe('refuse');
 });
 
+/** Opération brute, avec heure déclarée de décision : pour éprouver ce que le serveur recoupe lui-même. */
+function s02Raw(User $agent, int $seq, string $type, array $payload, ?string $clientTime): array
+{
+    $op = ['id' => (string) Str::uuid(), 'seq' => $seq, 'type' => $type, 'agent_id' => $agent->id, 'payload' => $payload];
+    if ($clientTime !== null) {
+        $op['client_time'] = $clientTime;
+    }
+
+    return $op;
+}
+
+it('ne laisse jamais le client prouver seul qu’il était en ligne : tablette coupée, délai non approuvé, opération déclarée « en ligne »', function () {
+    app(BadgeService::class)->associer($this->badges[0], DemoSeeder::id('visitor1'), $this->agent, DemoSeeder::id('device'));
+    $code = $this->badges[0]->code;
+    $visitor = DemoSeeder::id('visitor4');
+    $threeHoursAgo = now()->subHours(3)->toIso8601String();
+    // 1) la tablette a travaillé 3 h sans réseau puis envoie ses opérations en les déclarant « en ligne » : le serveur mesure lui-même le délai
+    $forged = fn (int $seq) => [
+        s02Raw($this->agent, $seq, 'controle', ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => $threeHoursAgo], $threeHoursAgo),
+        s02Raw($this->agent, $seq + 1, 'valider', ['visitor_id' => $visitor, 'offline' => false, 'known_at' => $threeHoursAgo], $threeHoursAgo),
+        s02Raw($this->agent, $seq + 2, 'badge', ['visitor_id' => $visitor, 'code' => $code, 'offline' => false, 'known_at' => $threeHoursAgo], $threeHoursAgo),
+        s02Raw($this->agent, $seq + 3, 'entree', ['visitor_id' => $visitor, 'duration_ms' => 1000, 'offline' => false, 'known_at' => $threeHoursAgo], $threeHoursAgo),
+    ];
+    expect(PostCapabilities::offlineTrustHours())->toBe(0); // politique non approuvée
+    $first = $forged(1);
+    expect(collect(s02Sync($first)->assertOk()->json('results'))->pluck('code')->all())->toBe(array_fill(0, 4, 'declaration_en_ligne_contredite'));
+    expect(DB::table('access_events')->where('visitor_id', $visitor)->count())->toBe(0);
+    // l'audit garde la trace du motif exact, et un renvoi identique ne duplique ni conflit ni effet (idempotence)
+    $conflicts = DB::table('sync_conflicts')->where('reason', 'declaration_en_ligne_contredite')->count();
+    expect($conflicts)->toBe(4);
+    $traces = DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'sync.conflit')->get()->filter(fn ($line) => (json_decode($line->details, true)['raison'] ?? null) === 'declaration_en_ligne_contredite');
+    expect($traces)->toHaveCount(4);
+    $replay = s02Sync($first)->assertOk()->json('results');
+    expect(collect($replay)->pluck('replayed')->filter()->count())->toBe(4)
+        ->and(DB::table('sync_conflicts')->where('reason', 'declaration_en_ligne_contredite')->count())->toBe(4);
+    // 2) délai approuvé mais copie trop ancienne à la décision, déclarée « en ligne » : refusée, toujours pour contradiction
+    s02Approve(2, true);
+    $old = s02Raw($this->agent, 5, 'controle', ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => now()->subHours(8)->toIso8601String()], $threeHoursAgo);
+    s02Sync([$old])->assertOk()->assertJsonPath('results.0.code', 'declaration_en_ligne_contredite');
+    // 3) décision réellement prise sur une copie récente avant la coupure : acceptée malgré la déclaration « en ligne » (le serveur la juge à la réception)
+    s02Approve(12, true);
+    $legit = s02Raw($this->agent, 6, 'controle', ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => now()->subHours(3)->subMinutes(30)->toIso8601String()], $threeHoursAgo);
+    s02Sync([$legit])->assertOk()->assertJsonPath('results.0.status', 'applique');
+});
+
+it('traite comme hors ligne une opération sans heure déclarée, ou datée du futur, même déclarée « en ligne »', function () {
+    app(BadgeService::class)->associer($this->badges[0], DemoSeeder::id('visitor1'), $this->agent, DemoSeeder::id('device'));
+    $code = $this->badges[0]->code;
+    $known = now()->subMinute()->toIso8601String();
+    $noTime = s02Raw($this->agent, 1, 'controle', ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => $known], null);
+    $future = s02Raw($this->agent, 2, 'controle', ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => $known], now()->addHours(3)->toIso8601String());
+    $byId = collect(s02Sync([$noTime, $future])->assertOk()->json('results'))->keyBy('id');
+    expect($byId[$noTime['id']]['code'])->toBe('politique_non_approuvee')->and($byId[$future['id']]['code'])->toBe('declaration_en_ligne_contredite');
+    expect(DB::table('access_events')->where('type', 'controle')->where('badge_id', $this->badges[0]->id)->count())->toBe(0);
+});
+
+it('documente la limite connue : un client qui falsifie AUSSI ses heures est jugé par le serveur sur l’état courant, sans preuve cryptographique', function () {
+    app(BadgeService::class)->associer($this->badges[0], DemoSeeder::id('visitor1'), $this->agent, DemoSeeder::id('device'));
+    $code = $this->badges[0]->code;
+    $now = now()->toIso8601String();
+    // heures cohérentes et récentes : indistinguables d'une décision en ligne ; la règle ne prétend pas faire plus (voir la documentation)
+    $op = s02Raw($this->agent, 1, 'controle', ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => $now], $now);
+    s02Sync([$op])->assertOk()->assertJsonPath('results.0.status', 'applique');
+    // mais le serveur rejuge toujours sur l'état courant : un badge annulé entre-temps est refusé quoi que le client déclare
+    app(BadgeService::class)->annuler($this->badges[0], s02User('superviseur'), 'Perdu');
+    $again = s02Raw($this->agent, 2, 'controle', ['code' => $code, 'local_valid' => true, 'offline' => false, 'known_at' => $now], $now);
+    s02Sync([$again])->assertOk()->assertJsonPath('results.0.code', 'annule_entre_temps');
+});
+
 it('applique la même protection aux opérations de car qui décident : remise de badge et arrivée, et à elles seules', function () {
     DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $group = DemoSeeder::id('group');
@@ -426,26 +496,49 @@ it('applique la même protection aux opérations de car qui décident : remise d
     }
 });
 
-it('refuse aux postes sans la capacité la remise de badge et l’arrivée d’un car, par le service comme par le rejeu', function () {
+it('distingue l’hôtel des postes de l’Académie : préparation et badges par permission de rôle, arrivée par scan à un poste', function () {
     DB::table('settings')->where('key', 'module_f06_active')->update(['value' => '1']);
     $group = DemoSeeder::id('group');
-    $known = now()->subMinute()->toIso8601String();
-    foreach (['poste_1' => ['poste_non_habilite', 'poste_non_habilite'], 'poste_3' => ['poste_non_habilite', 'poste_non_habilite'], 'soute' => ['poste_non_habilite', null]] as $point => [$badgeCode, $arriveCode]) {
-        s02Point($point);
-        $poste = Device::findOrFail(DemoSeeder::id('device'));
-        // appels directs aux services : la capacité est revérifiée même sans passer par la file
-        expect(fn () => app(Groups::class)->deliver($poste, $this->agent, $group, DemoSeeder::id('visitor270'), $this->badges[0]->code))->toThrow(DeskRefused::class);
-        if ($arriveCode !== null) {
-            expect(fn () => app(Groups::class)->arrive($poste, $this->agent, $this->badges[0]->code))->toThrow(DeskRefused::class);
+    $codeOf = function (callable $call): ?string {
+        try {
+            $call();
+        } catch (DeskRefused $e) {
+            return $e->code_;
         }
+
+        return null;
+    };
+    // tablette de l'hôtel : identifiée comme telle (jamais « poste 2 »), aucune capacité de poste
+    s02Point('hotel');
+    $hotel = Device::findOrFail(DemoSeeder::id('device'));
+    expect(PostCapabilities::capabilities($hotel))->toBe([]);
+    // la remise de badge de groupe (hôtel) relève de la permission de rôle groupes.remettre_badges : aucun refus de capacité de poste
+    expect($codeOf(fn () => app(Groups::class)->deliver($hotel, $this->agent, $group, DemoSeeder::id('visitor270'), $this->badges[0]->code)))->not->toBe('poste_non_habilite');
+    // l'arrivée d'un car est un scan physique à un poste de l'Académie : refusée à l'hôtel, comme à tout point sans capacité de scan
+    foreach (['hotel', 'poste_1', 'poste_3', 'poste_4'] as $point) {
+        s02Point($point);
+        expect($codeOf(fn () => app(Groups::class)->arrive(Device::findOrFail(DemoSeeder::id('device')), $this->agent, $this->badges[0]->code)))->toBe('poste_non_habilite');
     }
-    // rejeu : décisions prises EN LIGNE (âge déclaré) : la capacité du point courant les refuse
-    s02Point('poste_1');
+    foreach (['poste_2', 'soute'] as $point) {
+        s02Point($point);
+        expect($codeOf(fn () => app(Groups::class)->arrive(Device::findOrFail(DemoSeeder::id('device')), $this->agent, $this->badges[0]->code)))->not->toBe('poste_non_habilite');
+    }
+    // une tablette de l'hôtel ne contrôle, ne fait sortir et n'accueille personne
+    s02Point('hotel');
+    $this->postJson('/poste/api/controle', ['code' => $this->badges[0]->code], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
+    $this->postJson('/poste/api/sortie', ['code' => $this->badges[0]->code], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
+    $this->postJson('/poste/api/refuser', ['visitor_id' => DemoSeeder::id('visitor1'), 'motif' => 'essai'], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
+    // rejeu : la remise de badge de groupe faite à l'hôtel n'est pas refusée pour capacité ; l'arrivée du car l'est
+    $known = now()->subMinute()->toIso8601String();
     $ops = [
-        ['id' => (string) Str::uuid(), 'seq' => 1, 'type' => 'groupe_arrivee', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => $this->badges[0]->code, 'offline' => false, 'known_at' => $known]],
-        ['id' => (string) Str::uuid(), 'seq' => 2, 'type' => 'groupe_badge', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'code' => $this->badges[0]->code, 'offline' => false, 'known_at' => $known]],
+        ['id' => (string) Str::uuid(), 'seq' => 1, 'type' => 'groupe_badge', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['group_id' => $group, 'visitor_id' => DemoSeeder::id('visitor270'), 'code' => $this->badges[0]->code, 'offline' => false, 'known_at' => $known]],
+        ['id' => (string) Str::uuid(), 'seq' => 2, 'type' => 'groupe_arrivee', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => $this->badges[0]->code, 'offline' => false, 'known_at' => $known]],
     ];
-    expect(collect(s02Sync($ops)->assertOk()->json('results'))->pluck('code')->all())->toBe(['poste_non_habilite', 'poste_non_habilite']);
+    $codes = collect(s02Sync($ops)->assertOk()->json('results'))->pluck('code')->all();
+    expect($codes[0] ?? null)->not->toBe('poste_non_habilite')->and($codes[1])->toBe('poste_non_habilite');
+    // l'hôtel se déclare à la création d'un poste, sans fausse identité d'un poste de l'Académie
+    $this->actingAs(s02User('administrateur'))->post('/administration/postes', ['event_id' => DemoSeeder::id('event'), 'name' => 'Tablette hôtel fictive', 'point_code' => 'hotel'])->assertRedirect();
+    expect(DB::table('devices')->where('name', 'Tablette hôtel fictive')->value('point_code'))->toBe('hotel');
 });
 
 it('revérifie au rejeu le point courant du poste, même si la copie locale était plus ancienne', function () {
@@ -586,13 +679,28 @@ it('laisse la sortie ordinaire inchangée pour une catégorie sans indicateur', 
     expect(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('status'))->toBe('sorti');
 });
 
-it('réserve le réglage de la clôture réservée à la gestion des catégories', function () {
+it('empêche l’administration d’activer la clôture réservée tant que le parcours du superviseur n’existe pas', function () {
     $category = DemoSeeder::id('category1');
     $payload = ['event_id' => DemoSeeder::id('event'), 'name' => 'Catégorie fictive S02', 'color' => '#0F5AA6', 'priority_circuit' => false, 'closure_supervisor_only' => true, 'zone_ids' => []];
+    expect(SupervisorClosure::available())->toBeFalse();
+    // modification : refusée, rien n'est enregistré (pas même le nouveau nom)
+    $this->actingAs(s02User('administrateur'));
+    $this->putJson("/administration/categories/{$category}", $payload)->assertUnprocessable()->assertJsonValidationErrors('closure_supervisor_only');
+    expect((bool) DB::table('categories')->where('id', $category)->value('closure_supervisor_only'))->toBeFalse()
+        ->and(DB::table('categories')->where('id', $category)->value('name'))->not->toBe('Catégorie fictive S02');
+    // création : refusée, aucune catégorie créée
+    $this->postJson('/administration/categories', [...$payload, 'name' => 'Catégorie VIP fictive'])->assertUnprocessable()->assertJsonValidationErrors('closure_supervisor_only');
+    expect(DB::table('categories')->where('name', 'Catégorie VIP fictive')->exists())->toBeFalse();
+    // sans l'indicateur : accepté, et le libellé « VIP » n'y change rien
+    $this->postJson('/administration/categories', [...$payload, 'name' => 'VIP fictif', 'closure_supervisor_only' => false])->assertRedirect();
+    expect((bool) DB::table('categories')->where('name', 'VIP fictif')->value('closure_supervisor_only'))->toBeFalse();
+    // un état hérité (posé hors de l'administration) peut toujours être retiré, jamais activé de nouveau
+    DB::table('categories')->where('id', $category)->update(['closure_supervisor_only' => true]);
+    $this->putJson("/administration/categories/{$category}", [...$payload, 'closure_supervisor_only' => false])->assertRedirect();
+    expect((bool) DB::table('categories')->where('id', $category)->value('closure_supervisor_only'))->toBeFalse();
+    $this->putJson("/administration/categories/{$category}", $payload)->assertUnprocessable();
+    // les autres rôles n'y ont de toute façon aucun accès
     foreach (['agent_accueil', 'superviseur', 'hote'] as $role) {
         $this->actingAs(s02User($role))->putJson("/administration/categories/{$category}", $payload)->assertForbidden();
     }
-    expect((bool) DB::table('categories')->where('id', $category)->value('closure_supervisor_only'))->toBeFalse();
-    $this->actingAs(s02User('administrateur'))->putJson("/administration/categories/{$category}", $payload)->assertRedirect();
-    expect((bool) DB::table('categories')->where('id', $category)->value('closure_supervisor_only'))->toBeTrue();
 });

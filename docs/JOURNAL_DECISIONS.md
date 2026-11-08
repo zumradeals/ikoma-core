@@ -602,3 +602,11 @@ Décisions de l'architecte appliquées sans modifier les protections CI.
 - **Clôture VIP :** parcours du superviseur NON implémenté (lot ultérieur) ; cas bloqués identifiés et figés par un test (voir MATRICE_DROITS).
 - **Trivy (job production, images finales) :** voir le rapport de la PR ; aucune exception ajoutée, aucune protection modifiée.
 - **Points à valider :** (a) le délai hors ligne s'applique désormais aux décisions d'accès à chaque décision et son approbation est explicite ; (b) point de contrôle des tablettes de l'hôtel ; (c) les fixtures de recette approuvent un délai fictif pour que les parcours hors ligne de recette continuent de fonctionner (jamais en production).
+
+
+## S02 — revue d'architecture, troisième passe (novembre 2026)
+
+- **A. Déclaration hors ligne :** contournement confirmé (une opération déclarée `offline = false` avec `known_at` échappait à la politique quelle que soit la coupure) et corrigé par une mesure du serveur utilisant le délai DÉJÀ validé `poste_delai_appel_minutes`. Nouveau motif d'audit `declaration_en_ligne_contredite`. Limite documentée : falsification cohérente des heures non détectable sans attestation serveur (nouveau protocole, non décidé).
+- **B. Hôtel :** nouveau point `hotel` (lieu, hors postes de l'Académie, aucune capacité de poste). Retrait de ma porte « accueil » sur la remise de badge de groupe : elle contraignait à typer « poste 2 » une tablette de l'hôtel. La remise de badge de groupe et la préparation relèvent des permissions `groupes.*` ; l'arrivée du car (scan physique) exige la capacité `scan`. Le transport complet (embarquement individuel) reste au lot S08.
+- **C. Clôture VIP :** non activable par l'administration tant que le parcours du superviseur n'existe pas ; indicateur conservé.
+- **D. Dépendances :** voir le rapport de la PR (4 paquets Symfony 7.4.21 → 7.4.23 suffisent à lever les 9 avis ; aucun seuil modifié).
