@@ -24,9 +24,9 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | listes.importer | Oui | — | — | — | — |
 | listes.mettre_a_jour | — | — | — | Oui | — |
 | litiges.decider | — | Oui | — | — | — |
-| pilotage.consulter | — | Oui | — | — | — |
+| pilotage.consulter | Oui (S02, lecture) | Oui | — | — | — |
 | postes.gerer | Oui | — | — | — | — |
-| presences.consulter | — | Oui | — | — | — |
+| presences.consulter | Oui (S02, lecture) | Oui | — | — | — |
 | roles.attribuer | Oui | — | — | — | — |
 | visiteurs.enregistrer_mobile | — | — | Oui | — | — |
 | visiteurs.enregistrer_non_liste | — | — | Oui | — | — |
@@ -42,3 +42,22 @@ Lot L3b (décision du dirigeant, 27 octobre 2026) : `groupes.gerer`, `postes.ger
 Les permissions des futurs modules sont enregistrées mais aucune route ni table de ces modules n’est créée. `journal.exporter` est réservé ; aucun export L1.
 
 Validation du dirigeant : la permission `categories.gerer` est attribuée uniquement à l’administrateur, conformément à la section 10 du document de fonctionnement (« gestion des badges, zones et catégories »). La portée des listes de l’hôte et du groupe de l’encadreur devra être limitée aux objets concernés dans leurs futurs modules.
+
+
+## S02 — Autorisations et traçabilité (novembre 2026)
+
+- **Administrateur et supervision :** `pilotage.consulter` et `presences.consulter` lui sont accordées pour la **consultation** (tableau, présents, fiche, évacuation). Il n'a toujours ni `alertes.consulter` (qui porte aussi la prise en compte), ni `badges.annuler`, ni `litiges.decider`, ni `groupes.suivre`/`cars.suivre` : il consulte, il n'exerce aucune action du superviseur. Voir les alertes sans pouvoir les prendre en compte demandera de scinder `alertes.consulter` (lot ultérieur).
+- **Rôle de session :** un superviseur ou un administrateur ne devient jamais agent : toutes les routes du poste exigent le rôle `agent_accueil` ET chaque service (`SiteControl`, `Desk`) le revérifie.
+- **Capacités par poste** (`App\Services\Poste\PostCapabilities`, colonne `devices.point_code`) : le rôle ne suffit plus, la tablette doit tenir un point qui porte la capacité.
+
+| Point | accueil | scan | sortie |
+|---|:-:|:-:|:-:|
+| poste_1 (entrée principale) | — | — | — |
+| poste_2 (accès terrestre) | Oui | Oui | Oui |
+| poste_3, poste_4 (procédures « à confirmer ») | — | — | — |
+| soute | — | Oui | — |
+| non typé (poste hérité) | Oui | Oui | Oui |
+
+  Postes 3 et 4 : aucune capacité tant que leurs procédures ne sont pas décidées (cahier des charges §13). Poste non typé : comportement antérieur conservé, à typer avant toute mise en service réelle.
+- **Clôture VIP :** indicateur explicite `categories.closure_supervisor_only`. Sortie et restitution refusées à l'agent (`cloture_reservee_superviseur`) pour ces catégories ; jamais déduit du libellé. Le chemin superviseur de la clôture appartient au lot de clôture ultérieur.
+- **Clôture globale d'une activité :** `evenements.gerer`, réservée à l'administrateur (inchangé, désormais testé).

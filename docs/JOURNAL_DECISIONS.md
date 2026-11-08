@@ -575,3 +575,15 @@ Constat de recette sur tablette : une carte active avec une habilitation en cour
 ## Poste d'accueil — bandeau de réinitialisation retiré de l'écran de travail (2 novembre 2026)
 
 Demande du dirigeant : le bandeau blanc « Réinitialiser ce navigateur et changer de poste » en haut de l'écran de travail n'est pas professionnel. Il est retiré de l'écran ouvert. La réinitialisation locale reste disponible depuis l'écran verrouillé (« Ancien poste ? Réinitialiser ce navigateur pour le réenrôler »), qui est le chemin documenté (RESET_POSTE_CAMERA.md). Aucune règle ni donnée modifiée.
+
+
+## S02 — Sécurisation des autorisations et de la traçabilité (novembre 2026)
+
+Lot de sécurité ciblé, issu de la qualification S01 (aucun remodelage du domaine : personnes, participations, cycle des badges et clôtures collectives appartiennent aux lots suivants). Le projet n'est pas en production ; aucune reprise de données.
+
+- **Auteur des opérations (R-04) :** l'auteur est TOUJOURS le compte de la session. `SyncProcessor::process` refuse en bloc (403 `auteur_incoherent`) un lot contenant une opération dont `agent_id` n'est pas la session, avant toute écriture : aucune opération consommée, aucune séquence avancée (un refus partiel ferait passer l'appareil pour un clone), journal `sync.auteur_refuse` (identifiants seulement). Tablette partagée : chaque agent envoie ses propres opérations sous sa session ; le client conserve la file intacte et n'insiste pas. Les contrôles de rôle et de droit par opération restent en défense en profondeur.
+- **Capacités par poste :** colonne additive `devices.point_code` (poste_1, poste_2, poste_3, poste_4, soute ; nul = poste hérité inchangé), classe `PostCapabilities`, gardes en tête de `SiteControl::control|exit` et des opérations d'accueil de `Desk`, donc communes aux routes et au rejeu hors ligne (refus = quarantaine `poste_non_habilite`). Postes 3 et 4 sans capacité tant que leurs procédures sont « à confirmer ».
+- **Clôture réservée :** colonne additive `categories.closure_supervisor_only`, case dans l'écran Catégories. Aucun libellé de catégorie n'accorde ni ne retire un droit.
+- **Supervision :** l'administrateur reçoit `pilotage.consulter` et `presences.consulter` (consultation seule).
+- **Hors ligne :** aucune politique nouvelle. Le serveur applique à l'identique, au rejeu, les capacités de poste et la clôture réservée ; la tablette ne les connaît pas encore (pas de refus local) : un scan fait hors ligne à un point sans capacité est refusé et mis en quarantaine à la synchronisation. Écart assumé, à traiter avec la politique hors ligne (lot ultérieur).
+- **Décisions bloquantes :** voir le rapport S02 (typage obligatoire des postes avant mise en service, chemin superviseur de la clôture VIP, alertes consultables par l'administrateur).
