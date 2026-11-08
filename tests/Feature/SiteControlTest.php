@@ -474,7 +474,7 @@ it('accorde une zone par habilitation, la perd à la suspension, au retrait ou �
     siteEnter(1, $this->batch1[0]);
     $vip = fn () => siteControl($this->batch1[0]->code, siteZone(2))->assertOk()->json();
     expect($vip())->toMatchArray(['valid' => true, 'zone_ok' => false]);
-    $id = $entitlements->grant(DemoSeeder::id('visitor1'), DemoSeeder::id('zone2'), 'exceptionnelle', 'Visite officielle', now()->toIso8601String(), now()->addHours(2)->toIso8601String(), $admin);
+    $id = $entitlements->grant(DemoSeeder::id('visitor1'), DemoSeeder::id('zone2'), 'exceptionnelle', 'Visite officielle', now()->toIso8601String(), now()->addMinutes(2)->toIso8601String(), $admin);
     expect($vip())->toMatchArray(['zone_ok' => true])->and($vip()['zones'])->toContain('Espace VIP');
     // la catégorie reste intacte : une zone de la catégorie reste autorisée
     expect(siteControl($this->batch1[0]->code, siteZone(0))->json()['zone_ok'])->toBeTrue();
@@ -484,7 +484,7 @@ it('accorde une zone par habilitation, la perd à la suspension, au retrait ou �
     expect(siteControl($this->batch1[0]->code, siteZone(0))->json()['zone_ok'])->toBeTrue();
     $entitlements->resume($id, $admin);
     expect($vip()['zone_ok'])->toBeTrue();
-    $this->travel(3)->hours(); // l'habilitation exceptionnelle a expiré
+    $this->travel(150)->seconds(); // l'habilitation exceptionnelle (2 minutes) a expiré
     expect($vip()['zone_ok'])->toBeFalse();
     $this->travelBack();
     $this->travelTo('2027-01-10 10:00:00');
