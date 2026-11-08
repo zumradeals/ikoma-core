@@ -21,7 +21,7 @@ function visitor(id: string, name: string, over: Partial<SnapVisitor> = {}): Sna
 async function snapshot(): Promise<Snapshot> {
   const hash = await sha256Hex(TOKEN);
   return {
-    version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette A', station: 'Poste A', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
+    version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette A', station: 'Poste A', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
     settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }, { id: 'z2', name: 'Salle', est_accueil: false }, { id: 'z3', name: 'Espace VIP', est_accueil: false }],
     category_zone: [{ category_id: 'c1', zone_id: 'z1' }, { category_id: 'c1', zone_id: 'z2' }], hosts: [{ id: 'h1', name: 'Hôte fictif', service: null }], postes: [{ id: 'p1', name: 'Poste A' }, { id: 'p2', name: 'Poste B' }],
     visitors: [

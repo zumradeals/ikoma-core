@@ -49,6 +49,8 @@ export class PosteRuntime {
   }
 
   async enrol(code: string, pin: string, agent: { id: string; name: string }): Promise<void> {
+    // S02 / C3 : un nouvel enrôlement ne remplace jamais un coffre qui garde des opérations non envoyées.
+    if ((await this.store.count('pending')) > 0) throw new ApiError('operations_en_attente', 'Des opérations non envoyées restent sur cette tablette : elles doivent être synchronisées par leur auteur avant un nouvel enrôlement.', null, 409);
     const response = await this.fetcher('/poste/api/enroler', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN') }, body: JSON.stringify({ code }), credentials: 'same-origin' }).catch(() => { throw new ApiError('reseau', 'Pas de connexion au serveur : l’enrôlement demande le réseau.'); });
     const data = await response.json().catch(() => null) as (Enrolled & { message?: string; code?: string; errors?: Record<string, string[]> }) | null;
     if (!response.ok || !data?.device_token) throw new ApiError(data?.code ?? 'erreur', data?.message ?? Object.values(data?.errors ?? {})[0]?.[0] ?? 'Enrôlement impossible. Vérifiez le code ou demandez-en un nouveau.', null, response.status);
@@ -75,6 +77,13 @@ export class PosteRuntime {
     if (expectedAgentId) {
       const formerAgent = await this.vault.getSecret<{ id: string; name: string }>('profile');
       if (!formerAgent || formerAgent.id !== expectedAgentId) {
+        // S02 / C3 : les opérations en attente appartiennent à l'agent qui les a saisies. Un autre compte ne les efface pas, ne les envoie pas et ne les reprend pas :
+        // le coffre reste fermé, intact, jusqu'à ce que leur auteur se reconnecte et les synchronise. Sans opération en attente, l'ancien comportement s'applique.
+        const pending = await this.store.count('pending');
+        if (pending > 0) {
+          this.lock();
+          throw new ApiError('operations_en_attente_autre_agent', `Cette tablette garde ${pending} opération${pending > 1 ? 's' : ''} non envoyée${pending > 1 ? 's' : ''}, saisie${pending > 1 ? 's' : ''} par ${formerAgent?.name ?? 'un autre agent'} : cet agent doit se reconnecter et les envoyer avant tout changement d’agent. Rien n’est perdu.`, null, 409);
+        }
         await this.wipe('compte_change', false);
         return;
       }

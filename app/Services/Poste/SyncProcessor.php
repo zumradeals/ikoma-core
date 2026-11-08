@@ -34,7 +34,7 @@ final class SyncProcessor
         // S02 / R-04 : l'auteur d'une opération est TOUJOURS le compte authentifié de la session, jamais une valeur fournie par le client.
         // Un lot contenant une opération attribuée à un autre compte est refusé en bloc, avant toute écriture : aucune opération n'est
         // consommée, aucune séquence n'avance (un refus partiel ferait passer l'appareil pour un clone).
-        $declared = array_map(static fn ($op): string => is_array($op) ? (string) ($op['agent_id'] ?? '') : '', $operations);
+        $declared = array_map(static fn (array $op): string => (string) ($op['agent_id'] ?? ''), $operations);
         $foreign = array_values(array_filter($declared, static fn (string $id): bool => $id !== $session->id));
         if ($foreign !== []) {
             $this->audit->append('sync.auteur_refuse', $session->id, [
@@ -229,6 +229,7 @@ final class SyncProcessor
                 return $this->desk->enter($device, $agent, (string) $visitor, (int) ($p['duration_ms'] ?? 0), true, $clientTime);
             case 'controle':
                 [$code] = $need('code');
+                $this->requireFreshPolicy((string) $code, $p, $clientTime);
                 $verdict = $this->site->control($device, $agent, (string) $code, $this->point($p), $clientTime, isset($p['local_valid']) ? (bool) $p['local_valid'] : null, isset($p['known_at']) ? (string) $p['known_at'] : null);
                 // Le contrôle hors ligne avait jugé le badge valide alors que le serveur le refuse (annulé entre-temps, restitué…) : à signaler.
                 if (($p['local_valid'] ?? null) === true && ! $verdict['valid']) {
@@ -264,6 +265,29 @@ final class SyncProcessor
                 [$visitor, $name, $host, $category] = $need('visitor_id', 'name', 'host_id', 'category_id');
 
                 return $this->desk->createUnlisted($device, $agent, (string) $name, $p['organisation'] ?? null, (string) $host, (string) $category, (string) $visitor);
+        }
+    }
+
+    /**
+     * S02 / C2 : une décision FAVORABLE prise hors ligne sur un badge temporaire doit s'appuyer sur une copie qui n'était pas plus ancienne que la limite
+     * déjà validée (réglage poste_hors_reseau_max_heures ; 0 = limite désactivée, comportement inchangé). Aucune durée nouvelle n'est introduite.
+     * Les cartes permanentes gardent leur propre règle de confiance (PermanentAccess::offlineRefusal), qui n'est pas modifiée.
+     *
+     * @param  array<string, mixed>  $p
+     */
+    private function requireFreshPolicy(string $code, array $p, ?string $clientTime): void
+    {
+        if (($p['local_valid'] ?? null) !== true || str_starts_with($code, 'PC:')) {
+            return;
+        }
+        $max = (int) (DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->value('value') ?? 12);
+        if ($max <= 0) {
+            return;
+        }
+        $known = $this->time($p['known_at'] ?? null);
+        $decided = $clientTime ?? now()->utc()->format('Y-m-d H:i:s.uP');
+        if ($known === null || Carbon::parse($decided)->getTimestamp() - Carbon::parse($known)->getTimestamp() > $max * 3600) {
+            throw new DeskRefused('politique_perimee', 'La copie utilisée hors ligne était trop ancienne pour autoriser ce passage : il est mis en quarantaine et signalé.', 409);
         }
     }
 

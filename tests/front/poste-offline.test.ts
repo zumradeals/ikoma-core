@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
 import { createDeviceKey, createVault, fromB64, openJson, openVault, PBKDF2_ITERATIONS, randomBytes, sealJson, toB64 } from '../../resources/js/poste/local/crypto';
-import { PosteDb } from '../../resources/js/poste/local/db';
+import { PosteDb, setMeta } from '../../resources/js/poste/local/db';
 import { PosteVault, PinError, pinProblem } from '../../resources/js/poste/local/vault';
 import { LocalList, type Snapshot, type SnapVisitor } from '../../resources/js/poste/local/list';
 import { applyOp, searchOf } from '../../resources/js/poste/local/apply';
@@ -28,7 +28,7 @@ function visitor(id: string, name: string, over: Partial<SnapVisitor> = {}): Sna
 }
 function snapshot(visitors: SnapVisitor[], badges = [{ code: 'B-001', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true }, { code: 'B-002', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true }, { code: 'B-900', token_hash: '', category_id: 'c0', status: 'Disponible', mine: true }]): Snapshot {
   return {
-    version: 'v1', server_time: new Date(now0).toISOString(), poste: { id: 'p1', name: 'Tablette A', station: 'Poste fictif A', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
+    version: 'v1', server_time: new Date(now0).toISOString(), poste: { id: 'p1', name: 'Tablette A', station: 'Poste fictif A', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
     settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [vip, std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }, { id: 'z2', name: 'Salle', est_accueil: false }],
     category_zone: [{ category_id: 'c1', zone_id: 'z1' }, { category_id: 'c1', zone_id: 'z2' }, { category_id: 'c0', zone_id: 'z1' }], hosts: [{ id: 'h1', name: 'Hôte fictif', service: null }], postes: [{ id: 'p1', name: 'Poste fictif A' }], visitors, badges,
   };
@@ -328,6 +328,111 @@ describe('runtime', () => {
     expect(await runtime.expired()).toBe(true);
     await runtime.db.ops.put({ id: 'o', seq: 1, type: 'refuser', status: 'pending', data: new Uint8Array([1]) });
     expect(await runtime.expired()).toBe(false);
+  });
+});
+
+describe('S02 — restrictions de poste appliquées avant toute décision locale', () => {
+  async function repoFor(over: { point_code?: string | null; capabilities?: string[]; maxHours?: number; lastSync?: string | null }) {
+    const vault = new PosteVault(new PosteDb(dbName()), { iterations: ITER });
+    await vault.enrol({ token: 'b'.repeat(64), secret: SECRET, pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    const store = new PosteStore(vault);
+    const snap = snapshot([visitor('v1', 'Koné Mariam')]);
+    snap.poste = { ...snap.poste, point_code: over.point_code, capabilities: over.capabilities };
+    if (over.maxHours !== undefined) snap.settings.offline_max_hours = over.maxHours;
+    await store.saveSnapshot(snap);
+    await setMeta(vault.db, 'lastSyncAt', over.lastSync === undefined ? new Date(now0).toISOString() : over.lastSync);
+    const repo = new LocalPosteRepository(snap, vault, store, { id: 'u1', name: 'Agent fictif' }, vi.fn());
+    return { repo, store };
+  }
+  const gateReasons = ['poste_non_identifie', 'poste_non_habilite', 'politique_perimee'];
+  const full = ['accueil', 'scan', 'sortie'];
+
+  it('ne produit aucun résultat favorable pour un poste non identifié ou dont la copie ne porte pas ses capacités', async () => {
+    for (const over of [{ point_code: null, capabilities: [] }, { point_code: undefined, capabilities: undefined }, { point_code: 'poste_2', capabilities: undefined }]) {
+      const { repo, store } = await repoFor(over);
+      const control = await repo.control('c1', 'B-001', null);
+      expect(control.valid).toBe(false);
+      expect(control.reason).toBe('poste_non_identifie');
+      const exit = await repo.exit('x1', 'B-001', null);
+      expect(exit.ok).toBe(false);
+      expect(exit.reason).toBe('poste_non_identifie');
+      await expect(repo.refuse('r1', 'v1', 'motif')).rejects.toMatchObject({ code: 'poste_non_identifie' });
+      await expect(repo.enter('e1', 'v1', 1000)).rejects.toMatchObject({ code: 'poste_non_identifie' });
+      expect(await store.count('pending')).toBe(0); // rien n'est mis en file : aucune opération à rejuger côté serveur
+    }
+  });
+
+  it('refuse les capacités absentes du point tenu par la tablette (poste 1, poste 3, poste 4, soute)', async () => {
+    for (const [point, capabilities] of [['poste_1', []], ['poste_3', []], ['poste_4', []], ['soute', ['scan']]] as [string, string[]][]) {
+      const { repo, store } = await repoFor({ point_code: point, capabilities });
+      const scan = await repo.control('c-' + point, 'B-001', null);
+      if (capabilities.includes('scan')) expect(gateReasons).not.toContain(scan.reason);
+      else expect(scan.reason).toBe('poste_non_habilite');
+      expect((await repo.exit('x-' + point, 'B-001', null)).reason).toBe('poste_non_habilite');
+      await expect(repo.refuse('r-' + point, 'v1', 'motif')).rejects.toMatchObject({ code: 'poste_non_habilite' });
+      expect(await store.count('pending')).toBe(capabilities.includes('scan') ? 1 : 0); // le seul scan de la soute est consigné, comme avant
+    }
+  });
+
+  it('refuse une copie plus ancienne que la limite déjà validée, jamais en dessous, et ne change rien quand la limite est désactivée', async () => {
+    const hoursAgo = (h: number) => new Date(now0 - h * 3_600_000).toISOString();
+    const stale = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 12, lastSync: hoursAgo(13) });
+    expect((await stale.repo.control('s1', 'B-001', null)).reason).toBe('politique_perimee');
+    expect((await stale.repo.exit('s2', 'B-001', null)).reason).toBe('politique_perimee');
+    await expect(stale.repo.refuse('s3', 'v1', 'motif')).rejects.toMatchObject({ code: 'politique_perimee' });
+    expect(await stale.store.count('pending')).toBe(0);
+    const never = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 12, lastSync: null });
+    expect((await never.repo.control('n1', 'B-001', null)).reason).toBe('politique_perimee');
+    const fresh = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 12, lastSync: hoursAgo(1) });
+    expect(gateReasons).not.toContain((await fresh.repo.control('f1', 'B-001', null)).reason);
+    await fresh.repo.refuse('f2', 'v1', 'motif');
+    expect(await fresh.store.count('pending')).toBe(2);
+    const off = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 0, lastSync: hoursAgo(40) });
+    expect(gateReasons).not.toContain((await off.repo.control('o1', 'B-001', null)).reason);
+  });
+});
+
+describe('S02 — l’auteur initial des opérations en attente est préservé', () => {
+  const quiet = vi.fn(async () => { throw new TypeError('network'); }) as unknown as typeof fetch;
+  async function runtimeWith(agent: { id: string; name: string }, pending: number) {
+    const wiped = vi.fn();
+    const runtime = new PosteRuntime({ onState: () => undefined, onWiped: wiped }, { dbName: dbName(), iterations: ITER, fetcher: quiet });
+    await runtime.vault.enrol({ token: 'c'.repeat(64), secret: SECRET, pin: PIN, agent, poste: { id: 'p1', name: 'Poste fictif' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    for (let i = 1; i <= pending; i++) await runtime.db.ops.put({ id: 'op-' + i, seq: i, type: 'refuser', status: 'pending', data: new Uint8Array([1]) });
+    runtime.lock();
+    return { runtime, wiped };
+  }
+
+  it('refuse qu’un autre compte ouvre la tablette tant que des opérations attendent : rien n’est effacé, envoyé ni repris', async () => {
+    const { runtime, wiped } = await runtimeWith({ id: 'u1', name: 'Agent A' }, 2);
+    await expect(runtime.unlock(PIN, 'u2')).rejects.toMatchObject({ code: 'operations_en_attente_autre_agent', status: 409 });
+    expect(wiped).not.toHaveBeenCalled();
+    expect(runtime.vault.unlocked).toBe(false);
+    expect(await runtime.db.ops.count()).toBe(2);
+    expect(await runtime.store.count('pending')).toBe(2);
+    expect(await runtime.vault.state()).not.toBe('vide');
+    // l'auteur initial, authentifié, retrouve ses opérations intactes
+    await runtime.unlock(PIN, 'u1');
+    expect(runtime.vault.unlocked).toBe(true);
+    expect(await runtime.store.count('pending')).toBe(2);
+    expect(wiped).not.toHaveBeenCalled();
+    runtime.lock();
+  });
+
+  it('garde l’ancien comportement, déclaré, quand aucune opération n’attend : un autre agent peut reprendre la tablette', async () => {
+    const { runtime, wiped } = await runtimeWith({ id: 'u1', name: 'Agent A' }, 0);
+    await runtime.unlock(PIN, 'u2');
+    expect(wiped).toHaveBeenCalledWith('compte_change');
+    expect(await runtime.vault.state()).toBe('vide');
+  });
+
+  it('refuse un nouvel enrôlement par-dessus des opérations non envoyées, sans appeler le serveur', async () => {
+    const calls: string[] = [];
+    const runtime = new PosteRuntime(undefined, { dbName: dbName(), iterations: ITER, fetcher: (async (url: string | URL | Request) => { calls.push(String(url)); throw new TypeError('network'); }) as typeof fetch });
+    await runtime.db.ops.put({ id: 'op-1', seq: 1, type: 'refuser', status: 'pending', data: new Uint8Array([1]) });
+    await expect(runtime.enrol('ABCD-EFGH-2345', PIN, { id: 'u2', name: 'Agent B' })).rejects.toMatchObject({ code: 'operations_en_attente' });
+    expect(calls).toEqual([]);
+    expect(await runtime.db.ops.count()).toBe(1);
   });
 });
 

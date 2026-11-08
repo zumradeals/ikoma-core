@@ -35,7 +35,8 @@ final class ListSnapshot
             ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
 
         // Cartes permanentes, habilitations et politiques de zone : toute révocation ou habilitation modifiée change la version et est donc reprise à la prochaine synchronisation.
-        return sha1((string) $row->v.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)));
+        // Le point de contrôle du poste (et donc ses capacités) fait partie de la copie : le modifier change la version.
+        return sha1((string) $row->v.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-'));
     }
 
     private function groupMode(): string
@@ -63,7 +64,7 @@ final class ListSnapshot
         return [
             'version' => $this->version($poste),
             'server_time' => now()->utc()->format('Y-m-d\TH:i:s.u\Z'),
-            'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $e],
+            'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $e, 'point_code' => $poste->point_code, 'capabilities' => PostCapabilities::capabilities($poste)],
             'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at']),
             'settings' => ['inactivity_minutes' => $setting('poste_inactivite_minutes', 5), 'clock_skew_seconds' => $setting('poste_ecart_horloge_secondes', 300), 'pin_max_failures' => $setting('poste_echecs_pin_max', 15), 'controle_stagiaires' => $this->groupMode(), 'f06_active' => $f06Active,
                 'identity_document' => Desk::documentRequired(), 'offline_call_minutes' => $setting('poste_delai_appel_minutes', 15), 'offline_max_hours' => $setting('poste_hors_reseau_max_heures', 12), 'low_badges_percent' => $setting('poste_badges_bas_pourcent', 10), 'low_badges_min' => $setting('poste_badges_bas_minimum', 5)],

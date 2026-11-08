@@ -283,11 +283,11 @@ it('rejoue les contrôles et sorties faits hors ligne, une seule fois, et met en
     siteEnter(3, $this->batch0[0]);
     $id = (string) Str::uuid();
     $ops = [
-        siteOp('controle', ['code' => $this->batch1[0]->code, 'point' => siteZone(1), 'local_valid' => true], 1, $id),
+        siteOp('controle', ['code' => $this->batch1[0]->code, 'point' => siteZone(1), 'local_valid' => true, 'known_at' => now()->subMinutes(30)->toIso8601String()], 1, $id),
         siteOp('sortie', ['code' => $this->batch1[0]->code, 'point' => siteZone(0)], 2),
         siteOp('sortie', ['code' => $this->batch1[0]->code], 3), // double sortie
         siteOp('sortie', ['code' => $this->batch2[0]->code], 4), // sortie sans entrée connue
-        siteOp('controle', ['code' => $this->batch0[0]->code, 'local_valid' => true], 5), // badge annulé entre-temps
+        siteOp('controle', ['code' => $this->batch0[0]->code, 'local_valid' => true, 'known_at' => now()->subMinutes(30)->toIso8601String()], 5), // badge annulé entre-temps
         siteOp('controle', ['code' => $this->batch1[5]->code, 'local_valid' => false], 6), // refusé hors ligne, refusé aussi par le serveur : rien à signaler
     ];
     app(BadgeService::class)->annuler($this->batch0[0], siteUser('superviseur'), 'Perdu');
