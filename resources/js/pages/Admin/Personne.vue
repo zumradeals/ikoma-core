@@ -4,12 +4,14 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import BaseCard from '../../components/BaseCard.vue';
 import FormButton from '../../components/FormButton.vue';
+import ParticipationVisit, { type Visit } from '../../components/admin/ParticipationVisit.vue';
 
 type Participation = { id: string; event_id: string; event_name: string; event_kind: string; category: string; status: string | null; valid_from: string; valid_until: string; withdrawn_at: string | null; closed_at: string | null; closure_reason: string | null; holder_id: string | null };
 type Assignment = { id: string; badge_code: string; badge_id: string; event_name: string; assigned_at: string; returned_at: string | null; cancelled_at: string | null; cancellation_reason: string | null };
 const props = defineProps<{
   person: { id: string; full_name: string; organisation: string | null; status: string };
   participations: Participation[]; assignments: Assignment[]; holder: { identifier: string; status: string } | null;
+  visits?: Record<string, Visit>; vehicleKinds?: Record<string, string>;
   events: { id: string; name: string; kind: string }[]; categories: { id: string; event_id: string; name: string }[]; hosts: { id: string; event_id: string; name: string }[];
 }>();
 const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite', permanent: 'Permanent' };
@@ -37,6 +39,7 @@ function close(p: Participation) {
 <li v-for="p in participations" :key="p.id" class="rounded-xl border border-slate-200 p-4" :data-testid="'participation-' + p.id">
 <p class="font-bold">{{ p.event_name }} <span class="text-sm font-normal text-slate-600">({{ kinds[p.event_kind] ?? p.event_kind }})</span></p>
 <p class="text-sm text-slate-600">{{ p.category }} · {{ day(p.valid_from) }} – {{ day(p.valid_until) }} · {{ state(p) }}<template v-if="p.closure_reason"> · {{ p.closure_reason }}</template></p>
+<ParticipationVisit v-if="!p.closed_at && !p.withdrawn_at && !p.holder_id && visits?.[p.id]" :participation-id="p.id" :visit="visits[p.id]" :kinds="vehicleKinds ?? {}" :can-announce="(p.status ?? 'attendu') === 'attendu'" />
 <button v-if="!p.closed_at && !p.withdrawn_at && !p.holder_id" type="button" class="action mt-3" :data-testid="'cloturer-' + p.id" @click="close(p)">Clôturer cette participation</button>
 </li>
 </ul>
