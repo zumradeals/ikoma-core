@@ -259,6 +259,21 @@ describe('file hors ligne, règles locales et envoi', () => {
     expect(sync.state.needsLogin).toBe(false);
   });
 
+  it('garde la file intacte et n’insiste pas quand le serveur refuse un auteur incohérent (S02)', async () => {
+    let syncCalls = 0;
+    const { repo, sync, store } = await setup(undefined, (url) => {
+      if (url.endsWith('/sync')) { syncCalls++; return new Response(JSON.stringify({ code: 'auteur_incoherent', message: 'Ces opérations ont été saisies par un autre compte.', action: null }), { status: 403 }); }
+      return new Response(JSON.stringify(url.endsWith('/version') ? { version: 'v1', server_time: new Date(now0).toISOString() } : {}), { status: 200 });
+    });
+    await repo.refuse('a1', 'v1', 'motif');
+    await sync.sync(); sync.stop();
+    expect(syncCalls).toBe(1);
+    expect(await store.count('pending')).toBe(1);
+    expect(await store.count('conflict')).toBe(0);
+    expect(sync.state.lastError).toBe('Ces opérations ont été saisies par un autre compte.');
+    expect(sync.state.revoked).toBe(false);
+  });
+
   it('efface la tablette quand le serveur la déclare révoquée', async () => {
     const { repo, sync, vault, revoked } = await setup(undefined, () => new Response(JSON.stringify({ code: 'appareil_revoque', message: 'Révoquée' }), { status: 401 }));
     await repo.refuse('x1', 'v1', 'motif');

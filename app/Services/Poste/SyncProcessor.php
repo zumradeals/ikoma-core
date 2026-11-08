@@ -27,10 +27,24 @@ final class SyncProcessor
 
     /**
      * @param  list<array<string, mixed>>  $operations
-     * @return array{revoked:true}|array{results:list<array<string,mixed>>,summary:array<string,int>,clock_skew_seconds:?int}
+     * @return array{revoked:true}|array{author_mismatch:true}|array{results:list<array<string,mixed>>,summary:array<string,int>,clock_skew_seconds:?int}
      */
     public function process(Device $device, User $session, array $operations, ?string $sentAt): array
     {
+        // S02 / R-04 : l'auteur d'une opération est TOUJOURS le compte authentifié de la session, jamais une valeur fournie par le client.
+        // Un lot contenant une opération attribuée à un autre compte est refusé en bloc, avant toute écriture : aucune opération n'est
+        // consommée, aucune séquence n'avance (un refus partiel ferait passer l'appareil pour un clone).
+        $declared = array_map(static fn ($op): string => is_array($op) ? (string) ($op['agent_id'] ?? '') : '', $operations);
+        $foreign = array_values(array_filter($declared, static fn (string $id): bool => $id !== $session->id));
+        if ($foreign !== []) {
+            $this->audit->append('sync.auteur_refuse', $session->id, [
+                'device_id' => $device->id, 'event_id' => $device->event_id, 'operations' => count($operations), 'incoherentes' => count($foreign),
+                'auteurs_declares' => array_slice(array_values(array_unique(array_filter($foreign, static fn (string $id): bool => Str::isUuid($id)))), 0, 5),
+            ]);
+
+            return ['author_mismatch' => true];
+        }
+
         return DB::transaction(function () use ($device, $session, $operations, $sentAt): array {
             $event = DB::table('events')->where('id', $device->event_id)->sharedLock()->first(['status']);
             $locked = Device::query()->lockForUpdate()->findOrFail($device->id);

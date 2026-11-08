@@ -38,6 +38,9 @@ final class PosteSyncController
         $data = $r->validate(['sent_at' => 'nullable|date', 'operations' => 'required|array|min:1|max:'.SyncProcessor::MAX_OPERATIONS, 'operations.*' => 'array']);
 
         $result = $processor->process($this->poste($r), $r->user(), $data['operations'], $data['sent_at'] ?? null);
+        if ($result['author_mismatch'] ?? false) {
+            return response()->json(['code' => 'auteur_incoherent', 'message' => 'Ces opérations ont été saisies par un autre compte : reconnectez-vous avec le compte qui les a saisies. Rien n’a été enregistré.', 'action' => null], 403);
+        }
         if ($result['revoked'] ?? false) {
             return response()->json(['code' => 'appareil_revoque', 'message' => 'Cette tablette a été révoquée : contactez l’administrateur.'], 401);
         }

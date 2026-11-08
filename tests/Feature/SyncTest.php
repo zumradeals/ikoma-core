@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\Pilotage;
 use App\Services\Poste\Devices;
+use App\Services\Poste\SyncProcessor;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\Query\Builder;
@@ -266,18 +267,27 @@ it('refuse une seconde entrée venue d’un autre poste et signale la fiche modi
     expect($this->postJson('/poste/api/sync', ['operations' => [$fresh]], syncHeaders(SYNC_TOKEN_B))->json('results.0.status'))->toBe('applique');
 });
 
-it('met en quarantaine les opérations d’un agent désactivé entre-temps, sans bloquer les autres', function () {
+it('met en quarantaine les opérations d’un agent désactivé ou sans rôle d’agent, sans bloquer les autres (S02 : chaque lot est envoyé sous la session de son auteur)', function () {
+    $processor = app(SyncProcessor::class);
+    $device = Device::findOrFail($this->deviceA);
     $other = syncUser();
+    $hote = syncUser('hote');
     $seq = 0;
     $mine = syncOp('identite', ['visitor_id' => syncVisitor(1), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seq);
     $theirs = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $other, ++$seq);
+    $wrongRole = syncOp('valider', ['visitor_id' => syncVisitor(7)], $hote, ++$seq);
     $other->update(['active' => false]);
-    $wrongRole = syncOp('valider', ['visitor_id' => syncVisitor(7)], syncUser('hote'), ++$seq);
-    $unknown = syncOp('valider', ['visitor_id' => syncVisitor(7)], $this->agent, ++$seq, null, ['agent_id' => (string) Str::uuid()]);
-    $response = $this->postJson('/poste/api/sync', ['operations' => [$theirs, $mine, $wrongRole, $unknown]], syncHeaders())->assertOk();
-    $byId = collect($response->json('results'))->keyBy('id');
-    expect($byId[$mine['id']]['status'])->toBe('applique')->and($byId[$theirs['id']])->toMatchArray(['status' => 'conflit', 'code' => 'agent_desactive'])->and($byId[$wrongRole['id']]['code'])->toBe('agent_desactive')->and($byId[$unknown['id']]['code'])->toBe('agent_inconnu');
+    $okMine = $processor->process($device, $this->agent, [$mine], null);
+    $okTheirs = $processor->process($device, $other, [$theirs], null);
+    $okWrong = $processor->process($device, $hote, [$wrongRole], null);
+    expect($okMine['results'][0]['status'])->toBe('applique')
+        ->and($okTheirs['results'][0])->toMatchArray(['status' => 'conflit', 'code' => 'agent_desactive'])
+        ->and($okWrong['results'][0]['code'])->toBe('agent_desactive');
     expect(DB::table('photos')->where('visitor_id', syncVisitor(4))->count())->toBe(0)->and(DB::table('photos')->where('visitor_id', syncVisitor(1))->count())->toBe(1)->and(DB::table('sync_conflicts')->where('reason', 'agent_desactive')->count())->toBe(2);
+    // un auteur inconnu n'est plus une opération en conflit : le client n'a pas le droit de choisir l'auteur, le lot entier est refusé (S02, R-04)
+    $unknown = syncOp('valider', ['visitor_id' => syncVisitor(7)], $this->agent, ++$seq, null, ['agent_id' => (string) Str::uuid()]);
+    $this->postJson('/poste/api/sync', ['operations' => [$unknown]], syncHeaders())->assertForbidden()->assertJsonPath('code', 'auteur_incoherent');
+    expect(DB::table('sync_operations')->where('id', $unknown['id'])->exists())->toBeFalse();
 });
 
 it('signale l’écart d’horloge au-delà du seuil et conserve l’heure déclarée', function () {
