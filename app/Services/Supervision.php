@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 final class Supervision
 {
     public const PER_PAGE = 30;
+
     public const TYPES = ['entree', 'sortie', 'controle', 'correction'];
 
     /**
@@ -68,7 +69,15 @@ final class Supervision
             ->get(['e.id', 'v.id as visitor_id', 'v.full_name', 'z.name as zone', 'e.kind', 'e.reason', 'e.valid_from', 'e.valid_until', 'e.suspended_at', 'e.suspension_reason'])
             ->map(function ($row) {
                 $now = now();
-                $row->state = $row->suspended_at !== null ? 'suspendue' : (Carbon::parse($row->valid_until)->lt($now) ? 'expiree' : (Carbon::parse($row->valid_from)->gt($now) ? 'a_venir' : 'active'));
+                if ($row->suspended_at !== null) {
+                    $row->state = 'suspendue';
+                } elseif (Carbon::parse($row->valid_until)->lt($now)) {
+                    $row->state = 'expiree';
+                } elseif (Carbon::parse($row->valid_from)->gt($now)) {
+                    $row->state = 'a_venir';
+                } else {
+                    $row->state = 'active';
+                }
 
                 return $row;
             });
