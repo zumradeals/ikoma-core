@@ -8,6 +8,7 @@ use App\Services\BadgeRefused;
 use App\Services\BadgeService;
 use App\Services\Pilotage;
 use App\Services\Poste\DeskRefused;
+use App\Services\Supervision;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ use Inertia\Response;
  */
 final class PilotageController
 {
-    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges) {}
+    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision) {}
 
     private function event(Request $r): ?object
     {
@@ -80,6 +81,35 @@ final class PilotageController
             'rows' => $event ? $this->pilotage->presentRows($event->id, $filters, Pilotage::PER_PAGE, ($page - 1) * Pilotage::PER_PAGE) : [], 'total' => $total, 'page' => $page, 'perPage' => Pilotage::PER_PAGE,
             'categories' => $event ? DB::table('categories')->where('event_id', $event->id)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']) : [],
             'zones' => $event ? DB::table('zones')->where('event_id', $event->id)->orderBy('name')->pluck('name') : [],
+        ]);
+    }
+
+    /** Journal des mouvements physiques (S07) : lecture seule, filtrable. */
+    public function mouvements(Request $r): Response
+    {
+        $filters = $r->validate(['q' => 'nullable|string|max:80', 'type' => 'nullable|in:'.implode(',', Supervision::TYPES), 'point' => 'nullable|string|max:160', 'outcome' => 'nullable|in:valide,refuse',
+            'from' => 'nullable|date', 'until' => 'nullable|date', 'page' => 'nullable|integer|min:1|max:1000']);
+        $event = $this->event($r);
+        $page = (int) ($filters['page'] ?? 1);
+
+        return Inertia::render('Pilotage/Mouvements', [
+            ...$this->shared($event),
+            'filters' => ['q' => $filters['q'] ?? '', 'type' => $filters['type'] ?? '', 'point' => $filters['point'] ?? '', 'outcome' => $filters['outcome'] ?? '', 'from' => $filters['from'] ?? '', 'until' => $filters['until'] ?? ''],
+            'rows' => $event ? $this->supervision->movements($event->id, $filters, Supervision::PER_PAGE, ($page - 1) * Supervision::PER_PAGE) : [],
+            'total' => $event ? $this->supervision->movementCount($event->id, $filters) : 0, 'page' => $page, 'perPage' => Supervision::PER_PAGE,
+            'points' => $event ? $this->supervision->points($event->id) : [], 'types' => Supervision::TYPES,
+        ]);
+    }
+
+    /** Accès et badges à surveiller (S07) : habilitations de participation (lecture seule) et badges à récupérer. */
+    public function acces(Request $r): Response
+    {
+        $event = $this->event($r);
+
+        return Inertia::render('Pilotage/Acces', [
+            ...$this->shared($event),
+            'entitlements' => $event ? $this->supervision->entitlements($event->id) : [],
+            'badgesToReturn' => $event ? $this->supervision->badgesToReturn($event->id) : [],
         ]);
     }
 

@@ -11,7 +11,7 @@ import { pilotageHref } from '../pilotage/navigation';
 defineOptions({ inheritAttrs: false });
 type EventRef = { id: string; name: string };
 type Context = { event: EventRef | null; events: EventRef[]; openAlerts: number; criticalAlerts: number };
-const props = withDefaults(defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'litiges' | 'evacuation' | 'plus' | 'journal'; event?: EventRef | null; events?: EventRef[]; openAlerts?: number; title?: string; bare?: boolean }>(), { event: null, events: () => [], openAlerts: 0, title: '', bare: false });
+const props = withDefaults(defineProps<{ active: 'tableau' | 'alertes' | 'presents' | 'mouvements' | 'acces' | 'litiges' | 'evacuation' | 'plus' | 'journal'; event?: EventRef | null; events?: EventRef[]; openAlerts?: number; title?: string; bare?: boolean }>(), { event: null, events: () => [], openAlerts: 0, title: '', bare: false });
 const page = usePage<{ auth?: { name: string; permissions: string[] } | null; criticalAlerts?: number; f06Active?: boolean; pilotageContext?: Context | null }>();
 const currentEvent = computed(() => props.event ?? page.props.pilotageContext?.event ?? null);
 const events = computed(() => props.events.length ? props.events : page.props.pilotageContext?.events ?? []);
@@ -23,6 +23,8 @@ const items = [
   { key: 'tableau', label: 'Tableau de bord', short: 'Tableau', icon: 'home', href: '/pilotage', permission: 'pilotage.consulter' },
   { key: 'alertes', label: 'Alertes', short: 'Alertes', icon: 'alert', href: '/pilotage/alertes', permission: 'alertes.consulter' },
   { key: 'presents', label: 'Personnes présentes', short: 'Présents', icon: 'users', href: '/pilotage/presents', permission: 'presences.consulter' },
+  { key: 'mouvements', label: 'Mouvements', short: 'Mouvements', icon: 'arrow', href: '/pilotage/mouvements', permission: 'presences.consulter' },
+  { key: 'acces', label: 'Accès et badges', short: 'Accès', icon: 'qr', href: '/pilotage/acces', permission: 'pilotage.consulter' },
   { key: 'litiges', label: 'Litiges', short: 'Litiges', icon: 'shield', href: '/pilotage/litiges', permission: 'litiges.decider' },
   { key: 'plus', label: 'Groupes et cars', short: 'Groupes', icon: 'bus', href: '/pilotage/groupes', permission: 'groupes.suivre' },
   { key: 'evacuation', label: 'Évacuation', short: 'Évacuation', icon: 'arrow', href: '/pilotage/evacuation', permission: 'presences.consulter' },

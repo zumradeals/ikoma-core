@@ -647,3 +647,9 @@ Décisions de l'architecte appliquées sans modifier les protections CI.
 - **Tablette** : la copie locale reçoit `point_zones` et `entitlements` actifs ; la période est jugée sur la tablette. Une suspension ou un retrait n'atteint une tablette hors ligne qu'à sa prochaine synchronisation (même règle que pour la catégorie) ; le serveur reste l'autorité au rejeu.
 - **Hors périmètre S06** : habilitation refusant une zone de la catégorie (les habilitations sont additives) ; mouvements physiques et centre de supervision (S07).
 - **Précision (dirigeant)** : suspendre ou retirer une habilitation, même exceptionnelle, ne retire que l'accès supplémentaire qu'elle accordait ; les droits de la catégorie ne sont jamais retirés par cette action. Les écrans le disent explicitement et un test le vérifie.
+
+## S07 — Mouvements physiques et centre de supervision
+- **Réutilisation** : aucune table nouvelle. Le journal des mouvements est une lecture de `access_events` (entrées, sorties, contrôles valides ou refusés, corrections) ; les badges à récupérer sont les attributions ouvertes d'une personne sortie ou d'une participation clôturée (sortie ≠ restitution) ; les habilitations de participation (S06) sont affichées en lecture seule.
+- **Écrans** (menu Pilotage existant, pas de second centre) : `/pilotage/mouvements` (permission `presences.consulter`, filtres nom / type / point / résultat, pagination) et `/pilotage/acces` (permission `pilotage.consulter`). Le superviseur agit par les routes existantes (alertes, litiges, annulation de badge) ; il ne peut ni accorder, ni suspendre, ni retirer une habilitation (routes administrateur uniquement, testé).
+- **Périmètre** : celui de l'activité sélectionnée, comme le reste du pilotage. L'agent d'accueil et l'hôte n'ont aucun accès.
+- **Branche empilée** : S07 repose sur S06 (PR #96) ; elle sera réalignée sur `main` après la fusion de S06.
