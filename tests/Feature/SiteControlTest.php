@@ -553,7 +553,6 @@ it('juge la zone d’un poste selon la correspondance configurée par l’admini
     expect(siteAudit()->whereIn('action', ['point.zone_associee', 'point.zone_dissociee'])->count())->toBe(3);
 });
 
-
 // --- S07 : mouvements physiques et centre de supervision ------------------------------------------------------------------------
 
 it('liste les mouvements physiques de l’activité, filtrables, au superviseur seulement', function () {
