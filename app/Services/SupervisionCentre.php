@@ -34,7 +34,7 @@ final class SupervisionCentre
             'presents' => ['count' => $this->pilotage->presentCount($eventId), 'rows' => $this->pilotage->presentRows($eventId, [], self::LIMIT)],
             'movements' => $this->supervision->movements($eventId, [], 10)->map(fn ($m) => [
                 'id' => $m->id, 'occurred_at' => $m->occurred_at, 'type' => $m->type, 'checkpoint' => $m->checkpoint, 'visitor_id' => $m->visitor_id, 'full_name' => $m->full_name,
-                'badge_code' => $m->badge_code, 'verdict' => $m->verdict, 'zone_ok' => $m->zone_ok,
+                'badge_code' => $m->badge_code, 'verdict' => $m->verdict, 'zone_ok' => $m->zone_ok, 'direction' => $m->direction,
             ])->values()->all(),
             'visits' => ['counts' => $expected['counts'], 'late_after_minutes' => $expected['late_after_minutes'], 'rows' => array_slice($open, 0, self::LIMIT)],
             'vehicles' => array_slice($vehicles, 0, self::LIMIT),

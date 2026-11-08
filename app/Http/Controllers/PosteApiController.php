@@ -103,10 +103,10 @@ final class PosteApiController
 
     public function controle(Request $r): JsonResponse
     {
-        $data = $r->validate(['code' => 'required|string|max:100', 'point' => 'nullable|array', 'point.type' => 'required_with:point|in:zone,poste', 'point.id' => 'required_with:point|uuid']);
+        $data = $r->validate(['code' => 'required|string|max:100', 'point' => 'nullable|array', 'point.type' => 'required_with:point|in:zone,poste', 'point.id' => 'required_with:point|uuid', 'direction' => 'nullable|in:entree,sortie']);
         $poste = $this->poste($r);
 
-        return $this->operations->run($r, 'controle', hash('sha256', $data['code']).'|'.json_encode($data['point'] ?? null), fn () => $this->site->control($poste, $r->user(), $data['code'], $data['point'] ?? null));
+        return $this->operations->run($r, 'controle', hash('sha256', $data['code']).'|'.json_encode($data['point'] ?? null).'|'.($data['direction'] ?? ''), fn () => $this->site->control($poste, $r->user(), $data['code'], $data['point'] ?? null, null, null, null, $data['direction'] ?? null));
     }
 
     public function sortie(Request $r): JsonResponse

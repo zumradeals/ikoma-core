@@ -12,9 +12,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 final class BadgeWorkshopController
 {
+    /** Clés du modèle visuel d'un événement (identiques à celles de l'enregistrement : badge_atelier_{événement}_{clé}). */
+    private const MODEL_KEYS = ['design', 'title', 'primary', 'accent', 'orientation'];
+
     /** Ancien lien conservé : l'atelier d'impression est devenu l'Atelier des badges. */
     public function index(Request $request): RedirectResponse
     {
@@ -84,6 +88,50 @@ final class BadgeWorkshopController
         });
 
         return back()->with('status', 'Le modèle est enregistré pour cet événement.');
+    }
+
+    /**
+     * Revient au modèle par défaut d'un événement (S10) : efface les valeurs enregistrées, les défauts de l'installation s'appliquent de nouveau.
+     * Ne touche ni aux lots, ni aux badges, ni aux tirages déjà faits : seul l'aspect proposé à la prochaine impression change.
+     */
+    public function resetModel(Request $request): JsonResponse
+    {
+        Gate::authorize('badges.gerer');
+        $data = $request->validate(['event' => ['required', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)]]);
+        DB::transaction(function () use ($data): void {
+            foreach (self::MODEL_KEYS as $key) {
+                DB::table('settings')->where('key', 'badge_atelier_'.$data['event'].'_'.$key)->delete();
+            }
+            app(Audit::class)->append('badge.modele_reinitialise', auth()->id(), ['event_id' => $data['event']]);
+        });
+
+        return response()->json(['model' => BadgeArtwork::defaults()])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * Reprend le modèle d'un autre événement (S10) : recopie son aspect (modèle, titre, couleurs, orientation) vers l'événement choisi.
+     * Un événement sans modèle enregistré transmet les défauts. L'événement source n'est jamais modifié.
+     */
+    public function copyModel(Request $request): JsonResponse
+    {
+        Gate::authorize('badges.gerer');
+        $exists = Rule::exists('events', 'id')->where('is_permanent', false);
+        $data = $request->validate(['event' => ['required', 'uuid', $exists], 'source' => ['required', 'uuid', 'different:event', $exists]]);
+        $stored = DB::table('settings')->where('key', 'like', 'badge_atelier\_'.$data['source'].'\_%')->pluck('value', 'key');
+        $model = [];
+        foreach (BadgeArtwork::defaults() as $key => $default) {
+            if (in_array($key, self::MODEL_KEYS, true)) {
+                $model[$key] = $stored->get('badge_atelier_'.$data['source'].'_'.$key, $default);
+            }
+        }
+        DB::transaction(function () use ($data, $model): void {
+            foreach ($model as $key => $value) {
+                DB::table('settings')->updateOrInsert(['key' => 'badge_atelier_'.$data['event'].'_'.$key], ['value' => $value]);
+            }
+            app(Audit::class)->append('badge.modele_repris', auth()->id(), ['event_id' => $data['event'], 'source_event_id' => $data['source'], 'modele' => $model['design'] ?? null]);
+        });
+
+        return response()->json(['model' => $model])->header('Cache-Control', 'no-store, private');
     }
 
     /** Ancien lien conservé : génère un tirage tracé puis affiche le même document que l'Atelier. */
