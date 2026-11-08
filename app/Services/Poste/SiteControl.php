@@ -87,11 +87,11 @@ final class SiteControl
     public function giveBackCheck(Device $poste, string $code): array
     {
         $found = $this->giveBackTarget($poste, $code, false);
-        if (isset($found['refus'])) {
+        if ($found['refus'] !== null) {
             return $found['refus'];
         }
 
-        return ['ok' => true, 'badge_code' => $found['badge']->code, 'person' => ['name' => $found['visitor']->full_name], 'source' => 'serveur'];
+        return ['ok' => true, 'badge_code' => $found['badge']?->code, 'person' => ['name' => $found['visitor']?->full_name], 'source' => 'serveur'];
     }
 
     /**
@@ -105,10 +105,11 @@ final class SiteControl
     {
         return DB::transaction(function () use ($poste, $agent, $code): array {
             $found = $this->giveBackTarget($poste, $code, true);
-            if (isset($found['refus'])) {
-                $this->audit->append('restitution.refusee', $agent->id, ['badge_id' => $found['badge_id'] ?? null, 'event_id' => $poste->event_id, 'device_id' => $poste->id, 'raison' => $found['refus']['reason']]);
+            if ($found['refus'] !== null || $found['badge'] === null || $found['visitor'] === null) {
+                $refus = $found['refus'] ?? ['ok' => false, 'refus' => true, 'reason' => 'inconnu', 'message' => 'Badge inconnu.', 'badge_code' => null, 'source' => 'serveur'];
+                $this->audit->append('restitution.refusee', $agent->id, ['badge_id' => $found['badge_id'], 'event_id' => $poste->event_id, 'device_id' => $poste->id, 'raison' => $refus['reason']]);
 
-                return $found['refus'];
+                return $refus;
             }
             try {
                 $returned = $this->badges->restituer($found['badge']->id, $agent);
@@ -123,11 +124,11 @@ final class SiteControl
     }
 
     /**
-     * @return array{badge?: object, visitor?: object, badge_id?: ?string, refus?: array<string, mixed>}
+     * @return array{badge: ?\stdClass, visitor: ?\stdClass, badge_id: ?string, refus: ?array<string, mixed>}
      */
     private function giveBackTarget(Device $poste, string $code, bool $lock): array
     {
-        $refus = fn (?string $badgeId, string $reason, string $message): array => ['badge_id' => $badgeId, 'refus' => ['ok' => false, 'refus' => true, 'reason' => $reason, 'message' => $message, 'badge_code' => null, 'source' => 'serveur']];
+        $refus = fn (?string $badgeId, string $reason, string $message): array => ['badge' => null, 'visitor' => null, 'badge_id' => $badgeId, 'refus' => ['ok' => false, 'refus' => true, 'reason' => $reason, 'message' => $message, 'badge_code' => null, 'source' => 'serveur']];
         $input = trim($code);
         if (str_starts_with($input, QrSvg::PREFIX)) {
             $input = substr($input, strlen(QrSvg::PREFIX));
@@ -152,11 +153,11 @@ final class SiteControl
             return $refus($badge->id, 'autre_evenement', 'Ce badge est attribué dans une autre activité : la restitution se fait depuis un poste de cette activité.');
         }
         $visitor = DB::table('visitors')->where('id', $assignment->visitor_id)->first();
-        if ($visitor->status === 'present') {
+        if ($visitor === null || $visitor->status === 'present') {
             return $refus($badge->id, 'personne_presente', 'Cette personne est encore présente : enregistrez sa sortie avant la restitution.');
         }
 
-        return ['badge' => $badge, 'visitor' => $visitor];
+        return ['badge' => $badge, 'visitor' => $visitor, 'badge_id' => $badge->id, 'refus' => null];
     }
 
     /**
