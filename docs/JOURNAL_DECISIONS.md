@@ -575,3 +575,6 @@ Constat de recette sur tablette : une carte active avec une habilitation en cour
 ## Poste d'accueil — bandeau de réinitialisation retiré de l'écran de travail (2 novembre 2026)
 
 Demande du dirigeant : le bandeau blanc « Réinitialiser ce navigateur et changer de poste » en haut de l'écran de travail n'est pas professionnel. Il est retiré de l'écran ouvert. La réinitialisation locale reste disponible depuis l'écran verrouillé (« Ancien poste ? Réinitialiser ce navigateur pour le réenrôler »), qui est le chemin documenté (RESET_POSTE_CAMERA.md). Aucune règle ni donnée modifiée.
+
+## Dépendances — Symfony 7.4.21 → 7.4.23 (correctif d'avis de sécurité)
+- Mise à jour du seul `composer.lock` de `http-foundation`, `http-kernel`, `routing` et `serializer` (v7.4.21 → v7.4.23), dans la branche de contrainte actuelle `^7.4` : aucun passage à Symfony 8, `composer.json` et `content-hash` inchangés, aucun seuil ni contrôle de CI modifié. Contrôles : `composer audit` et Trivy sur les images finales dans la CI de la PR.
