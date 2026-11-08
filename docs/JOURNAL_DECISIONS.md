@@ -610,3 +610,6 @@ Décisions de l'architecte appliquées sans modifier les protections CI.
 - **B. Hôtel :** nouveau point `hotel` (lieu, hors postes de l'Académie, aucune capacité de poste). Retrait de ma porte « accueil » sur la remise de badge de groupe : elle contraignait à typer « poste 2 » une tablette de l'hôtel. La remise de badge de groupe et la préparation relèvent des permissions `groupes.*` ; l'arrivée du car (scan physique) exige la capacité `scan`. Le transport complet (embarquement individuel) reste au lot S08.
 - **C. Clôture VIP :** non activable par l'administration tant que le parcours du superviseur n'existe pas ; indicateur conservé.
 - **D. Dépendances :** voir le rapport de la PR (4 paquets Symfony 7.4.21 → 7.4.23 suffisent à lever les 9 avis ; aucun seuil modifié).
+
+## Dépendances — Symfony 7.4.21 → 7.4.23 (correctif d'avis de sécurité)
+- Mise à jour du seul `composer.lock` de `http-foundation`, `http-kernel`, `routing` et `serializer` (v7.4.21 → v7.4.23), dans la branche de contrainte actuelle `^7.4` : aucun passage à Symfony 8, `composer.json` et `content-hash` inchangés, aucun seuil ni contrôle de CI modifié. Contrôles : `composer audit` et Trivy sur les images finales dans la CI de la PR.
