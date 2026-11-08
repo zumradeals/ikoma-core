@@ -11,7 +11,7 @@ final class DataLifecycle
 {
     public const ENTITIES = ['personne' => ['visitors', 'listes.importer'], 'badge' => ['badges', 'badges.gerer'], 'lot' => ['badge_batches', 'badges.gerer'], 'evenement' => ['events', 'evenements.gerer'], 'categorie' => ['categories', 'categories.gerer'], 'zone' => ['zones', 'zones.gerer'], 'groupe' => ['groups', 'groupes.gerer']];
 
-    public const TABLES = ['events', 'hosts', 'devices', 'visitors', 'badge_batches', 'badges', 'badge_assignments', 'access_events', 'identity_checks', 'photos', 'sync_operations', 'sync_conflicts', 'notifications', 'alerts', 'refusals', 'import_batches', 'groups', 'group_members', 'categories', 'zones', 'category_zone', 'settings'];
+    public const TABLES = ['events', 'hosts', 'devices', 'visitors', 'badge_batches', 'badges', 'badge_assignments', 'access_events', 'identity_checks', 'photos', 'sync_operations', 'sync_conflicts', 'notifications', 'alerts', 'refusals', 'import_batches', 'groups', 'group_members', 'vehicles', 'categories', 'zones', 'category_zone', 'settings'];
 
     public function lock(): void
     {
@@ -46,7 +46,7 @@ final class DataLifecycle
             if (! in_array($row->status, [null, 'attendu'], true)) {
                 $reasons[] = 'Cette personne a un état opérationnel : sa fiche doit être conservée.';
             }
-            foreach (['access_events', 'identity_checks', 'photos', 'refusals', 'badge_assignments', 'participation_entitlements', 'group_members', 'notifications', 'sync_operations', 'sync_conflicts'] as $dependency) {
+            foreach (['access_events', 'identity_checks', 'photos', 'refusals', 'badge_assignments', 'participation_entitlements', 'vehicles', 'group_members', 'notifications', 'sync_operations', 'sync_conflicts'] as $dependency) {
                 if ($has($dependency, 'visitor_id', $id)) {
                     $reasons[] = 'Cette personne possède un historique ou une dépendance protégée. Vous pouvez la retirer après sa sortie, mais pas supprimer sa fiche.';
                     break;
@@ -168,6 +168,9 @@ final class DataLifecycle
         $reasons = [];
         if (app(Presence::class)->count($id) > 0 || DB::table('visitors')->where('event_id', $id)->where('status', 'present')->exists()) {
             $reasons[] = 'Des personnes sont encore présentes. Enregistrez leurs sorties réelles.';
+        }
+        if (DB::table('vehicles')->where('event_id', $id)->where('status', 'present')->exists()) {
+            $reasons[] = 'Des véhicules sont encore présents sur le site. Enregistrez leurs sorties réelles.';
         }
         if (DB::table('devices')->where('event_id', $id)->whereNotNull('enrolled_at')->where(fn ($q) => $q->whereNull('revoked_at')->orWhereNull('wipe_acknowledged_at'))->exists()) {
             $reasons[] = 'Synchronisez les tablettes, révoquez-les puis reconnectez-les pour confirmer leur effacement. Les opérations locales inconnues ne peuvent pas être déclarées résolues.';

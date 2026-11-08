@@ -15,7 +15,7 @@ final class Supervision
 {
     public const PER_PAGE = 30;
 
-    public const TYPES = ['entree', 'sortie', 'controle', 'correction', 'embarquement', 'debarquement'];
+    public const TYPES = ['entree', 'sortie', 'controle', 'correction', 'embarquement', 'debarquement', 'vehicule_entree', 'vehicule_sortie'];
 
     /**
      * Journal des mouvements physiques d'une activité : entrées, sorties, contrôles (valides ou refusés) et corrections, du plus récent au plus ancien.

@@ -41,6 +41,7 @@ use App\Http\Controllers\PostesController;
 use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\RetentionController;
+use App\Http\Controllers\VisitsController;
 use App\Http\Controllers\ZoneAccessController;
 use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
@@ -71,6 +72,12 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/hote/invites/{visitor}', [HostController::class, 'show'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
         Route::put('/hote/invites/{visitor}', [HostController::class, 'update'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
         Route::delete('/hote/invites/{visitor}', [HostController::class, 'destroy'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
+        Route::post('/hote/invites/{visitor}/annonce', [VisitsController::class, 'announce'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
+        Route::post('/hote/invites/{visitor}/vehicules', [VisitsController::class, 'addVehicle'])->whereUuid('visitor')->middleware('can:listes.mettre_a_jour');
+        Route::delete('/hote/vehicules/{vehicle}', [VisitsController::class, 'cancelVehicle'])->whereUuid('vehicle')->middleware('can:listes.mettre_a_jour');
+        Route::post('/administration/participations/{visitor}/annonce', [VisitsController::class, 'announce'])->whereUuid('visitor')->middleware('can:listes.importer');
+        Route::post('/administration/participations/{visitor}/vehicules', [VisitsController::class, 'addVehicle'])->whereUuid('visitor')->middleware('can:listes.importer');
+        Route::delete('/administration/vehicules/{vehicle}', [VisitsController::class, 'cancelVehicle'])->whereUuid('vehicle')->middleware('can:listes.importer');
         Route::get('/hote/notifications', [HostController::class, 'notifications'])->middleware('can:arrivees.recevoir_notification');
         Route::post('/hote/notifications/{notification}/lue', [HostController::class, 'read'])->whereUuid('notification')->middleware('can:arrivees.recevoir_notification');
         Route::post('/hote/notifications/{notification}/decision', [HostController::class, 'decide'])->whereUuid('notification')->middleware('can:visiteurs.valider_non_liste');
@@ -83,6 +90,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/pilotage/presents', [PilotageController::class, 'presents'])->middleware('can:presences.consulter');
         Route::get('/pilotage/mouvements', [PilotageController::class, 'mouvements'])->middleware('can:presences.consulter');
         Route::get('/pilotage/acces', [PilotageController::class, 'acces'])->middleware('can:pilotage.consulter');
+        Route::get('/pilotage/attendus', [PilotageController::class, 'attendus'])->middleware('can:pilotage.consulter');
+        Route::post('/pilotage/visiteurs/{visitor}/absence', [PilotageController::class, 'absence'])->whereUuid('visitor')->middleware('can:pilotage.consulter');
+        Route::post('/pilotage/visiteurs/{visitor}/cloture-superviseur', [PilotageController::class, 'clotureSuperviseur'])->whereUuid('visitor')->middleware('can:badges.annuler');
         Route::get('/pilotage/visiteurs/{visitor}', [PilotageController::class, 'visiteur'])->whereUuid('visitor')->middleware('can:pilotage.consulter');
         Route::post('/pilotage/badges/annuler', [PilotageController::class, 'annulerBadge'])->middleware('can:badges.annuler');
         Route::get('/pilotage/litiges', [PilotageController::class, 'litiges'])->middleware('can:litiges.decider');
@@ -165,6 +175,9 @@ Route::middleware(['auth'])->group(function (): void {
                 Route::post('/poste/api/badge', [PosteApiController::class, 'badge'])->middleware('can:badges.associer');
                 Route::post('/poste/api/entree', [PosteApiController::class, 'entree'])->middleware('can:visiteurs.valider');
                 Route::post('/poste/api/non-listes', [PosteApiController::class, 'nonListe'])->middleware('can:visiteurs.enregistrer_non_liste');
+                Route::get('/poste/api/vehicules', [PosteApiController::class, 'vehicules'])->middleware(['can:visiteurs.rechercher', 'throttle:recherche']);
+                Route::post('/poste/api/vehicules/entree', [PosteApiController::class, 'vehiculeEntree'])->middleware('can:visiteurs.valider');
+                Route::post('/poste/api/vehicules/sortie', [PosteApiController::class, 'vehiculeSortie'])->middleware('can:badges.controler');
             });
         });
 

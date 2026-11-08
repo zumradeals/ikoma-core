@@ -136,6 +136,7 @@ final class DemoCleanup
 
             if ($event) {
                 DB::table('group_members')->where('group_id', $id('group'))->delete();
+                DB::table('vehicles')->where('event_id', $eventId)->delete();
                 DB::table('visitors')->where('event_id', $eventId)->delete();
                 DB::table('badges')->where('event_id', $eventId)->delete();
                 DB::table('groups')->where('event_id', $eventId)->delete();

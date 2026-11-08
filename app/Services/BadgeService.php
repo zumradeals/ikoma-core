@@ -86,8 +86,23 @@ final class BadgeService
     public function restituer(Badge|string $badge, User $agent): Badge
     {
         $this->require($agent, 'badges.associer');
-        $badgeId = $badge instanceof Badge ? $badge->id : $badge;
 
+        return $this->giveBack($badge instanceof Badge ? $badge->id : $badge, $agent);
+    }
+
+    /**
+     * Restitution faite par le superviseur dans la clôture d'une personne à clôture réservée (S09) : même effet que la restitution de l'accueil, autorisée par le droit
+     * propre au superviseur (badges.annuler) puisqu'il n'associe aucun badge. N'est appelée que par SupervisorClosure.
+     */
+    public function restituerPourCloture(Badge|string $badge, User $superviseur): Badge
+    {
+        $this->require($superviseur, 'badges.annuler');
+
+        return $this->giveBack($badge instanceof Badge ? $badge->id : $badge, $superviseur);
+    }
+
+    private function giveBack(string $badgeId, User $agent): Badge
+    {
         return DB::transaction(function () use ($badgeId, $agent): Badge {
             $badge = $this->lockBadge($badgeId);
             $assignment = $this->activeAssignment($badge);
