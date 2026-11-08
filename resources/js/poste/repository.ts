@@ -1,6 +1,6 @@
 import type { ArrivalResult, BoardResult, GroupSummary, GroupView } from './local/group';
 import type { PermanentResult } from './local/permanent';
-import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
+import { ApiError, type VehicleMove, type VehicleResult, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
  * Tous les accès aux données du poste passent par cette interface (plan, section 4.1). Le lot L5 n'a qu'une implémentation (appels JSON) ;
@@ -17,6 +17,10 @@ export interface PosteRepository {
   search(query: string): Promise<SearchResult[]>;
   /** Recherche d'une personne permanente, en lecture seule ; absent quand le poste travaille directement sur le serveur. */
   searchPermanent?(query: string): Promise<PermanentResult[]>;
+  /** Véhicules (S09), EN LIGNE UNIQUEMENT : recherche par plaque, entrée et sortie. Absent quand le poste n'a pas ces opérations. */
+  searchVehicles?(query: string): Promise<VehicleResult[]>;
+  vehicleEnter?(operationId: string, vehicleId: string): Promise<VehicleMove>;
+  vehicleExit?(operationId: string, vehicleId: string): Promise<VehicleMove>;
   visitor(id: string): Promise<Fiche>;
   saveIdentity(operationId: string, visitorId: string, photo: Blob, doc?: IdentityDocument): Promise<void>;
   validate(operationId: string, visitorId: string, avis?: Avis): Promise<void>;

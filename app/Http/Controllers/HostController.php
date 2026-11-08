@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\HostGuests;
 use App\Services\HostNotifications;
 use App\Services\Poste\DeskRefused;
+use App\Services\Vehicles;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,8 @@ final class HostController
         Gate::authorize('listes.mettre_a_jour');
         $v = $this->guests->owned($r->user(), $visitor);
 
-        return Inertia::render('Hote/Guest', ['visitor' => $v->only(['id', 'full_name', 'organisation', 'category_id', 'host_id', 'valid_from', 'valid_until', 'status']), 'hosts' => $this->hosts($r), 'categories' => DB::table('categories')->where('event_id', $v->event_id)->where(fn ($q) => $q->whereRaw("public.ikoma_normalize(name)='visiteur'")->orWhere('id', $v->category_id))->get(['id', 'name', 'event_id']), 'feedback' => $r->session()->get('host_feedback'), 'arrived' => DB::table('access_events')->where('visitor_id', $v->id)->where('type', 'entree')->exists()]);
+        return Inertia::render('Hote/Guest', ['visitor' => $v->only(['id', 'full_name', 'organisation', 'category_id', 'host_id', 'valid_from', 'valid_until', 'status']), 'hosts' => $this->hosts($r), 'categories' => DB::table('categories')->where('event_id', $v->event_id)->where(fn ($q) => $q->whereRaw("public.ikoma_normalize(name)='visiteur'")->orWhere('id', $v->category_id))->get(['id', 'name', 'event_id']), 'feedback' => $r->session()->get('host_feedback'), 'arrived' => DB::table('access_events')->where('visitor_id', $v->id)->where('type', 'entree')->exists(),
+            'visit' => ['expected_at' => DB::table('visitors')->where('id', $v->id)->value('expected_at')], 'vehicles' => DB::table('vehicles')->where('visitor_id', $v->id)->whereIn('status', ['annonce', 'present'])->orderBy('plate')->get(['id', 'plate', 'kind', 'status']), 'kinds' => Vehicles::KINDS]);
     }
 
     public function store(Request $r): RedirectResponse

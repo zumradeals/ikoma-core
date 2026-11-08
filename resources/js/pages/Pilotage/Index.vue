@@ -9,7 +9,7 @@ import CancelBadge from '../../components/pilotage/CancelBadge.vue';
 import { usePolling } from '../../pilotage/usePolling';
 
 type Counters = { attendus: number; arrives: number; presents: number; refuses: number; as_of: string };
-type Overview = { critiques: number; hautes: number; litiges: number; cars: { total: number; partis: number; arrives: number; ecarts: number }; postes_silencieux: number };
+type Overview = { critiques: number; hautes: number; litiges: number; cars: { total: number; partis: number; arrives: number; ecarts: number }; postes_silencieux: number; retards?: number };
 const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; counters: Counters | null; alerts: AlertRow[]; overview: Overview | null }>();
 usePolling(['counters', 'alerts', 'openAlerts', 'criticalAlerts', 'overview'], 3000);
 
@@ -31,15 +31,18 @@ const situation = computed(() => {
     return { level: critical > 0 ? 'critique' : 'attention', icon: critical > 0 ? '⛔' : '▲', title: plural(props.openAlerts, 'alerte à traiter', 'alertes à traiter'), text: critical > 0 ? plural(critical, 'est critique', 'sont critiques') + ' : à traiter en premier.' : 'Aucune n’est critique.' };
   }
   if ((o?.litiges ?? 0) > 0) return { level: 'attention', icon: '⚖', title: plural(o!.litiges, 'cas à décider', 'cas à décider'), text: 'Des accès refusés attendent votre décision.' };
+  if ((o?.retards ?? 0) > 0) return { level: 'attention', icon: '◷', title: plural(o!.retards!, 'visite en retard', 'visites en retard'), text: 'Des personnes annoncées ne sont pas encore arrivées : voir les visites annoncées.' };
   return { level: 'calme', icon: '✓', title: 'Tout est calme', text: 'Aucune alerte et aucun cas à décider.' };
 });
 const field = computed(() => {
   const o = props.overview;
   if (!o) return [];
+  const delays = o.retards === undefined ? [] : [{ key: 'retards', icon: '◷', title: 'Visites en retard', text: o.retards ? plural(o.retards, 'personne annoncée n’est pas arrivée à l’heure attendue', 'personnes annoncées ne sont pas arrivées à l’heure attendue') : 'Aucune visite en retard', href: '/pilotage/attendus?etat=en_retard', warn: o.retards > 0 }];
   return [
     { key: 'litiges', icon: '⚖', title: 'Cas à décider', text: o.litiges ? plural(o.litiges, 'accès refusé attend votre décision', 'accès refusés attendent votre décision') : 'Aucun cas en attente', href: '/pilotage/litiges', warn: o.litiges > 0 },
     { key: 'cars', icon: '▭', title: 'Cars', text: o.cars.total === 0 ? 'Aucun car prévu' : `${o.cars.partis} parti${o.cars.partis > 1 ? 's' : ''} sur ${o.cars.total} · ${o.cars.arrives} arrivé${o.cars.arrives > 1 ? 's' : ''}${o.cars.ecarts ? ' · ' + plural(o.cars.ecarts, 'avec un écart', 'avec des écarts') : ''}`, href: '/pilotage/groupes', warn: o.cars.ecarts > 0 },
     { key: 'postes', icon: '▯', title: 'Tablettes', text: o.postes_silencieux ? plural(o.postes_silencieux, 'tablette sans nouvelles depuis plus d’une heure', 'tablettes sans nouvelles depuis plus d’une heure') : 'Toutes les tablettes donnent des nouvelles', href: null, warn: o.postes_silencieux > 0 },
+    ...delays,
   ];
 });
 const arrivedPercent = computed(() => (props.counters && props.counters.attendus > 0 ? Math.min(100, Math.round((props.counters.arrives / props.counters.attendus) * 100)) : 0));
@@ -75,7 +78,7 @@ const levelClass = { critique: 'border-red-700 bg-red-50', attention: 'border-or
           </section>
           <section v-if="overview" class="pilotage-card" aria-labelledby="terrain-titre">
 <h2 id="terrain-titre"><AdminIcon name="bus" /> Sur le terrain</h2>
-            <ul class="pilotage-field" data-testid="terrain"><li v-for="row in field.slice(1)" :key="row.key" :data-testid="'terrain-' + row.key" :data-warn="row.warn"><div class="pilotage-section-heading"><h3>{{ row.title === 'Cars' ? 'Cars et groupes' : row.title }}</h3><span v-if="row.warn" class="pilotage-tag">▲ À voir</span></div><p>{{ row.text }}</p><Link v-if="row.href && can('groupes.suivre') && can('cars.suivre')" :href="href(row.href)" class="pilotage-text-link">Suivre les groupes et cars</Link></li></ul>
+            <ul class="pilotage-field" data-testid="terrain"><li v-for="row in field.slice(1)" :key="row.key" :data-testid="'terrain-' + row.key" :data-warn="row.warn"><div class="pilotage-section-heading"><h3>{{ row.title === 'Cars' ? 'Cars et groupes' : row.title }}</h3><span v-if="row.warn" class="pilotage-tag">▲ À voir</span></div><p>{{ row.text }}</p><Link v-if="row.href && row.key !== 'retards' && can('groupes.suivre') && can('cars.suivre')" :href="href(row.href)" class="pilotage-text-link">Suivre les groupes et cars</Link><Link v-if="row.key === 'retards' && row.href" :href="href(row.href)" class="pilotage-text-link" data-testid="voir-retards">Voir les visites annoncées</Link></li></ul>
           </section>
           <section v-if="can('presences.consulter')" class="pilotage-card pilotage-evacuation" aria-labelledby="evacuation-titre"><h2 id="evacuation-titre"><AdminIcon name="arrow" /> Évacuation</h2><p><strong>{{ counters.presents }}</strong> personne{{ counters.presents > 1 ? 's' : '' }} présente{{ counters.presents > 1 ? 's' : '' }}</p><Link :href="href('/pilotage/evacuation')" class="btn-soft">Ouvrir la liste d’évacuation</Link></section>
         </div>

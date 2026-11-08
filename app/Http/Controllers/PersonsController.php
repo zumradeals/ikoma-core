@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Participations;
 use App\Services\Persons;
+use App\Services\Vehicles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,7 +52,13 @@ final class PersonsController
         $events = DB::table('events')->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']))
             ->whereNotIn('id', $taken)->orderByDesc('starts_at')->get(['id', 'name', 'kind', 'starts_at', 'ends_at']);
 
+        // S09 : annonce de visite et véhicules de chaque participation de la personne (administrateur seulement).
+        $visits = DB::table('visitors')->where('person_id', $person)->get(['id', 'expected_at', 'announced_at', 'no_show_reason'])->keyBy('id');
+        $vehicles = DB::table('vehicles')->whereIn('visitor_id', $visits->keys())->whereIn('status', ['annonce', 'present'])->orderBy('plate')->get(['id', 'visitor_id', 'plate', 'kind', 'status'])->groupBy('visitor_id');
+
         return Inertia::render('Admin/Personne', [...$history, 'events' => $events,
+            'visits' => $visits->map(fn ($v) => ['expected_at' => $v->expected_at, 'announced_at' => $v->announced_at, 'no_show_reason' => $v->no_show_reason, 'vehicles' => ($vehicles[$v->id] ?? collect())->map(fn ($x) => ['id' => $x->id, 'plate' => $x->plate, 'kind' => $x->kind, 'status' => $x->status])->values()->all()]),
+            'vehicleKinds' => Vehicles::KINDS,
             'categories' => DB::table('categories')->whereIn('event_id', $events->pluck('id'))->orderBy('name')->get(['id', 'event_id', 'name']),
             'hosts' => DB::table('hosts')->whereIn('event_id', $events->pluck('id'))->orderBy('name')->get(['id', 'event_id', 'name'])]);
     }

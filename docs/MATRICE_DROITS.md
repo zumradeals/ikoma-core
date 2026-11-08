@@ -20,6 +20,7 @@ Source : [document de fonctionnement v1.0](reference/Mode_de_fonctionnement_veri
 | groupes.gerer | Oui | — | — | — | — |
 | groupes.remettre_badges | — | — | Oui | — | — |
 | groupes.suivre | — | Oui | — | — | — |
+| cloture.superviseur (S09) | — | Oui | — | — | — |
 | journal.consulter | Oui | Oui | — | — | — |
 | journal.exporter | Oui | — | — | — | — |
 | listes.importer | Oui | — | — | — | — |

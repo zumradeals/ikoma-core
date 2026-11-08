@@ -9,6 +9,9 @@ use App\Services\BadgeService;
 use App\Services\Pilotage;
 use App\Services\Poste\DeskRefused;
 use App\Services\Supervision;
+use App\Services\SupervisorClosure;
+use App\Services\Vehicles;
+use App\Services\Visits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +26,7 @@ use Inertia\Response;
  */
 final class PilotageController
 {
-    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision) {}
+    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision, private readonly Visits $visits, private readonly Vehicles $vehicles, private readonly SupervisorClosure $closure) {}
 
     private function event(Request $r): ?object
     {
@@ -128,8 +131,42 @@ final class PilotageController
             'badge' => $badge ? ['id' => $badge->id, 'code' => $badge->code, 'status' => $badge->status] : null,
             'toRebadge' => $badge === null && $cancelled !== null && ! in_array($row->status, ['sorti', 'refuse'], true) ? ['code' => $cancelled->code, 'at' => $cancelled->cancelled_at, 'reason' => $cancelled->cancellation_reason] : null,
             'refusal' => $refusal ? (array) $refusal : null,
-            'permissions' => ['annuler' => $r->user()->can('badges.annuler'), 'decider' => $r->user()->can('litiges.decider')],
+            'closure' => $this->closure->offer($row->id),
+            'permissions' => ['annuler' => $r->user()->can('badges.annuler'), 'decider' => $r->user()->can('litiges.decider'), 'cloturer' => $r->user()->can('cloture.superviseur')],
         ]);
+    }
+
+    /** Visites annoncées de l'activité (attendus, en retard, absents, arrivés) et véhicules présents. Noms visibles à la consultation seulement. */
+    public function attendus(Request $r): Response
+    {
+        $event = $this->event($r);
+        $state = $r->query('etat');
+
+        return Inertia::render('Pilotage/Attendus', [
+            ...$this->shared($event),
+            'expected' => fn () => $event ? $this->visits->expected($event->id, is_string($state) ? $state : null) : ['rows' => [], 'counts' => [], 'late_after_minutes' => Visits::lateAfterMinutes()],
+            'vehicles' => fn () => $event ? $this->vehicles->present($event->id) : [],
+            'state' => is_string($state) ? $state : null,
+            'permissions' => ['absence' => $r->user()->can('pilotage.consulter')],
+        ]);
+    }
+
+    /** Constate l'absence d'une personne attendue : motif obligatoire, tracé. */
+    public function absence(Request $r, string $visitor): RedirectResponse|JsonResponse
+    {
+        $data = $r->validate(['reason' => 'required|string|max:200']);
+        $this->visits->markNoShow($r->user(), $visitor, $data['reason']);
+
+        return $r->expectsJson() && ! $r->header('X-Inertia') ? response()->json(['ok' => true]) : back();
+    }
+
+    /** Clôture d'une personne à clôture réservée : sortie, restitution et clôture de la participation, en une opération. Motif et confirmation obligatoires. */
+    public function clotureSuperviseur(Request $r, string $visitor): RedirectResponse|JsonResponse
+    {
+        $data = $r->validate(['reason' => 'required|string|max:200', 'confirmation' => 'accepted']);
+        $out = $this->closure->close($r->user(), $visitor, $data['reason']);
+
+        return $r->expectsJson() && ! $r->header('X-Inertia') ? response()->json(['ok' => true, ...$out]) : back();
     }
 
     /**

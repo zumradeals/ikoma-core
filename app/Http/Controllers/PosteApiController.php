@@ -8,6 +8,7 @@ use App\Services\Poste\Desk;
 use App\Services\Poste\Operations;
 use App\Services\Poste\SiteControl;
 use App\Services\Presence;
+use App\Services\Vehicles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Gate;
 /** Routes JSON du poste d'accueil. Les permissions sont portées par les routes ; chaque écriture est idempotente (X-Operation-Id). */
 final class PosteApiController
 {
-    public function __construct(private readonly Desk $desk, private readonly Operations $operations, private readonly SiteControl $site, private readonly Presence $presence) {}
+    public function __construct(private readonly Desk $desk, private readonly Operations $operations, private readonly SiteControl $site, private readonly Presence $presence, private readonly Vehicles $vehicles) {}
 
     public function postes(): JsonResponse
     {
@@ -128,6 +129,29 @@ final class PosteApiController
         $data = $r->validate(['code' => 'required|string|max:100']);
 
         return response()->json($this->site->giveBackCheck($this->poste($r), $r->user(), $data['code']));
+    }
+
+    public function vehicules(Request $r): JsonResponse
+    {
+        $data = $r->validate(['q' => 'nullable|string|max:40']);
+
+        return response()->json(['results' => $this->vehicles->search($this->poste($r), $r->user(), $data['q'] ?? '')]);
+    }
+
+    public function vehiculeEntree(Request $r): JsonResponse
+    {
+        $data = $r->validate(['vehicle_id' => 'required|uuid']);
+        $poste = $this->poste($r);
+
+        return $this->operations->run($r, 'vehicule_entree', $data['vehicle_id'], fn () => $this->vehicles->enter($poste, $r->user(), $data['vehicle_id']));
+    }
+
+    public function vehiculeSortie(Request $r): JsonResponse
+    {
+        $data = $r->validate(['vehicle_id' => 'required|uuid']);
+        $poste = $this->poste($r);
+
+        return $this->operations->run($r, 'vehicule_sortie', $data['vehicle_id'], fn () => $this->vehicles->exit($poste, $r->user(), $data['vehicle_id']));
     }
 
     public function presents(Request $r): JsonResponse

@@ -32,7 +32,7 @@ final class DataRetention
         $counts = DB::transaction(function () use ($days): array {
             DB::statement('SELECT pg_advisory_xact_lock(731902)');
             // La purge est une maintenance privilégiée : bloquer les écritures concurrentes avant de décider ou d'effacer un fichier.
-            DB::statement('LOCK TABLE events, hosts, devices, visitors, badges, badge_assignments, access_events, identity_checks, photos, sync_operations, sync_conflicts, notifications, alerts, refusals, import_batches, groups IN SHARE ROW EXCLUSIVE MODE');
+            DB::statement('LOCK TABLE events, hosts, devices, visitors, vehicles, badges, badge_assignments, access_events, identity_checks, photos, sync_operations, sync_conflicts, notifications, alerts, refusals, import_batches, groups IN SHARE ROW EXCLUSIVE MODE');
             DB::table('hosts')->orderBy('id')->lockForUpdate()->get(['id']);
             DB::table('devices')->orderBy('id')->lockForUpdate()->get(['id']);
             DB::table('visitors')->orderBy('id')->lockForUpdate()->get(['id']);
@@ -81,6 +81,8 @@ final class DataRetention
                     // Sans identité, aucune nouvelle admission ni rejeu n'est permis. Les références statistiques restent stables.
                     DB::table('devices')->where('event_id', $event->id)->update(['revoked_at' => $now, 'enrollment_hash' => null, 'enrollment_expires_at' => null, 'updated_at' => $now]);
                     $counts['visiteurs'] += (clone $visitors)->update(['full_name' => DB::raw("'Visiteur anonymisé ' || id::text"), 'organisation' => null, 'position' => null, 'host_id' => null, 'access_note' => null, 'withdrawn_at' => $now, 'updated_at' => $now]);
+                    // La plaque d'un véhicule est une donnée personnelle : effacée à l'échéance, la référence statistique (type, état, mouvements) reste.
+                    DB::table('vehicles')->where('event_id', $event->id)->update(['plate' => 'Plaque effacée', 'plate_normalized' => DB::raw("upper(substr(replace(id::text, '-', ''), 1, 12))"), 'updated_at' => $now]);
                     DB::table('hosts')->where('event_id', $event->id)->update(['name' => DB::raw("'Hôte anonymisé ' || id::text"), 'service' => null, 'user_id' => null, 'updated_at' => $now]);
                     DB::table('refusals')->whereIn('visitor_id', clone $ids)->update(['reason' => 'Motif effacé à échéance', 'supervisor_decision' => null]);
                     DB::table('notifications')->where('event_id', $event->id)->delete();

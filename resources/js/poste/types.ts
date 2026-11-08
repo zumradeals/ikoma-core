@@ -35,3 +35,7 @@ export type UnlistedInput = { name: string; organisation: string; host_id: strin
 export class ApiError extends Error {
   constructor(public readonly code: string, message: string, public readonly action: string | null = null, public readonly status = 0) { super(message); }
 }
+
+/** Véhicule annoncé ou présent retrouvé par sa plaque au poste (en ligne uniquement). Un véhicule présent ne vaut jamais présence de la personne. */
+export type VehicleResult = { id: string; plate: string; kind: string; status: 'annonce' | 'present'; visitor_id: string; full_name: string; visitor_status: string };
+export type VehicleMove = { ok: boolean; already?: boolean; plate?: string; status?: string };

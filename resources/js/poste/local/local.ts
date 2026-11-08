@@ -1,4 +1,4 @@
-import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
+import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput, type VehicleMove, type VehicleResult } from '../types';
 import type { GroupPosteRepository } from '../repository';
 import { posteGate, OP_POLICY } from './capabilities';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
@@ -232,7 +232,7 @@ export class LocalPosteRepository implements GroupPosteRepository {
 
   /** Restitution : en ligne uniquement. Aucune file hors ligne, aucune décision locale : le serveur seul tranche. */
   private requireOnline(): void {
-    if (!this.sync || !this.online) throw new ApiError('hors_ligne', 'La restitution d’un badge nécessite le réseau. Reconnectez le poste, puis recommencez.');
+    if (!this.sync || !this.online) throw new ApiError('hors_ligne', 'Cette opération nécessite le réseau. Reconnectez le poste, puis recommencez.');
   }
 
   async giveBackCheck(code: string): Promise<GiveBackResult> {
@@ -243,6 +243,22 @@ export class LocalPosteRepository implements GroupPosteRepository {
   async giveBack(operationId: string, code: string): Promise<GiveBackResult> {
     this.requireOnline();
     return await this.sync!.request<GiveBackResult>('POST', '/poste/api/restitution', { code }, operationId, 6000);
+  }
+
+  /** Véhicules : en ligne uniquement, le serveur seul tranche (aucune file hors ligne, aucune décision locale). */
+  async searchVehicles(query: string): Promise<VehicleResult[]> {
+    this.requireOnline();
+    return (await this.sync!.request<{ results: VehicleResult[] }>('GET', '/poste/api/vehicules?q=' + encodeURIComponent(query), undefined, undefined, 4000)).results;
+  }
+
+  async vehicleEnter(operationId: string, vehicleId: string): Promise<VehicleMove> {
+    this.requireOnline();
+    return await this.sync!.request<VehicleMove>('POST', '/poste/api/vehicules/entree', { vehicle_id: vehicleId }, operationId, 6000);
+  }
+
+  async vehicleExit(operationId: string, vehicleId: string): Promise<VehicleMove> {
+    this.requireOnline();
+    return await this.sync!.request<VehicleMove>('POST', '/poste/api/vehicules/sortie', { vehicle_id: vehicleId }, operationId, 6000);
   }
 
   trustMinutes(): number { return this.list.snapshot.permanent?.trust_minutes ?? 0; }

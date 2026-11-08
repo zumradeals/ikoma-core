@@ -47,3 +47,4 @@ pest()->use(DatabaseTransactions::class)->in('Feature/ConsolidationTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/RecetteA07Test.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/RegistrePersonnesTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/AutorisationsS02Test.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/VisitesVehiculesVipTest.php');

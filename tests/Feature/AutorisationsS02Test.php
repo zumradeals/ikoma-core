@@ -14,7 +14,6 @@ use App\Services\Poste\ListSnapshot;
 use App\Services\Poste\PostCapabilities;
 use App\Services\Poste\SiteControl;
 use App\Services\Poste\SyncProcessor;
-use App\Services\SupervisorClosure;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
@@ -87,7 +86,7 @@ it('donne à l’administrateur la seule consultation de supervision, alertes co
     foreach (['pilotage.consulter', 'presences.consulter', 'alertes.consulter'] as $permission) {
         expect($admin->can($permission))->toBeTrue();
     }
-    foreach (['alertes.prendre_en_compte', 'badges.annuler', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'badges.controler', 'badges.associer', 'visiteurs.valider'] as $permission) {
+    foreach (['alertes.prendre_en_compte', 'cloture.superviseur', 'badges.annuler', 'litiges.decider', 'groupes.suivre', 'cars.suivre', 'badges.controler', 'badges.associer', 'visiteurs.valider'] as $permission) {
         expect($admin->can($permission))->toBeFalse();
     }
     // le superviseur garde les deux : consulter ET prendre en compte
@@ -591,7 +590,7 @@ it('remet à la tablette le délai hors ligne effectif et change de version quan
     $this->getJson('/poste/api/liste', $headers)->assertOk()->assertJsonPath('settings.offline_trust_hours', 0);
 });
 
-// --- Clôture VIP : cas actuellement bloqués (le parcours du superviseur appartient à un lot ultérieur) ----------------------------
+// --- Clôture VIP : cas bloqués pour l'agent du poste (le parcours du superviseur est testé dans S09) ----------------------------
 
 it('documente par un test les cas bloqués par la clôture réservée : sortie par le poste, rejeu hors ligne et clôture de l’activité', function () {
     DB::table('categories')->where('id', DemoSeeder::id('category0'))->update(['closure_supervisor_only' => true]);
@@ -603,7 +602,7 @@ it('documente par un test les cas bloqués par la clôture réservée : sortie p
     $op = s02Offline($this->agent, 1, 'sortie', ['code' => $badge->code]);
     s02Sync([$op])->assertOk()->assertJsonPath('results.0.code', 'cloture_reservee_superviseur');
     expect(DB::table('sync_conflicts')->where('operation_id', $op['id'])->where('reason', 'cloture_reservee_superviseur')->count())->toBe(1);
-    // 3) personne d'autre n'a de chemin : ni l'administrateur ni le superviseur n'enregistrent une sortie au poste
+    // 3) ni l'administrateur ni le superviseur n'enregistrent une sortie au poste (le superviseur clôture par son parcours dédié)
     foreach (['administrateur', 'superviseur'] as $role) {
         $this->actingAs(s02User($role))->postJson('/poste/api/sortie', ['code' => $badge->code], s02Headers())->assertForbidden();
     }
@@ -657,7 +656,7 @@ it('interdit à l’agent la sortie et la restitution d’une catégorie à clô
         ->and(DB::table('badge_assignments')->where('badge_id', $badge->id)->whereNotNull('returned_at')->count())->toBe(0);
     $line = DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'sortie.refusee')->first();
     expect(json_decode($line->details, true)['raison'])->toBe('cloture_reservee_superviseur');
-    // ni un administrateur ni un superviseur ne passent par le poste : la clôture VIP n'a pas encore de chemin dédié (lot de clôture ultérieur)
+    // ni un administrateur ni un superviseur ne passent par le poste : la clôture VIP a son propre parcours (SupervisorClosure, S09)
     foreach (['administrateur', 'superviseur'] as $role) {
         $this->actingAs(s02User($role))->postJson('/poste/api/sortie', ['code' => $badge->code], s02Headers())->assertForbidden();
     }
@@ -681,27 +680,17 @@ it('laisse la sortie ordinaire inchangée pour une catégorie sans indicateur', 
     expect(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('status'))->toBe('sorti');
 });
 
-it('empêche l’administration d’activer la clôture réservée tant que le parcours du superviseur n’existe pas', function () {
+it('permet à l’administration d’activer et de retirer la clôture réservée maintenant que le parcours du superviseur existe', function () {
     $category = DemoSeeder::id('category1');
     $payload = ['event_id' => DemoSeeder::id('event'), 'name' => 'Catégorie fictive S02', 'color' => '#0F5AA6', 'priority_circuit' => false, 'closure_supervisor_only' => true, 'zone_ids' => []];
-    expect(SupervisorClosure::available())->toBeFalse();
-    // modification : refusée, rien n'est enregistré (pas même le nouveau nom)
     $this->actingAs(s02User('administrateur'));
-    $this->putJson("/administration/categories/{$category}", $payload)->assertUnprocessable()->assertJsonValidationErrors('closure_supervisor_only');
-    expect((bool) DB::table('categories')->where('id', $category)->value('closure_supervisor_only'))->toBeFalse()
-        ->and(DB::table('categories')->where('id', $category)->value('name'))->not->toBe('Catégorie fictive S02');
-    // création : refusée, aucune catégorie créée
-    $this->postJson('/administration/categories', [...$payload, 'name' => 'Catégorie VIP fictive'])->assertUnprocessable()->assertJsonValidationErrors('closure_supervisor_only');
-    expect(DB::table('categories')->where('name', 'Catégorie VIP fictive')->exists())->toBeFalse();
-    // sans l'indicateur : accepté, et le libellé « VIP » n'y change rien
-    $this->postJson('/administration/categories', [...$payload, 'name' => 'VIP fictif', 'closure_supervisor_only' => false])->assertRedirect();
-    expect((bool) DB::table('categories')->where('name', 'VIP fictif')->value('closure_supervisor_only'))->toBeFalse();
-    // un état hérité (posé hors de l'administration) peut toujours être retiré, jamais activé de nouveau
-    DB::table('categories')->where('id', $category)->update(['closure_supervisor_only' => true]);
+    $this->putJson("/administration/categories/{$category}", $payload)->assertRedirect();
+    expect((bool) DB::table('categories')->where('id', $category)->value('closure_supervisor_only'))->toBeTrue();
     $this->putJson("/administration/categories/{$category}", [...$payload, 'closure_supervisor_only' => false])->assertRedirect();
     expect((bool) DB::table('categories')->where('id', $category)->value('closure_supervisor_only'))->toBeFalse();
-    $this->putJson("/administration/categories/{$category}", $payload)->assertUnprocessable();
-    // les autres rôles n'y ont de toute façon aucun accès
+    $this->postJson('/administration/categories', [...$payload, 'name' => 'Catégorie VIP fictive'])->assertRedirect();
+    expect((bool) DB::table('categories')->where('name', 'Catégorie VIP fictive')->value('closure_supervisor_only'))->toBeTrue();
+    // les autres rôles n'y ont aucun accès
     foreach (['agent_accueil', 'superviseur', 'hote'] as $role) {
         $this->actingAs(s02User($role))->putJson("/administration/categories/{$category}", $payload)->assertForbidden();
     }
