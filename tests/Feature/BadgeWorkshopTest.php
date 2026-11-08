@@ -78,7 +78,7 @@ it('refuse plus de 1000 badges plutôt que de tronquer silencieusement', functio
 it('utilise les catégories réelles pour les trois modèles et distingue les stagiaires', function (int $category, string $design, string $mention) {
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category'.$category), 1, $this->admin);
     $response = $this->postJson('/administration/badges/modeles/apercu', [...$this->printOptions, 'batch' => $batch->id, 'design' => $design])->assertOk()->assertJsonPath('count', 1);
-    expect($response->json('html'))->toContain($mention)->toContain('Badge à restituer à la sortie');
+    expect($response->json('html'))->toContain($mention)->toContain('Badge à restituer à l’accueil');
 })->with([[0, 'vip', 'VIP'], [1, 'visiteur', 'VISITEUR'], [2, 'prestataire', 'PRESTATAIRE'], [3, 'prestataire', 'STAGIAIRE']]);
 
 it('sépare strictement les événements pour un même numéro de badge', function () {

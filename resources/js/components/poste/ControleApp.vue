@@ -49,7 +49,7 @@ const trust = computed(() => {
     : { state: 'expiree', text: 'Confiance hors ligne EXPIRÉE : les nouvelles entrées de titulaires permanents sont refusées jusqu’à la synchronisation. Les sorties restent possibles.' };
 });
 const lastSync = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSyncAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais'));
-const reasonLabels: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti' , carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', habilitation_non_commencee: 'Habilitation pas encore valable', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée' };
+const reasonLabels: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti', personne_sortie: 'Personne sortie : badge à restituer', carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', habilitation_non_commencee: 'Habilitation pas encore valable', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée' };
 
 function readStored(): { type: string; id: string } | null {
   try { const raw = window.localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -165,7 +165,7 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
         <p class="text-[clamp(2.5rem,10vw,5rem)] font-extrabold leading-none" data-testid="verdict"><span aria-hidden="true">{{ exit.ok ? '✓' : '✕' }}</span> {{ exit.ok ? 'SORTIE ENREGISTRÉE' : 'SORTIE REFUSÉE' }}</p>
         <template v-if="exit.ok">
           <p class="text-4xl font-bold" data-testid="nom">{{ exit.person?.name }}</p>
-          <p class="text-2xl">Badge {{ exit.badge_code }}<template v-if="exit.badge_status"> · {{ exit.badge_status === 'Disponible' ? 'de nouveau disponible' : 'clos (usage unique)' }}</template></p>
+          <p class="text-2xl">Badge {{ exit.badge_code }}<template v-if="exit.badge_status"> · {{ exit.badge_status === 'Associé' ? 'à restituer à l’accueil' : exit.badge_status === 'Disponible' ? 'de nouveau disponible' : 'clos (usage unique)' }}</template></p>
           <p v-if="exit.presents != null" class="text-2xl">Personnes présentes : {{ exit.presents }}</p>
           <p v-if="exit.warning" class="rounded-2xl bg-amber-300 px-5 py-3 text-2xl font-bold text-red-900"><span aria-hidden="true">⚠</span> {{ exit.warning }}</p>
         </template>

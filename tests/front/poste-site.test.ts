@@ -106,7 +106,7 @@ describe('dépôt local : contrôle et sortie', () => {
     expect(await repo.exit('op-4', 'b-001', null)).toMatchObject({ ok: true, source: 'local' });
     expect((await repo.visitor('v1')).status).toBe('sorti');
     expect(await repo.exit('op-5', 'B-001', null)).toMatchObject({ ok: false, reason: 'deja_sorti' });
-    expect(await repo.control('op-6', 'B-001', null)).toMatchObject({ valid: false, reason: 'restitue' });
+    expect(await repo.control('op-6', 'B-001', null)).toMatchObject({ valid: false, reason: 'personne_sortie' });
     expect((await store.ops('pending')).map(o => o.type)).toEqual(['sortie', 'controle']); // le refus de sortie n'est pas mis en file
     expect(await repo.presentCount()).toBeNull();
   });

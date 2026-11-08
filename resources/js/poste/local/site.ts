@@ -28,7 +28,7 @@ function pointName(list: LocalList, point: PointRef | null): string {
 }
 
 const REFUSALS: Record<string, string> = {
-  inconnu: 'Badge inconnu.', annule: 'Badge annulé : accès refusé.', restitue: 'Badge restitué : il n’est plus valable.', non_associe: 'Badge non associé à une personne.', hors_periode: 'Badge hors de sa période de validité.',
+  inconnu: 'Badge inconnu.', annule: 'Badge annulé : accès refusé.', restitue: 'Badge restitué : il n’est plus valable.', personne_sortie: 'Cette personne est sortie : le badge est à restituer et ne donne plus accès.', non_associe: 'Badge non associé à une personne.', hors_periode: 'Badge hors de sa période de validité.',
 };
 
 /** Même règle que BadgeService::controler, appliquée à la copie de la tablette (situation connue à la dernière synchronisation). */
@@ -46,8 +46,9 @@ export function controlLocal(list: LocalList, printed: string | null, point: Poi
   if (!badge) return refuse('inconnu');
   if (badge.status === 'Annulé') return refuse('annule');
   if (badge.status === 'Restitué' || badge.status === 'Clos') return refuse('restitue');
-  const holder = Array.from(list.visitors.values()).find(v => v.badge_code === badge.code && v.status !== 'sorti' && v.status !== 'refuse');
+  const holder = Array.from(list.visitors.values()).find(v => v.badge_code === badge.code && v.status !== 'refuse');
   if (badge.status === 'Disponible' || !holder) return refuse('non_associe');
+  if (holder.status === 'sorti') return refuse('personne_sortie'); // sortie ≠ restitution : le badge reste associé mais ne donne plus accès
   if (outsidePeriod(holder, now)) return refuse('hors_periode');
   const category = list.categories.get(holder.category_id) ?? null;
   const allowed = new Set(list.snapshot.category_zone.filter(cz => cz.category_id === holder.category_id).map(cz => cz.zone_id));

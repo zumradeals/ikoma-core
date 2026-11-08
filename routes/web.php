@@ -147,6 +147,7 @@ Route::middleware(['auth'])->group(function (): void {
                 Route::get('/poste/api/contexte', [PosteApiController::class, 'contexte'])->middleware('can:visiteurs.rechercher');
                 Route::post('/poste/api/controle', [PosteApiController::class, 'controle'])->middleware('can:badges.controler');
                 Route::post('/poste/api/sortie', [PosteApiController::class, 'sortie'])->middleware('can:badges.controler');
+                Route::post('/poste/api/restitution', [PosteApiController::class, 'restitution'])->middleware(['can:badges.controler', 'can:badges.associer']);
                 Route::get('/poste/api/presents', [PosteApiController::class, 'presents'])->middleware('can:badges.controler');
                 Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware(['can:visiteurs.rechercher', 'throttle:recherche']);
                 Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');

@@ -115,6 +115,14 @@ final class PosteApiController
         return $this->operations->run($r, 'sortie', hash('sha256', $data['code']).'|'.json_encode($data['point'] ?? null), fn () => $this->site->exit($poste, $r->user(), $data['code'], $data['point'] ?? null));
     }
 
+    public function restitution(Request $r): JsonResponse
+    {
+        $data = $r->validate(['code' => 'required|string|max:100']);
+        $poste = $this->poste($r);
+
+        return $this->operations->run($r, 'restitution', hash('sha256', $data['code']), fn () => $this->site->giveBack($poste, $r->user(), $data['code']));
+    }
+
     public function presents(Request $r): JsonResponse
     {
         $event = $this->poste($r)->event_id;
