@@ -62,6 +62,7 @@ final class DataLifecycle
                 || $batch?->print_exposed_at !== null
                 || $has('badge_assignments', 'badge_id', $id)
                 || $has('access_events', 'badge_id', $id)
+                || $has('badge_transfers', 'badge_id', $id)
                 || $has('groups', 'badge_batch_id', $row->badge_batch_id)) {
                 $reasons[] = 'Badge déjà utilisé, réservé, nominatif ou présenté à l’impression. Il peut être annulé par un superviseur, mais pas supprimé individuellement.';
             }
@@ -74,6 +75,7 @@ final class DataLifecycle
             if ((clone $badges)->where(fn ($q) => $q->where('status', '<>', 'Disponible')->orWhereNotNull('reserved_device_id')->orWhereNotNull('reserved_group_id')->orWhereNotNull('printed_for_visitor_id'))->exists()
                 || DB::table('badge_assignments')->whereIn('badge_id', (clone $badges)->select('id'))->exists()
                 || DB::table('access_events')->whereIn('badge_id', (clone $badges)->select('id'))->exists()
+                || DB::table('badge_transfers')->whereIn('badge_id', (clone $badges)->select('id'))->exists()
                 || $has('groups', 'badge_batch_id', $id)
                 || DB::table('devices')->where('event_id', $row->event_id)->whereNotNull('enrolled_at')->exists()) {
                 $reasons[] = 'Lot réservé, nominatif, utilisé ou exposé à une tablette : suppression interdite.';
@@ -90,6 +92,9 @@ final class DataLifecycle
                     $reasons[] = 'Cet événement contient des personnes, des équipements, des badges ou une activité. Seule une préparation inutilisée peut être supprimée.';
                     break;
                 }
+            }
+            if (DB::table('badge_transfers')->where('from_event_id', $id)->orWhere('to_event_id', $id)->exists()) {
+                $reasons[] = 'Des badges ont circulé depuis ou vers cette activité : conservez ses références.';
             }
             foreach (['category_zone', 'categories', 'zones'] as $configuration) {
                 $counts[$configuration] = DB::table($configuration)->where('event_id', $id)->count();

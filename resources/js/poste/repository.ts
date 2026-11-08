@@ -1,6 +1,6 @@
 import type { ArrivalResult, GroupSummary, GroupView } from './local/group';
 import type { PermanentResult } from './local/permanent';
-import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
+import { ApiError, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
  * Tous les accès aux données du poste passent par cette interface (plan, section 4.1). Le lot L5 n'a qu'une implémentation (appels JSON) ;
@@ -36,6 +36,9 @@ export interface SitePosteRepository extends PosteRepository {
   checkpoints(): Promise<Checkpoint[]>;
   control(operationId: string, code: string, point: PointRef | null): Promise<ControlResult>;
   exit(operationId: string, code: string, point: PointRef | null): Promise<ExitResult>;
+  /** Restitution d'un badge, EN LIGNE UNIQUEMENT (V1) : lève ApiError « hors_ligne » sans réseau. La vérification n'écrit rien ; la restitution est idempotente. */
+  giveBackCheck(code: string): Promise<GiveBackResult>;
+  giveBack(operationId: string, code: string): Promise<GiveBackResult>;
   /** Nombre de personnes présentes selon le serveur, ou null sans réseau. */
   presentCount(): Promise<number | null>;
   /** Durée de confiance hors ligne (minutes) approuvée pour les titulaires permanents ; 0 : aucune, toute nouvelle entrée hors ligne est refusée. */

@@ -1,4 +1,4 @@
-import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
+import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
 import type { GroupPosteRepository } from '../repository';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
 import { sha256Hex } from './crypto';
@@ -205,6 +205,21 @@ export class LocalPosteRepository implements GroupPosteRepository {
     const result = exitLocal(this.list, printed, point, await this.knownAt());
     if (result.ok) await this.enqueue(operationId, 'sortie', { code: printed, point });
     return result;
+  }
+
+  /** Restitution : en ligne uniquement. Aucune file hors ligne, aucune décision locale : le serveur seul tranche. */
+  private requireOnline(): void {
+    if (!this.sync || !this.online) throw new ApiError('hors_ligne', 'La restitution d’un badge nécessite le réseau. Reconnectez le poste, puis recommencez.');
+  }
+
+  async giveBackCheck(code: string): Promise<GiveBackResult> {
+    this.requireOnline();
+    return await this.sync!.request<GiveBackResult>('POST', '/poste/api/restitution/verifier', { code }, undefined, 4000);
+  }
+
+  async giveBack(operationId: string, code: string): Promise<GiveBackResult> {
+    this.requireOnline();
+    return await this.sync!.request<GiveBackResult>('POST', '/poste/api/restitution', { code }, operationId, 6000);
   }
 
   trustMinutes(): number { return this.list.snapshot.permanent?.trust_minutes ?? 0; }

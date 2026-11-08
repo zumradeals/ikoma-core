@@ -101,6 +101,13 @@ describe('dépôt local : contrôle et sortie', () => {
     expect((await store.ops('pending'))[1].payload.code).toBe('INCONNU');
   });
 
+  it('refuse la restitution hors ligne sans rien mettre en file (V1 : en ligne uniquement)', async () => {
+    const { repo, store } = await setup(() => { throw new ApiError('reseau', 'x'); }, false);
+    await expect(repo.giveBackCheck('B-001')).rejects.toMatchObject({ code: 'hors_ligne' });
+    await expect(repo.giveBack('op-gb', 'B-001')).rejects.toMatchObject({ code: 'hors_ligne' });
+    expect(await store.ops('pending')).toEqual([]);
+  });
+
   it('hors ligne, une sortie met le visiteur « sorti » et le badge n’est plus valable ; une deuxième sortie est refusée', async () => {
     const { repo, store } = await setup(() => { throw new ApiError('reseau', 'x'); }, false);
     expect(await repo.exit('op-4', 'b-001', null)).toMatchObject({ ok: true, source: 'local' });

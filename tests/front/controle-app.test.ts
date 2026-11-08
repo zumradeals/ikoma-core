@@ -121,4 +121,64 @@ describe('écran de contrôle', () => {
     expect(wrapper.find('[data-testid="resultat"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="erreur"]').text()).toContain('Une erreur est survenue');
   });
+
+  describe('restitution d’un badge (en ligne uniquement)', () => {
+    const checked = { ok: true, badge_code: 'B-001', person: { name: 'Koné Mariam' }, source: 'serveur' as const };
+    const given = { ok: true, badge_code: 'B-001', badge_status: 'Disponible', person: { name: 'Koné Mariam' }, source: 'serveur' as const };
+    const open = async (r: SitePosteRepository) => {
+      const wrapper = mountApp(r);
+      await flushPromises();
+      const hall = wrapper.findAll('button').find(b => b.text().includes('Hall'));
+      if (hall) { await hall.trigger('click'); await flushPromises(); }
+      await wrapper.get('[data-testid="mode-restitution"]').trigger('click');
+      return wrapper;
+    };
+
+    it('vérifie, demande confirmation, puis restitue seulement après la confirmation', async () => {
+      const giveBackCheck = vi.fn(async () => checked);
+      const giveBack = vi.fn(async () => given);
+      const wrapper = await open(repo({ giveBackCheck, giveBack }));
+      await wrapper.get('[data-testid="code-manuel"]').setValue('B-001');
+      await wrapper.get('form').trigger('submit');
+      await flushPromises();
+      expect(giveBackCheck).toHaveBeenCalledWith('B-001');
+      expect(giveBack).not.toHaveBeenCalled();
+      expect(wrapper.get('[data-testid="confirmation-restitution"]').text()).toContain('Koné Mariam');
+      await wrapper.get('[data-testid="confirmer-restitution"]').trigger('click');
+      await flushPromises();
+      expect(giveBack).toHaveBeenCalledTimes(1);
+      expect(giveBack.mock.calls[0]).toEqual([expect.any(String), 'B-001']);
+      expect(wrapper.get('[data-testid="resultat-restitution"]').text()).toContain('BADGE RESTITUÉ');
+      expect(wrapper.get('[data-testid="resultat-restitution"]').text()).toContain('de nouveau disponible');
+    });
+
+    it('n’appelle pas la restitution si l’agent annule, et affiche le refus du serveur', async () => {
+      const giveBack = vi.fn(async () => given);
+      const wrapper = await open(repo({ giveBackCheck: vi.fn(async () => checked), giveBack }));
+      await wrapper.get('[data-testid="code-manuel"]').setValue('B-001');
+      await wrapper.get('form').trigger('submit');
+      await flushPromises();
+      await wrapper.get('[data-testid="annuler-restitution"]').trigger('click');
+      expect(giveBack).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-testid="confirmation-restitution"]').exists()).toBe(false);
+
+      const refused = await open(repo({ giveBackCheck: vi.fn(async () => ({ ok: false, reason: 'personne_presente', message: 'Cette personne est encore présente.', badge_code: null, source: 'serveur' as const })) }));
+      await refused.get('[data-testid="code-manuel"]').setValue('B-002');
+      await refused.get('form').trigger('submit');
+      await flushPromises();
+      expect(refused.get('[data-testid="raison-restitution"]').text()).toBe('Personne encore présente');
+      expect(refused.find('[data-testid="confirmer-restitution"]').exists()).toBe(false);
+    });
+
+    it('est impossible hors ligne : message clair, aucun appel', async () => {
+      const offline = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+      const giveBackCheck = vi.fn(async () => checked);
+      const wrapper = await open(repo({ giveBackCheck }));
+      expect(wrapper.get('[data-testid="restitution-hors-ligne"]').text()).toContain('en ligne');
+      await wrapper.get('[data-testid="code-manuel"]').setValue('B-001');
+      expect(wrapper.get('[data-testid="valider-code"]').attributes('disabled')).toBeDefined();
+      expect(giveBackCheck).not.toHaveBeenCalled();
+      offline.mockRestore();
+    });
+  });
 });

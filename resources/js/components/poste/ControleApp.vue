@@ -6,18 +6,21 @@ import StatusBar from './StatusBar.vue';
 import { startScan, type ScanHandle } from '../../poste/media';
 import type { SitePosteRepository } from '../../poste/repository';
 import type { SyncState } from '../../poste/local/sync';
-import { ApiError, type Checkpoint, type ControlResult, type ExitResult } from '../../poste/types';
+import { ApiError, type Checkpoint, type ControlResult, type ExitResult, type GiveBackResult } from '../../poste/types';
 
 const props = defineProps<{ agent: string; repository: SitePosteRepository; sync?: SyncState | null }>();
 const emit = defineEmits<{ sync: []; lock: [] }>();
 const STORAGE_KEY = 'ikoma.controle.point';
-type Mode = 'controle' | 'sortie';
+type Mode = 'controle' | 'sortie' | 'restitution';
 
 const points = ref<Checkpoint[]>([]);
 const point = ref<Checkpoint | null>(null);
 const mode = ref<Mode>('controle');
 const control = ref<ControlResult | null>(null);
 const exit = ref<ExitResult | null>(null);
+// Restitution (en ligne uniquement) : vérification serveur → confirmation de l'agent → restitution, contrôlée de nouveau par le serveur.
+const giveBackCheck = ref<(GiveBackResult & { code: string }) | null>(null);
+const giveBackDone = ref<GiveBackResult | null>(null);
 const latency = ref<number | null>(null);
 const error = ref<string | null>(null);
 const busy = ref(false);
@@ -49,7 +52,7 @@ const trust = computed(() => {
     : { state: 'expiree', text: 'Confiance hors ligne EXPIRÉE : les nouvelles entrées de titulaires permanents sont refusées jusqu’à la synchronisation. Les sorties restent possibles.' };
 });
 const lastSync = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSyncAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais'));
-const reasonLabels: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti', personne_sortie: 'Personne sortie : badge à restituer', carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', habilitation_non_commencee: 'Habilitation pas encore valable', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée' };
+const reasonLabels: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti', personne_sortie: 'Personne sortie : badge à restituer', personne_presente: 'Personne encore présente', carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', habilitation_non_commencee: 'Habilitation pas encore valable', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée' };
 
 function readStored(): { type: string; id: string } | null {
   try { const raw = window.localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -75,9 +78,20 @@ function dismiss() { lastCamera = { ...lastCamera, at: Date.now() }; window.clea
 async function refreshPresent() { present.value = await props.repository.presentCount(); }
 
 /** Un badge à la fois : tant qu'un résultat est affiché ou qu'un contrôle est en cours, les lectures suivantes sont ignorées. */
+async function confirmGiveBack() {
+  const pending = giveBackCheck.value;
+  if (!pending || busy.value) return;
+  busy.value = true; error.value = null;
+  try { giveBackDone.value = await props.repository.giveBack(crypto.randomUUID(), pending.code); giveBackCheck.value = null; }
+  catch (e) { error.value = e instanceof ApiError ? e.message : 'La restitution a échoué. Réessayez ou appelez le superviseur.'; }
+  finally { busy.value = false; }
+}
+function cancelGiveBack() { giveBackCheck.value = null; giveBackDone.value = null; error.value = null; }
+function chooseMode(next: Mode) { mode.value = next; cancelGiveBack(); }
+
 async function submit(raw: string, fromCamera = false) {
   const value = raw.trim();
-  if (!value || busy.value || showing.value || !point.value) return;
+  if (!value || busy.value || showing.value || !point.value || giveBackCheck.value) return;
   // Le badge est encore devant la caméra quand l'agent referme le résultat : la même lecture n'est pas refaite avant 5 s.
   if (fromCamera && value === lastCamera.text && Date.now() - lastCamera.at < 5000) return;
   if (fromCamera) lastCamera.text = value;
@@ -86,6 +100,13 @@ async function submit(raw: string, fromCamera = false) {
   const where = { type: point.value.type, id: point.value.id };
   try {
     const operationId = crypto.randomUUID();
+    if (mode.value === 'restitution') {
+      giveBackDone.value = null;
+      const check = await props.repository.giveBackCheck(value);
+      if (check.ok) giveBackCheck.value = { ...check, code: value }; else giveBackDone.value = check;
+      code.value = '';
+      return;
+    }
     if (mode.value === 'controle') control.value = await props.repository.control(operationId, value, where);
     else { exit.value = await props.repository.exit(operationId, value, where); void refreshPresent(); }
     code.value = '';
@@ -131,16 +152,30 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
         </div>
         <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="situation-connue"><span aria-hidden="true">⚠</span> Hors ligne : les contrôles s’appuient sur la situation connue à {{ lastSync }}. Un badge annulé depuis peut apparaître valide.</p>
         <p v-if="trust" role="status" class="rounded-xl border-2 p-3 font-semibold" :class="trust.state === 'valide' ? 'border-amber-700 bg-amber-50 text-amber-950' : 'border-red-700 bg-red-50 text-red-900'" :data-testid="'confiance-' + trust.state"><span aria-hidden="true">⏱</span> {{ trust.text }}</p>
-        <div class="grid grid-cols-2 gap-3" role="group" aria-label="Mode">
-          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'controle' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'controle'" data-testid="mode-controle" @click="mode = 'controle'">Contrôle</button>
-          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'sortie' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'sortie'" data-testid="mode-sortie" @click="mode = 'sortie'">Sortie</button>
+        <div class="grid grid-cols-3 gap-3" role="group" aria-label="Mode">
+          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'controle' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'controle'" data-testid="mode-controle" @click="chooseMode('controle')">Contrôle</button>
+          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'sortie' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'sortie'" data-testid="mode-sortie" @click="chooseMode('sortie')">Sortie</button>
+          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'restitution' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'restitution'" data-testid="mode-restitution" @click="chooseMode('restitution')">Restitution</button>
         </div>
+        <p v-if="mode === 'restitution' && !online" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="restitution-hors-ligne"><span aria-hidden="true">⚠</span> La restitution d’un badge n’est possible qu’en ligne. Reconnectez le poste pour restituer.</p>
+        <section v-if="mode === 'restitution' && giveBackCheck" class="space-y-3 rounded-2xl border-4 border-ikoma-blue bg-white p-4" role="alertdialog" aria-labelledby="titre-restitution" data-testid="confirmation-restitution">
+          <h2 id="titre-restitution" class="text-2xl font-bold">Restituer ce badge ?</h2>
+          <p class="text-xl">Badge <strong data-testid="restitution-badge">{{ giveBackCheck.badge_code }}</strong> · rendu par <strong data-testid="restitution-nom">{{ giveBackCheck.person?.name }}</strong></p>
+          <p class="text-lg">Le badge sera récupéré et pourra être attribué à une autre personne. Cette action est enregistrée.</p>
+          <div class="grid grid-cols-2 gap-3"><button type="button" class="btn-main" :disabled="busy" data-testid="confirmer-restitution" @click="confirmGiveBack">Confirmer la restitution</button><button type="button" class="btn-soft" :disabled="busy" data-testid="annuler-restitution" @click="cancelGiveBack">Annuler</button></div>
+        </section>
+        <section v-if="mode === 'restitution' && giveBackDone" class="space-y-2 rounded-2xl border-4 p-4" :class="giveBackDone.ok ? 'border-green-700 bg-green-50 text-green-950' : 'border-red-700 bg-red-50 text-red-900'" role="status" data-testid="resultat-restitution">
+          <p class="text-2xl font-bold"><span aria-hidden="true">{{ giveBackDone.ok ? '✓' : '✕' }}</span> {{ giveBackDone.ok ? 'BADGE RESTITUÉ' : 'RESTITUTION REFUSÉE' }}</p>
+          <p v-if="giveBackDone.ok" class="text-xl">Badge {{ giveBackDone.badge_code }} · {{ giveBackDone.person?.name }} · {{ giveBackDone.badge_status === 'Disponible' ? 'de nouveau disponible' : 'clos (usage unique)' }}</p>
+          <template v-else><p class="text-xl font-bold" data-testid="raison-restitution">{{ reasonLabels[giveBackDone.reason ?? ''] ?? giveBackDone.reason }}</p><p class="text-lg">{{ giveBackDone.message }}</p></template>
+          <button type="button" class="btn-soft" data-testid="restitution-suivante" @click="cancelGiveBack">Restitution suivante</button>
+        </section>
         <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur"><span aria-hidden="true">⚠</span> {{ error }}</div>
         <div class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[40vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
         <p v-if="scanError" role="alert" class="font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ scanError }}</p>
         <form class="space-y-3" aria-label="Saisir le code du badge" @submit.prevent="submit(code)">
           <label class="block text-xl font-semibold">QR illisible ? Saisissez le code imprimé (exemple : B-014)<input v-model="code" class="field !min-h-16 !text-2xl uppercase" autocomplete="off" maxlength="100" data-testid="code-manuel"></label>
-          <button type="submit" class="btn-main" :disabled="!code.trim() || busy" data-testid="valider-code">{{ mode === 'controle' ? 'Contrôler ce badge' : 'Enregistrer la sortie' }}</button>
+          <button type="submit" class="btn-main" :disabled="!code.trim() || busy || (mode === 'restitution' && (!online || !!giveBackCheck))" data-testid="valider-code">{{ mode === 'controle' ? 'Contrôler ce badge' : mode === 'sortie' ? 'Enregistrer la sortie' : 'Vérifier le badge à restituer' }}</button>
         </form>
         <button type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Changer de point de contrôle</button>
       </template>

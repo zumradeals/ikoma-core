@@ -123,6 +123,13 @@ final class PosteApiController
         return $this->operations->run($r, 'restitution', hash('sha256', $data['code']), fn () => $this->site->giveBack($poste, $r->user(), $data['code']));
     }
 
+    public function restitutionVerifier(Request $r): JsonResponse
+    {
+        $data = $r->validate(['code' => 'required|string|max:100']);
+
+        return response()->json($this->site->giveBackCheck($this->poste($r), $data['code']));
+    }
+
     public function presents(Request $r): JsonResponse
     {
         $event = $this->poste($r)->event_id;

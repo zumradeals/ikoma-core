@@ -8,6 +8,7 @@ use App\Http\Controllers\AtelierController;
 use App\Http\Controllers\BadgeDetailsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
+use App\Http\Controllers\BadgeRegistryController;
 use App\Http\Controllers\BadgeReservationsController;
 use App\Http\Controllers\BadgesController;
 use App\Http\Controllers\BadgeSettingsController;
@@ -131,6 +132,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/badges/reservations', [BadgeReservationsController::class, 'store'])->middleware('can:badges.gerer');
         Route::put('/administration/badges/reglages', [BadgeSettingsController::class, 'update'])->middleware('can:badges.gerer');
         Route::get('/administration/badges/etiquettes', BadgeLabelsController::class)->middleware('can:badges.gerer');
+        Route::get('/administration/badges/registre', [BadgeRegistryController::class, 'index'])->middleware('can:badges.gerer');
+        Route::post('/administration/badges/mise-a-disposition', [BadgeRegistryController::class, 'store'])->middleware(['can:badges.gerer', 'throttle:titulaires']);
         Route::get('/administration/badges/{badge}', BadgeDetailsController::class)->whereUuid('badge')->middleware('can:badges.gerer');
 
         Route::middleware(EnsureAgentAccueil::class)->group(function (): void {
@@ -148,6 +151,7 @@ Route::middleware(['auth'])->group(function (): void {
                 Route::post('/poste/api/controle', [PosteApiController::class, 'controle'])->middleware('can:badges.controler');
                 Route::post('/poste/api/sortie', [PosteApiController::class, 'sortie'])->middleware('can:badges.controler');
                 Route::post('/poste/api/restitution', [PosteApiController::class, 'restitution'])->middleware(['can:badges.controler', 'can:badges.associer']);
+                Route::post('/poste/api/restitution/verifier', [PosteApiController::class, 'restitutionVerifier'])->middleware(['can:badges.controler', 'can:badges.associer']);
                 Route::get('/poste/api/presents', [PosteApiController::class, 'presents'])->middleware('can:badges.controler');
                 Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware(['can:visiteurs.rechercher', 'throttle:recherche']);
                 Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');

@@ -214,3 +214,8 @@ Migration `2026_11_25_000000_create_persons_and_activity_kind`. Contrats minimau
 - **Écrans** : Administration > Personnes (recherche, création explicite) ; fiche d'une personne (participations de toutes les activités, historique des badges, inscription à une activité, clôture d'une participation). La saisie d'un invité accepte une personne connue (`person_id`).
 - **Reconstruction** : tout est dans les migrations ; la remise à zéro de démonstration efface aussi les personnes.
 - **Conservation** : la durée de conservation de l'identité d'une personne (au-delà de l'anonymisation des fiches d'une activité) n'est pas définie par le cahier des charges (§11, §13) : décision à prendre ; aucune purge automatique des personnes n'est faite.
+
+## Évolution S05 — badges inter-activités
+- `badge_assignments.badge_id`, `access_events.badge_id`, `badges.badge_batch_id` : clés étrangères simples (plus de clé composite avec `event_id`).
+- `badges.event_id` = activité de rattachement courante (mobile uniquement par mise à disposition d'un badge Disponible, garde-fou `badges_event_guard`).
+- `badge_transfers` (id, badge_id, from_event_id, to_event_id, actor_id, reservation_released, timestamps) : historique des mises à disposition, non modifiable.

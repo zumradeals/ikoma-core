@@ -79,13 +79,55 @@ final class SiteControl
     }
 
     /**
-     * Restitution explicite d'un badge (acte distinct de la sortie physique). Le badge doit être associé à une personne du même événement que le poste ;
+     * Vérification SANS écriture avant une restitution : indique qui détient le badge et si la restitution est possible. Le poste s'en sert pour
+     * afficher la confirmation ; giveBack() refait toujours tous les contrôles (le serveur ne fait jamais confiance à la vérification préalable).
+     *
+     * @return array<string, mixed>
+     */
+    public function giveBackCheck(Device $poste, string $code): array
+    {
+        $found = $this->giveBackTarget($poste, $code, false);
+        if (isset($found['refus'])) {
+            return $found['refus'];
+        }
+
+        return ['ok' => true, 'badge_code' => $found['badge']->code, 'person' => ['name' => $found['visitor']->full_name], 'source' => 'serveur'];
+    }
+
+    /**
+     * Restitution explicite d'un badge (acte distinct de la sortie physique). Le badge doit être attribué à une personne de l'activité du poste ;
      * il redevient disponible (ou clos) selon le réglage badge_reutilisable. Une personne encore présente ne peut pas restituer : sa sortie vient d'abord.
+     * Disponible en ligne uniquement : aucune file hors ligne n'existe pour cette action.
      *
      * @return array<string, mixed>
      */
     public function giveBack(Device $poste, User $agent, string $code): array
     {
+        return DB::transaction(function () use ($poste, $agent, $code): array {
+            $found = $this->giveBackTarget($poste, $code, true);
+            if (isset($found['refus'])) {
+                $this->audit->append('restitution.refusee', $agent->id, ['badge_id' => $found['badge_id'] ?? null, 'event_id' => $poste->event_id, 'device_id' => $poste->id, 'raison' => $found['refus']['reason']]);
+
+                return $found['refus'];
+            }
+            try {
+                $returned = $this->badges->restituer($found['badge']->id, $agent);
+            } catch (BadgeRefused $e) {
+                $this->audit->append('restitution.refusee', $agent->id, ['badge_id' => $found['badge']->id, 'event_id' => $poste->event_id, 'device_id' => $poste->id, 'raison' => $e->reason]);
+
+                return ['ok' => false, 'refus' => true, 'reason' => $e->reason, 'message' => $e->getMessage(), 'badge_code' => null, 'source' => 'serveur'];
+            }
+
+            return ['ok' => true, 'badge_code' => $found['badge']->code, 'badge_status' => $returned->status->value, 'person' => ['name' => $found['visitor']->full_name], 'source' => 'serveur'];
+        });
+    }
+
+    /**
+     * @return array{badge?: object, visitor?: object, badge_id?: ?string, refus?: array<string, mixed>}
+     */
+    private function giveBackTarget(Device $poste, string $code, bool $lock): array
+    {
+        $refus = fn (?string $badgeId, string $reason, string $message): array => ['badge_id' => $badgeId, 'refus' => ['ok' => false, 'refus' => true, 'reason' => $reason, 'message' => $message, 'badge_code' => null, 'source' => 'serveur']];
         $input = trim($code);
         if (str_starts_with($input, QrSvg::PREFIX)) {
             $input = substr($input, strlen(QrSvg::PREFIX));
@@ -97,27 +139,24 @@ final class SiteControl
             $query->where('event_id', $poste->event_id)->whereRaw('upper(code) = ?', [mb_strtoupper($input)]);
         }
         $badge = $query->first();
-        if ($badge === null || $badge->event_id !== $poste->event_id) {
-            return $this->refused($poste, $agent, $badge && $badge->event_id === $poste->event_id ? $badge->id : null, 'inconnu', 'Badge inconnu ou d’un autre événement.', 'restitution.refusee');
+        if ($badge === null) {
+            return $refus(null, 'inconnu', 'Badge inconnu : vérifiez le code ou scannez à nouveau.');
+        }
+        // L'activité de la restitution est celle de l'attribution en cours, pas l'activité de rattachement du badge.
+        $assignments = DB::table('badge_assignments')->where('badge_id', $badge->id)->whereNull('returned_at')->whereNull('cancelled_at');
+        $assignment = ($lock ? $assignments->lockForUpdate() : $assignments)->first();
+        if ($assignment === null) {
+            return $refus($badge->id, 'non_associe', 'Ce badge n’est attribué à personne : rien à restituer.');
+        }
+        if ($assignment->event_id !== $poste->event_id) {
+            return $refus($badge->id, 'autre_evenement', 'Ce badge est attribué dans une autre activité : la restitution se fait depuis un poste de cette activité.');
+        }
+        $visitor = DB::table('visitors')->where('id', $assignment->visitor_id)->first();
+        if ($visitor->status === 'present') {
+            return $refus($badge->id, 'personne_presente', 'Cette personne est encore présente : enregistrez sa sortie avant la restitution.');
         }
 
-        return DB::transaction(function () use ($poste, $agent, $badge): array {
-            $assignment = DB::table('badge_assignments')->where('badge_id', $badge->id)->whereNull('returned_at')->whereNull('cancelled_at')->lockForUpdate()->first();
-            if ($assignment === null) {
-                return $this->refused($poste, $agent, $badge->id, 'non_associe', 'Ce badge n’est associé à personne : rien à restituer.', 'restitution.refusee');
-            }
-            $visitor = DB::table('visitors')->where('id', $assignment->visitor_id)->lockForUpdate()->first();
-            if ($visitor->status === 'present') {
-                return $this->refused($poste, $agent, $badge->id, 'personne_presente', 'Cette personne est encore présente : enregistrez sa sortie avant la restitution.', 'restitution.refusee');
-            }
-            try {
-                $returned = $this->badges->restituer($badge->id, $agent);
-            } catch (BadgeRefused $e) {
-                return $this->refused($poste, $agent, $badge->id, $e->reason, $e->getMessage(), 'restitution.refusee');
-            }
-
-            return ['ok' => true, 'badge_code' => $badge->code, 'badge_status' => $returned->status->value, 'person' => ['name' => $visitor->full_name], 'source' => 'serveur'];
-        });
+        return ['badge' => $badge, 'visitor' => $visitor];
     }
 
     /**
