@@ -132,6 +132,8 @@ it('calcule attendu, en retard et absent constaté, et trace l’absence avec so
     DB::table('visitors')->where('id', s09Visitor(2))->update(['status' => 'present']);
     expect($state()[s09Visitor(2)])->toBe('present');
     expect(s09Refusal(fn () => $this->visits->markNoShow($this->sup, s09Visitor(2), 'Trop tard'))?->errors())->toHaveKey('participation');
+    // l'agent ne constate aucune absence
+    $this->actingAs($this->agent)->postJson('/pilotage/visiteurs/'.s09Visitor(0).'/absence', ['reason' => 'Test'])->assertForbidden();
     // le délai de tolérance est un réglage
     DB::table('settings')->where('key', 'visite_retard_minutes')->update(['value' => '90']);
     expect($state()[s09Visitor(0)])->toBe('attendu');
@@ -139,8 +141,6 @@ it('calcule attendu, en retard et absent constaté, et trace l’absence avec so
     expect(collect($this->visits->expected(DemoSeeder::id('event'))['rows'])->firstWhere('id', s09Visitor(0))['state'])->toBe('attendu');
     DB::table('settings')->where('key', 'visite_retard_minutes')->update(['value' => '15']);
     expect(collect($this->visits->expected(DemoSeeder::id('event'))['rows'])->firstWhere('id', s09Visitor(0))['state'])->toBe('en_retard');
-    // l'agent ne constate aucune absence
-    $this->actingAs($this->agent)->postJson('/pilotage/visiteurs/'.s09Visitor(0).'/absence', ['reason' => 'Test'])->assertForbidden();
     expect(DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'visite.absence_constatee')->count())->toBe(1);
 });
 
