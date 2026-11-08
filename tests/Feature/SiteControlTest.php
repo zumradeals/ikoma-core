@@ -491,7 +491,7 @@ it('accorde une zone par habilitation, la perd Ã  la suspension, au retrait ou Ã
     $this->travelTo('2027-01-10 10:00:00');
     $entitlements->revoke($id, 'Fin de la visite', $admin);
     expect($vip()['zone_ok'])->toBeFalse();
-    $actions = siteAudit()->whereIn('action', ['habilitation.accordee', 'habilitation.suspendue', 'habilitation.reprise', 'habilitation.retiree'])->pluck('action')->all();
+    $actions = siteAudit()->whereIn('action', ['habilitation.accordee', 'habilitation.suspendue', 'habilitation.reprise', 'habilitation.retiree'])->orderBy('id')->pluck('action')->all();
     expect($actions)->toBe(['habilitation.accordee', 'habilitation.suspendue', 'habilitation.reprise', 'habilitation.retiree']);
     $details = siteAudit()->where('action', 'like', 'habilitation.%')->pluck('details')->implode(' ');
     expect($details)->not->toContain(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('full_name'));
