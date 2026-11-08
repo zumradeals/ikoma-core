@@ -23,3 +23,16 @@ describe('administration L2', () => {
   const wrapper = mount(ZoneForm, { props: { events: [{ id: 'a', name: 'Événement A' }], zone: { id: 'z', name: 'Zone existante', event_id: 'a' } } }); expect(wrapper.get('select').attributes('disabled')).toBeDefined(); expect(wrapper.get('input').element.value).toBe('Zone existante');
  });
 });
+
+it('ne permet pas d’activer la clôture réservée au superviseur tant que son parcours n’existe pas, mais permet de la retirer (S02)', () => {
+  const base = { events: [{ id: 'a', name: 'Événement A' }], zones: [] as { id: string; event_id: string; name: string }[] };
+  const blocked = mount(CategoryForm, { props: base });
+  expect(blocked.get('[data-testid="cloture-reservee"]').attributes('disabled')).toBeDefined();
+  expect(blocked.get('[data-testid="cloture-reservee-indisponible"]').text()).toContain('rendrait toute sortie impossible');
+  const available = mount(CategoryForm, { props: { ...base, closureAvailable: true } });
+  expect(available.get('[data-testid="cloture-reservee"]').attributes('disabled')).toBeUndefined();
+  expect(available.find('[data-testid="cloture-reservee-indisponible"]').exists()).toBe(false);
+  // un état hérité reste modifiable : l'administrateur peut le retirer
+  const legacy = mount(CategoryForm, { props: { ...base, category: { id: 'c', event_id: 'a', name: 'VIP', color: '#C9962B', priority_circuit: true, closure_supervisor_only: true, zone_ids: [] } } });
+  expect(legacy.get('[data-testid="cloture-reservee"]').attributes('disabled')).toBeUndefined();
+});

@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Event;
 use App\Models\Zone;
 use App\Services\Audit;
+use App\Services\SupervisorClosure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,9 @@ final class CategoriesController
 
         $r->validate(['event_id' => ['bail', 'required', 'uuid', $category ? Rule::in([$event]) : Rule::exists('events', 'id')]]);
         $data = $r->validate(['event_id' => ['required', 'uuid', $category ? Rule::in([$event]) : Rule::exists('events', 'id')], 'name' => ['required', 'string', 'max:120', Rule::unique('categories')->where('event_id', $event)->ignore($category?->id)], 'color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'], 'priority_circuit' => 'required|boolean', 'zone_ids' => 'present|array', 'zone_ids.*' => ['bail', 'required', 'uuid', 'distinct', Rule::exists('zones', 'id')->where('event_id', $event)]]);
+
+        // S02 : tant que le parcours du superviseur n'existe pas, l'indicateur ne peut pas être activé (il peut toujours être retiré).
+        SupervisorClosure::assertCanActivate($r->boolean('closure_supervisor_only'), (bool) $category?->closure_supervisor_only);
 
         return [...$data, 'priority_circuit' => $r->boolean('priority_circuit'), 'closure_supervisor_only' => $r->boolean('closure_supervisor_only'), 'zone_ids' => array_values($data['zone_ids'])];
     }
