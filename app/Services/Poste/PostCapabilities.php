@@ -12,7 +12,10 @@ use Illuminate\Support\Facades\DB;
  * Décisions validées (cahier des charges AILCT V1, §2 et §8) :
  *  - poste 1 : aucun scan ni confirmation numérique en V1 ;
  *  - poste 2 : contrôle individuel à l'entrée, accueil (identité, badge, admission) et sortie ;
- *  - soute : contrôle individuel bidirectionnel, rien d'autre.
+ *  - soute : contrôle individuel bidirectionnel, rien d'autre ;
+ *  - hôtel : lieu de regroupement des stagiaires, HORS des postes de l'Académie : aucune capacité de poste (ni accueil, ni scan, ni sortie). Les opérations de
+ *    préparation du transport (appel nominal), de remise des badges de groupe et de départ du car sont autorisées par leurs permissions de rôle (groupes.*),
+ *    pas par un point de contrôle : une tablette de l'hôtel n'est jamais typée « poste 2 ». L'arrivée du car est, elle, un scan physique à un poste de l'Académie.
  * Postes 3 et 4 : procédures numériques « à confirmer » (§13). Tant qu'elles ne sont pas décidées, ces points n'ont AUCUNE capacité (refus par défaut).
  * Poste non identifié (point_code nul) : AUCUNE capacité (refus par défaut). Le point de contrôle est obligatoire pour toute tablette
  * opérationnelle : à la création, à l'émission du code d'enrôlement, à l'enrôlement et, en base, pour tout appareil muni d'un jeton.
@@ -21,7 +24,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class PostCapabilities
 {
-    public const POINTS = ['poste_1' => 'Poste 1 — entrée principale', 'poste_2' => 'Poste 2 — accès terrestre', 'poste_3' => 'Poste 3 — chef du village', 'poste_4' => 'Poste 4 — Porton', 'soute' => 'Soute (point 5)'];
+    public const POINTS = ['poste_1' => 'Poste 1 — entrée principale', 'poste_2' => 'Poste 2 — accès terrestre', 'poste_3' => 'Poste 3 — chef du village', 'poste_4' => 'Poste 4 — Porton', 'soute' => 'Soute (point 5)', 'hotel' => 'Hôtel — regroupement et départ des cars (hors postes de l’Académie)'];
 
     private const ALLOWED = ['poste_2' => ['accueil', 'scan', 'sortie'], 'soute' => ['scan']];
 

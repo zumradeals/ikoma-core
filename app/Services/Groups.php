@@ -217,9 +217,6 @@ final class Groups
      */
     public function deliver(?Device $device, User $agent, string $groupId, string $visitorId, string $code): array
     {
-        if ($device !== null) {
-            PostCapabilities::require($device, $agent, 'accueil'); // S02 : remettre un badge est une décision d'accès du poste
-        }
         app(FoundingModules::class)->requireF06();
 
         return DB::transaction(function () use ($device, $agent, $groupId, $visitorId, $code): array {
@@ -298,7 +295,7 @@ final class Groups
      */
     public function arrive(Device $device, User $agent, string $code, ?string $declaredAt = null): array
     {
-        PostCapabilities::require($device, $agent, 'scan'); // S02 : l'arrivée d'un car est une admission, par scan individuel à un point équipé
+        PostCapabilities::require($device, $agent, 'scan'); // S02 : l'arrivée d'un car est un scan physique à un poste de l'Académie ; la remise des badges (hôtel) relève des permissions groupes.*
         app(FoundingModules::class)->requireF06();
 
         return DB::transaction(function () use ($device, $agent, $code, $declaredAt): array {

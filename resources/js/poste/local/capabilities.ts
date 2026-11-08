@@ -10,12 +10,15 @@ export type PosteRefusal = { reason: 'poste_non_identifie' | 'poste_non_habilite
  *    Sans réseau, elle n'est permise que sous un délai approuvé et sur une copie assez récente.
  * Ne produisent aucune décision d'accès, donc jamais bloquées par la péremption : refus, identité, non listé, sortie (jamais soumise à la confiance), et les
  * opérations de car groupe_controle, groupe_depart et groupe_arrivee_fin (aucune porte de capacité non plus).
+ * Cars : la préparation du transport (appel), la remise des badges de groupe et le départ se font à l'HÔTEL, hors des postes de l'Académie : ils relèvent de
+ * leurs permissions de rôle (capability null), jamais d'un point de contrôle ; l'arrivée est un scan physique à un poste de l'Académie (capacité scan).
  */
-export const OP_POLICY: Record<string, { capability: Capability; favorable: boolean }> = {
+export type OpPolicy = { capability: Capability | null; favorable: boolean };
+export const OP_POLICY: Record<string, OpPolicy> = {
   identite: { capability: 'accueil', favorable: false }, valider: { capability: 'accueil', favorable: true }, refuser: { capability: 'accueil', favorable: false },
   badge: { capability: 'accueil', favorable: true }, entree: { capability: 'accueil', favorable: true }, non_liste: { capability: 'accueil', favorable: false },
   controle: { capability: 'scan', favorable: true }, sortie: { capability: 'sortie', favorable: false },
-  groupe_badge: { capability: 'accueil', favorable: true }, groupe_arrivee: { capability: 'scan', favorable: true },
+  groupe_badge: { capability: null, favorable: true }, groupe_arrivee: { capability: 'scan', favorable: true },
 };
 
 /**
@@ -27,12 +30,12 @@ export const OP_POLICY: Record<string, { capability: Capability; favorable: bool
  *  - les cartes permanentes (`permanent`) gardent leur règle de confiance propre : seule la capacité de poste s'applique ici.
  * Retourne null quand l'opération peut être décidée localement.
  */
-export function posteGate(list: LocalList, policy: { capability: Capability; favorable: boolean }, now: number, knownAt: string | null, context: { offline: boolean; permanent?: boolean }): PosteRefusal | null {
+export function posteGate(list: LocalList, policy: OpPolicy, now: number, knownAt: string | null, context: { offline: boolean; permanent?: boolean }): PosteRefusal | null {
   const poste = list.snapshot.poste;
   if (!poste.point_code || !Array.isArray(poste.capabilities)) {
     return { reason: 'poste_non_identifie', message: 'Ce poste n’est pas identifié : l’administrateur doit préciser son point de contrôle.' };
   }
-  if (!poste.capabilities.includes(policy.capability)) {
+  if (policy.capability !== null && !poste.capabilities.includes(policy.capability)) {
     return { reason: 'poste_non_habilite', message: 'Cette opération n’est pas permise à ce poste.' };
   }
   if (!policy.favorable || !context.offline || context.permanent) return null;

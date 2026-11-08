@@ -9,6 +9,7 @@ import { PosteStore } from '../../resources/js/poste/local/store';
 import { LocalPosteRepository } from '../../resources/js/poste/local/local';
 import { SyncManager } from '../../resources/js/poste/local/sync';
 import { PosteRuntime } from '../../resources/js/poste/local/runtime';
+import { OP_POLICY, posteGate } from '../../resources/js/poste/local/capabilities';
 import { ApiError } from '../../resources/js/poste/types';
 
 const ITER = 1000; // le coût réel (600 000) est vérifié séparément : ici seulement la logique
@@ -424,6 +425,36 @@ describe('S02 — restrictions de poste appliquées avant toute décision locale
     expect(gateReasons).not.toContain(result.reason); // la carte est jugée par sa propre règle (PermanentAccess), pas par le délai des badges temporaires
     const none = await repoFor({ point_code: 'poste_1', capabilities: [], trustHours: 12, permanentHash: hash });
     expect((await none.repo.control('p2', 'IKOMA1:' + token, null)).reason).toBe('poste_non_habilite');
+  });
+});
+
+describe('S02 — l’hôtel n’est pas un poste de l’Académie', () => {
+  const listFor = (point: string, capabilities: string[], trustHours?: number) => {
+    const snap = snapshot([]);
+    snap.poste = { ...snap.poste, point_code: point, capabilities };
+    snap.settings = { ...snap.settings };
+    if (trustHours === undefined) delete snap.settings.offline_trust_hours; else snap.settings.offline_trust_hours = trustHours;
+    return new LocalList(snap);
+  };
+  const known = new Date(now0).toISOString();
+
+  it('autorise à l’hôtel la préparation et la remise des badges de groupe par permission de rôle, sans aucune capacité de poste', () => {
+    const hotel = listFor('hotel', [], 12);
+    expect(posteGate(hotel, OP_POLICY.groupe_badge, now0, known, { offline: true })).toBeNull(); // pas de capacité de poste exigée
+    for (const type of ['groupe_controle', 'groupe_depart', 'groupe_arrivee_fin']) expect(OP_POLICY[type]).toBeUndefined(); // enregistrements : aucune porte
+    // ... mais aucune opération de poste : ni accueil, ni scan, ni sortie, ni arrivée du car
+    for (const type of ['valider', 'badge', 'entree', 'controle', 'sortie', 'groupe_arrivee', 'refuser']) {
+      expect(posteGate(hotel, OP_POLICY[type], now0, known, { offline: false })?.reason, type).toBe('poste_non_habilite');
+    }
+  });
+
+  it('refuse la remise de badge de groupe sans réseau tant qu’aucun délai n’est approuvé, y compris à l’hôtel : c’est une décision d’accès', () => {
+    for (const trust of [undefined, 0]) {
+      expect(posteGate(listFor('hotel', [], trust), OP_POLICY.groupe_badge, now0, known, { offline: true })?.reason).toBe('politique_non_approuvee');
+    }
+    expect(posteGate(listFor('hotel', [], 12), OP_POLICY.groupe_badge, now0, known, { offline: false })).toBeNull(); // en ligne : jugée par le serveur
+    expect(posteGate(listFor('poste_2', ['accueil', 'scan', 'sortie'], 12), OP_POLICY.groupe_arrivee, now0, known, { offline: true })).toBeNull();
+    expect(posteGate(listFor('hotel', [], 12), OP_POLICY.groupe_arrivee, now0, known, { offline: true })?.reason).toBe('poste_non_habilite'); // l'arrivée est un scan à un poste de l’Académie
   });
 });
 
