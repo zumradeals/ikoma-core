@@ -198,7 +198,8 @@ it('embarque chaque passager séparément : badge connu, attribué, du groupe, a
     $first = $this->groups->board($this->device, $this->agent, $this->group->id, 'B-001');
     expect($first)->toMatchArray(['boarded' => true, 'already' => false, 'badge_code' => 'B-001', 'places_restantes' => 49]);
     expect($this->groups->board($this->device, $this->agent, $this->group->id, 'B-001')['already'])->toBeTrue();
-    $token = DB::table('badges')->where('event_id', $this->group->event_id)->where('code', 'B-002')->value('qr_token');
+    $token = bin2hex(random_bytes(32));
+    DB::table('badges')->where('event_id', $this->group->event_id)->where('code', 'B-002')->update(['qr_token' => $token]);
     expect($this->groups->board($this->device, $this->agent, $this->group->id, 'IKOMA1:'.$token)['already'])->toBeFalse();
     expect(DB::table('group_members')->where('visitor_id', $this->members[0])->value('boarded_by'))->toBe($this->agent->id);
     expect(DB::table('access_events')->where('type', 'embarquement')->count())->toBe(2)
