@@ -193,7 +193,7 @@ it('refuse le départ tant que l\'appel nominal est incomplet, puis trace les ab
 it('embarque chaque passager séparément : badge connu, attribué, du groupe, appel fait, rejouable, un mouvement par embarquement', function () {
     reserveForGroup($this->group, 40);
     deliverTo(3);
-    expect(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-404'))?->code_)->toBe('badge_inconnu')
+    expect(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-INCONNU-999'))?->code_)->toBe('badge_inconnu')
         ->and(refusal(fn () => $this->groups->board($this->device, $this->agent, $this->group->id, 'B-030'))?->code_)->toBe('non_associe');
     $first = $this->groups->board($this->device, $this->agent, $this->group->id, 'B-001');
     expect($first)->toMatchArray(['boarded' => true, 'already' => false, 'badge_code' => 'B-001', 'places_restantes' => 49]);
