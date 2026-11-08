@@ -1,6 +1,6 @@
 import type { ArrivalResult, BoardResult, GroupSummary, GroupView } from './local/group';
 import type { PermanentResult } from './local/permanent';
-import { ApiError, type VehicleMove, type VehicleResult, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
+import { ApiError, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
  * Tous les accès aux données du poste passent par cette interface (plan, section 4.1). Le lot L5 n'a qu'une implémentation (appels JSON) ;
@@ -21,6 +21,11 @@ export interface PosteRepository {
   searchVehicles?(query: string): Promise<VehicleResult[]>;
   vehicleEnter?(operationId: string, vehicleId: string): Promise<VehicleMove>;
   vehicleExit?(operationId: string, vehicleId: string): Promise<VehicleMove>;
+  /** Capacités du point tenu par la tablette (accueil, scan, sortie) : l'écran n'offre que les opérations permises ; le serveur les revérifie. Absent : aucune restriction connue. */
+  capabilities?(): string[];
+  /** Consultations en ligne uniquement (S10) : visites attendues au poste d'accueil, refus et incidents du poste. */
+  expectedVisits?(): Promise<ExpectedVisit[]>;
+  incidents?(): Promise<IncidentsView>;
   visitor(id: string): Promise<Fiche>;
   saveIdentity(operationId: string, visitorId: string, photo: Blob, doc?: IdentityDocument): Promise<void>;
   validate(operationId: string, visitorId: string, avis?: Avis): Promise<void>;

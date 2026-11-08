@@ -39,3 +39,10 @@ export class ApiError extends Error {
 /** Véhicule annoncé ou présent retrouvé par sa plaque au poste (en ligne uniquement). Un véhicule présent ne vaut jamais présence de la personne. */
 export type VehicleResult = { id: string; plate: string; kind: string; status: 'annonce' | 'present'; visitor_id: string; full_name: string; visitor_status: string };
 export type VehicleMove = { ok: boolean; already?: boolean; plate?: string; status?: string };
+
+/** Visite annoncée pas encore arrivée, vue du poste d'accueil (en ligne uniquement). */
+export type ExpectedVisit = { id: string; full_name: string; organisation: string | null; expected_at: string; state: 'attendu' | 'en_retard'; category: Category; host: string | null; plates: string | null };
+/** Refus et incidents pertinents pour le poste : contrôles refusés à ce poste et, à l'accueil, accès refusés de l'activité. */
+export type IncidentControl = { id: string; occurred_at: string; checkpoint: string | null; full_name: string | null; badge_code: string | null; reason: string | null };
+export type IncidentRefusal = { id: string; reason: string; refused_at: string; decision: string | null; visitor_id: string; full_name: string };
+export type IncidentsView = { controls: IncidentControl[]; refusals: IncidentRefusal[]; can_see_refusals: boolean };

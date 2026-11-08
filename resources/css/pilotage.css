@@ -168,3 +168,21 @@
 
 .pilotage-account summary { min-width:56px; }
 @media (max-width:359px) { .pilotage-header { padding-inline:8px; gap:6px; } .pilotage-brand { font-size:14px; gap:6px; } .pilotage-logo { width:28px; height:32px; } .pilotage-brand p { max-width:68px; } }
+
+/* S10 — centre de supervision : panneaux simultanés et panneau de détail qui garde le tableau de bord visible. */
+.centre { display:grid; gap:16px; }
+.centre-clock { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px 24px; padding:14px 18px; border-radius:16px; background:var(--inst-secondary, #0b3c6b); color:#fff; }
+.centre-clock time { font-size:clamp(2rem,6vw,3.25rem); font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.02em; line-height:1; }
+.centre-clock p { font-size:18px; font-weight:650; }
+.centre-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:16px; align-items:start; }
+.centre-card { display:grid; gap:10px; min-width:0; }
+.centre-card h3 { font-size:20px; font-weight:750; }
+.centre-big { font-size:34px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+.centre-list { display:grid; gap:6px; }
+.centre-list li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 12px; padding:6px 0; border-top:1px solid #e1e8f0; min-width:0; }
+.centre-list li:first-child { border-top:0; }
+.centre-warn { color:#9a3412; font-weight:700; }
+.centre-ok { color:#166534; font-weight:700; }
+.centre-bad { color:#b91c1c; font-weight:700; }
+.centre-drawer { position:fixed; inset:0 0 0 auto; z-index:60; width:min(100%,520px); overflow:auto; background:#fff; border-left:4px solid var(--inst-accent-alt, #f26b21); box-shadow:-12px 0 32px rgba(11,60,107,.22); padding:18px; display:grid; align-content:start; gap:14px; }
+@media (min-width:1280px) { .centre-drawer { width:min(42vw,560px); } }

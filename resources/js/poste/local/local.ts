@@ -1,4 +1,4 @@
-import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput, type VehicleMove, type VehicleResult } from '../types';
+import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult } from '../types';
 import type { GroupPosteRepository } from '../repository';
 import { posteGate, OP_POLICY } from './capabilities';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
@@ -243,6 +243,19 @@ export class LocalPosteRepository implements GroupPosteRepository {
   async giveBack(operationId: string, code: string): Promise<GiveBackResult> {
     this.requireOnline();
     return await this.sync!.request<GiveBackResult>('POST', '/poste/api/restitution', { code }, operationId, 6000);
+  }
+
+  capabilities(): string[] { const caps = this.list.snapshot.poste.capabilities; return Array.isArray(caps) ? caps : []; }
+
+  /** Consultations (visites attendues, refus et incidents) : en ligne uniquement, lecture seule. */
+  async expectedVisits(): Promise<ExpectedVisit[]> {
+    this.requireOnline();
+    return (await this.sync!.request<{ results: ExpectedVisit[] }>('GET', '/poste/api/attendus', undefined, undefined, 4000)).results;
+  }
+
+  async incidents(): Promise<IncidentsView> {
+    this.requireOnline();
+    return await this.sync!.request<IncidentsView>('GET', '/poste/api/incidents', undefined, undefined, 4000);
   }
 
   /** Véhicules : en ligne uniquement, le serveur seul tranche (aucune file hors ligne, aucune décision locale). */

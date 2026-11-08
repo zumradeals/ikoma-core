@@ -3,13 +3,14 @@ import AdminIcon from '../admin/AdminIcon.vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import CategorySwatch from '../CategorySwatch.vue';
 import PermanentSearch from './PermanentSearch.vue';
-import VehicleSearch from './VehicleSearch.vue';
+import AccueilOperations from './AccueilOperations.vue';
 import type { PosteRepository } from '../../poste/repository';
 import { ApiError, type SearchResult } from '../../poste/types';
 const props = defineProps<{ repository: PosteRepository; refreshKey?: string | null }>();
-const emit = defineEmits<{ select: [result: SearchResult]; started: []; unlisted: []; error: [error: ApiError] }>();
+const emit = defineEmits<{ select: [result: SearchResult]; open: [id: string]; started: []; unlisted: []; error: [error: ApiError] }>();
 const query = ref(''); const results = ref<SearchResult[]>([]); const searched = ref(false); const loading = ref(false);
 const showPermanent = ref(false);
+const incidentReasons: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', zone_non_autorisee: 'Zone non autorisée', poste_non_habilite: 'Opération non permise à ce poste' };
 let timer: number | undefined; let sequence = 0;
 
 /** Sans recherche : les dix premiers noms de la liste du poste, y compris hors ligne. */
@@ -68,6 +69,6 @@ onBeforeUnmount(() => { window.clearTimeout(timer); ++sequence; });
       <button v-if="repository.searchPermanent" type="button" class="btn-soft" :aria-expanded="showPermanent" data-testid="ouvrir-permanents" @click="showPermanent = !showPermanent">{{ showPermanent ? 'Fermer la recherche de personnes permanentes' : 'Chercher une personne permanente' }}</button>
     </div>
     <PermanentSearch v-if="showPermanent && repository.searchPermanent" :repository="repository" />
-    <VehicleSearch v-if="repository.searchVehicles" :repository="repository" />
+    <AccueilOperations v-if="repository.capabilities || repository.searchVehicles" :repository="repository" :reasons="incidentReasons" @open="id => emit('open', id)" />
   </section>
 </template>

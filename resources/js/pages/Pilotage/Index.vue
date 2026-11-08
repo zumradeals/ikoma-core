@@ -6,12 +6,13 @@ import { pilotageHref } from '../../pilotage/navigation';
 import PilotageLayout from '../../layouts/PilotageLayout.vue';
 import AlertCard, { type AlertRow } from '../../components/pilotage/AlertCard.vue';
 import CancelBadge from '../../components/pilotage/CancelBadge.vue';
+import CentreSupervision, { type Centre } from '../../components/pilotage/CentreSupervision.vue';
 import { usePolling } from '../../pilotage/usePolling';
 
 type Counters = { attendus: number; arrives: number; presents: number; refuses: number; as_of: string };
 type Overview = { critiques: number; hautes: number; litiges: number; cars: { total: number; partis: number; arrives: number; ecarts: number }; postes_silencieux: number; retards?: number };
-const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; counters: Counters | null; alerts: AlertRow[]; overview: Overview | null }>();
-usePolling(['counters', 'alerts', 'openAlerts', 'criticalAlerts', 'overview'], 3000);
+const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; counters: Counters | null; alerts: AlertRow[]; overview: Overview | null; centre?: Centre | null }>();
+usePolling(['counters', 'alerts', 'openAlerts', 'criticalAlerts', 'overview', 'centre'], 3000);
 
 const page = usePage<{ auth?: { permissions: string[] } | null }>();
 const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
@@ -55,6 +56,7 @@ const levelClass = { critique: 'border-red-700 bg-red-50', attention: 'border-or
       <section aria-label="Situation" class="pilotage-situation" :class="levelClass[situation.level as keyof typeof levelClass]" :data-level="situation.level" data-testid="situation">
         <span class="pilotage-situation-icon" aria-hidden="true">{{ situation.icon }}</span><div><h2 data-testid="situation-titre">{{ situation.title }}</h2><p>{{ situation.text }}</p></div>
       </section>
+      <CentreSupervision v-if="centre" :centre="centre" :event-id="event.id" :event-name="event.name" :can-close="can('cloture.superviseur')" />
       <section aria-label="Compteurs" class="pilotage-kpis">
         <div v-for="tile in tiles" :key="tile.key" class="pilotage-card pilotage-kpi" :class="'kpi-' + tile.key" :data-testid="'compteur-' + tile.key"><span class="pilotage-metric-icon"><AdminIcon :name="tile.icon" :size="28" /></span><div><h2>{{ tile.label }}</h2><p data-testid="valeur">{{ tile.value }}</p></div></div>
       </section>

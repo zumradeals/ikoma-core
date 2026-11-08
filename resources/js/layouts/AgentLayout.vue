@@ -4,7 +4,7 @@ import { usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
 import BrandName from '../components/BrandName.vue';
 import BrandLogo from '../components/BrandLogo.vue';
-const props = withDefaults(defineProps<{ active: 'home' | 'poste' | 'groupe' | 'controle' | 'securite'; agent?: string; online?: boolean; permissions?: string[] }>(), { agent: '', online: true, permissions: undefined });
+const props = withDefaults(defineProps<{ active: 'home' | 'poste' | 'groupe' | 'controle' | 'securite'; agent?: string; online?: boolean; permissions?: string[]; capabilities?: string[] | null }>(), { agent: '', online: true, permissions: undefined, capabilities: null });
 const page = usePage<{ auth?: { name: string; permissions: string[] } | null }>();
 const open = ref(false);
 const rights = computed(() => props.permissions ?? page.props?.auth?.permissions ?? []);
@@ -15,7 +15,9 @@ const items = [
   { key: 'controle', label: 'Contrôle sur site', icon: 'qr', href: '/controle', permission: 'badges.controler' },
   { key: 'securite', label: 'Sécurité', icon: 'shield', href: '/securite', permission: null },
 ] as const;
-const allowed = computed(() => items.filter(item => props.active === item.key || (item.permission ? rights.value.includes(item.permission) : !!page.props?.auth)));
+// Capacités du poste (S02) : un poste qui n'a pas la capacité « accueil » (la soute, par exemple) n'affiche pas l'accueil ; le contrôle exige « scan » ou « sortie ».
+const byCapability = (key: string) => props.capabilities === null || props.capabilities === undefined || props.active === key || (key === 'poste' ? props.capabilities.includes('accueil') : key === 'controle' ? props.capabilities.some(c => c === 'scan' || c === 'sortie') : true);
+const allowed = computed(() => items.filter(item => props.active === item.key || ((item.permission ? rights.value.includes(item.permission) : !!page.props?.auth) && byCapability(item.key))));
 </script>
 <template>
   <div class="agent-shell" data-testid="agent-layout" :data-active="active">
