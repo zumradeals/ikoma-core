@@ -52,13 +52,13 @@ class DeskFixtures extends Command
         $host = (string) Str::uuid();
         DB::table('hosts')->insert(['id' => $host, 'event_id' => $event, 'name' => "Hôte fictif {$s}", 'created_at' => $now, 'updated_at' => $now]);
         $device = (string) Str::uuid();
-        DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => "Tablette recette {$s}", 'station' => "Poste recette {$s}", 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => "Tablette recette {$s}", 'station' => "Poste recette {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
         // Deuxième tablette (accueil + contrôle sur site) : son propre lot de badges réservé, utilisée par le parcours « contrôle » (L7).
         $device2 = (string) Str::uuid();
-        DB::table('devices')->insert(['id' => $device2, 'event_id' => $event, 'name' => "Tablette contrôle {$s}", 'station' => "Poste contrôle {$s}", 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('devices')->insert(['id' => $device2, 'event_id' => $event, 'name' => "Tablette contrôle {$s}", 'station' => "Poste contrôle {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
         // Troisième tablette, réservée au parcours du superviseur (L8) : son propre lot de badges et son code d'enrôlement.
         $device3 = (string) Str::uuid();
-        DB::table('devices')->insert(['id' => $device3, 'event_id' => $event, 'name' => "Tablette supervision {$s}", 'station' => "Poste supervision {$s}", 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('devices')->insert(['id' => $device3, 'event_id' => $event, 'name' => "Tablette supervision {$s}", 'station' => "Poste supervision {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
         $visitor = function (string $name, string $category, ?string $from = null, ?string $until = null) use ($event, $host, $categories, $now): string {
             $id = (string) Str::uuid();
             DB::table('visitors')->insert(['id' => $id, 'event_id' => $event, 'full_name' => $name, 'organisation' => 'Organisation fictive de recette', 'host_id' => $host, 'category_id' => $categories[$category], 'valid_from' => $from ?? $now->copy()->subHour(), 'valid_until' => $until ?? $now->copy()->addDay(), 'source' => 'listé', 'status' => 'attendu', 'created_at' => $now, 'updated_at' => $now]);
@@ -127,7 +127,7 @@ class DeskFixtures extends Command
         DB::table('devices')->where('id', $device)->update(['enrollment_expires_at' => now()->addHours(6)]);
         // Lot L9 : tablette des cars, encadreur et quatre groupes (50 stagiaires, absents, hors ligne, arrivée avec écart).
         $device4 = (string) Str::uuid();
-        DB::table('devices')->insert(['id' => $device4, 'event_id' => $event, 'name' => "Tablette cars {$s}", 'station' => "Poste cars {$s}", 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('devices')->insert(['id' => $device4, 'event_id' => $event, 'name' => "Tablette cars {$s}", 'station' => "Poste cars {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
         $encadreurPassword = Str::password(24).'aA1!';
         $encadreur = User::create(['name' => "Encadreur fictif {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $encadreurPassword]);
         $encadreur->assignRole('encadreur');

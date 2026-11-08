@@ -39,8 +39,8 @@ final class PostesController
     public function store(Request $r, Devices $devices): RedirectResponse
     {
         Gate::authorize('postes.gerer');
-        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120', 'point_code' => ['nullable', Rule::in(array_keys(PostCapabilities::POINTS))]]);
-        $devices->create($data['event_id'], $data['name'], $data['station'] ?? null, $r->user(), $data['point_code'] ?? null);
+        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120', 'point_code' => ['required', Rule::in(array_keys(PostCapabilities::POINTS))]]);
+        $devices->create($data['event_id'], $data['name'], $data['station'] ?? null, $r->user(), $data['point_code']);
 
         return back();
     }

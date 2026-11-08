@@ -41,7 +41,7 @@ final class DemoSeeder extends Seeder
             for ($i = 0; $i < 3; $i++) {
                 DB::table('hosts')->insert(['id' => self::id('host'.$i), 'event_id' => $event, 'name' => 'Hôte fictif '.($i + 1), 'service' => 'Service fictif '.($i + 1), 'user_id' => null, ...$dates]);
             }
-            DB::table('devices')->insert(['id' => self::id('device'), 'event_id' => $event, 'name' => 'Tablette fictive A', 'station' => 'Poste fictif A', 'token_hash' => null, ...$dates]);
+            DB::table('devices')->insert(['id' => self::id('device'), 'event_id' => $event, 'name' => 'Tablette fictive A', 'station' => 'Poste fictif A', 'point_code' => 'poste_2', 'token_hash' => null, ...$dates]);
             DB::table('badge_batches')->insert(['id' => self::id('batch'), 'event_id' => $event, 'name' => 'Lot fictif de 400 badges', 'quantity' => 400, 'margin' => 100, ...$dates]);
             DB::table('groups')->insert(['id' => self::id('group'), 'event_id' => $event, 'name' => 'Groupe fictif de stagiaires', 'bus_number' => 'Car fictif 1', 'supervisor_id' => DB::table('users')->where('email', 'encadreur@exemple.test')->value('id'), 'badge_batch_id' => self::id('batch'), ...$dates]);
             $names = ['Yao Brou', 'Yao Konan', 'Koné Mariam', 'Aimé Traoré', 'Yao Brou', 'Koné Mariam', 'Yao Konan', 'Yao Brou'];

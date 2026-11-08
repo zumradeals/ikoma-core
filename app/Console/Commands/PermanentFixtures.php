@@ -51,7 +51,7 @@ class PermanentFixtures extends Command
         $holders = app(HolderEntitlements::class);
         $holders->savePolicy($event, $hall, 'NEUTRE-TEST', true, true, $admin);
         $device = (string) Str::uuid();
-        DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => "Tablette permanents {$s}", 'station' => "Entrée permanents {$s}", 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => "Tablette permanents {$s}", 'station' => "Entrée permanents {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
         $deviceModel = Device::findOrFail($device);
 
         app(InstitutionalCategories::class)->initialize($admin);

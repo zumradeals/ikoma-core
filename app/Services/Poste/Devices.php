@@ -21,9 +21,9 @@ final class Devices
 
     public function __construct(private readonly Audit $audit) {}
 
-    public function create(string $eventId, string $name, ?string $station, User $actor, ?string $pointCode = null): Device
+    public function create(string $eventId, string $name, ?string $station, User $actor, string $pointCode): Device
     {
-        if ($pointCode !== null && ! array_key_exists($pointCode, PostCapabilities::POINTS)) {
+        if (! array_key_exists($pointCode, PostCapabilities::POINTS)) {
             throw new DeskRefused('point_inconnu', 'Point de contrôle inconnu.', 422);
         }
 
@@ -38,6 +38,9 @@ final class Devices
     /** Génère un code à afficher une seule fois ; seul son hachage est conservé. */
     public function issueCode(Device $device, User $actor): string
     {
+        if ($device->point_code === null) {
+            throw new DeskRefused('poste_non_identifie', 'Précisez d’abord le point de contrôle de ce poste : aucune tablette n’est enrôlée sans point identifié.', 422);
+        }
         $code = '';
         for ($i = 0; $i < 12; $i++) {
             $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
@@ -72,6 +75,9 @@ final class Devices
                 throw new DeskRefused('code_invalide', 'Code d’enrôlement invalide ou expiré : demandez-en un nouveau à l’administrateur.', 422);
             }
             EventAvailability::requireOpen($device->event_id);
+            if ($device->point_code === null) {
+                throw new DeskRefused('poste_non_identifie', 'Ce poste n’a pas de point de contrôle identifié : demandez à l’administrateur de le préciser.', 422);
+            }
             $token = bin2hex(random_bytes(32));
             $secret = base64_encode(random_bytes(32));
             DB::table('devices')->where('id', $device->id)->update(['sync_seq' => 0, 'token_hash' => hash('sha256', $token), 'enrollment_hash' => null, 'enrollment_expires_at' => null, 'enrolled_at' => now(), 'revoked_at' => null, 'wipe_acknowledged_at' => null, 'updated_at' => now()]);
