@@ -71,6 +71,9 @@ final class ListSnapshot
             'categories' => DB::table('categories')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
             'zones' => DB::table('zones')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
+            // S06 : zones gardées par chaque point, et habilitations de participation actives (ni retirées ni suspendues) ; la période est jugée par la tablette.
+            'point_zones' => DB::table('checkpoint_zones')->where('event_id', $e)->get(['device_id', 'zone_id']),
+            'entitlements' => DB::table('participation_entitlements')->where('event_id', $e)->whereNull('revoked_at')->whereNull('suspended_at')->where('valid_until', '>=', now())->get(['visitor_id', 'zone_id', 'valid_from', 'valid_until']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
             'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
             'permanent' => app(PermanentAccess::class)->snapshot($e),

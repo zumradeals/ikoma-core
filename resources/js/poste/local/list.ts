@@ -14,6 +14,8 @@ export type Snapshot = {
   settings: { identity_document?: boolean; inactivity_minutes: number; clock_skew_seconds: number; pin_max_failures: number; controle_stagiaires?: 'identite' | 'encadreur'; f06_active?: boolean;
     offline_call_minutes?: number; offline_max_hours?: number; offline_trust_hours?: number; low_badges_percent?: number; low_badges_min?: number };
   categories: Category[]; zones: { id: string; name: string; est_accueil: boolean }[]; category_zone: { category_id: string; zone_id: string }[];
+  /** S06 : zones gardées par chaque point (poste) et habilitations de participation actives (la période est jugée sur la tablette). */
+  point_zones?: { device_id: string; zone_id: string }[]; entitlements?: { visitor_id: string; zone_id: string; valid_from: string; valid_until: string }[];
   hosts: { id: string; name: string; service: string | null }[]; postes: { id: string; name: string }[]; visitors: SnapVisitor[]; badges: SnapBadge[]; groups?: SnapGroup[]; members?: SnapMember[]; permanent?: PermanentSnapshot;
 };
 

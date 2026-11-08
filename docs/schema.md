@@ -223,3 +223,8 @@ Migration `2026_11_25_000000_create_persons_and_activity_kind`. Contrats minimau
 ## Évolution S02 — capacités de poste et clôture réservée
 
 Migration `2026_11_24_000000_add_poste_point_and_closure_flag` (additive, sans donnée à reprendre) : `devices.point_code` (CHECK : poste_1, poste_2, poste_3, poste_4, soute, hotel ; nul = poste non identifié, sans aucune capacité ; contrainte `devices_enrolled_has_point` : un appareil muni d'un jeton a obligatoirement un point) et `categories.closure_supervisor_only` (booléen, faux par défaut). Journal : `sync.auteur_refuse`, et `point_code` dans `poste.cree`. Réglage ajouté dans `settings` : `poste_hors_reseau_approuve` (0 : aucun délai hors ligne approuvé, donc aucune décision favorable hors ligne).
+
+## Évolution S06 — accès aux zones
+- `checkpoint_zones` (event_id, device_id, zone_id, created_by) : zones gardées par un point (poste) ; unique (device_id, zone_id).
+- `participation_entitlements` (event_id, visitor_id, zone_id, kind standard|exceptionnelle, reason, valid_from/until, granted_by, suspended_*, revoked_*) : habilitation d'une participation à une zone ; exceptionnelle = motif obligatoire ; non modifiable sauf suspension/retrait.
+- Réglage `habilitation_exceptionnelle_max_heures`.

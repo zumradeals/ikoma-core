@@ -52,9 +52,19 @@ export function controlLocal(list: LocalList, printed: string | null, point: Poi
   if (holder.status === 'sorti') return refuse('personne_sortie'); // sortie ≠ restitution : le badge reste associé mais ne donne plus accès
   if (outsidePeriod(holder, now)) return refuse('hors_periode');
   const category = list.categories.get(holder.category_id) ?? null;
+  // S06 : zones de la catégorie + habilitations actives de la participation (dans leur période) ; mêmes règles que le serveur.
   const allowed = new Set(list.snapshot.category_zone.filter(cz => cz.category_id === holder.category_id).map(cz => cz.zone_id));
+  for (const e of list.snapshot.entitlements ?? []) {
+    if (e.visitor_id === holder.id && Date.parse(e.valid_from) <= now && now <= Date.parse(e.valid_until)) allowed.add(e.zone_id);
+  }
   const zones = list.snapshot.zones.filter(z => allowed.has(z.id)).map(z => z.name).sort((a, b) => a.localeCompare(b, 'fr'));
-  return { ...base, valid: true, reason: null, message: 'Badge valide.', person: { name: holder.full_name }, organisation: holder.organisation, category, zones, zone_ok: point?.type === 'zone' ? allowed.has(point.id) : null };
+  let zoneOk: boolean | null = null;
+  if (point?.type === 'zone') zoneOk = allowed.has(point.id);
+  else {
+    const judged = (list.snapshot.point_zones ?? []).filter(m => m.device_id === (point?.id ?? list.snapshot.poste.id)).map(m => m.zone_id);
+    if (judged.length > 0) zoneOk = judged.some(id => allowed.has(id));
+  }
+  return { ...base, valid: true, reason: null, message: 'Badge valide.', person: { name: holder.full_name }, organisation: holder.organisation, category, zones, zone_ok: zoneOk };
 }
 
 /** Sortie jugée sur la copie locale. Une personne « attendue » sur cette tablette a peut-être été saisie à l'entrée ailleurs : on enregistre, le serveur tranchera. */

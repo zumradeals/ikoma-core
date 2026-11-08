@@ -52,6 +52,25 @@ describe('contrôle et sortie sur la copie locale', () => {
     }
   });
 
+  it('applique les habilitations de participation et la correspondance point / zones comme le serveur (S06)', async () => {
+    const snap = await snapshot();
+    snap.entitlements = [{ visitor_id: 'v1', zone_id: 'z3', valid_from: iso(-60_000), valid_until: iso(3_600_000) }, { visitor_id: 'v1', zone_id: 'z1', valid_from: iso(-7_200_000), valid_until: iso(-3_600_000) }];
+    snap.point_zones = [{ device_id: 'p2', zone_id: 'z3' }, { device_id: 'p1', zone_id: 'z2' }, { device_id: 'p1', zone_id: 'z3' }];
+    const list = new LocalList(snap);
+    const at = iso(-120_000);
+    // habilitation active : zone hors catégorie autorisée ; habilitation expirée : sans effet
+    expect(controlLocal(list, 'B-001', { type: 'zone', id: 'z3' }, now0, at)).toMatchObject({ valid: true, zone_ok: true, zones: ['Espace VIP', 'Hall', 'Salle'] });
+    expect(controlLocal(list, 'B-001', { type: 'zone', id: 'z3' }, now0 + 7_200_000, at).zone_ok).toBe(false);
+    // un poste qui garde des zones les juge ; sans correspondance il ne juge rien
+    expect(controlLocal(list, 'B-001', { type: 'poste', id: 'p2' }, now0, at).zone_ok).toBe(true);
+    expect(controlLocal(list, 'B-001', null, now0, at).zone_ok).toBe(true);
+    snap.point_zones = [{ device_id: 'p2', zone_id: 'z3' }];
+    expect(controlLocal(new LocalList(snap), 'B-001', null, now0, at).zone_ok).toBeNull();
+    snap.entitlements = [];
+    snap.point_zones = [{ device_id: 'p1', zone_id: 'z3' }];
+    expect(controlLocal(new LocalList(snap), 'B-001', null, now0, at).zone_ok).toBe(false);
+  });
+
   it('juge la sortie : refus sans rien écrire de faux, avertissement si l’entrée est inconnue de la tablette', async () => {
     const list = new LocalList(await snapshot());
     expect(exitLocal(list, 'B-001', null, null)).toMatchObject({ ok: true, warning: null, person: { name: 'Koné Mariam' } });

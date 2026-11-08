@@ -5,15 +5,20 @@ use App\Models\Device;
 use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\BadgeService;
+use App\Services\ParticipationEntitlements;
 use App\Services\Poste\DeskRefused;
 use App\Services\Poste\ListSnapshot;
 use App\Services\Poste\SiteControl;
 use App\Services\Presence;
+use App\Services\ZoneAccess;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 const SITE_TOKEN = '3333333333333333333333333333333333333333333333333333333333333333';
 
@@ -459,4 +464,89 @@ it('copie sur la tablette les seuils réglés, et change de version quand un seu
     DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '6']);
     DB::table('settings')->where('key', 'poste_delai_appel_minutes')->update(['value' => '10']);
     expect($snapshot->build($poste)['settings'])->toMatchArray(['offline_call_minutes' => 10, 'offline_max_hours' => 6])->and($snapshot->version($poste))->not->toBe($before);
+});
+
+
+// --- S06 : habilitations des participations et correspondance point / zones ------------------------------------------------------
+
+it('accorde une zone par habilitation, la perd à la suspension, au retrait ou à l’expiration, sans toucher à la catégorie', function () {
+    $admin = siteUser('administrateur');
+    $entitlements = app(ParticipationEntitlements::class);
+    siteEnter(1, $this->batch1[0]);
+    $vip = fn () => siteControl($this->batch1[0]->code, siteZone(2))->assertOk()->json();
+    expect($vip())->toMatchArray(['valid' => true, 'zone_ok' => false]);
+    $id = $entitlements->grant(DemoSeeder::id('visitor1'), DemoSeeder::id('zone2'), 'exceptionnelle', 'Visite officielle', now()->toIso8601String(), now()->addHours(2)->toIso8601String(), $admin);
+    expect($vip())->toMatchArray(['zone_ok' => true])->and($vip()['zones'])->toContain('Espace VIP');
+    // la catégorie reste intacte : une zone de la catégorie reste autorisée
+    expect(siteControl($this->batch1[0]->code, siteZone(0))->json()['zone_ok'])->toBeTrue();
+    $entitlements->suspend($id, 'Contrôle en cours', $admin);
+    expect($vip()['zone_ok'])->toBeFalse();
+    $entitlements->resume($id, $admin);
+    expect($vip()['zone_ok'])->toBeTrue();
+    $this->travel(3)->hours(); // l'habilitation exceptionnelle a expiré
+    expect($vip()['zone_ok'])->toBeFalse();
+    $this->travelBack();
+    $this->travelTo('2027-01-10 10:00:00');
+    $entitlements->revoke($id, 'Fin de la visite', $admin);
+    expect($vip()['zone_ok'])->toBeFalse();
+    $actions = siteAudit()->whereIn('action', ['habilitation.accordee', 'habilitation.suspendue', 'habilitation.reprise', 'habilitation.retiree'])->pluck('action')->all();
+    expect($actions)->toBe(['habilitation.accordee', 'habilitation.suspendue', 'habilitation.reprise', 'habilitation.retiree']);
+    $details = siteAudit()->where('action', 'like', 'habilitation.%')->pluck('details')->implode(' ');
+    expect($details)->not->toContain(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('full_name'));
+});
+
+it('exige un motif et une durée limitée pour une habilitation exceptionnelle, et garde l’habilitation immuable en base', function () {
+    $admin = siteUser('administrateur');
+    $entitlements = app(ParticipationEntitlements::class);
+    $grant = fn (string $kind, ?string $reason, int $hours) => $entitlements->grant(DemoSeeder::id('visitor1'), DemoSeeder::id('zone2'), $kind, $reason, now()->toIso8601String(), now()->addHours($hours)->toIso8601String(), $admin);
+    expect(fn () => $grant('exceptionnelle', null, 2))->toThrow(ValidationException::class, 'motif');
+    expect(fn () => $grant('exceptionnelle', 'Visite', ParticipationEntitlements::maxExceptionalHours() + 1))->toThrow(ValidationException::class, 'au plus');
+    $id = $grant('exceptionnelle', 'Visite', 2);
+    expect(fn () => $grant('standard', null, 3))->toThrow(ValidationException::class, 'existe déjà');
+    expect(fn () => DB::transaction(fn () => DB::table('participation_entitlements')->where('id', $id)->update(['zone_id' => DemoSeeder::id('zone3')])))->toThrow(QueryException::class);
+    $entitlements->revoke($id, 'Erreur', $admin);
+    expect(fn () => DB::transaction(fn () => DB::table('participation_entitlements')->where('id', $id)->update(['suspension_reason' => 'x', 'suspended_at' => now(), 'suspended_by' => $admin->id])))->toThrow(QueryException::class);
+    // un compte sans « zones.gerer » ne peut rien accorder, y compris par le service
+    expect(fn () => $entitlements->grant(DemoSeeder::id('visitor1'), DemoSeeder::id('zone3'), 'standard', null, now()->toIso8601String(), now()->addHour()->toIso8601String(), siteUser('superviseur')))->toThrow(HttpException::class);
+});
+
+it('réserve l’accès aux zones à l’administrateur : le superviseur et l’agent sont refusés par le serveur', function () {
+    $routes = [
+        ['post', '/administration/acces/habilitations', ['visitor_id' => DemoSeeder::id('visitor1'), 'zone_id' => DemoSeeder::id('zone2'), 'kind' => 'standard', 'valid_from' => '2027-01-10 10:00', 'valid_until' => '2027-01-10 12:00']],
+        ['post', '/administration/acces/correspondances', ['event_id' => DemoSeeder::id('event'), 'device_id' => DemoSeeder::id('device'), 'zone_id' => DemoSeeder::id('zone2')]],
+        ['put', '/administration/acces/reglage', ['max_heures' => 48]],
+    ];
+    foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
+        $this->actingAs(siteUser($role));
+        foreach ($routes as [$method, $url, $data]) {
+            $this->{$method.'Json'}($url, $data)->assertForbidden();
+        }
+        $this->get('/administration/acces')->assertForbidden();
+    }
+    expect(DB::table('participation_entitlements')->count())->toBe(0)->and(DB::table('checkpoint_zones')->count())->toBe(0);
+    $this->actingAs(siteUser('administrateur'))->get('/administration/acces')->assertOk();
+});
+
+it('juge la zone d’un poste selon la correspondance configurée par l’administrateur, sans rien coder en dur', function () {
+    $admin = siteUser('administrateur');
+    $zones = app(ZoneAccess::class);
+    siteEnter(1, $this->batch1[0]);
+    // sans correspondance, le poste ne juge aucune zone
+    expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeNull();
+    $zones->map(DemoSeeder::id('event'), DemoSeeder::id('device'), DemoSeeder::id('zone2'), $admin);
+    expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeFalse();
+    // un poste qui garde deux zones est franchi si l'une d'elles est autorisée
+    $zones->map(DemoSeeder::id('event'), DemoSeeder::id('device'), DemoSeeder::id('zone0'), $admin);
+    expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeTrue();
+    expect(fn () => $zones->map(DemoSeeder::id('event'), DemoSeeder::id('device'), DemoSeeder::id('zone0'), $admin))->toThrow(ValidationException::class);
+    $mapping = DB::table('checkpoint_zones')->where('zone_id', DemoSeeder::id('zone0'))->value('id');
+    $zones->unmap($mapping, $admin);
+    expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeFalse();
+    // la copie de la tablette porte la correspondance et les habilitations actives
+    app(ParticipationEntitlements::class)->grant(DemoSeeder::id('visitor1'), DemoSeeder::id('zone2'), 'standard', null, now()->toIso8601String(), now()->addHours(2)->toIso8601String(), $admin);
+    $snapshot = app(ListSnapshot::class)->build(Device::findOrFail(DemoSeeder::id('device')));
+    expect($snapshot['point_zones']->pluck('zone_id')->all())->toBe([DemoSeeder::id('zone2')])
+        ->and($snapshot['entitlements']->pluck('zone_id')->all())->toBe([DemoSeeder::id('zone2')])
+        ->and(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeTrue();
+    expect(siteAudit()->whereIn('action', ['point.zone_associee', 'point.zone_dissociee'])->count())->toBe(3);
 });
