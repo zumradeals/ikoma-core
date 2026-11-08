@@ -467,7 +467,6 @@ it('copie sur la tablette les seuils réglés, et change de version quand un seu
     expect($snapshot->build($poste)['settings'])->toMatchArray(['offline_call_minutes' => 10, 'offline_max_hours' => 6])->and($snapshot->version($poste))->not->toBe($before);
 });
 
-
 // --- S06 : habilitations des participations et correspondance point / zones ------------------------------------------------------
 
 it('accorde une zone par habilitation, la perd à la suspension, au retrait ou à l’expiration, sans toucher à la catégorie', function () {
