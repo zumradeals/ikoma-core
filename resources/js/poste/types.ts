@@ -17,7 +17,7 @@ export type PointRef = { type: 'zone' | 'poste'; id: string };
 /** Verdict d'un contrôle : `source` dit qui l'a rendu ; `known_at` n'existe que pour une réponse de la tablette (situation connue à cette heure). */
 export type ControlResult = {
   valid: boolean; reason: string | null; message: string; badge_code: string | null; zone_ok: boolean | null; point: string; person: { name: string } | null; organisation: string | null;
-  category: Category | null; zones: string[]; source: 'serveur' | 'local'; known_at?: string | null;
+  category: Category | null; zones: string[]; source: 'serveur' | 'local'; known_at?: string | null; direction?: PassageDirection | null;
   permanent?: { identifier: string; entered?: boolean } | null;
 };
 export type ExitResult = { ok: boolean; reason?: string; message?: string; badge_code: string | null; badge_status?: string; person?: { name: string }; point?: string; presents?: number | null; warning?: string | null; source: 'serveur' | 'local'; known_at?: string | null; permanent?: { identifier: string; card_kept?: boolean } | null };
@@ -46,3 +46,6 @@ export type ExpectedVisit = { id: string; full_name: string; organisation: strin
 export type IncidentControl = { id: string; occurred_at: string; checkpoint: string | null; full_name: string | null; badge_code: string | null; reason: string | null };
 export type IncidentRefusal = { id: string; reason: string; refused_at: string; decision: string | null; visitor_id: string; full_name: string };
 export type IncidentsView = { controls: IncidentControl[]; refusals: IncidentRefusal[]; can_see_refusals: boolean };
+
+/** Sens d'un passage contrôlé (S10) : choisi avant le scan à la soute ; inscrit dans le mouvement « contrôle » du journal de supervision. */
+export type PassageDirection = 'entree' | 'sortie';

@@ -4,7 +4,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { pilotageHref } from '../../pilotage/navigation';
 import PilotageLayout from '../../layouts/PilotageLayout.vue';
 
-type Row = { id: string; occurred_at: string; type: string; checkpoint: string | null; visitor_id: string | null; full_name: string | null; badge_code: string | null; verdict: string | null; zone_ok: string | null; corrected: boolean; corrige_id: string | null };
+type Row = { id: string; occurred_at: string; type: string; checkpoint: string | null; visitor_id: string | null; full_name: string | null; badge_code: string | null; verdict: string | null; zone_ok: string | null; direction?: string | null; corrected: boolean; corrige_id: string | null };
 const props = defineProps<{
   event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number;
   filters: { q: string; type: string; point: string; outcome: string; from: string; until: string }; rows: Row[]; total: number; page: number; perPage: number; points: string[]; types: string[];
@@ -34,7 +34,7 @@ const result = (r: Row) => r.type !== 'controle' ? '' : r.verdict !== 'valide' ?
     <p role="status" data-testid="total">{{ total }} mouvement{{ total > 1 ? 's' : '' }}</p>
     <ul class="pilotage-record-grid" data-testid="liste-mouvements">
       <li v-for="row in rows" :key="row.id" class="rounded-2xl border-2 border-slate-300 bg-white p-4" data-testid="mouvement">
-        <p class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xl">{{ labels[row.type] ?? row.type }}</strong><span>{{ when(row.occurred_at) }}</span></p>
+        <p class="flex flex-wrap items-center justify-between gap-2"><strong class="text-xl">{{ labels[row.type] ?? row.type }}<template v-if="row.type === 'controle' && row.direction"> · {{ row.direction === 'entree' ? 'entrée' : 'sortie' }}</template></strong><span>{{ when(row.occurred_at) }}</span></p>
         <p class="mt-1">
           <Link v-if="row.visitor_id" :href="pilotageHref('/pilotage/visiteurs/' + row.visitor_id, event?.id)" class="underline">{{ row.full_name }}</Link><span v-else>Personne non identifiée</span>
           · {{ row.checkpoint || 'Point non indiqué' }}<template v-if="row.badge_code"> · Badge {{ row.badge_code }}</template>

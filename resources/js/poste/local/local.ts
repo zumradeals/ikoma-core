@@ -1,4 +1,4 @@
-import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult } from '../types';
+import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput, type PassageDirection, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult } from '../types';
 import type { GroupPosteRepository } from '../repository';
 import { posteGate, OP_POLICY } from './capabilities';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
@@ -205,16 +205,19 @@ export class LocalPosteRepository implements GroupPosteRepository {
     }
   }
 
-  async control(operationId: string, code: string, point: PointRef | null): Promise<ControlResult> {
-    const server = await this.remote<ControlResult>('/poste/api/controle', { code, point }, operationId);
-    if (server) return { ...server, source: 'serveur' };
+  requiresDirection(): boolean { return this.list.snapshot.poste.point_code === 'soute'; }
+
+  async control(operationId: string, code: string, point: PointRef | null, direction?: PassageDirection): Promise<ControlResult> {
+    if (this.requiresDirection() && !direction) throw new ApiError('sens_requis', 'Choisissez Entrée ou Sortie avant de scanner un badge.');
+    const server = await this.remote<ControlResult>('/poste/api/controle', { code, point, direction }, operationId);
+    if (server) return { ...server, source: 'serveur', direction: direction ?? null };
     const known = await this.knownAt();
     const printed = await resolveBadge(this.list, code);
     const refusal = posteGate(this.list, OP_POLICY.controle, this.now(), known, { offline: true, permanent: printed?.startsWith(PERMANENT_PREFIX) ?? false });
-    if (refusal) return refusedControl(this.list, point, refusal, known);
-    const result = controlLocal(this.list, printed, point, this.now(), known);
+    if (refusal) return { ...refusedControl(this.list, point, refusal, known), direction: direction ?? null };
+    const result = { ...controlLocal(this.list, printed, point, this.now(), known), direction: direction ?? null };
     // Seul le code imprimé part dans la file : le contenu du QR n'est conservé nulle part sur la tablette.
-    await this.enqueue(operationId, 'controle', { code: printed ?? 'INCONNU', point, local_valid: result.valid, known_at: known, offline: true });
+    await this.enqueue(operationId, 'controle', { code: printed ?? 'INCONNU', point, local_valid: result.valid, known_at: known, offline: true, direction });
     return result;
   }
 

@@ -2,7 +2,7 @@
 export type Poste = { id: string; name: string; point_code: string | null; state: 'actif' | 'silencieux' | 'revoque'; last_synced_at: string | null; last_operation: { type: string; at: string; accepted: boolean } | null };
 export type Operation = { id: string; type: string; at: string; accepted: boolean; poste: string };
 export type PresentRow = { id: string; full_name: string; zone: string | null; entered_at: string; category: { name: string; color: string; priority_circuit: boolean } };
-export type Movement = { id: string; occurred_at: string; type: string; checkpoint: string | null; visitor_id: string | null; full_name: string | null; badge_code: string | null; verdict: string | null; zone_ok: string | null };
+export type Movement = { id: string; occurred_at: string; type: string; checkpoint: string | null; visitor_id: string | null; full_name: string | null; badge_code: string | null; verdict: string | null; zone_ok: string | null; direction?: string | null };
 export type VisitRow = { id: string; full_name: string; expected_at: string; state: string; plates: string | null; host: string | null };
 export type VehicleRow = { id: string; plate: string; kind: string; entered_at: string; visitor_id: string; full_name: string };
 export type ReturnRow = { id: string; code: string; visitor_id: string; full_name: string; status: string | null; closed_at: string | null; assigned_at: string };
@@ -51,7 +51,7 @@ const moveLabels: Record<string, string> = { entree: 'Entrée', sortie: 'Sortie'
 const pointLabels: Record<string, string> = { poste_1: 'Poste 1', poste_2: 'Poste 2 (accueil)', poste_3: 'Poste 3', poste_4: 'Poste 4', soute: 'Soute (P5)', hotel: 'Hôtel' };
 const stateLabels: Record<string, string> = { actif: 'En service', silencieux: 'Sans nouvelles', revoque: 'Révoqué' };
 const kinds: Record<string, string> = { voiture: 'Voiture', moto: 'Moto', minibus: 'Minibus', camion: 'Camion', autre: 'Autre' };
-const moveText = (m: Movement) => (m.type === 'controle' ? (m.verdict === 'valide' && m.zone_ok !== 'false' ? 'Contrôle valide' : m.zone_ok === 'false' ? 'Zone non autorisée' : 'Contrôle refusé') : moveLabels[m.type] ?? m.type);
+const moveText = (m: Movement) => (m.type === 'controle' ? (m.verdict === 'valide' && m.zone_ok !== 'false' ? 'Contrôle valide' : m.zone_ok === 'false' ? 'Zone non autorisée' : 'Contrôle refusé') + (m.direction ? ' · ' + (m.direction === 'entree' ? 'entrée' : 'sortie') : '') : moveLabels[m.type] ?? m.type);
 const lateRows = computed(() => props.centre.visits.rows.filter(r => r.state === 'en_retard'));
 const silent = computed(() => props.centre.postes.filter(p => p.state !== 'actif').length);
 const titles: Record<Kind, string> = { postes: 'Postes et dernières opérations', presents: 'Personnes présentes', visites: 'Visites annoncées', vehicules: 'Véhicules présents', badges: 'Badges non restitués', refus: 'Refus et incidents', cloture: 'Clôture réservée au superviseur' };

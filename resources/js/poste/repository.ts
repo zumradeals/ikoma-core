@@ -1,6 +1,6 @@
 import type { ArrivalResult, BoardResult, GroupSummary, GroupView } from './local/group';
 import type { PermanentResult } from './local/permanent';
-import { ApiError, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
+import { ApiError, type PassageDirection, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
  * Tous les accès aux données du poste passent par cette interface (plan, section 4.1). Le lot L5 n'a qu'une implémentation (appels JSON) ;
@@ -43,7 +43,9 @@ export interface PosteRepository {
  */
 export interface SitePosteRepository extends PosteRepository {
   checkpoints(): Promise<Checkpoint[]>;
-  control(operationId: string, code: string, point: PointRef | null): Promise<ControlResult>;
+  control(operationId: string, code: string, point: PointRef | null, direction?: PassageDirection): Promise<ControlResult>;
+  /** Vrai à la soute : le sens du passage (Entrée ou Sortie) est choisi avant le scan et obligatoire. */
+  requiresDirection?(): boolean;
   exit(operationId: string, code: string, point: PointRef | null): Promise<ExitResult>;
   /** Restitution d'un badge, EN LIGNE UNIQUEMENT (V1) : lève ApiError « hors_ligne » sans réseau. La vérification n'écrit rien ; la restitution est idempotente. */
   giveBackCheck(code: string): Promise<GiveBackResult>;
