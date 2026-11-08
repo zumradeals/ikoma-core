@@ -29,7 +29,7 @@ function saveMax() { maxForm.put('/administration/acces/reglage', { preserveScro
 <template>
 <AdminLayout active="acces-zones">
 <h1 class="mb-3 text-display font-bold">Administration · Accès aux zones</h1>
-<p class="mb-4 max-w-4xl">Deux réglages, réservés à l’administrateur. <strong>Quelles zones garde chaque point de contrôle</strong>, puis <strong>les habilitations des participants</strong> en complément de leur catégorie. Une habilitation <strong>exceptionnelle</strong> exige un motif et dure au plus {{ maxHours }} heure(s). Le superviseur peut consulter, jamais modifier.</p>
+<p class="mb-4 max-w-4xl">Deux réglages, réservés à l’administrateur. <strong>Quelles zones garde chaque point de contrôle</strong>, puis <strong>les habilitations des participants</strong> en complément de leur catégorie. Une habilitation <strong>exceptionnelle</strong> exige un motif et dure au plus {{ maxHours }} heure(s). Le superviseur peut consulter, jamais modifier. <strong>Suspendre ou retirer une habilitation ne retire que l’accès supplémentaire qu’elle accordait</strong> : les zones de la catégorie de la personne restent autorisées.</p>
 <label class="mb-5 block max-w-md font-semibold">Activité
   <select class="field" data-testid="choix-activite" :value="eventId ?? ''" @change="chooseEvent(($event.target as HTMLSelectElement).value)"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
 </label>

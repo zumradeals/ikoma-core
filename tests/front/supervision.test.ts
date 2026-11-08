@@ -34,6 +34,7 @@ describe('centre de supervision', () => {
     expect(wrapper.get('[data-testid=badge-a-recuperer]').text()).toContain('B-001');
     expect(wrapper.get('[data-testid=habilitation]').text()).toContain('Exceptionnelle · Active');
     expect(wrapper.get('[data-testid=habilitations]').text()).toContain('Consultation seule');
+    expect(wrapper.get('[data-testid=habilitations]').text()).toContain('les zones de la catégorie de la personne restent autorisées');
     expect(wrapper.findAll('[data-testid=habilitations] button')).toHaveLength(0);
   });
 });

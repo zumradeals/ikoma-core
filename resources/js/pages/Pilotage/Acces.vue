@@ -24,7 +24,7 @@ const when = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: '2-di
     </section>
     <section class="mt-6 space-y-3" aria-labelledby="titre-habilitations" data-testid="habilitations">
       <h2 id="titre-habilitations" class="text-xl font-bold">Habilitations de zone ({{ entitlements.length }})</h2>
-      <p>Consultation seule : seul l’administrateur accorde, suspend ou retire une habilitation.</p>
+      <p>Consultation seule : seul l’administrateur accorde, suspend ou retire une habilitation. Une habilitation suspendue ne retire que l’accès supplémentaire qu’elle accordait : les zones de la catégorie de la personne restent autorisées.</p>
       <ul class="pilotage-record-grid">
         <li v-for="e in entitlements" :key="e.id" class="rounded-2xl border-2 bg-white p-4" :class="e.kind === 'exceptionnelle' ? 'border-amber-600' : 'border-slate-300'" data-testid="habilitation">
           <Link :href="pilotageHref('/pilotage/visiteurs/' + e.visitor_id, event?.id)" class="underline"><strong>{{ e.full_name }}</strong></Link> → {{ e.zone }}
