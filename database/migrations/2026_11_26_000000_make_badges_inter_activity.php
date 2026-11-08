@@ -71,7 +71,7 @@ SQL);
 
         $event = (string) DB::selectOne("SELECT pg_get_functiondef('public.ikoma_reset_demo_event(uuid)'::regprocedure) AS d")->d;
         $event = str_replace(
-            "DELETE FROM public.badge_assignments WHERE event_id = p_event;",
+            'DELETE FROM public.badge_assignments WHERE event_id = p_event;',
             "DELETE FROM public.badge_transfers WHERE from_event_id = p_event OR to_event_id = p_event OR badge_id IN (SELECT id FROM public.badges WHERE event_id = p_event);\n    DELETE FROM public.access_events WHERE badge_id IN (SELECT id FROM public.badges WHERE event_id = p_event);\n    DELETE FROM public.badge_assignments WHERE event_id = p_event OR badge_id IN (SELECT id FROM public.badges WHERE event_id = p_event);",
             $event,
             $count,
