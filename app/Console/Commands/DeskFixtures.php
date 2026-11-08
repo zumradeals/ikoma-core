@@ -203,7 +203,7 @@ class DeskFixtures extends Command
         $s9 = ['announced' => $visitor9("Diabaté Annoncé {$s}", 'Invité'), 'absent' => $visitor9("Sanogo Absent {$s}", 'Invité'), 'vip' => $visitor9("Gnagne Honneur {$s}", 'Personnalité')];
         $s9Batch = $lots->generate($e9, $cat9['Personnalité'], 2, $admin);
         $s9Badge = Badge::where('badge_batch_id', $s9Batch->id)->orderBy('code')->firstOrFail();
-        app(BadgeService::class)->associer($s9Badge, $s9['vip'], $agent, $deviceModel);
+        app(BadgeService::class)->associer($s9Badge, $s9['vip'], $agent);
         DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $e9, 'visitor_id' => $s9['vip'], 'badge_id' => $s9Badge->id, 'actor_id' => $agent->id, 'type' => 'entree', 'checkpoint' => 'Poste fictif S09', 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('visitors')->where('id', $s9['vip'])->update(['status' => 'present', 'updated_at' => now()]);
         $s9People = array_map(fn (string $id) => (string) DB::table('visitors')->where('id', $id)->value('person_id'), $s9);
