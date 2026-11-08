@@ -132,7 +132,7 @@ final class PilotageController
             'toRebadge' => $badge === null && $cancelled !== null && ! in_array($row->status, ['sorti', 'refuse'], true) ? ['code' => $cancelled->code, 'at' => $cancelled->cancelled_at, 'reason' => $cancelled->cancellation_reason] : null,
             'refusal' => $refusal ? (array) $refusal : null,
             'closure' => $this->closure->offer($row->id),
-            'permissions' => ['annuler' => $r->user()->can('badges.annuler'), 'decider' => $r->user()->can('litiges.decider'), 'cloturer' => $r->user()->can('badges.annuler')],
+            'permissions' => ['annuler' => $r->user()->can('badges.annuler'), 'decider' => $r->user()->can('litiges.decider'), 'cloturer' => $r->user()->can('cloture.superviseur')],
         ]);
     }
 

@@ -54,7 +54,7 @@ final class Pilotage
      * Vue d'ensemble du terrain pour l'écran d'accueil du superviseur : alertes par gravité, cas à décider, cars et tablettes sans nouvelles.
      * Nombres seulement : aucun nom de personne.
      *
-     * @return array{critiques:int,hautes:int,escaladees:int,litiges:int,cars:array{total:int,partis:int,arrives:int,ecarts:int},postes_silencieux:int}
+     * @return array{critiques:int,hautes:int,escaladees:int,litiges:int,cars:array{total:int,partis:int,arrives:int,ecarts:int},postes_silencieux:int,retards:int}
      */
     public function overview(string $eventId): array
     {
@@ -65,6 +65,10 @@ final class Pilotage
         $silent = (int) DB::table('devices')->where('event_id', $eventId)->whereNotNull('token_hash')->whereNull('revoked_at')
             ->where(fn ($q) => $q->whereNull('last_synced_at')->orWhere('last_synced_at', '<', now()->subMinutes(self::silentAfterMinutes())))->count();
 
+        // Visites annoncées non arrivées dont l'heure attendue est dépassée du délai de tolérance, absence non encore constatée (S09).
+        $late = (int) DB::table('visitors')->where('event_id', $eventId)->whereNotNull('expected_at')->whereNull('withdrawn_at')->whereNull('closed_at')->whereNull('no_show_at')
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'attendu'))->where('expected_at', '<', now()->subMinutes(Visits::lateAfterMinutes()))->count();
+
         return [
             'critiques' => (int) $alerts->critiques, 'hautes' => (int) $alerts->hautes, 'escaladees' => (int) $alerts->escaladees, 'litiges' => $litiges,
             'cars' => [
@@ -73,6 +77,7 @@ final class Pilotage
                 'ecarts' => count(array_filter($groups, fn ($g) => (int) $g['ecarts'] > 0)),
             ],
             'postes_silencieux' => $silent,
+            'retards' => $late,
         ];
     }
 

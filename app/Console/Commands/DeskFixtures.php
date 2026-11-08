@@ -188,8 +188,28 @@ class DeskFixtures extends Command
         $carAgentPassword = Str::password(24);
         $carAgent = User::create(['name' => "Agent cars {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $carAgentPassword]);
         $carAgent->assignRole('agent_accueil');
+        // S09 : événement fictif distinct (jamais l'événement affiché par défaut) pour le parcours visites annoncées, véhicules et clôture VIP du superviseur.
+        $e9 = (string) Str::uuid();
+        DB::table('events')->insert(['id' => $e9, 'name' => "Recette S09 visites {$s}", 'starts_at' => $now->copy()->subHours(3), 'ends_at' => $now->copy()->addDays(2), 'created_at' => $now, 'updated_at' => $now]);
+        $cat9 = ['Personnalité' => (string) Str::uuid(), 'Invité' => (string) Str::uuid()];
+        DB::table('categories')->insert(['id' => $cat9['Personnalité'], 'event_id' => $e9, 'name' => 'Personnalité', 'color' => '#C9962B', 'priority_circuit' => true, 'closure_supervisor_only' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('categories')->insert(['id' => $cat9['Invité'], 'event_id' => $e9, 'name' => 'Invité', 'color' => '#0F5AA6', 'priority_circuit' => false, 'created_at' => $now, 'updated_at' => $now]);
+        $visitor9 = function (string $name, string $category) use ($e9, $cat9, $now): string {
+            $id = (string) Str::uuid();
+            DB::table('visitors')->insert(['id' => $id, 'event_id' => $e9, 'full_name' => $name, 'organisation' => 'Organisation fictive S09', 'category_id' => $cat9[$category], 'valid_from' => $now->copy()->subHours(3), 'valid_until' => $now->copy()->addDay(), 'source' => 'listé', 'status' => 'attendu', 'created_at' => $now, 'updated_at' => $now]);
+
+            return $id;
+        };
+        $s9 = ['announced' => $visitor9("Diabaté Annoncé {$s}", 'Invité'), 'absent' => $visitor9("Sanogo Absent {$s}", 'Invité'), 'vip' => $visitor9("Gnagne Honneur {$s}", 'Personnalité')];
+        $s9Batch = $lots->generate($e9, $cat9['Personnalité'], 2, $admin);
+        $s9Badge = Badge::where('badge_batch_id', $s9Batch->id)->orderBy('code')->firstOrFail();
+        app(BadgeService::class)->associer($s9Badge, $s9['vip'], $agent, $deviceModel);
+        DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $e9, 'visitor_id' => $s9['vip'], 'badge_id' => $s9Badge->id, 'actor_id' => $agent->id, 'type' => 'entree', 'checkpoint' => 'Poste fictif S09', 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('visitors')->where('id', $s9['vip'])->update(['status' => 'present', 'updated_at' => now()]);
+        $s9People = array_map(fn (string $id) => (string) DB::table('visitors')->where('id', $id)->value('person_id'), $s9);
         $this->output->writeln(json_encode([
             'cars' => $cars, 'enrolCode4' => $enrolCode4, 'posteCars' => "Poste cars {$s}", 'encadreur' => ['email' => $encadreur->email, 'password' => $encadreurPassword], 'liveEncadreur' => ['email' => $liveEncadreur->email, 'password' => $liveEncadreurPassword], 'carAgent' => ['email' => $carAgent->email, 'password' => $carAgentPassword],
+            's09' => ['event' => $e9, 'ids' => $s9, 'people' => $s9People, 'names' => ['announced' => "Diabaté Annoncé {$s}", 'absent' => "Sanogo Absent {$s}", 'vip' => "Gnagne Honneur {$s}"], 'vipBadge' => $s9Badge->code],
             'event' => $event, 'enrolCode' => $enrolCode, 'enrolCode2' => $enrolCode2, 'enrolCode3' => $enrolCode3, 'poste3' => "Poste supervision {$s}", 'pilotageNames' => $pilotageNames, 'pilotageBadges' => $pilotageBadges->pluck('code')->values(), 'supervisor' => ['email' => $supervisor->email, 'password' => $supervisorPassword, 'secret' => $supervisorSecret], 'poste2' => "Poste contrôle {$s}", 'controlNames' => $controlNames, 'controlBadges' => $controlBadges->pluck('code')->values(), 'controlQrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $controlBadges[0]->id)->value('qr_token')), 'QR du badge '.$controlBadges[0]->code), 'zonesNames' => array_keys($zones), 'admin' => ['email' => $admin->email, 'password' => $adminPassword, 'secret' => $secret], 'bulk' => $bulk, 'bulkPrefix' => 'Rafale Fictif',
             'email' => $agent->email, 'password' => $password, 'suffix' => $s, 'poste' => "Poste recette {$s}", 'names' => $names, 'ids' => $ids,
             'takenBadge' => $visitorBadges[0]->code, 'vipBadges' => $vipBadges->pluck('code'), 'freeBadges' => $visitorBadges->skip(3)->pluck('code')->values(),

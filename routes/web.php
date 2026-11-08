@@ -92,7 +92,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/pilotage/acces', [PilotageController::class, 'acces'])->middleware('can:pilotage.consulter');
         Route::get('/pilotage/attendus', [PilotageController::class, 'attendus'])->middleware('can:pilotage.consulter');
         Route::post('/pilotage/visiteurs/{visitor}/absence', [PilotageController::class, 'absence'])->whereUuid('visitor')->middleware('can:pilotage.consulter');
-        Route::post('/pilotage/visiteurs/{visitor}/cloture-superviseur', [PilotageController::class, 'clotureSuperviseur'])->whereUuid('visitor')->middleware('can:badges.annuler');
+        Route::post('/pilotage/visiteurs/{visitor}/cloture-superviseur', [PilotageController::class, 'clotureSuperviseur'])->whereUuid('visitor')->middleware('can:cloture.superviseur');
         Route::get('/pilotage/visiteurs/{visitor}', [PilotageController::class, 'visiteur'])->whereUuid('visitor')->middleware('can:pilotage.consulter');
         Route::post('/pilotage/badges/annuler', [PilotageController::class, 'annulerBadge'])->middleware('can:badges.annuler');
         Route::get('/pilotage/litiges', [PilotageController::class, 'litiges'])->middleware('can:litiges.decider');

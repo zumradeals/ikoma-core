@@ -89,9 +89,14 @@ final class Participations
             if (DB::table('badge_assignments')->where('visitor_id', $v->id)->whereNull('returned_at')->whereNull('cancelled_at')->exists()) {
                 throw ValidationException::withMessages(['participation' => 'Un badge est encore attribué à cette personne : restituez-le d’abord (une clôture ne vaut jamais restitution).']);
             }
+            // S09 : la clôture ne vaut jamais sortie d'un véhicule. Un véhicule présent bloque ; un véhicule seulement annoncé est annulé (sa plaque est libérée).
+            if (DB::table('vehicles')->where('visitor_id', $v->id)->where('status', 'present')->exists()) {
+                throw ValidationException::withMessages(['participation' => 'Un véhicule de cette personne est encore présent sur le site : enregistrez d’abord sa sortie à un poste d’accueil (une clôture ne vaut jamais sortie du véhicule).']);
+            }
+            $cancelled = DB::table('vehicles')->where('visitor_id', $v->id)->where('status', 'annonce')->update(['status' => 'annule', 'updated_at' => now()]);
             DB::table('visitors')->where('id', $v->id)->update(['closed_at' => now(), 'closed_by' => $actor->id, 'closure_reason' => $reason, 'updated_at' => now()->format('Y-m-d H:i:s.uP')]);
             DB::table('events')->where('id', $v->event_id)->increment('list_revision');
-            $this->audit->append('participation.cloturee', $actor->id, ['participation_id' => $v->id, 'person_id' => $v->person_id, 'event_id' => $v->event_id]);
+            $this->audit->append('participation.cloturee', $actor->id, ['participation_id' => $v->id, 'person_id' => $v->person_id, 'event_id' => $v->event_id, 'vehicules_annules' => $cancelled]);
         });
     }
 }

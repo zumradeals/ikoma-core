@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Clôture réservée au SUPERVISEUR (S09) : parcours des personnes dont la catégorie porte l'indicateur categories.closure_supervisor_only (par exemple les VIP).
  * L'agent d'accueil reste refusé (SiteControl::exit, raison « cloture_reservee_superviseur ») ; seul ce parcours, réservé à qui détient le droit propre du superviseur
- * (badges.annuler), enregistre en une seule opération atomique : la sortie (si la personne est présente), la restitution du badge attribué, l'annulation des véhicules
+ * (cloture.superviseur), enregistre en une seule opération atomique : la sortie (si la personne est présente), la restitution du badge attribué, l'annulation des véhicules
  * seulement annoncés et la clôture de la participation. Motif obligatoire, confirmation explicite, journal sans nom de personne.
  *
  * Refus : catégorie ordinaire (elle suit le parcours de l'accueil), participation déjà clôturée ou retirée, titulaire permanent, véhicule encore présent
@@ -43,7 +43,7 @@ final class SupervisorClosure
      */
     public function close(User $superviseur, string $participationId, string $reason): array
     {
-        abort_unless($superviseur->can('badges.annuler'), 403);
+        abort_unless($superviseur->can('cloture.superviseur'), 403);
         $reason = trim($reason);
         if ($reason === '' || mb_strlen($reason) > 200) {
             throw ValidationException::withMessages(['reason' => 'Le motif de clôture est obligatoire (200 caractères au plus).']);

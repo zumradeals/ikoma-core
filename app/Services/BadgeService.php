@@ -92,11 +92,11 @@ final class BadgeService
 
     /**
      * Restitution faite par le superviseur dans la clôture d'une personne à clôture réservée (S09) : même effet que la restitution de l'accueil, autorisée par le droit
-     * propre au superviseur (badges.annuler) puisqu'il n'associe aucun badge. N'est appelée que par SupervisorClosure.
+     * dédié cloture.superviseur (le superviseur n'associe aucun badge et ce droit n'est pas celui d'annuler un badge). N'est appelée que par SupervisorClosure.
      */
     public function restituerPourCloture(Badge|string $badge, User $superviseur): Badge
     {
-        $this->require($superviseur, 'badges.annuler');
+        $this->require($superviseur, 'cloture.superviseur');
 
         return $this->giveBack($badge instanceof Badge ? $badge->id : $badge, $superviseur);
     }
