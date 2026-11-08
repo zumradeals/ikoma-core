@@ -228,3 +228,9 @@ Migration `2026_11_24_000000_add_poste_point_and_closure_flag` (additive, sans d
 - `checkpoint_zones` (event_id, device_id, zone_id, created_by) : zones gardées par un point (poste) ; unique (device_id, zone_id).
 - `participation_entitlements` (event_id, visitor_id, zone_id, kind standard|exceptionnelle, reason, valid_from/until, granted_by, suspended_*, revoked_*) : habilitation d'une participation à une zone ; exceptionnelle = motif obligatoire ; non modifiable sauf suspension/retrait.
 - Réglage `habilitation_exceptionnelle_max_heures`.
+
+## Évolution S09 — visites annoncées, véhicules
+- `visitors` : `expected_at` (heure d'arrivée attendue), `announced_by` / `announced_at` (annonceur, tracés ensemble), `no_show_at` / `no_show_by` / `no_show_reason` (absence constatée, motif obligatoire).
+- `vehicles` (event_id, visitor_id, plate, plate_normalized, kind voiture|moto|minibus|camion|autre, status annonce|present|sorti|annule, entered_at/by, exited_at/by, created_by) : véhicule d'une participation. Index unique partiel : une plaque « annoncée » ou « présente » par activité ; garde SQL : un véhicule présent ne change ni de participation ni de plaque.
+- `access_events.type` : `vehicule_entree`, `vehicule_sortie` (ne valent jamais présence d'une personne).
+- Réglage `visite_retard_minutes` (15 par défaut).
