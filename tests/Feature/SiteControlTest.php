@@ -481,6 +481,8 @@ it('accorde une zone par habilitation, la perd à la suspension, au retrait ou �
     expect(siteControl($this->batch1[0]->code, siteZone(0))->json()['zone_ok'])->toBeTrue();
     $entitlements->suspend($id, 'Contrôle en cours', $admin);
     expect($vip()['zone_ok'])->toBeFalse();
+    // la suspension ne retire que l'accès supplémentaire : la catégorie reste autorisée
+    expect(siteControl($this->batch1[0]->code, siteZone(0))->json()['zone_ok'])->toBeTrue();
     $entitlements->resume($id, $admin);
     expect($vip()['zone_ok'])->toBeTrue();
     $this->travel(3)->hours(); // l'habilitation exceptionnelle a expiré
