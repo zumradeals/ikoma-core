@@ -31,6 +31,7 @@ const groups: Group[] = [
     { key: 'titulaires', label: 'Personnes et cartes permanentes', icon: 'users', href: '/administration/titulaires', permission: 'listes.importer' },
     { key: 'modeles-cartes', label: 'Personnalisation des cartes', icon: 'tag', href: '/administration/titulaires/modeles', permission: 'badges.gerer' },
     { key: 'habilitations', label: 'Habilitations et zones', icon: 'shield', href: '/administration/habilitations', permission: 'listes.importer' },
+    { key: 'acces-zones', label: 'Accès aux zones (participants)', icon: 'map', href: '/administration/acces', permission: 'zones.gerer' },
     { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer' },
   ] },
   { key: 'terrain', label: 'Sur le terrain', items: [

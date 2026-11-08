@@ -12,6 +12,7 @@ use App\Services\ControlAlerts;
 use App\Services\PermanentAccess;
 use App\Services\Presence;
 use App\Services\QrSvg;
+use App\Services\ZoneAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -23,7 +24,7 @@ use Illuminate\Support\Str;
  */
 final class SiteControl
 {
-    public function __construct(private readonly BadgeService $badges, private readonly Audit $audit, private readonly Presence $presence, private readonly ControlAlerts $controlAlerts, private readonly PermanentAccess $permanent) {}
+    public function __construct(private readonly BadgeService $badges, private readonly Audit $audit, private readonly Presence $presence, private readonly ControlAlerts $controlAlerts, private readonly PermanentAccess $permanent, private readonly ZoneAccess $zoneAccess) {}
 
     /**
      * @param  array{type:string,id:string}|null  $point
@@ -49,11 +50,10 @@ final class SiteControl
         $category = null;
         if ($valid) {
             $visitor = DB::table('visitors')->where('id', $verdict->person['id'])->first(['id', 'category_id']);
-            $zones = DB::table('category_zone as cz')->join('zones as z', 'z.id', '=', 'cz.zone_id')->where('cz.category_id', $visitor->category_id)->orderBy('z.name')->get(['z.id', 'z.name']);
+            // S06 : zones de la catégorie + habilitations actives de la participation ; le point juge sa zone, ou les zones que l'administrateur lui a associées.
+            $zones = $this->zoneAccess->zonesFor($visitor->id, $visitor->category_id);
             $category = DB::table('categories')->where('id', $visitor->category_id)->first(['id', 'name', 'color', 'priority_circuit']);
-            if ($checkpoint['type'] === 'zone') {
-                $zoneOk = $zones->contains('id', $checkpoint['id']);
-            }
+            $zoneOk = ZoneAccess::decide($this->zoneAccess->judgedZones($poste->event_id, $checkpoint), $zones);
         }
         $now = now();
         $eventId = (string) Str::uuid();
