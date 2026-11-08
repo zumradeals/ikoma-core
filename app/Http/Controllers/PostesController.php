@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,7 +31,7 @@ final class PostesController
             'events' => DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name']),
             'postes' => $postes,
             'settings' => ['inactivity' => $setting('poste_inactivite_minutes'), 'skew' => $setting('poste_ecart_horloge_secondes'), 'pin' => $setting('poste_echecs_pin_max'), 'pointsDelay' => $setting('controle_delai_min_points'), 'burstCount' => $setting('controle_rafale_nombre'), 'burstMinutes' => $setting('controle_rafale_minutes'),
-                'offlineCall' => $setting('poste_delai_appel_minutes'), 'offlineMaxHours' => $setting('poste_hors_reseau_max_heures'), 'lowBadgesPercent' => $setting('poste_badges_bas_pourcent'), 'lowBadgesMin' => $setting('poste_badges_bas_minimum'), 'silentMinutes' => $setting('pilotage_poste_silencieux_minutes'), 'escalationMinutes' => $setting('alerte_escalade_minutes'), 'identityDocument' => DB::table('settings')->where('key', 'identite_piece_active')->value('value') === '1'],
+                'offlineCall' => $setting('poste_delai_appel_minutes'), 'offlineMaxHours' => $setting('poste_hors_reseau_max_heures'), 'offlineApproved' => DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->value('value') === '1', 'lowBadgesPercent' => $setting('poste_badges_bas_pourcent'), 'lowBadgesMin' => $setting('poste_badges_bas_minimum'), 'silentMinutes' => $setting('pilotage_poste_silencieux_minutes'), 'escalationMinutes' => $setting('alerte_escalade_minutes'), 'identityDocument' => DB::table('settings')->where('key', 'identite_piece_active')->value('value') === '1'],
             'newCode' => session()->pull('enrol_code'),
             'conflicts' => DB::table('sync_conflicts as c')->join('devices as d', 'd.id', '=', 'c.device_id')->where('c.status', 'ouvert')->orderByDesc('c.created_at')->limit(50)->get(['c.id', 'c.kind', 'c.reason', 'c.operation_type', 'c.created_at', 'd.name as device_name']),
         ]);
@@ -69,9 +70,18 @@ final class PostesController
             'identityDocument' => 'sometimes|boolean',
             'pointsDelay' => 'sometimes|integer|min:1|max:3600', 'burstCount' => 'sometimes|integer|min:2|max:100', 'burstMinutes' => 'sometimes|integer|min:1|max:120',
             // Hors réseau, badges bas et tablette silencieuse (audit global F2, C1) : 0 désactive le blocage après N heures.
-            'offlineCall' => 'sometimes|integer|min:1|max:240', 'offlineMaxHours' => 'sometimes|integer|min:0|max:168', 'lowBadgesPercent' => 'sometimes|integer|min:1|max:90', 'lowBadgesMin' => 'sometimes|integer|min:0|max:1000', 'silentMinutes' => 'sometimes|integer|min:1|max:1440', 'escalationMinutes' => 'sometimes|integer|min:1|max:120',
+            'offlineCall' => 'sometimes|integer|min:1|max:240', 'offlineMaxHours' => 'sometimes|integer|min:0|max:168', 'offlineApproved' => 'sometimes|boolean', 'lowBadgesPercent' => 'sometimes|integer|min:1|max:90', 'lowBadgesMin' => 'sometimes|integer|min:0|max:1000', 'silentMinutes' => 'sometimes|integer|min:1|max:1440', 'escalationMinutes' => 'sometimes|integer|min:1|max:120',
         ]);
-        DB::transaction(function () use ($data): void {
+        // S02 : le délai hors ligne n'est jamais « illimité ». Il n'a d'effet que s'il est strictement positif ET approuvé ; modifier le délai retire l'approbation
+        // tant qu'elle n'est pas redonnée explicitement dans la même demande.
+        $hoursBefore = (int) DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->value('value');
+        $hoursAfter = (int) ($data['offlineMaxHours'] ?? $hoursBefore);
+        $approve = array_key_exists('offlineApproved', $data) ? (bool) $data['offlineApproved'] : ($hoursAfter === $hoursBefore && DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->value('value') === '1');
+        if ($approve && $hoursAfter < 1) {
+            throw ValidationException::withMessages(['offlineApproved' => 'Une durée d’au moins une heure est nécessaire pour approuver les décisions hors ligne.']);
+        }
+        DB::transaction(function () use ($data, $approve): void {
+            DB::table('settings')->updateOrInsert(['key' => 'poste_hors_reseau_approuve'], ['value' => $approve ? '1' : '0']);
             DB::table('settings')->where('key', 'poste_inactivite_minutes')->update(['value' => (string) $data['inactivity']]);
             DB::table('settings')->where('key', 'poste_ecart_horloge_secondes')->update(['value' => (string) $data['skew']]);
             DB::table('settings')->where('key', 'poste_echecs_pin_max')->update(['value' => (string) $data['pin']]);
@@ -85,7 +95,7 @@ final class PostesController
                     $control[$key] = (int) $data[$field];
                 }
             }
-            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['piece_identite' => isset($data['identityDocument']) ? (bool) $data['identityDocument'] : null, 'inactivite_minutes' => (int) $data['inactivity'], 'ecart_horloge_s' => (int) $data['skew'], 'echecs_pin_max' => (int) $data['pin']] + $control);
+            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['piece_identite' => isset($data['identityDocument']) ? (bool) $data['identityDocument'] : null, 'inactivite_minutes' => (int) $data['inactivity'], 'ecart_horloge_s' => (int) $data['skew'], 'echecs_pin_max' => (int) $data['pin'], 'hors_ligne_approuve' => $approve] + $control);
         });
 
         return back();

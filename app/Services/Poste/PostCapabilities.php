@@ -4,6 +4,7 @@ namespace App\Services\Poste;
 
 use App\Models\Device;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Capacités d'un poste (S02). Un agent ne dispose que des capacités du point de contrôle que tient sa tablette ; le rôle seul ne suffit plus.
@@ -23,6 +24,19 @@ final class PostCapabilities
     public const POINTS = ['poste_1' => 'Poste 1 — entrée principale', 'poste_2' => 'Poste 2 — accès terrestre', 'poste_3' => 'Poste 3 — chef du village', 'poste_4' => 'Poste 4 — Porton', 'soute' => 'Soute (point 5)'];
 
     private const ALLOWED = ['poste_2' => ['accueil', 'scan', 'sortie'], 'soute' => ['scan']];
+
+    /**
+     * Délai (en heures) pendant lequel une tablette sans réseau peut prendre une décision FAVORABLE (admission, badge, scan valide) sur sa copie locale.
+     * Il n'existe que si l'institution a fixé un délai strictement positif ET l'a approuvé ; sinon 0 = aucune décision favorable hors ligne.
+     * Une valeur nulle, absente ou non approuvée ne signifie jamais « illimité ». Les cartes permanentes ont leur propre règle (PermanentAccess).
+     */
+    public static function offlineTrustHours(): int
+    {
+        $hours = (int) (DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->value('value') ?? 0);
+        $approved = (string) (DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->value('value') ?? '0') === '1';
+
+        return $approved && $hours > 0 ? $hours : 0;
+    }
 
     /** @return list<string> */
     public static function capabilities(Device $poste): array

@@ -51,6 +51,7 @@ class PermanentFixtures extends Command
         $holders = app(HolderEntitlements::class);
         $holders->savePolicy($event, $hall, 'NEUTRE-TEST', true, true, $admin);
         $device = (string) Str::uuid();
+        DB::table('settings')->updateOrInsert(['key' => 'poste_hors_reseau_approuve'], ['value' => '1']); // recette : délai hors ligne approuvé (fictif)
         DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => "Tablette permanents {$s}", 'station' => "Entrée permanents {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
         $deviceModel = Device::findOrFail($device);
 

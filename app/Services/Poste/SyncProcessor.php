@@ -23,6 +23,14 @@ final class SyncProcessor
 
     private const PERMISSIONS = ['identite' => 'visiteurs.verifier', 'valider' => 'visiteurs.valider', 'refuser' => 'visiteurs.refuser', 'badge' => 'badges.associer', 'entree' => 'visiteurs.valider', 'non_liste' => 'visiteurs.enregistrer_non_liste', 'controle' => 'badges.controler', 'sortie' => 'badges.controler', 'groupe_controle' => 'groupes.appel_nominal', 'groupe_badge' => 'groupes.remettre_badges', 'groupe_depart' => 'groupes.remettre_badges', 'groupe_arrivee' => 'badges.controler', 'groupe_arrivee_fin' => 'badges.controler'];
 
+    /**
+     * Opérations hors ligne qui produisent une DÉCISION D'ACCÈS (favorable) et sont donc soumises à la politique hors ligne :
+     * contrôle valide, validation, remise de badge, entrée (accueil) et, pour les cars, remise de badge de groupe et arrivée (admission par scan).
+     * Les autres opérations n'accordent rien : refus, identité, non listé, sortie (jamais soumise à la confiance, comme pour les cartes permanentes),
+     * appel nominal, départ et fin d'arrivée d'un car.
+     */
+    private const FAVORABLE = ['controle', 'valider', 'badge', 'entree', 'groupe_badge', 'groupe_arrivee'];
+
     public function __construct(private readonly Desk $desk, private readonly Audit $audit, private readonly SiteControl $site, private readonly Groups $groups) {}
 
     /**
@@ -205,6 +213,7 @@ final class SyncProcessor
     private function execute(Device $device, User $agent, string $type, array $p, ?string $clientTime): array
     {
         $need = fn (string ...$keys) => array_map(fn ($k) => $p[$k] ?? throw new DeskRefused('operation_invalide', 'Opération incomplète.'), $keys);
+        $this->requireOfflinePolicy($type, $p, $clientTime);
         switch ($type) {
             case 'identite':
                 [$visitor, $photo] = $need('visitor_id', 'photo_b64');
@@ -229,7 +238,6 @@ final class SyncProcessor
                 return $this->desk->enter($device, $agent, (string) $visitor, (int) ($p['duration_ms'] ?? 0), true, $clientTime);
             case 'controle':
                 [$code] = $need('code');
-                $this->requireFreshPolicy((string) $code, $p, $clientTime);
                 $verdict = $this->site->control($device, $agent, (string) $code, $this->point($p), $clientTime, isset($p['local_valid']) ? (bool) $p['local_valid'] : null, isset($p['known_at']) ? (string) $p['known_at'] : null);
                 // Le contrôle hors ligne avait jugé le badge valide alors que le serveur le refuse (annulé entre-temps, restitué…) : à signaler.
                 if (($p['local_valid'] ?? null) === true && ! $verdict['valid']) {
@@ -269,24 +277,30 @@ final class SyncProcessor
     }
 
     /**
-     * S02 / C2 : une décision FAVORABLE prise hors ligne sur un badge temporaire doit s'appuyer sur une copie qui n'était pas plus ancienne que la limite
-     * déjà validée (réglage poste_hors_reseau_max_heures ; 0 = limite désactivée, comportement inchangé). Aucune durée nouvelle n'est introduite.
-     * Les cartes permanentes gardent leur propre règle de confiance (PermanentAccess::offlineRefusal), qui n'est pas modifiée.
+     * S02 / C2 : une décision favorable prise HORS LIGNE n'est acceptée que si l'institution a approuvé un délai (PostCapabilities::offlineTrustHours : délai nul,
+     * absent ou non approuvé = refus, jamais « illimité ») et si la copie utilisée n'était pas plus ancienne que ce délai. Aucune durée n'est fixée dans le code.
+     * Une opération qui ne déclare pas l'âge de sa copie (known_at) est traitée comme hors ligne et refusée par défaut. Les cartes permanentes gardent leur règle propre.
      *
      * @param  array<string, mixed>  $p
      */
-    private function requireFreshPolicy(string $code, array $p, ?string $clientTime): void
+    private function requireOfflinePolicy(string $type, array $p, ?string $clientTime): void
     {
-        if (($p['local_valid'] ?? null) !== true || str_starts_with($code, 'PC:')) {
+        if (! in_array($type, self::FAVORABLE, true)) {
             return;
         }
-        $max = (int) (DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->value('value') ?? 12);
-        if ($max <= 0) {
-            return;
+        if ($type === 'controle' && (($p['local_valid'] ?? null) !== true || str_starts_with((string) ($p['code'] ?? ''), 'PC:'))) {
+            return; // un refus local n'accorde rien ; une carte permanente suit PermanentAccess::offlineRefusal
         }
         $known = $this->time($p['known_at'] ?? null);
+        if (($p['offline'] ?? null) === false && $known !== null) {
+            return; // décision prise en ligne : le serveur la juge lui-même à la réception
+        }
+        $hours = PostCapabilities::offlineTrustHours();
+        if ($hours <= 0) {
+            throw new DeskRefused('politique_non_approuvee', 'Aucun délai hors ligne n’est approuvé : une décision favorable prise sans réseau n’est pas acceptée. Elle est mise en quarantaine et signalée.', 409);
+        }
         $decided = $clientTime ?? now()->utc()->format('Y-m-d H:i:s.uP');
-        if ($known === null || Carbon::parse($decided)->getTimestamp() - Carbon::parse($known)->getTimestamp() > $max * 3600) {
+        if ($known === null || Carbon::parse($decided)->getTimestamp() - Carbon::parse($known)->getTimestamp() > $hours * 3600) {
             throw new DeskRefused('politique_perimee', 'La copie utilisée hors ligne était trop ancienne pour autoriser ce passage : il est mis en quarantaine et signalé.', 409);
         }
     }

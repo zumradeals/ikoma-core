@@ -52,6 +52,7 @@ class DeskFixtures extends Command
         $host = (string) Str::uuid();
         DB::table('hosts')->insert(['id' => $host, 'event_id' => $event, 'name' => "Hôte fictif {$s}", 'created_at' => $now, 'updated_at' => $now]);
         $device = (string) Str::uuid();
+        DB::table('settings')->updateOrInsert(['key' => 'poste_hors_reseau_approuve'], ['value' => '1']); // recette : délai hors ligne approuvé (fictif)
         DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => "Tablette recette {$s}", 'station' => "Poste recette {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
         // Deuxième tablette (accueil + contrôle sur site) : son propre lot de badges réservé, utilisée par le parcours « contrôle » (L7).
         $device2 = (string) Str::uuid();

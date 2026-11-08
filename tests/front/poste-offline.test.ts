@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
-import { createDeviceKey, createVault, fromB64, openJson, openVault, PBKDF2_ITERATIONS, randomBytes, sealJson, toB64 } from '../../resources/js/poste/local/crypto';
+import { createDeviceKey, createVault, fromB64, openJson, openVault, PBKDF2_ITERATIONS, randomBytes, sealJson, sha256Hex, toB64 } from '../../resources/js/poste/local/crypto';
 import { PosteDb, setMeta } from '../../resources/js/poste/local/db';
 import { PosteVault, PinError, pinProblem } from '../../resources/js/poste/local/vault';
 import { LocalList, type Snapshot, type SnapVisitor } from '../../resources/js/poste/local/list';
@@ -29,7 +29,7 @@ function visitor(id: string, name: string, over: Partial<SnapVisitor> = {}): Sna
 function snapshot(visitors: SnapVisitor[], badges = [{ code: 'B-001', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true }, { code: 'B-002', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true }, { code: 'B-900', token_hash: '', category_id: 'c0', status: 'Disponible', mine: true }]): Snapshot {
   return {
     version: 'v1', server_time: new Date(now0).toISOString(), poste: { id: 'p1', name: 'Tablette A', station: 'Poste fictif A', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
-    settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [vip, std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }, { id: 'z2', name: 'Salle', est_accueil: false }],
+    settings: { offline_trust_hours: 12, inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [vip, std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }, { id: 'z2', name: 'Salle', est_accueil: false }],
     category_zone: [{ category_id: 'c1', zone_id: 'z1' }, { category_id: 'c1', zone_id: 'z2' }, { category_id: 'c0', zone_id: 'z1' }], hosts: [{ id: 'h1', name: 'Hôte fictif', service: null }], postes: [{ id: 'p1', name: 'Poste fictif A' }], visitors, badges,
   };
 }
@@ -332,24 +332,28 @@ describe('runtime', () => {
 });
 
 describe('S02 — restrictions de poste appliquées avant toute décision locale', () => {
-  async function repoFor(over: { point_code?: string | null; capabilities?: string[]; maxHours?: number; lastSync?: string | null }) {
+  async function repoFor(over: { point_code?: string | null; capabilities?: string[]; trustHours?: number; lastSync?: string | null; online?: boolean; permanentHash?: string }) {
     const vault = new PosteVault(new PosteDb(dbName()), { iterations: ITER });
     await vault.enrol({ token: 'b'.repeat(64), secret: SECRET, pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
     const store = new PosteStore(vault);
-    const snap = snapshot([visitor('v1', 'Koné Mariam')]);
+    const snap = snapshot([visitor('v1', 'Koné Mariam', { identity_done: true, photo_done: true }), visitor('v2', 'Yao Brou', { identity_done: true, photo_done: true })]);
     snap.poste = { ...snap.poste, point_code: over.point_code, capabilities: over.capabilities };
-    if (over.maxHours !== undefined) snap.settings.offline_max_hours = over.maxHours;
+    if (over.permanentHash) snap.permanent = { trust_minutes: 0, cards: [{ hash: over.permanentHash, status: 'active', holder_id: 'h1', identifier: 'P-0001' }], policies: [], holders: [] };
+    snap.settings = { ...snap.settings };
+    if (over.trustHours !== undefined) snap.settings.offline_trust_hours = over.trustHours; else delete snap.settings.offline_trust_hours;
     await store.saveSnapshot(snap);
     await setMeta(vault.db, 'lastSyncAt', over.lastSync === undefined ? new Date(now0).toISOString() : over.lastSync);
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(over.online ?? false);
     const repo = new LocalPosteRepository(snap, vault, store, { id: 'u1', name: 'Agent fictif' }, vi.fn());
     return { repo, store };
   }
-  const gateReasons = ['poste_non_identifie', 'poste_non_habilite', 'politique_perimee'];
+  const gateReasons = ['poste_non_identifie', 'poste_non_habilite', 'politique_non_approuvee', 'politique_perimee'];
   const full = ['accueil', 'scan', 'sortie'];
+  const hoursAgo = (h: number) => new Date(now0 - h * 3_600_000).toISOString();
 
   it('ne produit aucun résultat favorable pour un poste non identifié ou dont la copie ne porte pas ses capacités', async () => {
     for (const over of [{ point_code: null, capabilities: [] }, { point_code: undefined, capabilities: undefined }, { point_code: 'poste_2', capabilities: undefined }]) {
-      const { repo, store } = await repoFor(over);
+      const { repo, store } = await repoFor({ ...over, trustHours: 12 });
       const control = await repo.control('c1', 'B-001', null);
       expect(control.valid).toBe(false);
       expect(control.reason).toBe('poste_non_identifie');
@@ -364,7 +368,7 @@ describe('S02 — restrictions de poste appliquées avant toute décision locale
 
   it('refuse les capacités absentes du point tenu par la tablette (poste 1, poste 3, poste 4, soute)', async () => {
     for (const [point, capabilities] of [['poste_1', []], ['poste_3', []], ['poste_4', []], ['soute', ['scan']]] as [string, string[]][]) {
-      const { repo, store } = await repoFor({ point_code: point, capabilities });
+      const { repo, store } = await repoFor({ point_code: point, capabilities, trustHours: 12 });
       const scan = await repo.control('c-' + point, 'B-001', null);
       if (capabilities.includes('scan')) expect(gateReasons).not.toContain(scan.reason);
       else expect(scan.reason).toBe('poste_non_habilite');
@@ -374,21 +378,52 @@ describe('S02 — restrictions de poste appliquées avant toute décision locale
     }
   });
 
-  it('refuse une copie plus ancienne que la limite déjà validée, jamais en dessous, et ne change rien quand la limite est désactivée', async () => {
-    const hoursAgo = (h: number) => new Date(now0 - h * 3_600_000).toISOString();
-    const stale = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 12, lastSync: hoursAgo(13) });
+  it('refuse par défaut toute décision favorable sans réseau tant qu’aucun délai n’est approuvé : délai nul, absent ou non approuvé ne signifie jamais « illimité »', async () => {
+    for (const trustHours of [undefined, 0, -1]) {
+      const { repo, store } = await repoFor({ point_code: 'poste_2', capabilities: full, trustHours, lastSync: hoursAgo(0) });
+      expect((await repo.control('c', 'B-001', null)).reason).toBe('politique_non_approuvee');
+      for (const op of [() => repo.validate('v', 'v1'), () => repo.assignBadge('b', 'v1', 'B-001'), () => repo.enter('e', 'v1', 1000)]) {
+        await expect(op()).rejects.toMatchObject({ code: 'politique_non_approuvee' });
+      }
+      // ce qui n'accorde rien reste possible : refus, identité, sortie (jamais soumise à la confiance)
+      await repo.refuse('r', 'v1', 'motif');
+      expect(gateReasons).not.toContain((await repo.exit('x', 'B-001', null)).reason);
+      expect(await store.count('pending')).toBe(1);
+    }
+  });
+
+  it('refuse une copie plus ancienne que le délai approuvé, jamais en dessous, et laisse passer ce qui n’accorde rien', async () => {
+    const stale = await repoFor({ point_code: 'poste_2', capabilities: full, trustHours: 12, lastSync: hoursAgo(13) });
     expect((await stale.repo.control('s1', 'B-001', null)).reason).toBe('politique_perimee');
-    expect((await stale.repo.exit('s2', 'B-001', null)).reason).toBe('politique_perimee');
-    await expect(stale.repo.refuse('s3', 'v1', 'motif')).rejects.toMatchObject({ code: 'politique_perimee' });
-    expect(await stale.store.count('pending')).toBe(0);
-    const never = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 12, lastSync: null });
+    await expect(stale.repo.enter('s3', 'v1', 1000)).rejects.toMatchObject({ code: 'politique_perimee' });
+    expect(gateReasons).not.toContain((await stale.repo.exit('s2', 'B-001', null)).reason); // la sortie n'est jamais bloquée par la péremption
+    await stale.repo.refuse('s4', 'v1', 'motif'); // un refus non plus
+    const never = await repoFor({ point_code: 'poste_2', capabilities: full, trustHours: 12, lastSync: null });
     expect((await never.repo.control('n1', 'B-001', null)).reason).toBe('politique_perimee');
-    const fresh = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 12, lastSync: hoursAgo(1) });
+    const fresh = await repoFor({ point_code: 'poste_2', capabilities: full, trustHours: 12, lastSync: hoursAgo(1) });
     expect(gateReasons).not.toContain((await fresh.repo.control('f1', 'B-001', null)).reason);
-    await fresh.repo.refuse('f2', 'v1', 'motif');
+    await fresh.repo.validate('f2', 'v2');
     expect(await fresh.store.count('pending')).toBe(2);
-    const off = await repoFor({ point_code: 'poste_2', capabilities: full, maxHours: 0, lastSync: hoursAgo(40) });
-    expect(gateReasons).not.toContain((await off.repo.control('o1', 'B-001', null)).reason);
+  });
+
+  it('n’applique pas la péremption en ligne : le serveur juge alors lui-même, et la file embarque l’âge de la copie', async () => {
+    const { repo, store } = await repoFor({ point_code: 'poste_2', capabilities: full, trustHours: 0, lastSync: hoursAgo(40), online: true });
+    await repo.refuse('o1', 'v1', 'motif');
+    await repo.validate('o2', 'v2');
+    const ops = await store.ops('pending');
+    const valider = ops.find(o => o.type === 'valider');
+    expect(valider?.payload).toMatchObject({ offline: false });
+    expect(typeof valider?.payload.known_at).toBe('string');
+  });
+
+  it('laisse les cartes permanentes à leur règle propre : la péremption ne s’applique pas, la capacité de poste oui', async () => {
+    const token = 'a'.repeat(64);
+    const hash = await sha256Hex(token);
+    const { repo } = await repoFor({ point_code: 'soute', capabilities: ['scan'], trustHours: 0, permanentHash: hash });
+    const result = await repo.control('p1', 'IKOMA1:' + token, null);
+    expect(gateReasons).not.toContain(result.reason); // la carte est jugée par sa propre règle (PermanentAccess), pas par le délai des badges temporaires
+    const none = await repoFor({ point_code: 'poste_1', capabilities: [], trustHours: 12, permanentHash: hash });
+    expect((await none.repo.control('p2', 'IKOMA1:' + token, null)).reason).toBe('poste_non_habilite');
   });
 });
 

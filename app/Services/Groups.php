@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\Poste\DeskRefused;
+use App\Services\Poste\PostCapabilities;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -216,6 +217,9 @@ final class Groups
      */
     public function deliver(?Device $device, User $agent, string $groupId, string $visitorId, string $code): array
     {
+        if ($device !== null) {
+            PostCapabilities::require($device, $agent, 'accueil'); // S02 : remettre un badge est une décision d'accès du poste
+        }
         app(FoundingModules::class)->requireF06();
 
         return DB::transaction(function () use ($device, $agent, $groupId, $visitorId, $code): array {
@@ -294,6 +298,7 @@ final class Groups
      */
     public function arrive(Device $device, User $agent, string $code, ?string $declaredAt = null): array
     {
+        PostCapabilities::require($device, $agent, 'scan'); // S02 : l'arrivée d'un car est une admission, par scan individuel à un point équipé
         app(FoundingModules::class)->requireF06();
 
         return DB::transaction(function () use ($device, $agent, $code, $declaredAt): array {

@@ -22,7 +22,7 @@ const visitor = (id: string, name: string, over: Partial<SnapVisitor> = {}): Sna
 });
 const snapshot = (visitors: SnapVisitor[], settings: Partial<Snapshot['settings']> = {}): Snapshot => ({
   version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette A', station: 'Poste fictif A', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
-  settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, ...settings }, categories: [std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }], category_zone: [{ category_id: 'c1', zone_id: 'z1' }],
+  settings: { offline_trust_hours: 12, inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, ...settings }, categories: [std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }], category_zone: [{ category_id: 'c1', zone_id: 'z1' }],
   hosts: [{ id: 'h1', name: 'Hôte fictif', service: null }], postes: [{ id: 'p1', name: 'Poste fictif A' }], visitors,
   badges: [
     { code: 'B-001', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true }, { code: 'B-002', token_hash: '', category_id: 'c1', status: 'Disponible', mine: true },

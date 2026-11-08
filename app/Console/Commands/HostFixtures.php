@@ -51,6 +51,7 @@ final class HostFixtures extends Command
         $listed = (string) Str::uuid();
         $name = 'Invité fictif arrivée '.$suffix;
         DB::table('visitors')->insert(['id' => $listed, 'event_id' => $event, 'full_name' => $name, 'organisation' => 'Organisation fictive L10', 'host_id' => $host, 'category_id' => $category, 'valid_from' => $at->copy()->subHour(), 'valid_until' => $at->copy()->addDay(), 'source' => 'listé', 'status' => 'attendu', 'created_at' => $at, 'updated_at' => $at]);
+        DB::table('settings')->updateOrInsert(['key' => 'poste_hors_reseau_approuve'], ['value' => '1']); // recette : délai hors ligne approuvé (fictif)
         $poste = Device::create(['event_id' => $event, 'name' => 'Tablette hôte '.$suffix, 'station' => 'Poste hôte '.$suffix, 'point_code' => 'poste_2']);
         $admin = User::findOrFail($users['administrateur']['id']);
         $batch = app(BadgeLots::class)->generate($event, $category, 8, $admin);
