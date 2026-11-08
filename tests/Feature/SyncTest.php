@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\Pilotage;
 use App\Services\Poste\Devices;
+use App\Services\Poste\SyncProcessor;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\Query\Builder;
@@ -35,6 +36,11 @@ function syncHeaders(string $token = SYNC_TOKEN_A): array
 /** Une opération de la file locale, telle que la tablette l'envoie. */
 function syncOp(string $type, array $payload, User $agent, int $seq, ?string $id = null, array $extra = []): array
 {
+    // S02 : une décision d'accès (validation, badge, entrée) déclare l'âge de sa copie et si elle a été prise sans réseau ; ici, prise en ligne.
+    if (in_array($type, ['valider', 'badge', 'entree'], true)) {
+        $payload = ['known_at' => now()->subMinute()->toIso8601String(), 'offline' => false, ...$payload];
+    }
+
     return ['id' => $id ?? (string) Str::uuid(), 'seq' => $seq, 'type' => $type, 'agent_id' => $agent->id, 'client_time' => now()->toIso8601String(), 'payload' => $payload, ...$extra];
 }
 
@@ -70,7 +76,7 @@ beforeEach(function () {
     $this->actingAs($this->agent);
     $this->deviceA = DemoSeeder::id('device');
     $this->deviceB = (string) Str::uuid();
-    DB::table('devices')->insert(['id' => $this->deviceB, 'event_id' => DemoSeeder::id('event'), 'name' => 'Tablette fictive B', 'station' => 'Poste fictif B', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('devices')->insert(['id' => $this->deviceB, 'event_id' => DemoSeeder::id('event'), 'name' => 'Tablette fictive B', 'station' => 'Poste fictif B', 'point_code' => 'poste_2', 'created_at' => now(), 'updated_at' => now()]);
     DB::table('devices')->where('id', $this->deviceA)->update(['token_hash' => hash('sha256', SYNC_TOKEN_A)]);
     DB::table('devices')->where('id', $this->deviceB)->update(['token_hash' => hash('sha256', SYNC_TOKEN_B)]);
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 12, syncUser('administrateur'));
@@ -180,7 +186,7 @@ it('bloque les essais de code après cinq échecs', function () {
 
 it('envoie la copie de travail sans jeton QR en clair, avec tous les badges de l’événement (L7) dont seuls les badges réservés au poste sont marqués « mine »', function () {
     $liste = $this->getJson('/poste/api/liste', syncHeaders())->assertOk()->json();
-    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'f06_active' => false, 'identity_document' => false, 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
+    expect($liste['visitors'])->toHaveCount(300)->and($liste['categories'])->toHaveCount(4)->and($liste['hosts'])->toHaveCount(3)->and($liste['settings'])->toBe(['inactivity_minutes' => 5, 'clock_skew_seconds' => 300, 'pin_max_failures' => 15, 'controle_stagiaires' => 'encadreur', 'f06_active' => false, 'identity_document' => false, 'offline_call_minutes' => 15, 'offline_max_hours' => 12, 'offline_trust_hours' => 0, 'low_badges_percent' => 10, 'low_badges_min' => 5]);
     expect(array_keys($liste['visitors'][0]))->toBe(['id', 'full_name', 'organisation', 'host_id', 'category_id', 'valid_from', 'valid_until', 'source', 'status', 'host_validation', 'access_note', 'group_id', 'a_rebadger', 'rev', 'identity_done', 'photo_done', 'validated', 'badge_code']);
     $codes = array_column($liste['badges'], 'code');
     expect($codes)->toContain($this->badges[0]->code)->toContain($this->badges[2]->code)->toContain($this->badges[3]->code);
@@ -266,18 +272,27 @@ it('refuse une seconde entrée venue d’un autre poste et signale la fiche modi
     expect($this->postJson('/poste/api/sync', ['operations' => [$fresh]], syncHeaders(SYNC_TOKEN_B))->json('results.0.status'))->toBe('applique');
 });
 
-it('met en quarantaine les opérations d’un agent désactivé entre-temps, sans bloquer les autres', function () {
+it('met en quarantaine les opérations d’un agent désactivé ou sans rôle d’agent, sans bloquer les autres (S02 : chaque lot est envoyé sous la session de son auteur)', function () {
+    $processor = app(SyncProcessor::class);
+    $device = Device::findOrFail($this->deviceA);
     $other = syncUser();
+    $hote = syncUser('hote');
     $seq = 0;
     $mine = syncOp('identite', ['visitor_id' => syncVisitor(1), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $this->agent, ++$seq);
     $theirs = syncOp('identite', ['visitor_id' => syncVisitor(4), 'identity_checked' => true, 'photo_b64' => syncPhoto()], $other, ++$seq);
+    $wrongRole = syncOp('valider', ['visitor_id' => syncVisitor(7)], $hote, ++$seq);
     $other->update(['active' => false]);
-    $wrongRole = syncOp('valider', ['visitor_id' => syncVisitor(7)], syncUser('hote'), ++$seq);
-    $unknown = syncOp('valider', ['visitor_id' => syncVisitor(7)], $this->agent, ++$seq, null, ['agent_id' => (string) Str::uuid()]);
-    $response = $this->postJson('/poste/api/sync', ['operations' => [$theirs, $mine, $wrongRole, $unknown]], syncHeaders())->assertOk();
-    $byId = collect($response->json('results'))->keyBy('id');
-    expect($byId[$mine['id']]['status'])->toBe('applique')->and($byId[$theirs['id']])->toMatchArray(['status' => 'conflit', 'code' => 'agent_desactive'])->and($byId[$wrongRole['id']]['code'])->toBe('agent_desactive')->and($byId[$unknown['id']]['code'])->toBe('agent_inconnu');
+    $okMine = $processor->process($device, $this->agent, [$mine], null);
+    $okTheirs = $processor->process($device, $other, [$theirs], null);
+    $okWrong = $processor->process($device, $hote, [$wrongRole], null);
+    expect($okMine['results'][0]['status'])->toBe('applique')
+        ->and($okTheirs['results'][0])->toMatchArray(['status' => 'conflit', 'code' => 'agent_desactive'])
+        ->and($okWrong['results'][0]['code'])->toBe('agent_desactive');
     expect(DB::table('photos')->where('visitor_id', syncVisitor(4))->count())->toBe(0)->and(DB::table('photos')->where('visitor_id', syncVisitor(1))->count())->toBe(1)->and(DB::table('sync_conflicts')->where('reason', 'agent_desactive')->count())->toBe(2);
+    // un auteur inconnu n'est plus une opération en conflit : le client n'a pas le droit de choisir l'auteur, le lot entier est refusé (S02, R-04)
+    $unknown = syncOp('valider', ['visitor_id' => syncVisitor(7)], $this->agent, ++$seq, null, ['agent_id' => (string) Str::uuid()]);
+    $this->postJson('/poste/api/sync', ['operations' => [$unknown]], syncHeaders())->assertForbidden()->assertJsonPath('code', 'auteur_incoherent');
+    expect(DB::table('sync_operations')->where('id', $unknown['id'])->exists())->toBeFalse();
 });
 
 it('signale l’écart d’horloge au-delà du seuil et conserve l’heure déclarée', function () {
@@ -328,7 +343,7 @@ it('gère les postes depuis l’administration : création, code affiché une fo
     foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
         $this->actingAs(syncUser($role))->get('/administration/postes')->assertForbidden();
     }
-    $this->actingAs($admin)->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive C', 'station' => 'Poste fictif C'])->assertRedirect();
+    $this->actingAs($admin)->post('/administration/postes', ['event_id' => $event, 'name' => 'Tablette fictive C', 'station' => 'Poste fictif C', 'point_code' => 'poste_2'])->assertRedirect();
     $device = DB::table('devices')->where('name', 'Tablette fictive C')->first();
     $this->post('/administration/postes/'.$device->id.'/code')->assertRedirect();
     $page = $this->get('/administration/postes')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->component('Admin/Postes')->where('newCode.device_id', $device->id)->has('newCode.code')->has('postes', 3)->where('settings.inactivity', 5));

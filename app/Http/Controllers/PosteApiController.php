@@ -127,7 +127,7 @@ final class PosteApiController
     {
         $data = $r->validate(['code' => 'required|string|max:100']);
 
-        return response()->json($this->site->giveBackCheck($this->poste($r), $data['code']));
+        return response()->json($this->site->giveBackCheck($this->poste($r), $r->user(), $data['code']));
     }
 
     public function presents(Request $r): JsonResponse

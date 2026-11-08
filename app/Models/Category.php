@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * @property bool $closure_supervisor_only
+ */
 class Category extends Model
 {
     use HasUuids;
@@ -15,7 +18,7 @@ class Category extends Model
 
     protected function casts(): array
     {
-        return ['priority_circuit' => 'boolean'];
+        return ['priority_circuit' => 'boolean', 'closure_supervisor_only' => 'boolean'];
     }
 
     /** @return BelongsTo<Event, $this> */

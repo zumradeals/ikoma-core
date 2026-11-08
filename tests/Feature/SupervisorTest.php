@@ -77,9 +77,20 @@ it('refuse chaque écran et chaque action du pilotage à tout autre rôle, et au
         ['get', '/pilotage'], ['get', '/pilotage/alertes'], ['post', "/pilotage/alertes/$uuid/prendre-en-compte"], ['get', '/pilotage/presents'], ['get', '/pilotage/visiteurs/'.supVisitor(1)],
         ['post', '/pilotage/badges/annuler'], ['get', '/pilotage/litiges'], ['post', "/pilotage/litiges/$uuid/decision"], ['get', '/pilotage/groupes'], ['get', '/pilotage/evacuation'], ['get', '/pilotage/api/evacuation'], ['get', '/api/presences?event_id='.$this->event],
     ];
-    foreach (['administrateur', 'agent_accueil', 'hote', 'encadreur'] as $role) {
+    foreach (['agent_accueil', 'hote', 'encadreur'] as $role) {
         supAs(supUser($role));
         foreach ($routes as [$method, $url]) {
+            test()->json($method, $url, [])->assertForbidden();
+        }
+    }
+    // S02 : l'administrateur CONSULTE la supervision (pilotage, alertes, présents, évacuation) mais n'en exerce aucune action (prise en compte, annulation, litiges, cars).
+    $admin = supUser('administrateur');
+    supAs($admin);
+    $consult = ['/pilotage', '/pilotage/alertes', '/pilotage/presents', '/pilotage/visiteurs/'.supVisitor(1), '/pilotage/evacuation', '/pilotage/api/evacuation', '/api/presences?event_id='.$this->event];
+    foreach ($routes as [$method, $url]) {
+        if ($method === 'get' && in_array($url, $consult, true)) {
+            expect(test()->json($method, $url, [])->status())->not->toBeIn([401, 403]);
+        } else {
             test()->json($method, $url, [])->assertForbidden();
         }
     }
@@ -87,7 +98,9 @@ it('refuse chaque écran et chaque action du pilotage à tout autre rôle, et au
     foreach ($routes as [$method, $url]) {
         expect(test()->json($method, $url, [])->status())->toBeIn([401, 302]);
     }
-    expect(DB::table('audit_logs')->where('id', '>', $this->auditStart)->whereIn('action', ['alerte.prise_en_compte', 'litige.decide', 'badge.annule', 'evacuation.consultee'])->count())->toBe(0);
+    expect(DB::table('audit_logs')->where('id', '>', $this->auditStart)->whereIn('action', ['alerte.prise_en_compte', 'litige.decide', 'badge.annule'])->count())->toBe(0);
+    // seules les consultations de l'administrateur (lecture) ont pu être journalisées pour l'évacuation : jamais celles d'un autre rôle refusé
+    expect(DB::table('audit_logs')->where('id', '>', $this->auditStart)->where('action', 'evacuation.consultee')->where('actor_id', '<>', $admin->id)->count())->toBe(0);
     // le superviseur n'a ni droit d'association de badge, ni gestion de comptes, ni accès au poste
     supAs($this->supervisor);
     $this->postJson('/poste/api/badge', ['visitor_id' => supVisitor(1), 'code' => $this->batch1[0]->code], ['X-Device-Token' => SUP_TOKEN, 'X-Operation-Id' => (string) Str::uuid()])->assertForbidden();

@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
-import { PosteDb } from '../../resources/js/poste/local/db';
+import { PosteDb, setMeta } from '../../resources/js/poste/local/db';
 import { LocalList, type Snapshot, type SnapVisitor } from '../../resources/js/poste/local/list';
 import { LocalPosteRepository } from '../../resources/js/poste/local/local';
 import { PosteStore } from '../../resources/js/poste/local/store';
@@ -21,8 +21,8 @@ function visitor(id: string, name: string, over: Partial<SnapVisitor> = {}): Sna
 async function snapshot(): Promise<Snapshot> {
   const hash = await sha256Hex(TOKEN);
   return {
-    version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette A', station: 'Poste A', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
-    settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }, { id: 'z2', name: 'Salle', est_accueil: false }, { id: 'z3', name: 'Espace VIP', est_accueil: false }],
+    version: 'v1', server_time: iso(0), poste: { id: 'p1', name: 'Tablette A', station: 'Poste A', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-3_600_000), ends_at: iso(86_400_000) },
+    settings: { offline_trust_hours: 12, inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [std], zones: [{ id: 'z1', name: 'Hall', est_accueil: true }, { id: 'z2', name: 'Salle', est_accueil: false }, { id: 'z3', name: 'Espace VIP', est_accueil: false }],
     category_zone: [{ category_id: 'c1', zone_id: 'z1' }, { category_id: 'c1', zone_id: 'z2' }], hosts: [{ id: 'h1', name: 'Hôte fictif', service: null }], postes: [{ id: 'p1', name: 'Poste A' }, { id: 'p2', name: 'Poste B' }],
     visitors: [
       visitor('v1', 'Koné Mariam', { badge_code: 'B-001' }), visitor('v2', 'Yao Brou', { status: 'attendu', badge_code: 'B-002' }), visitor('v3', 'Soro Fictif', { badge_code: 'B-004', valid_until: iso(-60_000) }), visitor('v4', 'Traoré Fictif', { status: 'sorti', badge_code: 'B-006' }), visitor('v5', 'Bamba Fictif', { status: 'attendu' }),
@@ -70,6 +70,7 @@ describe('dépôt local : contrôle et sortie', () => {
     const store = new PosteStore(vault);
     const snap = await snapshot();
     await store.saveSnapshot(snap);
+    await setMeta(vault.db, 'lastSyncAt', new Date().toISOString()); // la tablette a synchronisé après son enrôlement
     const sync = { request: vi.fn(request), sync: vi.fn(async () => undefined) } as unknown as SyncManager;
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
     const repo = new LocalPosteRepository(snap, vault, store, { id: '11111111-1111-4111-8111-111111111111', name: 'Agent fictif' }, vi.fn(), 0, sync);

@@ -1,12 +1,13 @@
 import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput } from '../types';
 import type { GroupPosteRepository } from '../repository';
+import { posteGate, OP_POLICY } from './capabilities';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
 import { sha256Hex } from './crypto';
 import { getMeta } from './db';
 import { applyGroupOp, groupSummaries, groupView, type ArrivalResult, type GroupSummary, type GroupView } from './group';
 import { LocalList, type Snapshot } from './list';
-import { searchPermanentDirectory, type PermanentResult } from './permanent';
-import { checkpointsOf, controlLocal, exitLocal, resolveBadge } from './site';
+import { PERMANENT_PREFIX, searchPermanentDirectory, type PermanentResult } from './permanent';
+import { checkpointsOf, controlLocal, exitLocal, refusedControl, refusedExit, resolveBadge } from './site';
 import type { PosteStore } from './store';
 import type { SyncManager } from './sync';
 import type { PosteVault } from './vault';
@@ -115,6 +116,17 @@ export class LocalPosteRepository implements GroupPosteRepository {
       const v = this.list.visitors.get(String(existing.op.payload.visitor_id));
       return { badge_code: String(existing.op.payload.code ?? v?.badge_code ?? ''), zones: v ? this.list.zonesFor(v) : [], visitor_id: String(existing.op.payload.visitor_id ?? '') };
     }
+    // S02 : rien n'est décidé ni mis en file par un poste sans capacité, non identifié, ou sans délai hors ligne approuvé pour une décision favorable.
+    // Une décision favorable embarque l'âge de la copie (known_at) et si elle a été prise sans réseau (offline) : le serveur les revérifie au rejeu.
+    const policy = OP_POLICY[type];
+    if (policy) {
+      const known = await this.knownAt();
+      const offline = typeof payload.offline === 'boolean' ? payload.offline : !this.online;
+      const permanent = type === 'controle' && String(payload.code ?? '').startsWith(PERMANENT_PREFIX);
+      const refusal = posteGate(this.list, policy, this.now(), known, { offline, permanent });
+      if (refusal) throw new ApiError(refusal.reason, refusal.message, null, 403);
+      if (policy.favorable) payload = { ...payload, known_at: known, offline };
+    }
     const visitorId = typeof payload.visitor_id === 'string' ? payload.visitor_id : null;
     const op: LocalOp = { id: operationId, seq: await this.store.nextSeq(), type, agent_id: this.profile.id, client_time: new Date(this.now()).toISOString(), visitor_rev: visitorId ? this.list.visitors.get(visitorId)?.rev ?? null : null, payload };
     const result = applyOp(this.list, op, this.now()); // refuse avant d'écrire dans la file si une règle l'interdit
@@ -190,19 +202,24 @@ export class LocalPosteRepository implements GroupPosteRepository {
   async control(operationId: string, code: string, point: PointRef | null): Promise<ControlResult> {
     const server = await this.remote<ControlResult>('/poste/api/controle', { code, point }, operationId);
     if (server) return { ...server, source: 'serveur' };
-    const printed = await resolveBadge(this.list, code);
     const known = await this.knownAt();
+    const printed = await resolveBadge(this.list, code);
+    const refusal = posteGate(this.list, OP_POLICY.controle, this.now(), known, { offline: true, permanent: printed?.startsWith(PERMANENT_PREFIX) ?? false });
+    if (refusal) return refusedControl(this.list, point, refusal, known);
     const result = controlLocal(this.list, printed, point, this.now(), known);
     // Seul le code imprimé part dans la file : le contenu du QR n'est conservé nulle part sur la tablette.
-    await this.enqueue(operationId, 'controle', { code: printed ?? 'INCONNU', point, local_valid: result.valid, known_at: known });
+    await this.enqueue(operationId, 'controle', { code: printed ?? 'INCONNU', point, local_valid: result.valid, known_at: known, offline: true });
     return result;
   }
 
   async exit(operationId: string, code: string, point: PointRef | null): Promise<ExitResult> {
     const server = await this.remote<ExitResult>('/poste/api/sortie', { code, point }, operationId);
     if (server) return { ...server, source: 'serveur' };
+    const known = await this.knownAt();
+    const refusal = posteGate(this.list, OP_POLICY.sortie, this.now(), known, { offline: true }); // la sortie n'accorde rien : capacité de poste seulement, jamais de péremption
+    if (refusal) return refusedExit(this.list, point, refusal, known);
     const printed = await resolveBadge(this.list, code);
-    const result = exitLocal(this.list, printed, point, await this.knownAt());
+    const result = exitLocal(this.list, printed, point, known);
     if (result.ok) await this.enqueue(operationId, 'sortie', { code: printed, point });
     return result;
   }

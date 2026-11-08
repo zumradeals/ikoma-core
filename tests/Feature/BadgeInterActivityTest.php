@@ -41,7 +41,7 @@ function iaEvent(string $kind = 'stage', ?string $token = null): array
     $at = ['created_at' => now(), 'updated_at' => now()];
     DB::table('events')->insert(['id' => $id, 'name' => 'Activité S05 '.Str::random(5), 'starts_at' => '2027-01-01 08:00:00+00', 'ends_at' => '2027-03-01 18:00:00+00', 'kind' => $kind, ...$at]);
     DB::table('categories')->insert(['id' => $category, 'event_id' => $id, 'name' => 'Stagiaire S05', 'color' => '#1E9E5A', 'priority_circuit' => false, ...$at]);
-    DB::table('devices')->insert(['id' => $device, 'event_id' => $id, 'name' => 'Tablette S05', 'station' => 'Poste S05', 'token_hash' => $token === null ? null : hash('sha256', $token), ...$at]);
+    DB::table('devices')->insert(['id' => $device, 'event_id' => $id, 'name' => 'Tablette S05', 'station' => 'Poste S05', 'point_code' => 'poste_2', 'token_hash' => $token === null ? null : hash('sha256', $token), ...$at]);
 
     return ['id' => $id, 'category' => $category, 'device' => $device];
 }
@@ -184,4 +184,24 @@ it('expose le registre aux administrateurs seulement, applique la mise à dispos
     expect(DB::table('badges')->where('id', $badge->id)->value('event_id'))->toBe($this->visitB['id']);
     $this->post('/administration/badges/mise-a-disposition', ['badges' => [$badge->id], 'event_id' => $this->visitB['id'], 'category_id' => $this->visitB['category']])->assertSessionHasErrors('badges');
     $this->get('/administration/badges/'.$badge->id)->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/BadgeDetails')->has('transfers', 1)->has('history', 0));
+});
+
+it('réserve la restitution au poste 2 : un poste de soute, un poste non identifié ou un autre rôle sont refusés par le serveur', function () {
+    $badge = $this->lotA[0];
+    $this->registry->transfer([$badge->id], $this->visitB['id'], $this->visitB['category'], $this->visitB['device'], $this->admin);
+    $visitor = iaVisitor($this->visitB, 'Visiteur S05 Poste');
+    $this->badges->associer($badge, $visitor, $this->agent, $this->visitB['device']);
+    DB::table('visitors')->where('id', $visitor)->update(['status' => 'sorti']);
+    $this->actingAs($this->agent);
+    $code = 'IKOMA1:'.DB::table('badges')->where('id', $badge->id)->value('qr_token');
+    $headers = fn () => ['X-Device-Token' => IA_TOKEN_B, 'X-Operation-Id' => (string) Str::uuid(), 'Accept' => 'application/json'];
+    // un poste de soute n'a que la capacité « scan »
+    DB::table('devices')->where('id', $this->visitB['device'])->update(['point_code' => 'soute']);
+    $this->postJson('/poste/api/restitution/verifier', ['code' => $code], $headers())->assertForbidden()->assertJson(['code' => 'poste_non_habilite']);
+    $this->postJson('/poste/api/restitution', ['code' => $code], $headers())->assertForbidden()->assertJson(['code' => 'poste_non_habilite']);
+    expect(DB::table('badges')->where('id', $badge->id)->value('status'))->toBe('Associé');
+    // le poste 2 restitue
+    DB::table('devices')->where('id', $this->visitB['device'])->update(['point_code' => 'poste_2']);
+    $this->postJson('/poste/api/restitution', ['code' => $code], $headers())->assertOk()->assertJson(['ok' => true]);
+    expect(DB::table('badges')->where('id', $badge->id)->value('status'))->toBe('Disponible');
 });

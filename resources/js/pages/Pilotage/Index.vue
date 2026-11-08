@@ -59,7 +59,7 @@ const levelClass = { critique: 'border-red-700 bg-red-50', attention: 'border-or
         <div class="pilotage-stack">
           <section v-if="can('alertes.consulter')" aria-labelledby="alertes-titre" class="pilotage-card">
             <div class="pilotage-section-heading"><h2 id="alertes-titre"><AdminIcon name="alert" /> Alertes à traiter <span v-if="openAlerts" class="pilotage-count">{{ openAlerts }}</span></h2><Link :href="href('/pilotage/alertes')" class="pilotage-text-link">Voir toutes</Link></div>
-            <ul v-if="alerts.length" class="pilotage-alert-list"><AlertCard v-for="a in alerts" :key="a.id" :alert="a" :event-id="event.id" /></ul>
+            <ul v-if="alerts.length" class="pilotage-alert-list"><AlertCard v-for="a in alerts" :key="a.id" :alert="a" :event-id="event.id" :can-acknowledge="can('alertes.prendre_en_compte')" /></ul>
             <p v-else class="pilotage-empty" data-testid="aucune-alerte">✓ Aucune alerte à traiter.</p>
           </section>
           <section v-if="overview && can('litiges.decider')" class="pilotage-card" aria-labelledby="litiges-titre" data-testid="terrain-litiges" :data-warn="overview.litiges > 0">

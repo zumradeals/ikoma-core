@@ -1,5 +1,6 @@
 import type { Checkpoint, ControlResult, ExitResult, PointRef } from '../types';
 import { outsidePeriod } from './apply';
+import type { PosteRefusal } from './capabilities';
 import { sha256Hex } from './crypto';
 import type { LocalList } from './list';
 import { PERMANENT_PREFIX, decidePermanentOffline, findPermanentCard } from './permanent';
@@ -75,4 +76,13 @@ export function exitLocal(list: LocalList, printed: string | null, point: PointR
   if (badge.status !== 'Associé') return refuse('restitue', 'Badge restitué : aucune sortie à enregistrer.');
   if (holder.status === 'refuse') return refuse('visiteur_refuse', 'Accès refusé à cette personne : aucune sortie à enregistrer.');
   return { ...base, ok: true, badge_code: badge.code, person: { name: holder.full_name }, warning: holder.status === 'present' ? null : 'Aucune entrée connue sur cette tablette : la sortie sera vérifiée à la synchronisation.' };
+}
+
+/** Refus de poste (S02) rendu comme un résultat de contrôle : jamais favorable, rien n'est mis en file. */
+export function refusedControl(list: LocalList, point: PointRef | null, refusal: PosteRefusal, knownAt: string | null): ControlResult {
+  return { badge_code: null, zone_ok: null, point: pointName(list, point), person: null, organisation: null, category: null, zones: [], source: 'local', known_at: knownAt, valid: false, reason: refusal.reason, message: refusal.message };
+}
+
+export function refusedExit(list: LocalList, point: PointRef | null, refusal: PosteRefusal, knownAt: string | null): ExitResult {
+  return { source: 'local', known_at: knownAt, point: pointName(list, point), ok: false, reason: refusal.reason, message: refusal.message, badge_code: null };
 }

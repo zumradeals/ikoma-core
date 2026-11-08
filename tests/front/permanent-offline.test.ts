@@ -21,8 +21,8 @@ async function permanent(over: Partial<PermanentSnapshot> = {}): Promise<Permane
 }
 async function list(snap: PermanentSnapshot): Promise<LocalList> {
   const s: Snapshot = {
-    version: 'v', server_time: iso(0), poste: { id: 'p1', name: 'Tablette', station: 'Entrée', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-86_400_000), ends_at: iso(86_400_000) },
-    settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [], zones: ZONES, category_zone: [], hosts: [], postes: [{ id: 'p1', name: 'Entrée' }], visitors: [], badges: [], permanent: snap,
+    version: 'v', server_time: iso(0), poste: { id: 'p1', name: 'Tablette', station: 'Entrée', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-86_400_000), ends_at: iso(86_400_000) },
+    settings: { offline_trust_hours: 12, inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [], zones: ZONES, category_zone: [], hosts: [], postes: [{ id: 'p1', name: 'Entrée' }], visitors: [], badges: [], permanent: snap,
   };
   return new LocalList(s);
 }
