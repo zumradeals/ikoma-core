@@ -56,7 +56,7 @@ final class AdminVisitorsController
     {
         Gate::authorize('listes.importer');
         $data = $request->validate([
-            'event_id' => 'required|uuid|exists:events,id', 'full_name' => 'required|string|max:160', 'organisation' => 'nullable|string|max:160', 'position' => 'nullable|string|max:160',
+            'event_id' => 'required|uuid|exists:events,id', 'person_id' => 'nullable|uuid|exists:persons,id', 'full_name' => 'required|string|max:160', 'organisation' => 'nullable|string|max:160', 'position' => 'nullable|string|max:160',
             'category_id' => ['required', 'uuid', Rule::exists('categories', 'id')->where('event_id', $request->input('event_id'))],
             'host_id' => ['nullable', 'uuid', Rule::exists('hosts', 'id')->where('event_id', $request->input('event_id'))],
             'group_id' => ['nullable', 'uuid', Rule::exists('groups', 'id')->where('event_id', $request->input('event_id'))],

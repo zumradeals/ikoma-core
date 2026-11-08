@@ -8,7 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/** @property CarbonImmutable|null $withdrawn_at */
+/**
+ * @property CarbonImmutable|null $withdrawn_at
+ * @property string|null $closed_at
+ * @property string $person_id
+ */
 class Visitor extends Model
 {
     use HasUuids;

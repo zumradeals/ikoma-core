@@ -330,6 +330,9 @@ final class Desk
         if ($visitor->withdrawn_at !== null) {
             throw new DeskRefused('invite_retire', 'Cet invité a été retiré de la liste.');
         }
+        if ($visitor->closed_at !== null) {
+            throw new DeskRefused('participation_cloturee', 'La participation de cette personne est clôturée.');
+        }
         if ($visitor->status === 'refuse') {
             throw new DeskRefused('visiteur_refuse', 'L’accès a été refusé à ce visiteur.');
         }

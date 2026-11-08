@@ -575,3 +575,14 @@ Constat de recette sur tablette : une carte active avec une habilitation en cour
 ## Poste d'accueil — bandeau de réinitialisation retiré de l'écran de travail (2 novembre 2026)
 
 Demande du dirigeant : le bandeau blanc « Réinitialiser ce navigateur et changer de poste » en haut de l'écran de travail n'est pas professionnel. Il est retiré de l'écran ouvert. La réinitialisation locale reste disponible depuis l'écran verrouillé (« Ancien poste ? Réinitialiser ce navigateur pour le réenrôler »), qui est le chemin documenté (RESET_POSTE_CAMERA.md). Aucune règle ni donnée modifiée.
+
+
+## S03/S04 — Personnes, activités et participations (novembre 2026)
+
+Branche issue de `main` (S02 n'est pas fusionnée ; à réaligner dès son intégration). Aucune donnée de production à migrer : structure propre, sans mécanisme de compatibilité.
+
+- **Une identité, des participations :** `persons` est l'identité durable ; les fiches `visitors` sont les participations (une par personne et par activité). Les titulaires permanents sont des personnes avec un profil d'engagement. Pas de second registre : la saisie d'un invité, l'inscription depuis la fiche et les cartes permanentes passent par la même identité.
+- **Jamais de fusion automatique :** aucune unicité sur le nom ; l'homonyme est signalé et sa création confirmée ; les importations créent une personne par ligne (pas de rapprochement implicite). Le rapprochement de doublons reste une décision humaine (lot ultérieur).
+- **Garanties en base :** participation sans personne impossible (déclencheur), `person_id` immuable, une participation par personne et par activité, nature d'activité cohérente avec le contexte permanent.
+- **Clôture d'une participation :** individuelle, motivée, refusée si présente ou badge attribué (jamais valant restitution), sans effet sur la personne ni sur ses autres participations. Clôtures collectives et VIP : hors périmètre.
+- **Points à valider :** conservation de l'identité (non définie) ; rapprochement de doublons ; importations (un homonyme d'une personne existante n'est pas repris automatiquement).
