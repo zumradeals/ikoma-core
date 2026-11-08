@@ -18,6 +18,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 const SITE_TOKEN = '3333333333333333333333333333333333333333333333333333333333333333';
@@ -549,4 +550,47 @@ it('juge la zone d’un poste selon la correspondance configurée par l’admini
         ->and($snapshot['entitlements']->pluck('zone_id')->all())->toBe([DemoSeeder::id('zone2')])
         ->and(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeTrue();
     expect(siteAudit()->whereIn('action', ['point.zone_associee', 'point.zone_dissociee'])->count())->toBe(3);
+});
+
+
+// --- S07 : mouvements physiques et centre de supervision ------------------------------------------------------------------------
+
+it('liste les mouvements physiques de l’activité, filtrables, au superviseur seulement', function () {
+    siteEnter(1, $this->batch1[0]);
+    siteControl($this->batch1[0]->code, siteZone(2))->assertOk(); // zone non autorisée
+    siteControl($this->batch1[0]->code, siteZone(0))->assertOk(); // zone autorisée
+    $this->postJson('/poste/api/sortie', ['code' => $this->batch1[0]->code, 'point' => siteZone(0)], siteHeaders())->assertOk();
+    $event = DemoSeeder::id('event');
+    $this->actingAs(siteUser('superviseur'));
+    $page = fn (string $query) => $this->get('/pilotage/mouvements?event='.$event.$query);
+    $page('')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Pilotage/Mouvements')->where('total', 4)->etc());
+    $page('&outcome=refuse')->assertOk()->assertInertia(fn (Assert $p) => $p->where('total', 1)->where('rows.0.checkpoint', 'Espace VIP')->etc());
+    $page('&outcome=valide')->assertOk()->assertInertia(fn (Assert $p) => $p->where('total', 1)->etc());
+    $page('&type=sortie')->assertOk()->assertInertia(fn (Assert $p) => $p->where('total', 1)->etc());
+    $page('&type=entree')->assertOk()->assertInertia(fn (Assert $p) => $p->where('total', 1)->etc());
+    $name = DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('full_name');
+    $page('&q='.rawurlencode(mb_substr($name, 0, 4)))->assertOk()->assertInertia(fn (Assert $p) => $p->where('total', 4)->etc());
+    $page('&type=inconnu')->assertSessionHasErrors('type');
+    foreach (['agent_accueil', 'hote'] as $role) {
+        $this->actingAs(siteUser($role))->get('/pilotage/mouvements')->assertForbidden();
+    }
+});
+
+it('montre au superviseur les badges à récupérer et les habilitations, sans lui permettre de les modifier', function () {
+    $admin = siteUser('administrateur');
+    $event = DemoSeeder::id('event');
+    siteEnter(1, $this->batch1[0]);
+    $this->postJson('/poste/api/sortie', ['code' => $this->batch1[0]->code], siteHeaders())->assertOk();
+    $id = app(ParticipationEntitlements::class)->grant(DemoSeeder::id('visitor1'), DemoSeeder::id('zone2'), 'exceptionnelle', 'Visite officielle', now()->toIso8601String(), now()->addHours(2)->toIso8601String(), $admin);
+    $supervisor = siteUser('superviseur');
+    $this->actingAs($supervisor)->get('/pilotage/acces?event='.$event)->assertOk()->assertInertia(fn (Assert $p) => $p->component('Pilotage/Acces')
+        ->has('badgesToReturn', 1)->where('badgesToReturn.0.code', $this->batch1[0]->code)->has('entitlements', 1)->where('entitlements.0.state', 'active')->where('entitlements.0.kind', 'exceptionnelle')->etc());
+    // le superviseur ne peut ni suspendre, ni retirer, ni accorder
+    $this->postJson('/administration/acces/habilitations/'.$id.'/suspendre', ['reason' => 'essai'])->assertForbidden();
+    $this->postJson('/administration/acces/habilitations/'.$id.'/retirer', ['reason' => 'essai'])->assertForbidden();
+    expect(DB::table('participation_entitlements')->where('id', $id)->whereNull('suspended_at')->whereNull('revoked_at')->exists())->toBeTrue();
+    // une fois le badge restitué, il disparaît de la liste
+    app(BadgeService::class)->restituer($this->batch1[0], $this->agent);
+    $this->actingAs($supervisor)->get('/pilotage/acces?event='.$event)->assertInertia(fn (Assert $p) => $p->has('badgesToReturn', 0)->etc());
+    $this->actingAs(siteUser('agent_accueil'))->get('/pilotage/acces')->assertForbidden();
 });
