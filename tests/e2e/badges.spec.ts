@@ -10,8 +10,11 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   const origin = new URL(baseURL || 'http://localhost:8080').origin;
   await page.setViewportSize({ width: 1024, height: 1400 });
   await loginWithSecondFactor(page, user.email, user.password, user.secret);
+  // L'entrée « Badges et cartes » ouvre l'espace de travail ; les lots et réservations restent sur leur page historique.
   await openMenu(page, 'badges-cartes');
-  await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible();
+  await expect(page.getByTestId('espace-travail')).toBeVisible();
+  await page.getByTestId('lien-lots').click();
+  await expect(page.getByRole('heading', { name: 'Administration · Lots et réservations de badges' })).toBeVisible();
 
   // 1. Génération d'un lot de 20 badges « Visiteur » : 20 attendus + 10 % de marge = 22.
   const lotForm = page.getByRole('form', { name: 'Générer un lot de badges' });
@@ -48,7 +51,7 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   // 3. Page d'impression : aucune requête hors de notre origine, 22 étiquettes, QR décodables.
   const external: string[] = [];
   page.on('request', request => { const url = request.url(); if (!url.startsWith('data:') && new URL(url).origin !== origin) external.push(url); });
-  await page.goto('/administration/badges');
+  await page.goto('/administration/badges/lots');
   await page.locator('li').filter({ hasText: lotName }).filter({ hasText: 'Exercice fictif IKOMA' }).first().getByRole('link', { name: 'Imprimer les étiquettes' }).click();
   // Les étiquettes sont un format de l'Atelier des badges : sélection préremplie, document généré puis ouvert.
   await expect(page.getByTestId('choix-format')).toHaveValue('etiquettes');
