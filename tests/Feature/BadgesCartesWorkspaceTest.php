@@ -114,12 +114,13 @@ it('liste cartes permanentes et badges temporaires dans un seul registre, avec t
     $t = bwTemporary();
     $c = bwCard();
     $rows = $this->actingAs($this->admin)->getJson('/administration/badges/supports?q=zz')->assertOk()->json('data');
-    $byCode = collect($rows)->keyBy('code');
-    expect($byCode[$t['code']])->toMatchArray(['type' => 'badge_temporaire', 'holder_name' => $t['name'], 'state' => 'emis', 'state_label' => 'Émis, non remis', 'category' => 'Stagiaire', 'printed' => false])
-        ->and($byCode[$c['code']])->toMatchArray(['type' => 'carte_permanente', 'holder_name' => $c['name'], 'state' => 'emis', 'state_label' => 'Émis, non remis', 'printed' => false]);
+    // Le numéro d'un support est unique dans son activité, pas dans tout le site : on identifie par l'identifiant du support.
+    $byId = collect($rows)->keyBy('id');
+    expect($byId[$t['badge']])->toMatchArray(['type' => 'badge_temporaire', 'holder_name' => $t['name'], 'state' => 'emis', 'state_label' => 'Émis, non remis', 'category' => 'Stagiaire', 'printed' => false])
+        ->and($byId[$c['badge']])->toMatchArray(['type' => 'carte_permanente', 'holder_name' => $c['name'], 'state' => 'emis', 'state_label' => 'Émis, non remis', 'printed' => false]);
     // La remise de la carte (activation explicite) la rend active ; le badge temporaire le devient à l'accueil (association), jamais à l'émission.
     app(HolderCards::class)->activate($c['holder'], $this->admin);
-    expect(collect($this->getJson('/administration/badges/supports?q=zz')->json('data'))->keyBy('code')[$c['code']])->toMatchArray(['state' => 'actif', 'state_label' => 'Actif']);
+    expect(collect($this->getJson('/administration/badges/supports?q=zz')->json('data'))->keyBy('id')[$c['badge']])->toMatchArray(['state' => 'actif', 'state_label' => 'Actif']);
 });
 
 it('filtre par type, par état et par recherche, sans jamais interpréter la saisie ni exposer de jeton', function () {
@@ -127,10 +128,10 @@ it('filtre par type, par état et par recherche, sans jamais interpréter la sai
     $c = bwCard('Zzbeta');
     $this->actingAs($this->admin);
     $cartes = collect($this->getJson('/administration/badges/supports?type=carte_permanente')->assertOk()->json('data'));
-    expect($cartes->every(fn ($r) => $r['type'] === 'carte_permanente'))->toBeTrue()->and($cartes->pluck('code'))->toContain($c['code'])->not->toContain($t['code']);
+    expect($cartes->every(fn ($r) => $r['type'] === 'carte_permanente'))->toBeTrue()->and($cartes->pluck('id'))->toContain($c['badge'])->not->toContain($t['badge']);
     $temp = collect($this->getJson('/administration/badges/supports?type=badge_temporaire&etat=emis&q=zzalpha')->assertOk()->json('data'));
     expect($temp->pluck('code')->all())->toBe([$t['code']]);
-    expect($this->getJson('/administration/badges/supports?q='.strtolower($c['code']))->json('data.0.code'))->toBe($c['code']);
+    expect(collect($this->getJson('/administration/badges/supports?q='.strtolower($c['code']))->json('data'))->pluck('id'))->toContain($c['badge']);
     expect($this->getJson('/administration/badges/supports?q=%25')->json('meta.total'))->toBe(0);
     expect($this->getJson('/administration/badges/supports?etat=restitue&q=zzalpha')->json('meta.total'))->toBe(0);
     $this->getJson('/administration/badges/supports?type=autre')->assertStatus(422);
@@ -157,12 +158,14 @@ it('reflète les cycles de vie : carte révoquée, badge restitué, badge annul�
     $t = bwTemporary('Zzrestitue');
     $n = bwTemporary('Zzannule');
     app(CardLifecycle::class)->revoke($c['holder'], 'perdue', null, $this->admin);
+    // Cycle de vie légitime : Disponible → Associé → Restitué (le déclencheur refuse les autres transitions).
+    DB::table('badges')->where('id', $t['badge'])->update(['status' => 'Associé']);
     DB::table('badges')->where('id', $t['badge'])->update(['status' => 'Restitué']);
     DB::table('badges')->where('id', $n['badge'])->update(['status' => 'Annulé']);
     $this->actingAs($this->admin);
-    $byCode = collect($this->getJson('/administration/badges/supports?q=zz')->assertOk()->json('data'))->keyBy('code');
-    expect($byCode[$c['code']]['state'])->not->toBe('actif')->and($byCode[$c['code']]['state_label'])->not->toBe('Actif')
-        ->and($byCode[$t['code']]['state'])->toBe('restitue')->and($byCode[$n['code']]['state'])->toBe('annule');
+    $byId = collect($this->getJson('/administration/badges/supports?q=zz')->assertOk()->json('data'))->keyBy('id');
+    expect($byId[$c['badge']]['state'])->toBe('perdu')->and($byId[$c['badge']]['state_label'])->toBe('Perdue')
+        ->and($byId[$t['badge']]['state'])->toBe('restitue')->and($byId[$n['badge']]['state'])->toBe('annule');
     expect($this->getJson('/administration/badges/supports?etat=restitue&q=zzrestitue')->json('meta.total'))->toBe(1);
 });
 
