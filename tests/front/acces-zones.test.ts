@@ -14,7 +14,7 @@ import AccesZones from '../../resources/js/pages/Admin/AccesZones.vue';
 
 const base = {
   events: [{ id: 'e1', name: 'Stage A' }], eventId: 'e1', q: '', zones: [{ id: 'z1', name: 'Hall' }, { id: 'z2', name: 'Espace VIP' }], points: [{ id: 'p1', name: 'Poste 2' }],
-  mappings: [{ id: 'm1', device_id: 'p1', point: 'Poste 2', zone_id: 'z1', zone: 'Hall' }],
+  mappings: [{ id: 'm1', checkpoint_id: 'p1', point: 'Poste 2', zone_id: 'z1', zone: 'Hall' }],
   participants: [{ id: 'v1', full_name: 'Koné Mariam', organisation: null }], maxHours: 24, now: '2027-01-10T10:00:00Z',
   entitlements: [
     { id: 'h1', visitor_id: 'v1', person_id: 'p', full_name: 'Koné Mariam', zone_id: 'z2', zone: 'Espace VIP', kind: 'exceptionnelle' as const, reason: 'Visite officielle', valid_from: '2027-01-10T09:00:00Z', valid_until: '2027-01-10T18:00:00Z', suspended_at: null, suspension_reason: null, revoked_at: null, revocation_reason: null },

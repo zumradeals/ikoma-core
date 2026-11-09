@@ -117,6 +117,12 @@ const CN_ROUTES = [
 /** Routes ajoutées volontairement par la consolidation (déclarées ici pour rester visibles). */
 const CN_ADDED = [
     ['GET', 'administration/modeles', ['can:badges.gerer'], []],
+    ['GET', 'administration/site', ['can:postes.gerer'], []],
+    ['PUT', 'administration/site', ['can:postes.gerer'], []],
+    ['POST', 'administration/site/postes', ['can:postes.gerer'], []],
+    ['PUT', 'administration/site/postes/{checkpoint}', ['can:postes.gerer'], []],
+    ['POST', 'administration/site/postes/{checkpoint}/activation', ['can:postes.gerer'], []],
+    ['POST', 'administration/site/tablettes/{device}/affectation', ['can:postes.gerer'], []],
 ];
 
 function cnUser(string $role): User
@@ -130,7 +136,7 @@ function cnUser(string $role): User
 
 function cnScope(): array
 {
-    return ['badges', 'atelier', 'titulaires', 'habilitations', 'acces', 'categories-institutionnelles', 'personnes', 'imports', 'invites', 'participations', 'modeles'];
+    return ['badges', 'atelier', 'titulaires', 'habilitations', 'acces', 'categories-institutionnelles', 'personnes', 'imports', 'invites', 'participations', 'modeles', 'site'];
 }
 
 /** @return list<string> */

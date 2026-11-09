@@ -29,7 +29,7 @@ final class PostesController
 
         return Inertia::render('Admin/Postes', [
             'events' => DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name']),
-            'postes' => $postes,
+            'postes' => $postes, 'points' => PostCapabilities::points(false),
             'settings' => ['inactivity' => $setting('poste_inactivite_minutes'), 'skew' => $setting('poste_ecart_horloge_secondes'), 'pin' => $setting('poste_echecs_pin_max'), 'pointsDelay' => $setting('controle_delai_min_points'), 'burstCount' => $setting('controle_rafale_nombre'), 'burstMinutes' => $setting('controle_rafale_minutes'),
                 'offlineCall' => $setting('poste_delai_appel_minutes'), 'offlineMaxHours' => $setting('poste_hors_reseau_max_heures'), 'offlineApproved' => DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->value('value') === '1', 'lowBadgesPercent' => $setting('poste_badges_bas_pourcent'), 'lowBadgesMin' => $setting('poste_badges_bas_minimum'), 'silentMinutes' => $setting('pilotage_poste_silencieux_minutes'), 'lateMinutes' => $setting('visite_retard_minutes'), 'escalationMinutes' => $setting('alerte_escalade_minutes'), 'identityDocument' => DB::table('settings')->where('key', 'identite_piece_active')->value('value') === '1'],
             'newCode' => session()->pull('enrol_code'),
@@ -40,7 +40,7 @@ final class PostesController
     public function store(Request $r, Devices $devices): RedirectResponse
     {
         Gate::authorize('postes.gerer');
-        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120', 'point_code' => ['required', Rule::in(array_keys(PostCapabilities::POINTS))]]);
+        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120', 'point_code' => ['required', Rule::in(array_keys(PostCapabilities::points()))]]);
         $devices->create($data['event_id'], $data['name'], $data['station'] ?? null, $r->user(), $data['point_code']);
 
         return back();

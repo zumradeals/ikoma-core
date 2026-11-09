@@ -316,7 +316,7 @@ final class SiteControl
         if ($direction !== null && ! in_array($direction, ['entree', 'sortie'], true)) {
             throw new DeskRefused('sens_invalide', 'Sens de passage inconnu : choisissez Entrée ou Sortie.', 422);
         }
-        if ($direction === null && $poste->point_code === 'soute') {
+        if ($direction === null && PostCapabilities::requiresDirection($poste)) {
             throw new DeskRefused('sens_requis', 'Choisissez Entrée ou Sortie avant de scanner un badge.', 422, 'Touchez « Entrée » ou « Sortie », puis scannez.');
         }
 

@@ -16,7 +16,7 @@ const menu = (active: string, permissions: string[], demo = false, f06 = true) =
   const wrapper = mount(AdminLayout, { props: { active } });
   return { ids: wrapper.findAll('[data-testid^="menu-"]').map(a => a.attributes('data-testid')!.replace('menu-', '')), hrefs: wrapper.findAll('[data-testid^="menu-"]').map(a => a.attributes('href')), wrapper };
 };
-const FULL = ['tableau', 'evenements', 'zones', 'categories', 'personnes', 'badges-cartes', 'acces-zones', 'habilitations', 'categories-institutionnelles', 'postes', 'groupes', 'identite', 'modules', 'comptes', 'donnees', 'journal', 'securite', 'demonstration'];
+const FULL = ['tableau', 'evenements', 'zones', 'categories', 'personnes', 'badges-cartes', 'acces-zones', 'habilitations', 'categories-institutionnelles', 'site-acces', 'postes', 'groupes', 'identite', 'modules', 'comptes', 'donnees', 'journal', 'securite', 'demonstration'];
 
 describe('navigation d’administration', () => {
   it('propose une seule entrée par usage, sans doublon d’adresse ni d’intitulé', () => {
@@ -38,9 +38,9 @@ describe('navigation d’administration', () => {
     expect(wrapper.findAll('[data-testid^="groupe-"],[data-testid="menu-badges-cartes"]')).toHaveLength(5);
   });
 
-  it('compte 16 entrées visibles en exploitation, 18 avec le module Groupes et la démonstration', () => {
-    expect(menu('tableau', ALL, false, false).ids).toHaveLength(16);
-    expect(menu('tableau', ALL, true, true).ids).toHaveLength(18);
+  it('compte 17 entrées visibles en exploitation, 19 avec le module Groupes et la démonstration (menu transitoire avant les sept entrées)', () => {
+    expect(menu('tableau', ALL, false, false).ids).toHaveLength(17);
+    expect(menu('tableau', ALL, true, true).ids).toHaveLength(19);
     expect(menu('tableau', ALL, false, false).ids).not.toEqual(expect.arrayContaining(['groupes', 'demonstration']));
   });
 

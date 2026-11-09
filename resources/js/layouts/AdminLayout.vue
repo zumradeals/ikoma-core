@@ -33,6 +33,7 @@ const groups: Group[] = [
     { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer' },
   ] },
   { key: 'postes', label: 'Postes et opérations', items: [
+    { key: 'site-acces', label: 'Site et accès', icon: 'map', href: '/administration/site', permission: 'postes.gerer' },
     { key: 'postes', label: 'Postes et tablettes', icon: 'monitor', href: '/administration/postes', permission: 'postes.gerer' },
     { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
   ] },

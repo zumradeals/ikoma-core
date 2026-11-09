@@ -50,3 +50,5 @@ pest()->use(DatabaseTransactions::class)->in('Feature/AutorisationsS02Test.php')
 pest()->use(DatabaseTransactions::class)->in('Feature/VisitesVehiculesVipTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/InterfacesS10Test.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/ConsolidationNavigationTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/CaracterisationV1Test.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/SiteAccesTest.php');

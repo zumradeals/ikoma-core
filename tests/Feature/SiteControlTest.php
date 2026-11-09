@@ -515,7 +515,7 @@ it('exige un motif et une durée limitée pour une habilitation exceptionnelle, 
 it('réserve l’accès aux zones à l’administrateur : le superviseur et l’agent sont refusés par le serveur', function () {
     $routes = [
         ['post', '/administration/acces/habilitations', ['visitor_id' => DemoSeeder::id('visitor1'), 'zone_id' => DemoSeeder::id('zone2'), 'kind' => 'standard', 'valid_from' => '2027-01-10 10:00', 'valid_until' => '2027-01-10 12:00']],
-        ['post', '/administration/acces/correspondances', ['event_id' => DemoSeeder::id('event'), 'device_id' => DemoSeeder::id('device'), 'zone_id' => DemoSeeder::id('zone2')]],
+        ['post', '/administration/acces/correspondances', ['event_id' => DemoSeeder::id('event'), 'checkpoint_id' => (string) DB::table('checkpoints')->where('code', 'poste_2')->value('id'), 'zone_id' => DemoSeeder::id('zone2')]],
         ['put', '/administration/acces/reglage', ['max_heures' => 48]],
     ];
     foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
@@ -532,15 +532,16 @@ it('réserve l’accès aux zones à l’administrateur : le superviseur et l’
 it('juge la zone d’un poste selon la correspondance configurée par l’administrateur, sans rien coder en dur', function () {
     $admin = siteUser('administrateur');
     $zones = app(ZoneAccess::class);
+    $poste2 = (string) DB::table('checkpoints')->where('code', 'poste_2')->value('id');
     siteEnter(1, $this->batch1[0]);
     // sans correspondance, le poste ne juge aucune zone
     expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeNull();
-    $zones->map(DemoSeeder::id('event'), DemoSeeder::id('device'), DemoSeeder::id('zone2'), $admin);
+    $zones->map(DemoSeeder::id('event'), $poste2, DemoSeeder::id('zone2'), $admin);
     expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeFalse();
     // un poste qui garde deux zones est franchi si l'une d'elles est autorisée
-    $zones->map(DemoSeeder::id('event'), DemoSeeder::id('device'), DemoSeeder::id('zone0'), $admin);
+    $zones->map(DemoSeeder::id('event'), $poste2, DemoSeeder::id('zone0'), $admin);
     expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeTrue();
-    expect(fn () => $zones->map(DemoSeeder::id('event'), DemoSeeder::id('device'), DemoSeeder::id('zone0'), $admin))->toThrow(ValidationException::class);
+    expect(fn () => $zones->map(DemoSeeder::id('event'), $poste2, DemoSeeder::id('zone0'), $admin))->toThrow(ValidationException::class);
     $mapping = DB::table('checkpoint_zones')->where('zone_id', DemoSeeder::id('zone0'))->value('id');
     $zones->unmap($mapping, $admin);
     expect(siteControl($this->batch1[0]->code)->json()['zone_ok'])->toBeFalse();
