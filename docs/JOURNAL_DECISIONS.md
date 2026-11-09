@@ -790,3 +790,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **États affichés** : « Émis, non remis » (carte non activée / badge nominatif non associé) ≠ Actif/Associé ; les compteurs « Supports actifs » ne comptent que les cartes remises et les badges associés.
 - **Aperçu** : indicatif avant génération (ni numéro ni QR, aucun support créé) ; réel après émission (numéro et QR du serveur, QR affiché comme image).
 - **Écarts assumés avec la maquette** : le modèle institutionnel n'est pas choisi librement (le contrat le dérive de la catégorie de la personne ; affiché en lecture) ; pas de remplacement/suppression de photo (aucune fonction existante) ; le type de support se choisit en première étape car il détermine la population de personnes ; « Impressions (30 j) » devient « Tirages (30 j) » (tirages enregistrés, pas impressions confirmées).
+
+## V1 — Badges et cartes : simplification des onglets (validée par le dirigeant)
+- **Modèles institutionnels** : la page s'ouvre sur les modèles par catégorie institutionnelle (cartes et badges). L'ancien modèle des badges de lots, par activité, est rangé dans un bloc replié (« stock existant ») ; `?section=badges` l'ouvre.
+- **Impression et historique** : `/administration/atelier` s'ouvre sur le seul suivi des tirages (généré · demandé · confirmé). L'atelier par lots (modèle, lot, plage, format) s'ouvre avec `?vue=atelier` ou par les anciens liens (`person`, `batch`, `format`, `from`, `to`, `cols`, `rows`, `mode`), et depuis « Lots et réservations ». Imprimer ou réimprimer un support se fait depuis le registre.
+- **Registre** : le stock de lots sans titulaire est masqué par défaut ; il reste visible par le filtre « Disponible (stock) » et par la recherche d'un numéro.
+- Aucune route, donnée ni moteur supprimé ou modifié.

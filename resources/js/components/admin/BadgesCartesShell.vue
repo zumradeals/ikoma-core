@@ -18,7 +18,7 @@ const can = (permission: string) => page.props.auth?.permissions?.includes(permi
 const tabs = [
   { key: 'registre', label: 'Registre et cartes', hint: 'Supports, préparer, consulter', href: '/administration/badges', permission: 'badges.gerer', icon: 'qr' },
   { key: 'modeles', label: 'Modèles institutionnels', hint: 'Aspect des badges et des cartes', href: '/administration/modeles', permission: 'badges.gerer', icon: 'pencil' },
-  { key: 'impression', label: 'Impression et historique', hint: 'Tirages, réimpressions, suivi', href: '/administration/atelier', permission: 'badges.gerer', icon: 'print' },
+  { key: 'impression', label: 'Impression et historique', hint: 'Suivi des tirages et réimpressions', href: '/administration/atelier', permission: 'badges.gerer', icon: 'print' },
 ] as const;
 const shown = computed(() => tabs.filter(tab => can(tab.permission)));
 // Les anciennes pages (lots, registre commun, fiche d'un badge, cartes) appartiennent à la responsabilité « Registre et cartes ».

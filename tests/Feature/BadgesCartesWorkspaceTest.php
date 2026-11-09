@@ -243,3 +243,30 @@ it('garde le parcours groupé sur le même contrat : une opération rejouée ne 
     $rows = collect($this->getJson('/administration/badges/supports?q=zzg')->json('data'));
     expect($rows)->toHaveCount(3)->and($rows->every(fn ($r) => $r['printed'] === false && $r['state'] === 'emis'))->toBeTrue();
 });
+
+it('masque par défaut le stock de lots sans titulaire, visible sur demande et par la recherche', function () {
+    $t = bwTemporary('Zzstock');
+    $this->actingAs($this->admin);
+    $default = collect($this->getJson('/administration/badges/supports')->assertOk()->json('data'));
+    expect($default->contains(fn ($r) => $r['state'] === 'disponible'))->toBeFalse()->and($default->pluck('id'))->toContain($t['badge']);
+    $stock = collect($this->getJson('/administration/badges/supports?etat=disponible')->assertOk()->json('data'));
+    expect($stock->isNotEmpty())->toBeTrue()->and($stock->every(fn ($r) => $r['state'] === 'disponible'))->toBeTrue();
+    $code = (string) $stock->first()['code'];
+    expect(collect($this->getJson('/administration/badges/supports?q='.strtolower($code))->json('data'))->pluck('state'))->toContain('disponible');
+});
+
+it('ouvre l’historique des tirages par défaut et l’atelier par lots seulement à la demande ou par les anciens liens', function () {
+    $this->actingAs($this->admin);
+    $this->get('/administration/atelier')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Atelier')->where('vue', 'historique'));
+    $this->get('/administration/atelier?vue=atelier')->assertOk()->assertInertia(fn (Assert $p) => $p->where('vue', 'atelier'));
+    $this->get('/administration/atelier?format=etiquettes&batch='.DemoSeeder::id('batch'))->assertOk()->assertInertia(fn (Assert $p) => $p->where('vue', 'atelier'));
+    $this->get('/administration/atelier?mode=cartes')->assertOk()->assertInertia(fn (Assert $p) => $p->where('vue', 'atelier'));
+    $this->get('/administration/atelier?vue=autre')->assertStatus(302);
+});
+
+it('ouvre les modèles institutionnels par défaut ; l’ancien modèle par activité reste demandable', function () {
+    app(InstitutionalCategories::class)->initialize($this->admin);
+    $this->actingAs($this->admin);
+    $this->get('/administration/modeles')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Modeles')->where('section', 'cartes')->has('cards.categories', 8));
+    $this->get('/administration/modeles?section=badges')->assertOk()->assertInertia(fn (Assert $p) => $p->where('section', 'badges')->has('preferences'));
+});

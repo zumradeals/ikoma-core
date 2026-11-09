@@ -89,26 +89,27 @@ describe('Page Modèles', () => {
   const cards = { categories: [{ code: 'AILCT-01', label: 'Catégorie un' }], selected: 'AILCT-01', model: { category_code: 'AILCT-01', label: 'Catégorie un', color: '#2E7D32', mention: 'M', show_validity: true, qr_side: 'verso', version: 1, status: 'brouillon', validated: false, validated_at: null, validated_by: null, saved: false }, preview: { recto: '<i>r</i>', verso: '<i>v</i>' }, settings: { ligne1: '', ligne2: '', contact: '', avis: '' }, limits: { ligne1: 80, ligne2: 80, contact: 80, avis: 160 }, initialized: true, canConfigure: true };
   const mountPage = (section: 'badges' | 'cartes') => mount(Modeles, { props: { ...props, section, cards } as never, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' } } } });
 
-  it('montre le cadre à trois onglets et la section badge visiteur par défaut', async () => {
-    const wrapper = mountPage('badges'); await flushPromises();
+  it('montre le cadre à trois onglets et les modèles institutionnels par catégorie, sans tuile de choix de type', async () => {
+    const wrapper = mountPage('cartes'); await flushPromises();
     expect(wrapper.get('[data-testid="onglet-modeles"]').attributes('aria-current')).toBe('page');
     expect(wrapper.findAll('[data-testid^="onglet-"]').map(a => a.attributes('data-testid'))).toEqual(['onglet-registre', 'onglet-modeles', 'onglet-impression']);
-    expect(wrapper.find('[data-testid="bloc-modele-badge"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="page-modeles-cartes"]').exists()).toBe(false);
-  });
-
-  it('passe à la section carte permanente sans quitter la page, avec les mêmes contrôles qu’auparavant', async () => {
-    const wrapper = mountPage('badges'); await flushPromises();
-    await wrapper.get('[data-testid="modele-type-cartes"]').trigger('click');
     expect(wrapper.find('[data-testid="page-modeles-cartes"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="choix-categorie"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="enregistrer-modele"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="badge-enregistrer-modele"]').exists()).toBe(false);
   });
 
-  it('s’ouvre directement sur la carte quand la section est demandée', async () => {
+  it('range l’ancien modèle par activité (lots) dans un bloc replié, hors du parcours normal', async () => {
     const wrapper = mountPage('cartes'); await flushPromises();
-    expect(wrapper.get('[data-testid="modele-type-cartes"]').attributes('aria-pressed')).toBe('true');
+    const historique = wrapper.get('[data-testid="modele-historique"]');
+    expect(historique.element.tagName).toBe('DETAILS');
+    expect(historique.attributes('open')).toBeUndefined();
+    expect(historique.text()).toContain('stock existant');
+    expect(historique.find('[data-testid="bloc-modele-badge"]').exists()).toBe(true);
+  });
+
+  it('ouvre le bloc historique quand la section badges est demandée explicitement', async () => {
+    const wrapper = mountPage('badges'); await flushPromises();
+    expect(wrapper.get('[data-testid="modele-historique"]').attributes('open')).toBeDefined();
     expect(wrapper.find('[data-testid="choix-categorie"]').exists()).toBe(true);
   });
 });

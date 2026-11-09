@@ -35,7 +35,7 @@ final class ModelesController
 
         return Inertia::render('Admin/Modeles', [
             'events' => $events, 'preferences' => $preferences, 'initialEvent' => $input['event'] ?? null,
-            'section' => ($input['section'] ?? 'badges') === 'cartes' ? 'cartes' : 'badges',
+            'section' => ($input['section'] ?? 'cartes') === 'badges' ? 'badges' : 'cartes',
             'cards' => $holderCards->modelProps($request, $cards, $categories, $models),
         ]);
     }

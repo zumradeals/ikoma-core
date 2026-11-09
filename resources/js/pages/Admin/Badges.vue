@@ -28,7 +28,7 @@ const available = computed(() => Object.values(props.batchCounts ?? {}).flat().f
   <a href="#fabriquer" class="rounded-xl border-2 border-[#0066B3] bg-white px-5 py-3 font-bold" data-testid="aller-fabriquer"><span class="mr-2 inline-grid size-8 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">1</span>Fabriquer</a>
   <a href="#affecter" class="rounded-xl border-2 px-5 py-3 font-bold" :class="toAssign > 0 ? 'border-amber-600 bg-amber-50' : 'border-slate-300 bg-white'" data-testid="aller-affecter"><span class="mr-2 inline-grid size-8 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">2</span>Affecter <span class="font-normal" data-testid="nb-a-affecter">({{ toAssign }} sans poste)</span></a>
   <a href="#suivre" class="rounded-xl border-2 border-slate-300 bg-white px-5 py-3 font-bold" data-testid="aller-suivre"><span class="mr-2 inline-grid size-8 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">3</span>Suivre <span class="font-normal">({{ available }} disponibles)</span></a>
-  <Link href="/administration/atelier" class="action ml-auto" data-testid="ouvrir-atelier">Imprimer dans l’Atelier des badges</Link>
+  <Link href="/administration/atelier?vue=atelier" class="action ml-auto" data-testid="ouvrir-atelier">Imprimer dans l’Atelier des badges</Link>
 </nav>
 
 <div class="mb-8 space-y-6">

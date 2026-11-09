@@ -27,7 +27,7 @@ describe('page Badges visiteurs en trois temps', () => {
     expect(wrapper.get('[data-testid=etapes-badges]').text()).toContain('Fabriquer');
     expect(wrapper.get('[data-testid=nb-a-affecter]').text()).toContain('5 sans poste');
     expect(wrapper.get('[data-testid=alerte-sans-poste]').text()).toContain('5 badge(s)');
-    expect(wrapper.get('[data-testid=ouvrir-atelier]').attributes('href')).toBe('/administration/atelier');
+    expect(wrapper.get('[data-testid=ouvrir-atelier]').attributes('href')).toBe('/administration/atelier?vue=atelier');
     expect(wrapper.get('[data-testid=lien-cartes-permanentes]').attributes('href')).toBe('/administration/titulaires');
   });
 

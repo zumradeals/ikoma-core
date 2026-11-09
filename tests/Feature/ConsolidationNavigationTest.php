@@ -259,7 +259,7 @@ it('sert la page Modèles avec le modèle de badge de chaque activité et le mod
     app(InstitutionalCategories::class)->initialize($admin);
     $this->actingAs($admin);
     $this->get('/administration/modeles')->assertOk()
-        ->assertInertia(fn ($page) => $page->component('Admin/Modeles')->where('section', 'badges')->has('events')->has('preferences')->has('cards.categories', 8)->where('cards.canConfigure', true));
+        ->assertInertia(fn ($page) => $page->component('Admin/Modeles')->where('section', 'cartes')->has('events')->has('preferences')->has('cards.categories', 8)->where('cards.canConfigure', true));
     $this->get('/administration/modeles?section=cartes&categorie=AILCT-02')->assertOk()
         ->assertInertia(fn ($page) => $page->where('section', 'cartes')->where('cards.selected', 'AILCT-02'));
     $event = DemoSeeder::id('event');

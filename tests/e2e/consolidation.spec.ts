@@ -42,12 +42,13 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await noHorizontalScroll(page, `titulaires ${label}`);
     await page.screenshot({ path: `test-results/consolidation-cartes-${label}.png`, fullPage: true });
 
-    // Modèles : badge visiteur par activité, carte permanente par catégorie, même page.
+    // Modèles institutionnels : un modèle par catégorie ; l'ancien modèle par activité (lots) est rangé dans un bloc replié.
     await page.getByTestId('onglet-modeles').click();
     await expect(page.getByTestId('page-modeles')).toBeVisible();
-    await expect(page.getByTestId('bloc-modele-badge')).toBeVisible();
-    await page.getByTestId('modele-type-cartes').click();
     await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
+    await expect(page.getByTestId('bloc-modele-badge')).toBeHidden();
+    await page.getByTestId('modele-type-badges').click();
+    await expect(page.getByTestId('bloc-modele-badge')).toBeVisible();
     await noHorizontalScroll(page, `modeles ${label}`);
     await page.screenshot({ path: `test-results/consolidation-modeles-${label}.png`, fullPage: true });
     // Ancienne adresse des modèles de cartes : renvoi vers l'espace Modèles, section carte.
@@ -55,9 +56,12 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await expect(page).toHaveURL(/\/administration\/modeles\?section=cartes/);
     await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
 
-    // Impression : le modèle n'y est plus modifiable, il est rappelé avec un lien vers Modèles.
+    // Impression et historique : le suivi des tirages d'abord ; l'atelier par lots (stock existant) s'ouvre à la demande, le modèle y est rappelé avec un lien vers Modèles.
     await page.getByTestId('onglet-impression').click();
     await expect(page.getByTestId('page-atelier')).toBeVisible();
+    await expect(page.getByTestId('suivi-tirages')).toBeVisible();
+    await expect(page.getByTestId('etape-modele')).toHaveCount(0);
+    await page.getByTestId('ouvrir-atelier-lots').click();
     await expect(page.getByTestId('rappel-modele')).toBeVisible();
     await noHorizontalScroll(page, `impression ${label}`);
     await page.getByTestId('lien-modeles-badges').click();

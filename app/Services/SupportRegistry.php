@@ -53,6 +53,10 @@ final class SupportRegistry
         if (isset(self::STATES[$etat])) {
             $query->whereRaw(self::STATE.' = ?', [$etat]);
         }
+        // Le stock de lots sans titulaire n'encombre pas le registre : visible sur demande (filtre « Disponible (stock) ») et par la recherche.
+        if ($etat === '' && $term === '') {
+            $query->whereRaw(self::STATE." <> 'disponible'");
+        }
         $paginated = $query->orderByDesc('b.created_at')->orderBy('b.code')->select(['b.id', 'b.code', 'e.name as event_name',
             DB::raw(self::TYPE.' AS type'), DB::raw(self::STATE.' AS state'),
             DB::raw('coalesce(h.full_name, v.full_name) AS holder_name'), DB::raw('coalesce(ic.label, c.name) AS category'),
