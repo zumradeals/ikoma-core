@@ -26,6 +26,7 @@ final class SupportRegistry
      * « Émis, non remis » : support nominatif généré mais pas encore remis (carte non activée, badge non associé) : émis ≠ imprimé ≠ remis ≠ actif.
      */
     private const TYPE = "CASE WHEN k.id IS NOT NULL OR e.is_permanent THEN 'carte_permanente' ELSE 'badge_temporaire' END";
+
     private const STATE = "CASE WHEN k.id IS NOT NULL THEN CASE k.status WHEN 'active' THEN CASE WHEN k.activated_at IS NULL THEN 'emis' ELSE 'actif' END WHEN 'retiree' THEN 'remplace' WHEN 'perdue' THEN 'perdu' WHEN 'volee' THEN 'vole' WHEN 'revoquee' THEN 'revoque' ELSE 'clos' END "
         ."ELSE CASE b.status WHEN 'Disponible' THEN CASE WHEN b.printed_for_visitor_id IS NOT NULL THEN 'emis' ELSE 'disponible' END WHEN 'Associé' THEN 'associe' WHEN 'Restitué' THEN 'restitue' WHEN 'Annulé' THEN 'annule' ELSE 'clos' END END";
 
