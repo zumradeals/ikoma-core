@@ -3,10 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\Atelier\PrintTrail;
-use App\Services\HolderCards;
 use App\Services\Institution;
 use App\Services\PermanentHolders;
+use App\Services\SupportPrinting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -44,7 +43,7 @@ final class AtelierCartesController
     }
 
     /** Document de plusieurs cartes permanentes : un tirage tracé, puis recto/verso de chaque carte. */
-    public function document(Request $request, HolderCards $cards, PrintTrail $trail, PermanentHolders $holders): Response
+    public function document(Request $request, PermanentHolders $holders): Response
     {
         Gate::authorize('badges.gerer');
         Gate::authorize('listes.importer');
@@ -54,17 +53,10 @@ final class AtelierCartesController
         /** @var User $user */
         $user = $request->user();
         $ids = array_values($data['holders']);
-        $result = DB::transaction(function () use ($ids, $data, $cards, $trail, $user, $context): array {
-            $views = [];
-            foreach ($ids as $holder) {
-                $views[] = $cards->cardData($holder);
-                $cards->recordPrint($holder, $data['reason'] ?? null, $user);
-            }
-            $run = $trail->generate($user, ['kind' => 'permanent', 'nature' => 'officiel', 'event_id' => $context->id, 'batch_id' => null, 'format' => 'cr80', 'side' => 'recto', 'design' => null, 'mode' => null,
-                'planned_count' => count($ids), 'first_number' => null, 'last_number' => null, 'options' => ['cartes' => count($ids)]], $data['reason'] ?? null);
-
-            return [$views, $run];
-        });
+        // Impression par le contrat UNIQUE (SupportPrinting) : mêmes règles, même rendu, même traçage que pour les badges temporaires.
+        $badgeIds = DB::table('holder_cards')->whereIn('holder_id', $ids)->where('status', 'active')->pluck('badge_id', 'holder_id');
+        abort_if($badgeIds->count() !== count($ids), 404);
+        $result = [app(SupportPrinting::class)->print($user, array_values(array_map(fn (string $h): string => (string) $badgeIds[$h], $ids)), $data['reason'] ?? null)['views']];
         $nonce = base64_encode(random_bytes(16));
         $request->attributes->set('csp_style_nonce', $nonce);
 

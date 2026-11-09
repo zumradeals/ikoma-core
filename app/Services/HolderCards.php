@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\Visitor;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
@@ -320,6 +321,36 @@ final class HolderCards
             'portrait' => $withPortrait ? $this->portraitDataUri($holder) : null,
             'qr' => app(QrSvg::class)->render(QrSvg::payload($card->qr_token), 'QR de la carte '.$holder->identifier),
             'badge_code' => $card->code, 'card_id' => $card->id, 'rank' => $card->rank, 'specimen' => false,
+        ]);
+    }
+
+    /**
+     * Données de présentation du badge TEMPORAIRE nominatif d'une participation : MÊME composeur et MÊME modèle institutionnel (CardModels) que les cartes permanentes.
+     * Le modèle est celui de la catégorie institutionnelle liée à la catégorie de participation (categories.institutional_code) ; sans lien, modèle neutre et mention provisoire.
+     * Le portrait n'est lu que si l'impression en est autorisée (refus respecté).
+     *
+     * @return array<string, mixed>
+     */
+    public function temporaryData(string $badgeId, bool $withPortrait = true): array
+    {
+        $row = DB::table('badges as b')->join('visitors as v', 'v.id', '=', 'b.printed_for_visitor_id')->join('categories as c', 'c.id', '=', 'v.category_id')
+            ->leftJoin('institutional_categories as ic', 'ic.code', '=', 'c.institutional_code')->where('b.id', $badgeId)
+            ->first(['b.code as badge_code', 'b.qr_token', 'v.id as visitor_id', 'v.full_name', 'v.organisation', 'v.position', 'v.valid_from', 'v.valid_until', 'c.name as event_category',
+                'c.color as event_color', 'ic.code as inst_code', 'ic.label as inst_label', 'ic.color as inst_color', 'ic.symbol as inst_symbol']);
+        abort_unless($row !== null, 404);
+        $portrait = null;
+        if ($withPortrait) {
+            $visitor = Visitor::find($row->visitor_id);
+            $bytes = $visitor === null ? null : app(ProfilePortrait::class)->read($visitor, true);
+            $portrait = $bytes === null ? null : 'data:image/jpeg;base64,'.base64_encode($bytes);
+        }
+
+        return $this->compose([
+            'name' => $row->full_name, 'role' => implode(' · ', array_filter([$row->position, $row->organisation])), 'identifier' => $row->badge_code, 'code' => $row->inst_code,
+            'label' => $row->inst_label ?? $row->event_category, 'color' => $row->inst_color ?? $row->event_color, 'symbol' => $row->inst_symbol,
+            'from' => $row->valid_from, 'until' => $row->valid_until, 'portrait' => $portrait,
+            'qr' => app(QrSvg::class)->render(QrSvg::payload($row->qr_token), 'QR du badge '.$row->badge_code),
+            'badge_code' => $row->badge_code, 'card_id' => null, 'rank' => 1, 'specimen' => false,
         ]);
     }
 

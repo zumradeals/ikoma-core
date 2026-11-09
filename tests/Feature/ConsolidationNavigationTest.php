@@ -124,6 +124,10 @@ const CN_ADDED = [
     ['PUT', 'administration/site/postes/{checkpoint}', ['can:postes.gerer'], []],
     ['POST', 'administration/site/postes/{checkpoint}/activation', ['can:postes.gerer'], []],
     ['POST', 'administration/site/tablettes/{device}/affectation', ['can:postes.gerer'], []],
+    // Badges et cartes : contrat d'impression unique des supports émis (récapitulatif, aperçu, impression).
+    ['POST', 'administration/badges/impression/recapitulatif', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
+    ['POST', 'administration/badges/impression/apercu', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
+    ['POST', 'administration/badges/impression', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
 ];
 
 function cnUser(string $role): User

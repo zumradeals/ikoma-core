@@ -43,6 +43,7 @@ use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\SiteAccesController;
+use App\Http\Controllers\SupportPrintController;
 use App\Http\Controllers\VisitsController;
 use App\Http\Controllers\ZoneAccessController;
 use App\Http\Controllers\ZonesController;
@@ -142,6 +143,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/atelier/tirages/{run}/demande', [AtelierController::class, 'requested'])->whereUuid('run')->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::post('/administration/atelier/tirages/{run}/confirmation', [AtelierController::class, 'confirmed'])->whereUuid('run')->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::get('/administration/atelier/alignement', [AtelierController::class, 'alignment'])->middleware('can:badges.gerer');
+        Route::post('/administration/badges/impression/recapitulatif', [SupportPrintController::class, 'plan'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
+        Route::post('/administration/badges/impression/apercu', [SupportPrintController::class, 'preview'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
+        Route::post('/administration/badges/impression', [SupportPrintController::class, 'print'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::get('/administration/badges', BadgesController::class)->middleware('can:badges.gerer');
         Route::get('/administration/badges/modeles', [BadgeWorkshopController::class, 'index'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/modeles/apercu', [BadgeWorkshopController::class, 'preview'])->middleware('can:badges.gerer');

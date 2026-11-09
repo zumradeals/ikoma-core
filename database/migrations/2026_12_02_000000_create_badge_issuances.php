@@ -60,6 +60,15 @@ BEGIN
 END $$;
 CREATE TRIGGER badge_issuances_immutable BEFORE UPDATE ON badge_issuances FOR EACH ROW EXECUTE FUNCTION public.ikoma_badge_issuance_immutable();
 SQL);
+        // Reprise de l'existant (lecture seule des données actuelles, aucune modification) : cartes permanentes et supports nominatifs déjà émis entrent dans le registre
+        // comme émissions d'origine, afin qu'ils restent imprimables par le contrat unique. Les supports nominatifs dont la participation n'est pas rattachée à une personne canonique n'y entrent pas.
+        DB::statement("INSERT INTO badge_issuances (id, operation_id, purpose, support_type, person_id, holder_id, event_id, badge_id, actor_id, created_at)
+            SELECT gen_random_uuid(), gen_random_uuid(), CASE WHEN k.rank = 1 THEN 'emission' ELSE 'remplacement' END, 'carte_permanente', h.person_id, k.holder_id, k.event_id, k.badge_id, k.issued_by, k.issued_at
+            FROM holder_cards k JOIN permanent_holders h ON h.id = k.holder_id");
+        DB::statement("INSERT INTO badge_issuances (id, operation_id, purpose, support_type, person_id, visitor_id, event_id, badge_id, created_at)
+            SELECT gen_random_uuid(), gen_random_uuid(), 'emission', 'badge_temporaire', v.person_id, v.id, b.event_id, b.id, b.created_at
+            FROM badges b JOIN visitors v ON v.id = b.printed_for_visitor_id
+            WHERE v.person_id IS NOT NULL AND v.holder_id IS NULL AND NOT EXISTS (SELECT 1 FROM badge_issuances i WHERE i.badge_id = b.id)");
         // Au plus un support nominatif en cours par participation, même en requêtes simultanées.
         DB::statement("CREATE UNIQUE INDEX badges_one_open_nominative ON badges (printed_for_visitor_id) WHERE printed_for_visitor_id IS NOT NULL AND status IN ('Disponible', 'Associé')");
     }
