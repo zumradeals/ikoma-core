@@ -155,3 +155,23 @@ describe('Activités : fiche', () => {
     expect(w.find('[data-testid=journal-activite]').exists()).toBe(false);
   });
 });
+
+describe('Activités : préparer les badges', () => {
+  it('propose le parcours unique avec la sélection, seulement avec les droits et pour une activité ouverte', async () => {
+    const w = mountPage({ selected: profile(), participants });
+    await w.get('[data-testid=onglet-participants]').trigger('click');
+    expect(w.get('[data-testid=preparer-badges]').attributes('href')).toBe('/administration/badges/preparer?activite=e1');
+    await w.get('[data-testid=choisir-badge-p1]').setValue(true);
+    expect(w.get('[data-testid=nb-choisis]').text()).toBe('1');
+    expect(w.get('[data-testid=preparer-badges]').attributes('href')).toBe('/administration/badges/preparer?activite=e1&ids=p1');
+    expect(w.find('[data-testid=choisir-badge-p2]').exists()).toBe(false); // participation clôturée : non sélectionnable
+    await w.get('[data-testid=choisir-tous]').trigger('click');
+    expect(w.get('[data-testid=nb-choisis]').text()).toBe('1');
+    const closed = mountPage({ selected: profile(true), participants });
+    await closed.get('[data-testid=onglet-participants]').trigger('click');
+    expect(closed.find('[data-testid=preparer-badges]').exists()).toBe(false);
+    const noRight = mountPage({ selected: profile(), participants, can: { ...can, badges: false } });
+    await noRight.get('[data-testid=onglet-participants]').trigger('click');
+    expect(noRight.find('[data-testid=preparer-badges]').exists()).toBe(false);
+  });
+});

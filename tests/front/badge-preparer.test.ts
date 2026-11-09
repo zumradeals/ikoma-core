@@ -99,3 +99,13 @@ describe('Préparer un badge : parcours unique', () => {
     expect(w.get('[data-testid=erreur-preparation]').text()).toContain('Choisissez une activité.');
   });
 });
+
+describe('Préparer un badge : venue d’une fiche d’activité', () => {
+  it('ouvre la recherche de l’activité et présélectionne les personnes éligibles transmises', async () => {
+    mockFetch({ '/preparer/personnes': { people } });
+    const w = mount(BadgePreparer, { props: { events, max: 100, preset: { event: 'e1', ids: ['p1', 'p3', 'inconnu'] } } });
+    await flushPromises();
+    expect(calls[0].url).toContain('event=e1');
+    expect(w.get('[data-testid=compte-selection]').text()).toContain('1 sélectionnée');
+  });
+});

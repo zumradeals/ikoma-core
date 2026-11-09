@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import AdminIcon from '../../components/admin/AdminIcon.vue';
@@ -15,11 +15,11 @@ type Person = { id: string; name: string; organisation: string | null; category:
 type Plan = { a_generer: string[]; existants: { id: string; code: string }[]; non_eligibles: { id: string; code: string; message: string }[]; doublons_ignores: number };
 type Result = { complete: boolean; created: { badge_id: string; code: string; visitor_id: string | null; holder_id: string | null }[]; existing: { id?: string; badge_id?: string; code?: string; message?: string }[]; failed: { id: string; code: string; message: string }[]; printable: string[] };
 
-const props = defineProps<{ events: { id: string; name: string; kind: string; starts_at: string; ends_at: string }[]; max: number }>();
+const props = defineProps<{ events: { id: string; name: string; kind: string; starts_at: string; ends_at: string }[]; max: number; preset?: { event: string; ids: string[] } | null }>();
 
 const step = ref<1 | 2 | 3 | 4>(1);
 const support = ref<Support>('badge_temporaire');
-const event = ref(props.events[0]?.id ?? '');
+const event = ref(props.preset?.event ?? props.events[0]?.id ?? '');
 const query = ref('');
 const people = ref<Person[]>([]);
 const searched = ref(false);
@@ -83,6 +83,12 @@ const printIds = computed(() => result.value?.printable ?? []);
 const stateLabel: Record<Person['state'], string> = { a_generer: 'À générer', existant: 'Support déjà en cours', non_eligible: 'Non éligible' };
 const stateClass: Record<Person['state'], string> = { a_generer: 'bg-green-100 text-green-900', existant: 'bg-sky-100 text-sky-900', non_eligible: 'bg-slate-200 text-slate-700' };
 const steps = ['Personnes', 'Vérification', 'Génération', 'Impression'];
+// Venue d'une fiche d'activité : même parcours, personnes déjà choisies ; chaque étape est de nouveau vérifiée côté serveur.
+onMounted(async () => {
+  if (!props.preset) return;
+  await search();
+  selected.value = props.preset.ids.filter(id => people.value.some(p => p.id === id && p.state !== 'non_eligible')).slice(0, props.max);
+});
 </script>
 
 <template>

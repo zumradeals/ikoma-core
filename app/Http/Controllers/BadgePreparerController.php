@@ -33,13 +33,18 @@ final class BadgePreparerController
         return $user;
     }
 
-    public function page(): Response
+    public function page(Request $request): Response
     {
         $this->authorize();
+        // Présélection venant d'une fiche d'activité : seuls des identifiants valides sont retenus ; l'éligibilité reste vérifiée côté serveur à chaque étape.
+        $input = $request->validate(['activite' => 'nullable|uuid', 'ids' => 'nullable|string|max:4000']);
+        $ids = array_values(array_filter(array_map('trim', explode(',', (string) ($input['ids'] ?? ''))), fn (string $id): bool => preg_match('/^[0-9a-f-]{36}$/i', $id) === 1));
+        $preset = ! empty($input['activite']) && DB::table('events')->where('id', $input['activite'])->where('is_permanent', false)->exists() ? ['event' => $input['activite'], 'ids' => array_slice($ids, 0, BadgeIssuance::MAX_PER_CALL)] : null;
 
         return Inertia::render('Admin/BadgePreparer', [
             'events' => DB::table('events')->where('is_permanent', false)->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']))->whereNull('anonymized_at')->orderByDesc('starts_at')->get(['id', 'name', 'kind', 'starts_at', 'ends_at']),
             'max' => BadgeIssuance::MAX_PER_CALL,
+            'preset' => $preset,
         ]);
     }
 

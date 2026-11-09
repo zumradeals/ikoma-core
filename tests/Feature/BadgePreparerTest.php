@@ -111,3 +111,11 @@ it('établit le récapitulatif et génère en groupe sans doublon, avec un résu
     // trop de personnes : refus
     $this->postJson('/administration/badges/preparer/recapitulatif', ['support' => 'badge_temporaire', 'ids' => array_fill(0, BadgeIssuance::MAX_PER_CALL + 1, (string) Str::uuid())])->assertStatus(422);
 });
+
+it('transmet à la page la présélection venue d’une activité, en ne retenant que des identifiants valides d’une activité ordinaire', function () {
+    $a = bpParticipant('Zzpreset');
+    $this->actingAs($this->admin)->get('/administration/badges/preparer?activite='.$this->event['id'].'&ids='.$a['id'].',pas-un-id,'.$a['id'])->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('preset.event', $this->event['id'])->where('preset.ids', [$a['id'], $a['id']]));
+    $this->get('/administration/badges/preparer?activite='.(string) Str::uuid())->assertOk()->assertInertia(fn (Assert $page) => $page->where('preset', null));
+    $this->get('/administration/badges/preparer')->assertOk()->assertInertia(fn (Assert $page) => $page->where('preset', null));
+});
