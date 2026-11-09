@@ -5,7 +5,6 @@ namespace App\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -177,6 +176,22 @@ final class PersonRegistry
     }
 
     /**
+     * Zones des activités indiquées, groupées par activité (boucle simple : types explicites pour l'analyse statique).
+     *
+     * @param  list<mixed>  $eventIds
+     * @return array<string, list<array{id: mixed, name: mixed}>>
+     */
+    private function zonesByEvent(array $eventIds): array
+    {
+        $byEvent = [];
+        foreach (DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name']) as $z) {
+            $byEvent[(string) $z->event_id][] = ['id' => $z->id, 'name' => $z->name];
+        }
+
+        return $byEvent;
+    }
+
+    /**
      * Choix proposés aux formulaires d'attribution : activités ouvertes et leurs zones (permanent, si le profil est actif) ; participations ouvertes et zones de leur activité.
      *
      * @param  list<object>  $participations
@@ -185,21 +200,19 @@ final class PersonRegistry
     private function grantOptions(?object $holder, array $participations): array
     {
         $open = fn (Builder $q): Builder => $q->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
-        $zonesOf = fn (array $eventIds): Collection => DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name'])->groupBy('event_id');
-
         $permanent = null;
         if ($holder !== null && $holder->status === 'actif') {
             $events = $open(DB::table('events'))->orderByDesc('starts_at')->limit(50)->get(['id', 'name', 'starts_at', 'ends_at']);
-            $zones = $zonesOf($events->pluck('id')->all());
+            $zones = $this->zonesByEvent($events->pluck('id')->all());
             $permanent = ['holder_id' => $holder->id, 'events' => $events->map(fn (object $e): array => ['id' => $e->id, 'name' => $e->name, 'starts_at' => $e->starts_at, 'ends_at' => $e->ends_at,
-                'zones' => ($zones[$e->id] ?? collect())->map(fn (object $z): array => ['id' => $z->id, 'name' => $z->name])->values()->all()])->all()];
+                'zones' => $zones[$e->id] ?? []])->all()];
         }
 
         $eligible = array_values(array_filter($participations, fn (object $p): bool => $p->holder_id === null && $p->closed_at === null && $p->withdrawn_at === null && $p->status !== 'refuse'
             && ! in_array($p->event_status, ['clos', 'archive'], true)));
-        $zones = $zonesOf(array_values(array_unique(array_map(fn (object $p): string => $p->event_id, $eligible))));
+        $zones = $this->zonesByEvent(array_values(array_unique(array_map(fn (object $p): string => $p->event_id, $eligible))));
         $activities = array_map(fn (object $p): array => ['participation_id' => $p->id, 'event_id' => $p->event_id, 'event' => $p->event_name, 'valid_from' => $p->valid_from, 'valid_until' => $p->valid_until,
-            'zones' => ($zones[$p->event_id] ?? collect())->map(fn (object $z): array => ['id' => $z->id, 'name' => $z->name])->values()->all()], $eligible);
+            'zones' => $zones[$p->event_id] ?? []], $eligible);
 
         return ['permanent' => $permanent, 'activites' => $activities, 'max_exceptional_hours' => ParticipationEntitlements::maxExceptionalHours()];
     }
