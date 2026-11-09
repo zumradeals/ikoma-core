@@ -232,6 +232,15 @@ const n = (v: number | string | undefined) => Number(v ?? 0);
                 <span class="rounded-full px-2.5 py-0.5 text-xs font-bold" :class="phaseClass(phaseOf(event))" :data-testid="'etat-' + event.id">{{ phases[phaseOf(event)] }}</span>
                 <a :href="'/administration?event=' + encodeURIComponent(event.id)" class="text-sm font-semibold underline" :data-testid="'ouvrir-evenement-' + event.id">Tableau</a>
               </span>
+              <details class="act-actions" :data-testid="'actions-' + event.id">
+                <summary class="cursor-pointer font-semibold">Actions</summary>
+                <div class="mt-3 flex flex-wrap gap-3">
+                  <button v-if="!['clos', 'archive'].includes(event.status ?? '')" type="button" class="btn-soft" @click="startEdit(event)">Modifier</button>
+                  <button v-if="!['clos', 'archive'].includes(event.status ?? '')" type="button" class="btn-soft" @click="transition(event.id, 'cloturer')">Clôturer</button>
+                  <button v-if="event.status === 'clos'" type="button" class="btn-soft" @click="transition(event.id, 'archiver')">Archiver</button>
+                  <Link :href="`/administration/donnees?entity=evenement&id=${event.id}`" class="btn-soft">Analyser une suppression</Link>
+                </div>
+              </details>
             </li>
           </ul>
           <nav v-if="pages > 1" class="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm" aria-label="Pagination du registre des activités" data-testid="pagination-activites">

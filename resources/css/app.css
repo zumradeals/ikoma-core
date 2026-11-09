@@ -299,3 +299,5 @@ html { scroll-padding-bottom: 6rem; }
 @media (min-width:900px) {
   .act-row { grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr); }
 }
+
+.act-actions { grid-column:1 / -1; }
