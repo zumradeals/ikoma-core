@@ -117,14 +117,8 @@ final class HolderCardsController
         $request->attributes->set('csp_style_nonce', $nonce);
 
         return response()->view('badges.holder-card-print', [
-            'card' => null, 'kind' => null, 'alignment' => true, 'nonce' => $nonce, 'institution' => app(Institution::class)->profile()['name'], 'back' => '/administration/titulaires/modeles',
+            'card' => null, 'kind' => null, 'alignment' => true, 'nonce' => $nonce, 'institution' => app(Institution::class)->profile()['name'], 'back' => '/administration/modeles?section=cartes',
         ])->header('Cache-Control', 'no-store, private')->header('Referrer-Policy', 'no-referrer');
-    }
-
-    /** Page « Personnalisation des cartes » : un modèle à la fois, choisi parmi les huit catégories. */
-    public function models(Request $request, HolderCards $cards, InstitutionalCategories $categories, CardModels $models): \Inertia\Response
-    {
-        return Inertia::render('Admin/PersonnalisationCartes', $this->modelProps($request, $cards, $categories, $models));
     }
 
     /**
@@ -172,7 +166,7 @@ final class HolderCardsController
         abort_unless(DB::table('institutional_categories')->where('code', $code)->exists(), 404);
         $models->save($code, $request->all(), $request->user());
 
-        return redirect('/administration/titulaires/modeles?categorie='.$code)->with('status', 'Modèle enregistré. Il est « à valider » avant de servir de modèle officiel.');
+        return redirect('/administration/modeles?section=cartes&categorie='.$code)->with('status', 'Modèle enregistré. Il est « à valider » avant de servir de modèle officiel.');
     }
 
     public function validateModel(Request $request, string $code, CardModels $models): RedirectResponse
@@ -181,7 +175,7 @@ final class HolderCardsController
         abort_unless(DB::table('institutional_categories')->where('code', $code)->exists(), 404);
         $models->validate($code, $request->user());
 
-        return redirect('/administration/titulaires/modeles?categorie='.$code)->with('status', 'Modèle validé.');
+        return redirect('/administration/modeles?section=cartes&categorie='.$code)->with('status', 'Modèle validé.');
     }
 
     public function settings(Request $request, HolderCards $cards): RedirectResponse

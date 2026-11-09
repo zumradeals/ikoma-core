@@ -138,7 +138,7 @@ const picked = ref<string[]>([]);
 const canPrepare = computed(() => !!props.can?.participants && !!props.can?.badges && !!props.selected && !props.selected.event.closed);
 function togglePick(id: string) { picked.value = picked.value.includes(id) ? picked.value.filter(x => x !== id) : [...picked.value, id]; }
 function pickAll() { picked.value = (props.participants?.data ?? []).filter(p => p.can_close).map(p => p.id); }
-const prepareHref = computed(() => props.selected ? `/administration/badges/preparer?activite=${encodeURIComponent(props.selected.event.id)}${picked.value.length ? '&ids=' + picked.value.join(',') : ''}` : '#');
+const prepareHref = computed(() => props.selected ? `/administration/badges?activite=${encodeURIComponent(props.selected.event.id)}${picked.value.length ? '&ids=' + picked.value.join(',') : ''}` : '#');
 function closeParticipation(p: Participant) {
   errors.value = [];
   router.post(`/administration/participations/${p.id}/cloturer`, { reason: reason.value.trim(), retour: 'activites' }, { preserveScroll: true, onSuccess: () => { closing.value = null; reason.value = ''; }, onError });

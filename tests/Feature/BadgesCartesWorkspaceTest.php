@@ -97,17 +97,24 @@ it('sans le droit d’importer des listes : registre consultable, préparation e
     $this->get('/administration/badges/preparer')->assertForbidden();
 });
 
-it('conserve les anciennes adresses : filtres de lots redirigés vers la page historique, parcours « préparer » dans le même espace', function () {
+it('conserve les adresses utiles : filtres de lots redirigés vers la page historique, anciennes adresses supprimées', function () {
     $this->actingAs($this->admin);
     $location = (string) $this->get('/administration/badges?status=Disponible&page=2')->assertRedirect()->headers->get('Location');
     expect($location)->toContain('/administration/badges/lots?')->toContain('status=Disponible')->toContain('page=2');
     $this->get('/administration/badges?batch='.DemoSeeder::id('batch'))->assertRedirect();
     $this->get('/administration/badges/lots')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Badges')->has('batches')->has('badges.data'));
     $this->get('/administration/badges/lots?status=Disponible')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Badges'));
-    // Lien d'une fiche d'activité : même espace, présélection conservée.
-    $this->get('/administration/badges/preparer?activite='.$this->event['id'].'&ids='.Str::uuid())->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/BadgesCartes')->where('preset.event', $this->event['id'])->has('preset.ids', 1));
-    $this->get('/administration/atelier/parcours')->assertRedirect('/administration/badges');
+    // Présélection venue d'une fiche d'activité : même espace.
+    $this->get('/administration/badges?activite='.$this->event['id'].'&ids='.Str::uuid())->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/BadgesCartes')->where('preset.event', $this->event['id'])->has('preset.ids', 1));
+    // Filtre d'ouverture du registre (carte permanente) repris par l'écran.
+    $this->get('/administration/badges?type=carte_permanente')->assertOk()->assertInertia(fn (Assert $p) => $p->where('filters.type', 'carte_permanente'));
     $this->post('/administration/badges/lots', [])->assertSessionHasErrors();
+    // Routes supprimées : doublons et anciens liens sans usage.
+    foreach (['/administration/atelier/parcours', '/administration/badges/preparer', '/administration/badges/modeles', '/administration/badges/modeles/imprimer', '/administration/badges/etiquettes', '/administration/atelier/cartes'] as $gone) {
+        $this->get($gone)->assertNotFound();
+    }
+    // Seule la modification des réglages de carte (PUT) subsiste à cette adresse.
+    $this->get('/administration/titulaires/modeles')->assertStatus(405);
 });
 
 it('liste cartes permanentes et badges temporaires dans un seul registre, avec type, titulaire et état dérivés', function () {
@@ -260,7 +267,7 @@ it('ouvre l’historique des tirages par défaut et l’atelier par lots seuleme
     $this->get('/administration/atelier')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Atelier')->where('vue', 'historique'));
     $this->get('/administration/atelier?vue=atelier')->assertOk()->assertInertia(fn (Assert $p) => $p->where('vue', 'atelier'));
     $this->get('/administration/atelier?format=etiquettes&batch='.DemoSeeder::id('batch'))->assertOk()->assertInertia(fn (Assert $p) => $p->where('vue', 'atelier'));
-    $this->get('/administration/atelier?mode=cartes')->assertOk()->assertInertia(fn (Assert $p) => $p->where('vue', 'atelier'));
+    $this->get('/administration/atelier?mode=cartes')->assertRedirect('/administration/badges?type=carte_permanente');
     $this->get('/administration/atelier?vue=autre')->assertStatus(302);
 });
 

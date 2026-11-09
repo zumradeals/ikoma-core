@@ -59,7 +59,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
           <li v-for="(label, i) in steps" :key="label" class="rounded-lg border px-3 py-1 text-sm font-semibold" :class="i <= stage ? 'bg-white' : 'opacity-60'" :aria-current="i === stage ? 'step' : undefined">{{ i + 1 }}. {{ label }}</li>
         </ol>
         <p class="rounded-lg border bg-white p-3 text-sm" data-testid="avis-acces">Posséder une carte ne donne aucun droit d’accès : les accès dépendent des habilitations de chaque événement.</p>
-        <p v-if="provisional" class="rounded-lg border-2 border-amber-600 bg-amber-50 p-3 text-sm font-semibold" role="status" data-testid="avis-provisoire">Le modèle de cette catégorie n’est pas encore validé. <Link href="/administration/titulaires/modeles" class="underline">Personnalisation des cartes</Link></p>
+        <p v-if="provisional" class="rounded-lg border-2 border-amber-600 bg-amber-50 p-3 text-sm font-semibold" role="status" data-testid="avis-provisoire">Le modèle de cette catégorie n’est pas encore validé. <Link href="/administration/modeles?section=cartes" class="underline">Personnalisation des cartes</Link></p>
       </header>
 
       <p v-if="holder.status === 'clos'" class="rounded-xl border bg-white p-5 font-semibold" data-testid="titulaire-clos">Ce titulaire est clos : aucune carte ne peut être émise ou imprimée.</p>
@@ -119,7 +119,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
 
           <section class="space-y-3 rounded-xl border bg-white p-5" aria-label="Impression">
             <h2 class="text-heading font-bold">{{ reprinting ? 'Réimprimer la carte' : 'Imprimer la carte' }}</h2>
-            <p class="text-sm">Pour imprimer plusieurs cartes à la fois, utilisez <Link href="/administration/atelier?mode=cartes" class="font-semibold underline" data-testid="lien-atelier-cartes">l’Atelier des badges</Link>.</p>
+            <p class="text-sm">Pour imprimer plusieurs cartes à la fois, utilisez <Link href="/administration/badges?type=carte_permanente" class="font-semibold underline" data-testid="lien-atelier-cartes">l’Atelier des badges</Link>.</p>
             <p v-if="reprinting">Réimprimer conserve le même badge, le même QR et le même identifiant. Un motif est obligatoire et reste dans l’historique.</p>
             <p v-else>Le premier tirage est l’émission de la carte. Faites d’abord un essai sur la <a href="/administration/titulaires/alignement" target="_blank" rel="noopener" class="font-semibold underline" data-testid="lien-alignement">page d’alignement</a>.</p>
             <form method="post" :action="base + '/carte/imprimer'" target="_blank" class="space-y-3" data-testid="formulaire-impression">

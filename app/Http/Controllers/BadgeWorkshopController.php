@@ -2,14 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Atelier\BadgePrinting;
 use App\Services\Audit;
 use App\Services\BadgeArtwork;
 use App\Services\BadgePreparation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -18,14 +16,6 @@ final class BadgeWorkshopController
 {
     /** Clés du modèle visuel d'un événement (identiques à celles de l'enregistrement : badge_atelier_{événement}_{clé}). */
     private const MODEL_KEYS = ['design', 'title', 'primary', 'accent', 'orientation'];
-
-    /** Ancien lien conservé : l'atelier d'impression est devenu l'Atelier des badges. */
-    public function index(Request $request): RedirectResponse
-    {
-        Gate::authorize('badges.gerer');
-
-        return redirect('/administration/atelier'.($request->query() === [] ? '' : '?'.http_build_query($request->query())));
-    }
 
     public function preview(Request $request, BadgeArtwork $artwork): JsonResponse
     {
@@ -132,15 +122,5 @@ final class BadgeWorkshopController
         });
 
         return response()->json(['model' => $model])->header('Cache-Control', 'no-store, private');
-    }
-
-    /** Ancien lien conservé : génère un tirage tracé puis affiche le même document que l'Atelier. */
-    public function print(Request $request, BadgePrinting $printing): Response
-    {
-        Gate::authorize('badges.gerer');
-        $reason = $request->input('reason');
-        $run = $printing->planBadges($request->user(), $request->all(), is_string($reason) ? $reason : null);
-
-        return $printing->document($request, $run);
     }
 }

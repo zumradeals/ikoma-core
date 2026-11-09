@@ -7,6 +7,7 @@ use App\Services\Atelier\BadgePrinting;
 use App\Services\Atelier\PrintTrail;
 use App\Services\BadgeArtwork;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ use Inertia\Inertia;
  */
 final class AtelierController
 {
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): \Inertia\Response|RedirectResponse
     {
         Gate::authorize('badges.gerer');
         $input = $request->validate([
@@ -27,6 +28,10 @@ final class AtelierController
             'from' => 'nullable|integer|min:1', 'to' => 'nullable|integer|min:1', 'cols' => 'nullable|integer|min:1|max:4', 'rows' => 'nullable|integer|min:1|max:10',
             'vue' => 'nullable|in:atelier,historique', 'mode' => 'nullable|in:visiteurs,cartes',
         ]);
+        // Ancien lien « Cartes permanentes » de l'Atelier : les cartes s'impriment depuis le registre (même contrat d'impression).
+        if (($input['mode'] ?? null) === 'cartes') {
+            return redirect('/administration/badges?type=carte_permanente');
+        }
         // Par défaut, l'historique des tirages. L'atelier par lots (stock existant) s'ouvre explicitement ou par les anciens liens (personne, lot, format, plage, mode).
         $workshop = ($input['vue'] ?? null) === 'atelier' || $request->hasAny(['person', 'batch', 'format', 'from', 'to', 'cols', 'rows', 'mode']);
         $person = null;

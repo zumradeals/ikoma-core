@@ -53,8 +53,8 @@ beforeEach(function () {
 });
 
 it('sert la page et ses points d’accès aux seuls comptes qui gèrent les badges et les listes', function () {
-    $this->actingAs($this->admin)->get('/administration/badges/preparer')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/BadgesCartes')->has('events')->has('registre.data')->where('canPrepare', true)->where('max', BadgeIssuance::MAX_PER_CALL));
-    $this->actingAs($this->agent)->get('/administration/badges/preparer')->assertForbidden();
+    $this->actingAs($this->admin)->get('/administration/badges')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/BadgesCartes')->has('events')->has('registre.data')->where('canPrepare', true)->where('max', BadgeIssuance::MAX_PER_CALL));
+    $this->actingAs($this->agent)->get('/administration/badges')->assertForbidden();
     $this->getJson('/administration/badges/preparer/personnes?support=badge_temporaire&event='.$this->event['id'])->assertForbidden();
     $this->postJson('/administration/badges/preparer/recapitulatif', ['support' => 'badge_temporaire', 'ids' => [(string) Str::uuid()]])->assertForbidden();
     $this->postJson('/administration/badges/preparer/generer', ['support' => 'badge_temporaire', 'ids' => [(string) Str::uuid()], 'operation' => (string) Str::uuid(), 'confirm' => true])->assertForbidden();
@@ -114,8 +114,8 @@ it('établit le récapitulatif et génère en groupe sans doublon, avec un résu
 
 it('transmet à la page la présélection venue d’une activité, en ne retenant que des identifiants valides d’une activité ordinaire', function () {
     $a = bpParticipant('Zzpreset');
-    $this->actingAs($this->admin)->get('/administration/badges/preparer?activite='.$this->event['id'].'&ids='.$a['id'].',pas-un-id,'.$a['id'])->assertOk()
+    $this->actingAs($this->admin)->get('/administration/badges?activite='.$this->event['id'].'&ids='.$a['id'].',pas-un-id,'.$a['id'])->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('preset.event', $this->event['id'])->where('preset.ids', [$a['id'], $a['id']]));
-    $this->get('/administration/badges/preparer?activite='.(string) Str::uuid())->assertOk()->assertInertia(fn (Assert $page) => $page->where('preset', null));
-    $this->get('/administration/badges/preparer')->assertOk()->assertInertia(fn (Assert $page) => $page->where('preset', null));
+    $this->get('/administration/badges?activite='.(string) Str::uuid())->assertOk()->assertInertia(fn (Assert $page) => $page->where('preset', null));
+    $this->get('/administration/badges')->assertOk()->assertInertia(fn (Assert $page) => $page->where('preset', null));
 });

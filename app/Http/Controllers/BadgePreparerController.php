@@ -6,14 +6,11 @@ use App\Models\User;
 use App\Services\BadgeIssuance;
 use App\Services\BadgeRefused;
 use App\Services\CardModels;
-use App\Services\SupportRegistry;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
-use Inertia\Response;
 
 /**
  * Parcours unique « Préparer un badge » : choisir des personnes (identités canoniques), vérifier, générer, puis imprimer (SupportPrintController).
@@ -33,14 +30,6 @@ final class BadgePreparerController
         $user = $request->user();
 
         return $user;
-    }
-
-    public function page(Request $request): Response|RedirectResponse
-    {
-        $this->authorize();
-
-        // Ancienne adresse du parcours : même espace de travail (registre, préparation, aperçu), présélection d'une fiche d'activité comprise.
-        return app(BadgesController::class)($request, app(SupportRegistry::class), $this);
     }
 
     /**
