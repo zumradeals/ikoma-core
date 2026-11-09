@@ -137,10 +137,15 @@ final class ActivityRegistry
             DB::raw('(SELECT b.code FROM badge_assignments a JOIN badges b ON b.id = a.badge_id WHERE a.visitor_id = v.id AND a.returned_at IS NULL AND a.cancelled_at IS NULL LIMIT 1) AS badge'),
         ])->paginate(self::PER_PAGE, ['*'], 'page', max(1, $page));
 
-        return [
-            'data' => collect($paginated->items())->map(fn (object $p): array => ['id' => $p->id, 'person_id' => $p->person_id, 'full_name' => $p->full_name, 'organisation' => $p->organisation,
+        $data = [];
+        foreach ($paginated->items() as $p) {
+            $data[] = ['id' => $p->id, 'person_id' => $p->person_id, 'full_name' => $p->full_name, 'organisation' => $p->organisation,
                 'category' => $p->category, 'group' => $p->group_name, 'status' => $p->closed_at !== null ? 'cloturee' : ($p->status ?? 'attendu'), 'habilitations' => (int) $p->habilitations, 'badge' => $p->badge,
-                'can_close' => $p->closed_at === null && $p->person_id !== null])->all(),
+                'can_close' => $p->closed_at === null && $p->person_id !== null];
+        }
+
+        return [
+            'data' => $data,
             'meta' => ['current_page' => $paginated->currentPage(), 'last_page' => $paginated->lastPage(), 'total' => $paginated->total()],
         ];
     }
