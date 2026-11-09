@@ -212,10 +212,10 @@ it('distingue les postes administrativement actifs, les appareils synchronisés 
     $recent = (string) Str::uuid();
     $silent = (string) Str::uuid();
     // Un appareil enrôlé porte toujours un poste (contrainte devices_enrolled_has_point).
-    $base = ['event_id' => $event, 'token_hash' => hash('sha256', Str::random(16)), 'point_code' => 'poste_2', 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()];
+    $base = ['event_id' => $event, 'point_code' => 'poste_2', 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()];
     $columns = collect(DB::getSchemaBuilder()->getColumnListing('devices'));
     foreach ([[$recent, now()->subMinute()], [$silent, now()->subDays(2)]] as [$id, $sync]) {
-        $row = ['id' => $id, 'name' => 'Tablette fictive '.Str::random(4), ...$base, 'last_synced_at' => $sync];
+        $row = ['id' => $id, 'name' => 'Tablette fictive '.Str::random(4), 'token_hash' => hash('sha256', Str::random(32)), ...$base, 'last_synced_at' => $sync];
         DB::table('devices')->insert(array_intersect_key($row, $columns->flip()->all()));
     }
     $after = app(OperationsOverview::class)->general()['postes'];
