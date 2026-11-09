@@ -229,10 +229,10 @@ final class HolderCards
      *
      * @return string identifiant de la carte
      */
-    public function issue(string $holderId, User $actor, bool $activate = true): string
+    public function issue(string $holderId, User $actor, bool $activate = true, ?string $operationId = null, string $purpose = 'emission', ?string $replacesBadgeId = null): string
     {
         try {
-            return DB::transaction(function () use ($holderId, $actor, $activate): string {
+            return DB::transaction(function () use ($holderId, $actor, $activate, $operationId, $purpose, $replacesBadgeId): string {
                 $holder = DB::table('permanent_holders')->where('id', $holderId)->lockForUpdate()->first();
                 abort_unless($holder !== null, 404);
                 if ($holder->status === 'clos') {
@@ -253,6 +253,9 @@ final class HolderCards
                     'id' => $id, 'holder_id' => $holderId, 'badge_id' => $badge['id'], 'event_id' => $context->id, 'status' => 'active',
                     'issued_by' => $actor->id, 'issued_at' => now(), 'activated_at' => $activate ? now() : null, 'activation_source' => $activate ? 'ancienne' : null, 'rank' => (int) DB::table('holder_cards')->where('holder_id', $holderId)->max('rank') + 1, 'created_at' => now(), 'updated_at' => now(),
                 ]);
+                // Toute émission de carte entre dans le registre canonique des émissions (opération identifiée, personne canonique, contexte permanent).
+                IssuanceLedger::record(['operation_id' => $operationId ?? (string) Str::uuid(), 'purpose' => $purpose, 'support_type' => 'carte_permanente', 'person_id' => $holder->person_id, 'holder_id' => $holderId,
+                    'event_id' => $context->id, 'badge_id' => $badge['id'], 'replaces_badge_id' => $replacesBadgeId, 'actor_id' => $actor->id]);
                 $this->audit->append('carte.emise', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier, 'code_badge' => $badge['code']]);
 
                 return $id;
