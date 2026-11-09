@@ -714,3 +714,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **Préparation, impression demandée, tirage confirmé** : comportements, registres (`badge_print_runs`, `badge_print_events`, `holder_card_prints`) et actions d'audit inchangés. L'uniformisation de la traçabilité des impressions fait l'objet d'un contrat séparé.
 - **Hors périmètre, non réalisé** : rattachement d'un profil permanent à une personne existante, réengagement successif, correction des noms, rapprochement des doublons.
 - **Code laissé en place pour un nettoyage ultérieur validé séparément** : `AtelierParcoursController`, `Admin/AtelierParcours.vue`, `HolderCardsController::models`, `Admin/PersonnalisationCartes.vue` (plus atteints par une route), alias `/administration/badges/modeles/*` et `/etiquettes`.
+
+## V1 — Invariants du site et lot PR 1 « Garde-fous et socle site » (en cours)
+- Les invariants validés par le propriétaire (site, postes, tablettes, mouvements, présence, supports, navigation) sont inscrits dans `docs/ailct/V1-INVARIANTS-SITE-ET-CONTROLE.md`, avec la liste des contrats remplacés.
+- **Plusieurs tablettes par poste** ; l'affectation d'une tablette est historisée ; aucune contrainte « une seule tablette active par poste ».
+- PR 1 : socle additif (site, postes, affectations, relation poste–zone portée par le poste, configuration en données), écran « Site et accès », tests de caractérisation. Le moteur de contrôle, la présence, les activités, les badges et la navigation en sept entrées relèvent des PR 2 à 5.
+
