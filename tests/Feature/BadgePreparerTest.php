@@ -53,7 +53,7 @@ beforeEach(function () {
 });
 
 it('sert la page et ses points d’accès aux seuls comptes qui gèrent les badges et les listes', function () {
-    $this->actingAs($this->admin)->get('/administration/badges/preparer')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/BadgePreparer')->has('events')->where('max', BadgeIssuance::MAX_PER_CALL));
+    $this->actingAs($this->admin)->get('/administration/badges/preparer')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/BadgesCartes')->has('events')->has('registre.data')->where('canPrepare', true)->where('max', BadgeIssuance::MAX_PER_CALL));
     $this->actingAs($this->agent)->get('/administration/badges/preparer')->assertForbidden();
     $this->getJson('/administration/badges/preparer/personnes?support=badge_temporaire&event='.$this->event['id'])->assertForbidden();
     $this->postJson('/administration/badges/preparer/recapitulatif', ['support' => 'badge_temporaire', 'ids' => [(string) Str::uuid()]])->assertForbidden();

@@ -150,9 +150,12 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/badges/preparer/recapitulatif', [BadgePreparerController::class, 'summary'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/preparer/generer', [BadgePreparerController::class, 'generate'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression/recapitulatif', [SupportPrintController::class, 'plan'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
+        Route::post('/administration/badges/impression/donnees', [SupportPrintController::class, 'previewData'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression/apercu', [SupportPrintController::class, 'preview'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression', [SupportPrintController::class, 'print'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::get('/administration/badges', BadgesController::class)->middleware('can:badges.gerer');
+        Route::get('/administration/badges/supports', [BadgesController::class, 'supports'])->middleware(['can:badges.gerer', 'throttle:recherche']);
+        Route::get('/administration/badges/lots', [BadgesController::class, 'lots'])->middleware('can:badges.gerer');
         Route::get('/administration/badges/modeles', [BadgeWorkshopController::class, 'index'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/modeles/apercu', [BadgeWorkshopController::class, 'preview'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/modeles/personnes', [BadgeWorkshopController::class, 'people'])->middleware(['can:badges.gerer', 'can:listes.importer']);

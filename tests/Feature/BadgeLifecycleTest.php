@@ -539,14 +539,14 @@ it('réserve une plage depuis l’écran et refuse proprement les plages impossi
     $this->post('/administration/badges/reservations', [...$payload, 'to' => 3])->assertSessionHasErrors('to');
     $this->post('/administration/badges/reservations', [...$payload, 'target_type' => 'groupe'])->assertSessionHasErrors('target_id');
     $this->post('/administration/badges/reservations', [...$payload, 'from' => $first + 5, 'to' => $first + 6, 'target_type' => 'groupe', 'target_id' => DemoSeeder::id('group')])->assertRedirect()->assertSessionHasNoErrors();
-    $this->get('/administration/badges?batch='.$lot->badge_batch_id)->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Badges')->where('badges.total', 11)->where('badges.data.0.category_name', 'Visiteur')->where('badges.data.0.reserved_station', 'Poste fictif A')->where('badges.data.5.reserved_group', 'Groupe fictif de stagiaires')->missing('badges.data.0.qr_token')->where('settings.margin', 10)->where('settings.reusable', false));
+    $this->get('/administration/badges/lots?batch='.$lot->badge_batch_id)->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Badges')->where('badges.total', 11)->where('badges.data.0.category_name', 'Visiteur')->where('badges.data.0.reserved_station', 'Poste fictif A')->where('badges.data.5.reserved_group', 'Groupe fictif de stagiaires')->missing('badges.data.0.qr_token')->where('settings.margin', 10)->where('settings.reusable', false));
 });
 
 it('affiche l’écran des badges sans aucun nom de personne', function () {
     $lot = demoLot(3);
     $this->service->associer($lot, demoVisitor(1), $this->agent);
     $name = DB::table('visitors')->where('id', demoVisitor(1))->value('full_name');
-    $response = $this->actingAs(badgeAccount('administrateur'))->get('/administration/badges?status=Associé')->assertOk();
+    $response = $this->actingAs(badgeAccount('administrateur'))->get('/administration/badges/lots?status=Associé')->assertOk();
     expect($response->getContent())->not->toContain($name);
     $response->assertInertia(fn (Assert $p) => $p->where('badges.total', 1)->has('batches.0.first_number')->has('events')->has('devices')->has('groups')->has('categories'));
 });
