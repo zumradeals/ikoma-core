@@ -49,3 +49,4 @@ pest()->use(DatabaseTransactions::class)->in('Feature/RegistrePersonnesTest.php'
 pest()->use(DatabaseTransactions::class)->in('Feature/AutorisationsS02Test.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/VisitesVehiculesVipTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/InterfacesS10Test.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/ConsolidationNavigationTest.php');
