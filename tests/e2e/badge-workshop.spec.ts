@@ -25,7 +25,7 @@ test('Atelier des badges : exemple fictif, badge réel, PVC, A4, étiquettes, tr
   await loginWithSecondFactor(page, user.email, user.password, user.secret);
 
   // Un lot de 200 badges : le stock se gère toujours dans la page Badges.
-  await page.goto('/administration/badges');
+  await page.goto('/administration/badges/lots');
   const lots = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Lots et étiquettes' }) });
   const before = await lots.getByRole('link', { name: 'Imprimer les étiquettes' }).evaluateAll(links => links.map(a => a.getAttribute('href')));
   const generate = page.getByRole('form', { name: 'Générer un lot de badges' });

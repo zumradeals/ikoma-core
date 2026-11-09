@@ -89,10 +89,10 @@ describe('Page Modèles', () => {
   const cards = { categories: [{ code: 'AILCT-01', label: 'Catégorie un' }], selected: 'AILCT-01', model: { category_code: 'AILCT-01', label: 'Catégorie un', color: '#2E7D32', mention: 'M', show_validity: true, qr_side: 'verso', version: 1, status: 'brouillon', validated: false, validated_at: null, validated_by: null, saved: false }, preview: { recto: '<i>r</i>', verso: '<i>v</i>' }, settings: { ligne1: '', ligne2: '', contact: '', avis: '' }, limits: { ligne1: 80, ligne2: 80, contact: 80, avis: 160 }, initialized: true, canConfigure: true };
   const mountPage = (section: 'badges' | 'cartes') => mount(Modeles, { props: { ...props, section, cards } as never, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' } } } });
 
-  it('montre le cadre à quatre onglets et la section badge visiteur par défaut', async () => {
+  it('montre le cadre à trois onglets et la section badge visiteur par défaut', async () => {
     const wrapper = mountPage('badges'); await flushPromises();
     expect(wrapper.get('[data-testid="onglet-modeles"]').attributes('aria-current')).toBe('page');
-    expect(wrapper.findAll('[data-testid^="onglet-"]').map(a => a.attributes('data-testid'))).toEqual(['onglet-visiteurs', 'onglet-cartes', 'onglet-modeles', 'onglet-impression']);
+    expect(wrapper.findAll('[data-testid^="onglet-"]').map(a => a.attributes('data-testid'))).toEqual(['onglet-registre', 'onglet-modeles', 'onglet-impression']);
     expect(wrapper.find('[data-testid="bloc-modele-badge"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="page-modeles-cartes"]').exists()).toBe(false);
   });

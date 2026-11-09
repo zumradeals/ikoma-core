@@ -17,7 +17,7 @@ const can = (permission: string) => page.props.auth?.permissions?.includes(permi
 type Step = { key: string; label: string; text: string; href?: string; allowed?: boolean };
 const visitorSteps = computed<Step[]>(() => [
   { key: 'preparer', label: 'Préparer et imprimer', text: `Modèles, préparation et tirages de badges. ${props.visitors.print_runs} tirage(s) enregistré(s).`, href: '/administration/atelier', allowed: can('badges.gerer') },
-  { key: 'stock', label: 'Lots, réservations et stock', text: `${props.visitors.batches} lot(s) · ${props.visitors.badges.Disponible} badge(s) disponible(s).`, href: '/administration/badges', allowed: can('badges.gerer') },
+  { key: 'stock', label: 'Lots, réservations et stock', text: `${props.visitors.batches} lot(s) · ${props.visitors.badges.Disponible} badge(s) disponible(s).`, href: '/administration/badges/lots', allowed: can('badges.gerer') },
   { key: 'attribuer', label: 'Attribuer à une personne', text: `À l’accueil, par l’agent, au poste d’accueil. ${props.visitors.badges.Associé} badge(s) attribué(s) en ce moment.` },
   { key: 'restituer', label: 'Restituer', text: `À l’accueil, par l’agent (« Restituer un badge »), acte distinct de la sortie. ${props.visitors.to_return} badge(s) encore attribué(s) à une personne sortie ou clôturée.` },
   { key: 'historique', label: 'Historique d’un badge', text: 'Attributions, restitutions, transferts et annulations d’un badge.', href: '/administration/badges/registre', allowed: can('badges.gerer') },

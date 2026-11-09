@@ -27,7 +27,7 @@ test('fiche manuelle, portrait recadré et trois badges nominatifs avec et sans 
   const person = new URL(page.url()).searchParams.get('visitor')!;
   await expect(page.getByAltText('Aperçu du portrait')).toBeVisible();
   await page.screenshot({ path: 'test-results/fiche-personne-portrait.png', fullPage: true });
-  await page.goto('/administration/badges');
+  await page.goto('/administration/badges/lots');
   const lots = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Lots et étiquettes' }) });
   const before = await lots.getByRole('link', { name: 'Imprimer les étiquettes' }).evaluateAll(links => links.map(a => a.getAttribute('href')));
   const generate = page.getByRole('form', { name: 'Générer un lot de badges' });

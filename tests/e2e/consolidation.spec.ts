@@ -27,8 +27,8 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     // L'espace : quatre responsabilités, compteurs, rappel du poste d'accueil.
     await page.getByTestId('menu-badges-cartes').click();
     await expect(page).toHaveURL(/\/administration\/badges$/);
-    for (const key of ['visiteurs', 'cartes', 'modeles', 'impression']) await expect(page.getByTestId(`onglet-${key}`)).toBeVisible();
-    await expect(page.getByTestId('onglet-visiteurs')).toHaveAttribute('aria-current', 'page');
+    for (const key of ['registre', 'modeles', 'impression']) await expect(page.getByTestId(`onglet-${key}`)).toBeVisible();
+    await expect(page.getByTestId('onglet-registre')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('compteurs-badges-cartes')).toBeVisible();
     await expect(page.getByTestId('rappel-accueil')).toContainText('acte distinct de la sortie physique');
     await noHorizontalScroll(page, `badges ${label}`);
@@ -37,7 +37,7 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     // Cartes permanentes : renvoi explicite depuis les badges visiteurs, onglet actif, renvoi inverse.
     await page.getByTestId('lien-cartes-permanentes').click();
     await expect(page.getByTestId('page-titulaires')).toBeVisible();
-    await expect(page.getByTestId('onglet-cartes')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('onglet-registre')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('navigation-cartes')).toContainText('Badges visiteurs');
     await noHorizontalScroll(page, `titulaires ${label}`);
     await page.screenshot({ path: `test-results/consolidation-cartes-${label}.png`, fullPage: true });

@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Enums\BadgeStatus;
+use App\Services\SupportRegistry;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -12,7 +15,33 @@ use Inertia\Response;
 
 final class BadgesController
 {
-    public function __invoke(Request $r): Response
+    /**
+     * Espace de travail « Badges et cartes » : registre commun, préparation d'un badge et aperçu, dans un seul écran. Lecture seule ici ; les actions passent par les contrats d'émission et d'impression.
+     * Les anciennes adresses de filtrage des lots (statut, lot, réservation) mènent à la page historique des lots, qui reste disponible.
+     */
+    public function __invoke(Request $r, SupportRegistry $registry, BadgePreparerController $preparer): Response|RedirectResponse
+    {
+        Gate::authorize('badges.gerer');
+        if ($r->hasAny(['status', 'batch', 'reserved'])) {
+            return redirect('/administration/badges/lots'.($r->getQueryString() === null || $r->getQueryString() === '' ? '' : '?'.$r->getQueryString()));
+        }
+        $filters = $r->validate(['q' => 'nullable|string|max:160', 'type' => ['nullable', Rule::in(['carte_permanente', 'badge_temporaire'])], 'etat' => ['nullable', Rule::in(array_keys(SupportRegistry::STATES))], 'page' => 'nullable|integer|min:1']);
+
+        return Inertia::render('Admin/BadgesCartes', [...$preparer->workspaceProps($r), 'registre' => $registry->list($filters, (int) ($filters['page'] ?? 1)), 'filters' => ['q' => $filters['q'] ?? '', 'type' => $filters['type'] ?? '', 'etat' => $filters['etat'] ?? ''],
+            'states' => SupportRegistry::STATES]);
+    }
+
+    /** JSON : une page du registre commun (recherche, type, état). */
+    public function supports(Request $r, SupportRegistry $registry): JsonResponse
+    {
+        Gate::authorize('badges.gerer');
+        $filters = $r->validate(['q' => 'nullable|string|max:160', 'type' => ['nullable', Rule::in(['carte_permanente', 'badge_temporaire'])], 'etat' => ['nullable', Rule::in(array_keys(SupportRegistry::STATES))], 'page' => 'nullable|integer|min:1']);
+
+        return response()->json($registry->list($filters, (int) ($filters['page'] ?? 1)))->header('Cache-Control', 'no-store, private');
+    }
+
+    /** Page historique des lots, réservations et stock existants : conservée pour compatibilité et consultation, hors du parcours normal. */
+    public function lots(Request $r): Response
     {
         Gate::authorize('badges.gerer');
         $filters = $r->validate(['status' => ['nullable', Rule::enum(BadgeStatus::class)], 'batch' => 'bail|nullable|uuid|exists:badge_batches,id', 'reserved' => ['nullable', Rule::in(['oui', 'non'])]]);
