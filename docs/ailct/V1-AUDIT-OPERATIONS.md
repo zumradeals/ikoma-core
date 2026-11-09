@@ -14,6 +14,11 @@ Inventaire limité aux composants nécessaires. Les trois espaces existent déj�
 - Les noms de personnes ne sont communiqués qu'aux comptes qui consultent les présences (même règle que le Pilotage) ; les droits sont vérifiés côté serveur, les boutons masqués ne sont pas la barrière.
 - Clôtures, décisions de litige et alertes restent dans le Pilotage : l'écran d'administration n'en simule aucune.
 
+## Qualification (revue de #108)
+- **Présences du site** : le total compte des **identités physiques distinctes** (personne canonique, dernier mouvement confirmé et non corrigé, tous contextes confondus). Les compteurs par contexte restent affichés comme indicateurs distincts, jamais additionnés ; l'écart (`multi_contextes`) est signalé. Une sortie ou une entrée corrigée n'est pas comptée.
+- **Postes** : « administrativement actif » (état du poste) ≠ appareil « synchronisé récemment » (preuve de connexion, délai existant de `Pilotage`) ≠ appareil « silencieux ». Aucun libellé « En ligne » sans preuve.
+- **Périmètres** : indicateurs du **site entier** (indépendants de l'activité choisie, titulaires permanents inclus) séparés du **détail par activité** ; chaque panneau précise son périmètre. Les permissions sur les données personnelles sont inchangées.
+
 ## Limites (non traitées, signalées)
 - Pas de graphique de comparaison entre activités ni d'export propre à Opérations.
 - La carte « Activité en cours » consulte une seule activité à la fois (sélecteur), la vue globale couvre le site entier.

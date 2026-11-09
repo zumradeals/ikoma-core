@@ -141,3 +141,102 @@ it('ne modifie rien : la vue Opérations ne fait que lire', function () {
     $this->get('/administration/operations')->assertOk();
     expect($counts())->toBe($before)->and(DB::table('audit_logs')->count())->toBe($audit);
 });
+
+/** Participation de la MÊME personne canonique à une autre activité (ou au contexte permanent) : une seule identité, plusieurs contextes. */
+function opSecondContext(string $person): array
+{
+    $event = (string) Str::uuid();
+    $category = (string) Str::uuid();
+    $at = ['created_at' => now(), 'updated_at' => now()];
+    DB::table('events')->insert(['id' => $event, 'name' => 'Seconde activité fictive '.Str::random(5), 'starts_at' => '2027-01-01 08:00:00+00', 'ends_at' => '2027-03-01 18:00:00+00', 'kind' => 'stage', ...$at]);
+    DB::table('categories')->insert(['id' => $category, 'event_id' => $event, 'name' => 'Stagiaire', 'color' => '#1E9E5A', 'priority_circuit' => false, ...$at]);
+
+    return ['event' => $event, 'visitor' => app(Participations::class)->enrol(test()->admin, $person, ['event_id' => $event, 'category_id' => $category])];
+}
+
+it('compte une identité physique une seule fois quand la même personne est présente dans plusieurs activités', function () {
+    $overview = app(OperationsOverview::class);
+    $before = $overview->general();
+    $a = opActivityVisitor();
+    $person = (string) DB::table('visitors')->where('id', $a['visitor'])->value('person_id');
+    $b = opSecondContext($person);
+    opMove($a['event'], $a['visitor'], 'entree', now()->toDateTimeString());
+    opMove($b['event'], $b['visitor'], 'entree', now()->addMinute()->toDateTimeString());
+
+    $after = $overview->general();
+    // un seul humain : +1 au total du site, mais chaque contexte garde son propre compteur (+1 chacun, non additionnés pour le total)
+    expect($after['presents']['total'])->toBe($before['presents']['total'] + 1)->and($after['presents']['multi_contextes'])->toBe($before['presents']['multi_contextes'] + 1);
+    $byEvent = collect($after['presents']['contextes'])->keyBy('event_id');
+    expect($byEvent[$a['event']]['presents'])->toBe(1)->and($byEvent[$b['event']]['presents'])->toBe(1);
+    expect(app(Presence::class)->count($a['event']) + app(Presence::class)->count($b['event']))->toBe(2);
+});
+
+it('compte une seule fois une personne présente dans le contexte permanent et dans une activité', function () {
+    $overview = app(OperationsOverview::class);
+    $before = $overview->general();
+    $p = opPermanentVisitor();
+    $person = (string) DB::table('visitors')->where('id', $p['visitor'])->value('person_id');
+    $b = opSecondContext($person);
+    opMove($p['event'], $p['visitor'], 'entree', now()->toDateTimeString());
+    opMove($b['event'], $b['visitor'], 'entree', now()->addMinute()->toDateTimeString());
+    $after = $overview->general();
+    expect($after['presents']['total'])->toBe($before['presents']['total'] + 1)->and($after['presents']['multi_contextes'])->toBe($before['presents']['multi_contextes'] + 1);
+});
+
+it('retire la personne des présents du site à sa dernière sortie, et la rétablit quand cette sortie est corrigée', function () {
+    $overview = app(OperationsOverview::class);
+    $before = $overview->general();
+    $a = opActivityVisitor();
+    $person = (string) DB::table('visitors')->where('id', $a['visitor'])->value('person_id');
+    $b = opSecondContext($person);
+    opMove($a['event'], $a['visitor'], 'entree', now()->toDateTimeString());
+    opMove($b['event'], $b['visitor'], 'entree', now()->addMinute()->toDateTimeString());
+    expect($overview->general()['presents']['total'])->toBe($before['presents']['total'] + 1);
+    // sortie confirmée dans l'une des activités : l'identité a quitté le site
+    $exit = opMove($b['event'], $b['visitor'], 'sortie', now()->addMinutes(5)->toDateTimeString());
+    expect($overview->general()['presents']['total'])->toBe($before['presents']['total']);
+    // la sortie était une erreur : elle est corrigée par un événement distinct, la personne redevient présente
+    app(Presence::class)->corriger($exit, $this->admin, 'Sortie saisie par erreur');
+    expect($overview->general()['presents']['total'])->toBe($before['presents']['total'] + 1);
+    // une entrée corrigée n'est plus comptée non plus
+    $solo = opActivityVisitor();
+    $entry = opMove($solo['event'], $solo['visitor'], 'entree', now()->toDateTimeString());
+    expect($overview->general()['presents']['total'])->toBe($before['presents']['total'] + 2);
+    app(Presence::class)->corriger($entry, $this->admin, 'Entrée saisie par erreur');
+    expect($overview->general()['presents']['total'])->toBe($before['presents']['total'] + 1);
+});
+
+it('distingue les postes administrativement actifs, les appareils synchronisés récemment et les appareils silencieux', function () {
+    $before = app(OperationsOverview::class)->general()['postes'];
+    $event = opActivityVisitor()['event'];
+    $recent = (string) Str::uuid();
+    $silent = (string) Str::uuid();
+    $base = ['event_id' => $event, 'token_hash' => hash('sha256', Str::random(16)), 'created_at' => now(), 'updated_at' => now()];
+    $columns = collect(DB::getSchemaBuilder()->getColumnListing('devices'));
+    foreach ([[$recent, now()->subMinute()], [$silent, now()->subDays(2)]] as [$id, $sync]) {
+        $row = ['id' => $id, 'name' => 'Tablette fictive '.Str::random(4), ...$base, 'last_synced_at' => $sync];
+        DB::table('devices')->insert(array_intersect_key($row, $columns->flip()->all()));
+    }
+    $after = app(OperationsOverview::class)->general()['postes'];
+    expect($after['appareils_enroles'])->toBe($before['appareils_enroles'] + 2)->and($after['appareils_synchronises'])->toBe($before['appareils_synchronises'] + 1)
+        ->and($after['appareils_silencieux'])->toBe($before['appareils_silencieux'] + 1)->and($after['actifs'])->toBe($before['actifs']); // l'état administratif des postes ne change pas
+    // l'écran du centre ne dit jamais « en ligne » : l'état est « actif » (synchronisé récemment) ou « silencieux »
+    $this->actingAs($this->admin)->get('/administration/operations?event='.$event)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('centre.postes', fn ($rows) => collect($rows)->pluck('state', 'id')->only([$recent, $silent])->all() === [$recent => 'actif', $silent => 'silencieux']));
+});
+
+it('ne fait jamais dépendre les indicateurs du site entier de l’activité consultée', function () {
+    $a = opActivityVisitor();
+    opMove($a['event'], $a['visitor'], 'entree');
+    $p = opPermanentVisitor();
+    opMove($p['event'], $p['visitor'], 'entree');
+    $this->actingAs($this->admin);
+    $global = fn (string $query) => $this->get('/administration/operations'.$query)->assertOk()->viewData('page')['props']['general'];
+    $withActivity = $global('?event='.$a['event']);
+    $withPermanent = $global('?event='.$p['event']);
+    $without = $global('');
+    foreach (['mouvements', 'presents', 'alertes', 'litiges', 'postes', 'par_heure'] as $key) {
+        expect($withActivity[$key], $key)->toBe($withPermanent[$key])->and($without[$key], $key)->toBe($withActivity[$key]);
+    }
+    expect($withActivity['presents']['permanents'])->toBeGreaterThanOrEqual(1);
+});
