@@ -41,6 +41,10 @@ BEGIN
        AND NEW.last_name IS NOT DISTINCT FROM OLD.last_name AND NEW.organisation IS NOT DISTINCT FROM OLD.organisation THEN
         RETURN NEW;
     END IF;
+    -- Changer la personne d'un profil est interdit par la garde existante (« ne change jamais de personne ») : on lui laisse refuser avec son message.
+    IF TG_OP = 'UPDATE' AND NEW.person_id IS DISTINCT FROM OLD.person_id THEN
+        RETURN NEW;
+    END IF;
     SELECT first_name, last_name, full_name, organisation INTO p FROM public.persons WHERE id = NEW.person_id;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Un profil permanent se rattache à une personne existante.' USING ERRCODE = 'foreign_key_violation';
