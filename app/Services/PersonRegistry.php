@@ -4,6 +4,8 @@ namespace App\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -182,8 +184,8 @@ final class PersonRegistry
      */
     private function grantOptions(?object $holder, array $participations): array
     {
-        $open = fn (\Illuminate\Database\Query\Builder $q): \Illuminate\Database\Query\Builder => $q->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
-        $zonesOf = fn (array $eventIds): \Illuminate\Support\Collection => DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name'])->groupBy('event_id');
+        $open = fn (Builder $q): Builder => $q->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
+        $zonesOf = fn (array $eventIds): Collection => DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name'])->groupBy('event_id');
 
         $permanent = null;
         if ($holder !== null && $holder->status === 'actif') {
@@ -194,7 +196,7 @@ final class PersonRegistry
         }
 
         $eligible = array_values(array_filter($participations, fn (object $p): bool => $p->holder_id === null && $p->closed_at === null && $p->withdrawn_at === null && $p->status !== 'refuse'
-            && ! in_array($p->event_status, ['clos', 'archive'], true)));
+            && !in_array($p->event_status, ['clos', 'archive'], true)));
         $zones = $zonesOf(array_values(array_unique(array_map(fn (object $p): string => $p->event_id, $eligible))));
         $activities = array_map(fn (object $p): array => ['participation_id' => $p->id, 'event_id' => $p->event_id, 'event' => $p->event_name, 'valid_from' => $p->valid_from, 'valid_until' => $p->valid_until,
             'zones' => ($zones[$p->event_id] ?? collect())->map(fn (object $z): array => ['id' => $z->id, 'name' => $z->name])->values()->all()], $eligible);
