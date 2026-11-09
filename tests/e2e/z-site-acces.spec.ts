@@ -103,7 +103,10 @@ test('Site et accès : registre des postes, configuration à la sélection, enre
   await phone.getByTestId('selectionner-poste_2').tap();
   await expect(phone.getByTestId('detail-poste')).toBeVisible();
   await noScroll();
-  for (const id of ['nom-poste_2', 'capacite-poste_2-scan', 'enregistrer-poste_2', 'activation-poste_2', 'fermer-detail']) await touchable(id);
+  for (const id of ['nom-poste_2', 'enregistrer-poste_2', 'activation-poste_2', 'fermer-detail']) await touchable(id);
+  // une case à cocher se touche par sa ligne (libellé cliquable), pas par la case seule
+  const row = await phone.getByTestId('capacite-poste_2-scan').locator('xpath=ancestor::label').boundingBox();
+  expect(row!.height).toBeGreaterThanOrEqual(44);
   await phone.getByTestId('detail-poste').scrollIntoViewIfNeeded();
   await phone.screenshot({ path: 'test-results/site-acces-mobile-configuration.png', fullPage: true });
   await phone.getByTestId('fermer-detail').tap();
