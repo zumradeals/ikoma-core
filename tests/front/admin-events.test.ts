@@ -55,6 +55,6 @@ describe('création des événements dans IKOMA ACCESS', () => {
     const wrapper = mount(AdminLayout, { props: { active: 'tableau' } });
     expect(wrapper.get('.admin-brand').text()).toContain('IKOMA ACCESS');
     expect(wrapper.get('.admin-logo img').attributes('src')).toBe('/brand/ikoma-access-icon.svg');
-    expect(wrapper.get('[data-testid=menu-evenements]').attributes('href')).toBe('/administration/evenements');
+    expect(wrapper.get('[data-testid=menu-activites]').attributes('href')).toBe('/administration/evenements');
   });
 });

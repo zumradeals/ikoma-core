@@ -59,3 +59,8 @@ Sept entrées, sans accordéons : Tableau de bord ; Site et accès ; Personnes e
 
 ## 10. Ce qui ne change pas
 Journaux d'audit, registres d'impression et cartes en ajout seul ; politique de fonctionnement hors réseau ; permissions par rôle ; rôle requis en plus du poste ; F01 à F09 ; clôture VIP réservée au superviseur ; restitution distincte de la sortie.
+
+
+## Addendum — navigation réalisée et distinction sortie / restitution (PR 1)
+- Les sept menus sont réalisés dès la PR 1 (à plat, sans accordéon) ; les pages existantes s'y rangent en sous-menus. Le contrat de navigation de la PR #101 (cinq rubriques, accordéons) est remplacé.
+- La sortie du site et la restitution du badge restent deux opérations distinctes. Elles partagent aujourd'hui la capacité de poste « sortie » ; leur séparation en deux capacités est une décision ouverte (voir le journal des décisions).

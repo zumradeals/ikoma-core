@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  *  - tablette sans poste (ancien point « hotel », groupes et cars) : aucune capacité de poste ; les opérations de groupe restent autorisées par leurs permissions de rôle.
  * Un poste désactivé n'a plus aucune capacité. Poste non identifié (point_code nul) : AUCUNE capacité (refus par défaut).
  *
- * Capacités : « accueil » (identité, validation, refus, badge, entrée, non listé), « scan » (contrôle d'un badge), « sortie » (sortie et restitution).
+ * Capacités : « accueil » (identité, validation, refus, badge, entrée, non listé), « scan » (contrôle d'un badge), « sortie » : la sortie du site et la restitution du badge sont DEUX opérations distinctes (la restitution exige une personne déjà sortie et une vérification physique) ; elles partagent aujourd'hui la même porte de poste. Les séparer en deux capacités est une décision ouverte (journal des décisions).
  */
 final class PostCapabilities
 {
@@ -26,7 +26,7 @@ final class PostCapabilities
     public const CATALOGUE = [
         'accueil' => 'Accueil : identité, admission et attribution de badge',
         'scan' => 'Contrôle d’un badge (entrée ou passage)',
-        'sortie' => 'Contrôle de sortie et restitution',
+        'sortie' => 'Sortie du site (la restitution du badge reste une opération distincte, permise par la même capacité)',
     ];
 
     /** Point hérité des tablettes sans poste (groupes et cars). */

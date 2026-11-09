@@ -182,3 +182,9 @@ html { scroll-padding-bottom: 6rem; }
 .admin-nav-heading:hover { background:#eef5ff; }
 .admin-nav-items { display:flex; flex-direction:column; gap:2px; }
 .admin-nav-items .admin-nav-link { min-height:48px; padding-left:24px; font-size:15px; }
+
+/* Onglets des pages d'un même menu (menu latéral à sept entrées) : passent à la ligne, jamais de défilement horizontal. */
+.admin-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; border-bottom:1px solid #e0ebf7; padding-bottom:10px; }
+.admin-tab { display:inline-flex; align-items:center; min-height:44px; padding:8px 16px; border-radius:999px; font-size:15px; font-weight:650; color:#00469c; background:#f3f8fe; }
+.admin-tab:hover { background:#eef5ff; }
+.admin-tab[aria-current=page] { background:var(--inst-accent-ui); color:#172e4b; font-weight:750; }
