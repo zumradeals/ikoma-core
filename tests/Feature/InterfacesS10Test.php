@@ -180,19 +180,18 @@ it('expose à la tablette les capacités du poste pour adapter l’écran', func
 
 // --- Parcours de l'atelier -------------------------------------------------------------------------------------------------------------
 
-it('range les parcours en deux domaines distincts avec leurs nombres, pour l’administrateur seulement', function () {
-    $this->actingAs($this->admin)->get('/administration/atelier/parcours')->assertOk()->assertInertia(fn ($page) => $page->component('Admin/AtelierParcours')
-        ->has('visitors.badges')->where('visitors.badges.Disponible', fn ($n) => $n >= 4)->has('visitors.batches')->has('visitors.print_runs')->has('visitors.to_return')
-        ->has('cards', fn ($c) => $c->has('holders')->has('active')->has('inactive')->has('prints')));
+it('redirige l’ancien sommaire des parcours vers l’espace Badges et cartes, pour l’administrateur seulement', function () {
+    $this->actingAs($this->admin)->get('/administration/atelier/parcours')->assertRedirect('/administration/badges');
     foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
         $this->actingAs(s10User($role))->get('/administration/atelier/parcours')->assertForbidden();
     }
 });
 
-it('ne compte pas les badges des cartes permanentes parmi les badges visiteurs', function () {
+it('ne compte pas les badges des cartes permanentes parmi les badges visiteurs dans les compteurs de l’espace', function () {
     $before = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->count();
-    $this->actingAs($this->admin)->get('/administration/atelier/parcours')->assertOk()->assertInertia(fn ($page) => $page->where('visitors.badges.Disponible', DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->where('b.status', 'Disponible')->count())->etc());
-    expect($before)->toBeGreaterThan(0);
+    $available = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->where('b.status', 'Disponible')->count();
+    $this->actingAs($this->admin)->get('/administration/badges')->assertOk()->assertInertia(fn ($page) => $page->where('badgesCartes.visitors.available', $available)->has('badgesCartes.cards.holders'));
+    expect($before)->toBeGreaterThan(0)->and($available)->toBeGreaterThanOrEqual(4);
 });
 
 // --- Soute (P5) : sens du passage choisi avant le scan --------------------------------------------------------------------------------

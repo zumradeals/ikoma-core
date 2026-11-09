@@ -53,16 +53,16 @@ test('le superviseur n’accède à aucune page d’agent ni d’administration'
   }
 });
 
-test('l’administrateur voit les deux domaines de l’atelier, sans mélange, et ouvre un parcours', async ({ page }) => {
+test('l’administrateur retrouve l’espace Badges et cartes : ancien sommaire redirigé, quatre onglets distincts', async ({ page }) => {
   await loginWithSecondFactor(page, fx.admin.email, fx.admin.password, fx.admin.secret);
   await page.goto('/administration/atelier/parcours');
-  await expect(page.getByTestId('domaine-visiteurs')).toContainText('Badges visiteurs');
-  await expect(page.getByTestId('domaine-cartes')).toContainText('Cartes permanentes');
-  await expect(page.getByTestId('domaine-visiteurs')).not.toContainText('Titulaires');
-  await expect(page.getByTestId('etape-visiteur-restituer')).toContainText('acte distinct de la sortie');
-  await page.getByTestId('lien-visiteur-stock').click();
   await expect(page).toHaveURL(/\/administration\/badges$/);
-  await page.goto('/administration/atelier/parcours');
-  await page.getByTestId('lien-carte-titulaires').click();
+  await expect(page.getByTestId('onglet-visiteurs')).toContainText('Badges visiteurs');
+  await expect(page.getByTestId('onglet-cartes')).toContainText('Cartes permanentes');
+  await expect(page.getByTestId('compteurs-badges-cartes')).toContainText('Badges à restituer');
+  await expect(page.getByTestId('rappel-accueil')).toContainText('acte distinct de la sortie physique');
+  await page.getByTestId('onglet-cartes').click();
   await expect(page).toHaveURL(/\/administration\/titulaires$/);
+  await page.getByTestId('onglet-visiteurs').click();
+  await expect(page).toHaveURL(/\/administration\/badges$/);
 });

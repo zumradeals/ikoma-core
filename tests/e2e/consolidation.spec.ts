@@ -9,7 +9,7 @@ async function noHorizontalScroll(page: Page, label: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), label).toBe(true);
 }
 
-test('navigation consolidée : badges visiteurs, cartes permanentes, invités (ordinateur et tablette)', async ({ page }) => {
+test('navigation consolidée : espace Badges et cartes, quatre responsabilités, invités (ordinateur et tablette)', async ({ page }) => {
   test.setTimeout(240_000);
   await loginWithSecondFactor(page, admin.email, admin.password, admin.secret);
   for (const [label, width, height] of [['1440', 1440, 900], ['1024', 1024, 768]] as const) {
@@ -17,35 +17,55 @@ test('navigation consolidée : badges visiteurs, cartes permanentes, invités (o
     if (width < 1100) { /* le menu se replie sur tablette : on l'ouvre quand il existe */ }
     const openMenu = async () => { const toggle = page.getByTestId('ouvrir-menu'); if (await toggle.isVisible() && (await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click(); };
 
-    // Rubrique d'accueil : une entrée par usage, aucune sous-entrée ouverte.
+    // Accueil : une seule entrée « Badges et cartes » ; plus d'entrée par page.
     await page.goto('/administration'); await openMenu();
-    await expect(page.getByTestId('menu-badges')).toHaveText('Badges visiteurs');
-    await expect(page.getByTestId('menu-titulaires')).toContainText('Personnes et cartes permanentes');
-    await expect(page.getByTestId('menu-atelier')).toHaveText('Atelier des badges');
-    await expect(page.getByTestId('menu-modeles-cartes')).toBeHidden();
+    await expect(page.getByTestId('menu-badges-cartes')).toHaveText('Badges et cartes');
+    for (const ancien of ['menu-badges', 'menu-titulaires', 'menu-atelier', 'menu-modeles-cartes', 'menu-atelier-parcours', 'menu-imports']) await expect(page.getByTestId(ancien)).toHaveCount(0);
     await noHorizontalScroll(page, `tableau ${label}`);
-    await page.screenshot({ path: `test-results/a065-tableau-${label}.png`, fullPage: true });
+    await page.screenshot({ path: `test-results/consolidation-tableau-${label}.png`, fullPage: true });
 
-    // Badges visiteurs : l'atelier est une sous-entrée ; renvoi explicite vers les cartes permanentes.
-    await page.goto('/administration/badges'); await openMenu();
-    await expect(page.getByTestId('menu-atelier')).toBeVisible();
-    await expect(page.getByTestId('menu-modeles-cartes')).toBeVisible();
+    // L'espace : quatre responsabilités, compteurs, rappel du poste d'accueil.
+    await page.getByTestId('menu-badges-cartes').click();
+    await expect(page).toHaveURL(/\/administration\/badges$/);
+    for (const key of ['visiteurs', 'cartes', 'modeles', 'impression']) await expect(page.getByTestId(`onglet-${key}`)).toBeVisible();
+    await expect(page.getByTestId('onglet-visiteurs')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('compteurs-badges-cartes')).toBeVisible();
+    await expect(page.getByTestId('rappel-accueil')).toContainText('acte distinct de la sortie physique');
     await noHorizontalScroll(page, `badges ${label}`);
-    await page.screenshot({ path: `test-results/a065-badges-visiteurs-${label}.png`, fullPage: true });
+    await page.screenshot({ path: `test-results/consolidation-badges-visiteurs-${label}.png`, fullPage: true });
+
+    // Cartes permanentes : renvoi explicite depuis les badges visiteurs, onglet actif, renvoi inverse.
     await page.getByTestId('lien-cartes-permanentes').click();
     await expect(page.getByTestId('page-titulaires')).toBeVisible();
-
-    // Titulaires et cartes : sous-entrées propres, renvoi vers les badges visiteurs.
-    await openMenu();
-    await expect(page.getByTestId('menu-modeles-cartes')).toBeVisible();
-    await expect(page.getByTestId('menu-habilitations')).toBeVisible();
-    await expect(page.getByTestId('menu-atelier')).toBeVisible();
+    await expect(page.getByTestId('onglet-cartes')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('navigation-cartes')).toContainText('Badges visiteurs');
     await noHorizontalScroll(page, `titulaires ${label}`);
-    await page.screenshot({ path: `test-results/a065-titulaires-cartes-${label}.png`, fullPage: true });
-    await page.getByTestId('lien-modeles').click();
+    await page.screenshot({ path: `test-results/consolidation-cartes-${label}.png`, fullPage: true });
+
+    // Modèles : badge visiteur par activité, carte permanente par catégorie, même page.
+    await page.getByTestId('onglet-modeles').click();
+    await expect(page.getByTestId('page-modeles')).toBeVisible();
+    await expect(page.getByTestId('bloc-modele-badge')).toBeVisible();
+    await page.getByTestId('modele-type-cartes').click();
     await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
-    await page.screenshot({ path: `test-results/a065-modeles-cartes-${label}.png`, fullPage: true });
+    await noHorizontalScroll(page, `modeles ${label}`);
+    await page.screenshot({ path: `test-results/consolidation-modeles-${label}.png`, fullPage: true });
+    // Ancienne adresse des modèles de cartes : renvoi vers l'espace Modèles, section carte.
+    await page.goto('/administration/titulaires/modeles');
+    await expect(page).toHaveURL(/\/administration\/modeles\?section=cartes/);
+    await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
+
+    // Impression : le modèle n'y est plus modifiable, il est rappelé avec un lien vers Modèles.
+    await page.getByTestId('onglet-impression').click();
+    await expect(page.getByTestId('page-atelier')).toBeVisible();
+    await expect(page.getByTestId('rappel-modele')).toBeVisible();
+    await noHorizontalScroll(page, `impression ${label}`);
+    await page.getByTestId('lien-modeles-badges').click();
+    await expect(page.getByTestId('page-modeles')).toBeVisible();
+
+    // Ancien sommaire : adresse conservée, renvoi vers l'espace.
+    await page.goto('/administration/atelier/parcours');
+    await expect(page).toHaveURL(/\/administration\/badges$/);
 
     // Invités : « Ajouter un invité », réservé aux invités temporaires, avec renvoi vers le registre.
     await page.goto('/administration/imports');

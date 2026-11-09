@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
+import BadgesCartesShell from '../../components/admin/BadgesCartesShell.vue';
 
 type Category = { code: string; label: string; color: string; symbol: string };
 type Holder = {
@@ -108,6 +109,7 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
 
 <template>
   <AdminLayout active="titulaires">
+    <BadgesCartesShell active="cartes" />
     <div class="space-y-6" data-testid="page-titulaires">
       <header class="col-span-full space-y-2">
         <h1 class="text-display font-bold">Registre des personnes</h1>

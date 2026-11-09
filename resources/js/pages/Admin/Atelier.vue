@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
+import BadgesCartesShell from '../../components/admin/BadgesCartesShell.vue';
 import '../../../../public/badges/cards.css';
 
 type Visual = { design: string; title: string; primary: string; accent: string; orientation: string };
@@ -77,28 +78,6 @@ async function loadSpecimen() {
   if (data) specimen.value = data;
   specimenBusy.value = false;
 }
-// Gestion des modèles (S10) : revenir au modèle par défaut, ou reprendre celui d'une autre activité. Les valeurs reprises priment sur celles de la page jusqu'au prochain enregistrement.
-const adopted = reactive<Record<string, Visual>>({});
-const sourceEvent = ref('');
-const modelMessage = ref('');
-const otherEvents = computed(() => props.events.filter(e => e.id !== form.event));
-function saveModel() { form.put('/administration/atelier/modeles', { preserveScroll: true, onSuccess: () => { delete adopted[form.event]; } }); }
-async function resetModel() {
-  if (busy.value || !form.event) return;
-  busy.value = true; errors.value = []; modelMessage.value = '';
-  const data = await api<{ model: Visual }>('/administration/atelier/modeles/reinitialiser', { event: form.event });
-  if (data) { adopted[form.event] = data.model; Object.assign(form, data.model); modelMessage.value = 'Modèle par défaut rétabli pour cet événement.'; }
-  busy.value = false;
-}
-async function copyModel() {
-  if (busy.value || !form.event || !sourceEvent.value) return;
-  busy.value = true; errors.value = []; modelMessage.value = '';
-  const name = props.events.find(e => e.id === sourceEvent.value)?.name ?? '';
-  const data = await api<{ model: Visual }>('/administration/atelier/modeles/reprendre', { event: form.event, source: sourceEvent.value });
-  if (data) { adopted[form.event] = data.model; Object.assign(form, data.model); modelMessage.value = `Modèle repris de « ${name} » pour cet événement.`; sourceEvent.value = ''; }
-  busy.value = false;
-}
-
 // --- 2. Sélection ------------------------------------------------------------------------------------------------------------
 function range() { form.from = String(batch.value?.first_number ?? ''); form.to = String(batch.value?.last_number ?? ''); }
 function chooseBatch() { if (!batches.value.some(b => b.id === form.batch)) form.batch = batches.value[0]?.id ?? ''; if (!form.from && !form.to) range(); }
@@ -171,7 +150,7 @@ const stateLabel: Record<Run['state'], string> = { generated: 'Document génér�
 const formatLabel: Record<string, string> = { pvc: 'PVC CR80', a4: 'Planche A4', etiquettes: 'Étiquettes A4' };
 function when(value: string) { return new Date(value).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }); }
 
-watch(() => form.event, () => { Object.assign(form, adopted[form.event] ?? props.preferences[form.event] ?? defaults); modelMessage.value = ''; form.batch = ''; form.from = ''; form.to = ''; chooseBatch(); real.value = null; generated.value = null; void refreshRuns(); void loadSpecimen(); });
+watch(() => form.event, () => { Object.assign(form, props.preferences[form.event] ?? defaults); form.batch = ''; form.from = ''; form.to = ''; chooseBatch(); real.value = null; generated.value = null; void refreshRuns(); void loadSpecimen(); });
 watch(() => form.batch, () => { range(); resetPreparation(); real.value = null; generated.value = null; });
 watch(() => form.mode, () => { form.personal_allowed = false; form.show_photo = false; form.show_org = false; form.show_period = false; resetPreparation(); });
 watch(() => form.orientation, () => { if (form.format !== 'etiquettes') { form.cols = form.orientation === 'portrait' ? 3 : 2; form.rows = form.orientation === 'portrait' ? 3 : 5; } });
@@ -183,6 +162,7 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
 
 <template>
   <AdminLayout active="atelier" :event="events.find(event => event.id === form.event) ?? null">
+    <BadgesCartesShell active="impression" />
     <div class="mb-6 space-y-2" data-testid="page-atelier">
       <p class="text-sm font-bold uppercase tracking-widest text-blue-700">Atelier des badges · IKOMA ACCESS</p>
       <h1 class="text-display font-bold">Atelier des badges</h1>
@@ -202,23 +182,14 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
     <div class="workshop-layout">
       <div class="space-y-5">
         <section class="workshop-panel" aria-labelledby="etape-modele" data-testid="etape-modele">
-          <h2 id="etape-modele">1. Choisir le modèle</h2>
+          <h2 id="etape-modele">1. Choisir l’activité et l’aspect du badge</h2>
           <label>Événement<select v-model="form.event" class="field" data-testid="choix-evenement"><option v-for="event in events" :key="event.id" :value="event.id">{{ event.name }}</option></select></label>
           <div class="space-y-3"><label v-for="design in designs" :key="design.id" class="workshop-design" :class="{ selected: form.design === design.id }"><input v-model="form.design" type="radio" name="design" :value="design.id" @change="designColors(design)"><span class="workshop-design-letter" :style="{ background: design.color }" aria-hidden="true">{{ design.label }}</span><span><strong>{{ design.name }}</strong><small>{{ design.description }}</small></span></label></div>
           <label>Titre du site<input v-model="form.title" class="field" maxlength="60" required></label>
           <div class="grid grid-cols-2 gap-3"><label>Couleur principale<input v-model="form.primary" class="field" type="color"></label><label>Couleur d’accent<input v-model="form.accent" class="field" type="color"></label></div>
           <label>Orientation<select v-model="form.orientation" class="field"><option value="paysage">Paysage 85,60 × 53,98 mm</option><option value="portrait">Portrait 53,98 × 85,60 mm</option></select></label>
           <p class="text-base">Modèle générique de l’installation. Le logo IKOMA ACCESS fourni est utilisé ; aucun modèle institutionnel n’est présenté comme validé.</p>
-          <button type="button" class="btn-soft" :disabled="!form.event || form.processing" data-testid="enregistrer-modele" @click="saveModel">Enregistrer ce modèle pour l’événement</button>
-          <div class="space-y-3 rounded-xl border border-slate-300 p-3" data-testid="gestion-modeles">
-            <p class="font-semibold">Gérer le modèle de cet événement</p>
-            <button type="button" class="btn-soft" :disabled="busy || !form.event" data-testid="reinitialiser-modele" @click="resetModel">Revenir au modèle par défaut</button>
-            <template v-if="otherEvents.length">
-              <label class="block">Reprendre le modèle d’une autre activité<select v-model="sourceEvent" class="field" data-testid="source-modele"><option value="" disabled>Choisir…</option><option v-for="e in otherEvents" :key="e.id" :value="e.id">{{ e.name }}</option></select></label>
-              <button type="button" class="btn-soft" :disabled="busy || !form.event || !sourceEvent" data-testid="reprendre-modele" @click="copyModel">Reprendre ce modèle</button>
-            </template>
-            <p v-if="modelMessage" role="status" class="font-semibold" data-testid="message-modele">{{ modelMessage }}</p>
-          </div>
+          <p class="rounded-xl border border-slate-300 p-3 text-base" data-testid="rappel-modele">Ces réglages valent pour <strong>ce tirage seulement</strong>. Pour enregistrer un modèle durablement, revenir au modèle par défaut ou reprendre celui d’une autre activité : espace « Modèles ». <Link :href="'/administration/modeles' + (form.event ? '?event=' + form.event : '')" class="font-semibold underline" data-testid="lien-modeles-badges">Gérer les modèles</Link></p>
         </section>
 
         <section class="workshop-panel" aria-labelledby="etape-selection" data-testid="etape-selection">

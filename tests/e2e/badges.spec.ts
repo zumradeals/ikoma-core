@@ -11,7 +11,7 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   await page.setViewportSize({ width: 1024, height: 1400 });
   await loginWithSecondFactor(page, user.email, user.password, user.secret);
   await expandMenu(page);
-  await page.getByRole('link', { name: 'Badges visiteurs', exact: true }).click();
+  await page.getByRole('link', { name: 'Badges et cartes', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible();
 
   // 1. Génération d'un lot de 20 badges « Visiteur » : 20 attendus + 10 % de marge = 22.

@@ -39,7 +39,8 @@ test('administrateur : politique de conservation proposée et export daté du jo
   const fx = JSON.parse(readFileSync('.secrets/screen-account.json', 'utf8')) as { email: string; password: string; secret: string };
   await loginWithSecondFactor(page, fx.email, fx.password, fx.secret);
   await expandMenu(page);
-  await page.getByRole('link', { name: 'Conservation des données' }).click();
+  await page.getByRole('link', { name: 'Données et conservation', exact: true }).click();
+  await page.getByRole('link', { name: 'Consulter la politique' }).click();
   await expect(page.getByRole('heading', { name: 'Conservation des données' })).toBeVisible();
   await expect(page.getByLabel(/Le client a approuvé/)).not.toBeChecked();
   await page.screenshot({ path: 'test-results/l11-conservation.png', fullPage: true });
