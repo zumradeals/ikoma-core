@@ -17,15 +17,17 @@ final class Pilotage
 
     public function __construct(private readonly Presence $presence) {}
 
-    /** Événement affiché : celui demandé, sinon celui qui est en cours, sinon le plus récent. */
+    /**
+     * Événement affiché : celui demandé (y compris le contexte permanent, choisi explicitement : les passages des titulaires permanents restent consultables), sinon celui qui est
+     * en cours, sinon le plus récent. Le contexte permanent (jamais clos, valable sans fin) ne devient jamais l'événement affiché PAR DÉFAUT.
+     */
     public function event(?string $requested): ?object
     {
-        // Le contexte permanent (jamais clos, valable sans fin) ne devient jamais l'événement affiché par défaut.
-        $events = DB::table('events')->where('is_permanent', false)->orderByDesc('starts_at')->get(['id', 'name', 'starts_at', 'ends_at', 'status']);
-        if ($requested !== null && ($found = $events->firstWhere('id', $requested)) !== null) {
+        $all = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name', 'starts_at', 'ends_at', 'status', 'is_permanent']);
+        if ($requested !== null && ($found = $all->firstWhere('id', $requested)) !== null) {
             return $found;
         }
-        $events = $events->reject(fn ($e) => $e->status === 'archive');
+        $events = $all->reject(fn ($e) => $e->is_permanent || $e->status === 'archive');
         $now = now()->toDateTimeString();
 
         return $events->first(fn ($e) => $e->starts_at <= $now && $e->ends_at >= $now) ?? $events->first();

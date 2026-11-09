@@ -6,6 +6,7 @@ use App\Services\Alerts;
 use App\Services\Audit;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
+use App\Services\OperationsOverview;
 use App\Services\Pilotage;
 use App\Services\Poste\DeskRefused;
 use App\Services\Supervision;
@@ -27,7 +28,7 @@ use Inertia\Response;
  */
 final class PilotageController
 {
-    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision, private readonly Visits $visits, private readonly Vehicles $vehicles, private readonly SupervisorClosure $closure, private readonly SupervisionCentre $centre) {}
+    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision, private readonly Visits $visits, private readonly Vehicles $vehicles, private readonly SupervisorClosure $closure, private readonly SupervisionCentre $centre, private readonly OperationsOverview $site) {}
 
     private function event(Request $r): ?object
     {
@@ -56,6 +57,8 @@ final class PilotageController
             'alerts' => fn () => $event ? $this->pilotage->alerts($event->id, 'a_traiter', 5) : [],
             'overview' => fn () => $event ? $this->pilotage->overview($event->id) : null,
             'centre' => fn () => $event ? $this->centre->build($event->id, $r->user()) : null,
+            // Vue du site entier : les passages des titulaires permanents et des personnes hors activité restent visibles quelle que soit l'activité consultée.
+            'site' => fn () => $this->site->general(),
         ]);
     }
 
