@@ -149,7 +149,7 @@ it('donne à chaque priorité un état réel et un lien vers sa fonction d’ori
     $a = aoActivity();
     DB::table('refusals')->insert(['id' => (string) Str::uuid(), 'visitor_id' => $a['visitor'], 'reason' => 'Accès refusé (fictif)', 'refused_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     $silent = (string) Str::uuid();
-    DB::table('devices')->insert(['id' => $silent, 'event_id' => $a['event'], 'name' => 'Tablette fictive', 'token_hash' => hash('sha256', Str::random(16)), 'last_synced_at' => now()->subDays(2), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('devices')->insert(['id' => $silent, 'event_id' => $a['event'], 'name' => 'Tablette fictive', 'station' => 'Poste fictif', 'point_code' => 'poste_2', 'enrolled_at' => now(), 'token_hash' => hash('sha256', Str::random(16)), 'last_synced_at' => now()->subDays(2), 'created_at' => now(), 'updated_at' => now()]);
     $byKey = collect(aoGeneral()['priorites'])->keyBy('key');
     // le litige relève du superviseur : l'administrateur voit l'état mais pas de lien de décision
     expect($byKey['litiges']['count'])->toBeGreaterThanOrEqual(1)->and($byKey['litiges']['status'])->toBe('En attente de décision')->and($byKey['litiges']['href'])->toBeNull()
