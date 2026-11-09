@@ -347,13 +347,13 @@ it('rejoue à la soute les contrôles Entrée et Sortie faits hors ligne, avec l
     DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->update(['value' => '1']);
     expect(DB::table('devices')->where('id', $this->deviceId)->where('token_hash', hash('sha256', S10_TOKEN))->whereNull('revoked_at')->exists())->toBeTrue();
     s10Enter($this->visitorBadges[0], 1);
-    s10Enter($this->visitorBadges[1], 2);
+    s10Enter($this->visitorBadges[1], 4); // même catégorie que le badge (1 et 4 sont de la catégorie 1)
     $this->actingAs($this->agent);
     $presence = app(Presence::class);
     $present = $presence->count($this->event);
     $siteMovements = fn () => DB::table('access_events')->whereIn('type', ['entree', 'sortie'])->count();
     $siteBefore = $siteMovements();
-    $statusBefore = DB::table('visitors')->whereIn('id', [s10Visitor(1), s10Visitor(2)])->orderBy('id')->pluck('status', 'id')->all();
+    $statusBefore = DB::table('visitors')->whereIn('id', [s10Visitor(1), s10Visitor(4)])->orderBy('id')->pluck('status', 'id')->all();
     $zone1 = ['type' => 'zone', 'id' => DemoSeeder::id('zone1')];
     $zone2 = ['type' => 'zone', 'id' => DemoSeeder::id('zone2')];
     $code1 = $this->visitorBadges[0]->code;
@@ -381,7 +381,7 @@ it('rejoue à la soute les contrôles Entrée et Sortie faits hors ligne, avec l
     expect($events)->toHaveCount(3);
     // (6) la présence du site et le statut des personnes ne changent pas
     expect($presence->count($this->event))->toBe($present)->and($siteMovements())->toBe($siteBefore)
-        ->and(DB::table('visitors')->whereIn('id', [s10Visitor(1), s10Visitor(2)])->orderBy('id')->pluck('status', 'id')->all())->toBe($statusBefore);
+        ->and(DB::table('visitors')->whereIn('id', [s10Visitor(1), s10Visitor(4)])->orderBy('id')->pluck('status', 'id')->all())->toBe($statusBefore);
 
     // (8) rejeu du même lot : mêmes identifiants, aucun mouvement en double
     $count = DB::table('access_events')->where('type', 'controle')->count();
