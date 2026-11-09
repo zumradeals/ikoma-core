@@ -11,8 +11,9 @@ import { usePolling } from '../../pilotage/usePolling';
 
 type Counters = { attendus: number; arrives: number; presents: number; refuses: number; as_of: string };
 type Overview = { critiques: number; hautes: number; litiges: number; cars: { total: number; partis: number; arrives: number; ecarts: number }; postes_silencieux: number; retards?: number };
-const props = defineProps<{ event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; counters: Counters | null; alerts: AlertRow[]; overview: Overview | null; centre?: Centre | null }>();
-usePolling(['counters', 'alerts', 'openAlerts', 'criticalAlerts', 'overview', 'centre'], 3000);
+type Site = { presents: { total: number; permanents: number; activites: number }; mouvements: { entrees: number; sorties: number; controles: number; refus: number }; postes: { total: number; actifs: number; silencieux: number } };
+const props = defineProps<{ site?: Site | null; event: { id: string; name: string } | null; events: { id: string; name: string }[]; openAlerts: number; counters: Counters | null; alerts: AlertRow[]; overview: Overview | null; centre?: Centre | null }>();
+usePolling(['counters', 'alerts', 'openAlerts', 'criticalAlerts', 'overview', 'centre', 'site'], 3000);
 
 const page = usePage<{ auth?: { permissions: string[] } | null }>();
 const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
@@ -57,6 +58,11 @@ const levelClass = { critique: 'border-red-700 bg-red-50', attention: 'border-or
         <span class="pilotage-situation-icon" aria-hidden="true">{{ situation.icon }}</span><div><h2 data-testid="situation-titre">{{ situation.title }}</h2><p>{{ situation.text }}</p></div>
       </section>
       <CentreSupervision v-if="centre" :centre="centre" :event-id="event.id" :event-name="event.name" :can-close="can('cloture.superviseur')" />
+      <section v-if="site" class="pilotage-card" aria-labelledby="site-titre" data-testid="site-general">
+        <h2 id="site-titre"><AdminIcon name="pin" /> Le site, toutes activités confondues</h2>
+        <p class="pilotage-muted">Ces chiffres ne dépendent pas de l’activité choisie : ils incluent les titulaires permanents et les personnes hors activité.</p>
+        <p data-testid="site-presents"><strong>{{ site.presents.total }}</strong> présent{{ site.presents.total > 1 ? 's' : '' }} sur le site ({{ site.presents.permanents }} permanent{{ site.presents.permanents > 1 ? 's' : '' }}, {{ site.presents.activites }} en activité) · 24 h : <span data-testid="site-mouvements">{{ site.mouvements.entrees }} entrée{{ site.mouvements.entrees > 1 ? 's' : '' }}, {{ site.mouvements.sorties }} sortie{{ site.mouvements.sorties > 1 ? 's' : '' }}</span></p>
+      </section>
       <section aria-label="Compteurs" class="pilotage-kpis">
         <div v-for="tile in tiles" :key="tile.key" class="pilotage-card pilotage-kpi" :class="'kpi-' + tile.key" :data-testid="'compteur-' + tile.key"><span class="pilotage-metric-icon"><AdminIcon :name="tile.icon" :size="28" /></span><div><h2>{{ tile.label }}</h2><p data-testid="valeur">{{ tile.value }}</p></div></div>
       </section>

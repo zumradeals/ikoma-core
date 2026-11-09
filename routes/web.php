@@ -33,6 +33,7 @@ use App\Http\Controllers\ListImportsController;
 use App\Http\Controllers\ModelesController;
 use App\Http\Controllers\ModulesController;
 use App\Http\Controllers\MonGroupeController;
+use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PermanentHoldersController;
 use App\Http\Controllers\PersonsController;
 use App\Http\Controllers\PilotageController;
@@ -275,6 +276,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/administration/modules', [ModulesController::class, 'index'])->middleware('can:comptes.gerer');
         Route::put('/administration/modules/F06', [ModulesController::class, 'update'])->middleware(['can:comptes.gerer', 'throttle:6,1']);
         Route::get('/administration', AdminDashboardController::class)->middleware('can:evenements.gerer');
+        Route::get('/administration/operations', [OperationsController::class, 'index'])->middleware('can:pilotage.consulter');
         Route::get('/administration/evenements', [EventsController::class, 'index'])->middleware('can:evenements.gerer');
         Route::post('/administration/evenements', [EventsController::class, 'store'])->middleware('can:evenements.gerer');
         Route::get('/administration/comptes', [AccountsController::class, 'index'])->middleware('can:comptes.gerer');

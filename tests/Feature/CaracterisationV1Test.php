@@ -66,6 +66,7 @@ const CV_ROUTES = [
     ['PUT', 'administration/modules/F06', ['can:comptes.gerer'], ['throttle:6,1']],
     ['GET', 'administration', ['can:evenements.gerer'], []],
     ['GET', 'administration/evenements', ['can:evenements.gerer'], []],
+    ['GET', 'administration/operations', ['can:pilotage.consulter'], []],
     ['POST', 'administration/evenements', ['can:evenements.gerer'], []],
     ['GET', 'administration/comptes', ['can:comptes.gerer'], []],
     ['POST', 'administration/comptes', ['can:comptes.gerer', 'can:roles.attribuer'], []],
