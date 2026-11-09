@@ -131,4 +131,22 @@ describe('Atelier des badges : la gestion des modèles est dans l’espace Modè
     await wrapper.findAll('input[name="design"]')[1].setValue(true); await flushPromises();
     expect(calls().some(c => c.url.endsWith('/administration/atelier/modeles') || c.url.includes('/modeles/'))).toBe(false);
   });
+
+  it('ouvre par défaut l’historique des tirages seul : ni modèle, ni lot, ni plage ; l’atelier par lots reste accessible', async () => {
+    const wrapper = mount(Atelier, { props: { ...props, vue: 'historique' } as never, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' }, BadgesCartesShell: true } } });
+    await flushPromises();
+    expect(wrapper.get('h1').text()).toBe('Impression et historique');
+    expect(wrapper.find('[data-testid="suivi-tirages"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="rappel-trace"]').exists()).toBe(true);
+    for (const id of ['etape-modele', 'etape-selection', 'etape-impression', 'apercu-fictif', 'apercu-reel', 'type-visiteurs']) expect(wrapper.find(`[data-testid="${id}"]`).exists()).toBe(false);
+    expect(wrapper.find('[data-testid="ouvrir-atelier-lots"]').exists()).toBe(true);
+  });
+
+  it('garde l’atelier complet quand il est demandé (lien historique ou anciens paramètres)', async () => {
+    const wrapper = mount(Atelier, { props: { ...props, vue: 'atelier' } as never, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' }, BadgesCartesShell: true } } });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="etape-modele"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="retour-historique"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="suivi-tirages"]').exists()).toBe(true);
+  });
 });

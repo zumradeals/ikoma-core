@@ -25,7 +25,10 @@ final class AtelierController
         $input = $request->validate([
             'person' => 'nullable|uuid|exists:visitors,id', 'batch' => 'nullable|uuid|exists:badge_batches,id', 'format' => 'nullable|in:pvc,a4,etiquettes',
             'from' => 'nullable|integer|min:1', 'to' => 'nullable|integer|min:1', 'cols' => 'nullable|integer|min:1|max:4', 'rows' => 'nullable|integer|min:1|max:10',
+            'vue' => 'nullable|in:atelier,historique', 'mode' => 'nullable|in:visiteurs,cartes',
         ]);
+        // Par défaut, l'historique des tirages. L'atelier par lots (stock existant) s'ouvre explicitement ou par les anciens liens (personne, lot, format, plage, mode).
+        $workshop = ($input['vue'] ?? null) === 'atelier' || $request->hasAny(['person', 'batch', 'format', 'from', 'to', 'cols', 'rows', 'mode']);
         $person = null;
         if (! empty($input['person'])) {
             Gate::authorize('listes.importer');
@@ -51,6 +54,7 @@ final class AtelierController
             'runs' => app(PrintTrail::class)->recent(null, 30),
             'initial' => ['event' => $batchEvent, 'batch' => $input['batch'] ?? null, 'format' => $input['format'] ?? null, 'from' => $input['from'] ?? null, 'to' => $input['to'] ?? null, 'cols' => $input['cols'] ?? null, 'rows' => $input['rows'] ?? null],
             'canPrepare' => $request->user()->can('listes.importer'),
+            'vue' => $workshop ? 'atelier' : 'historique',
         ]);
     }
 

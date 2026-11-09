@@ -15,8 +15,10 @@ type Run = {
 type Initial = { event: string | null; batch: string | null; format: string | null; from: number | string | null; to: number | string | null; cols: number | string | null; rows: number | string | null };
 const props = defineProps<{
   events: { id: string; name: string }[]; batches: Batch[]; preferences: Record<string, Visual>; runs: Run[]; initial: Initial; canPrepare: boolean;
-  person?: { id: string; event_id: string; category_id: string; full_name: string } | null;
+  person?: { id: string; event_id: string; category_id: string; full_name: string } | null; vue?: 'historique' | 'atelier';
 }>();
+// Par défaut : l'historique des tirages. L'atelier par lots (stock existant) s'ouvre avec ?vue=atelier ou avec les anciens paramètres (lot, format, plage…).
+const history = props.vue === 'historique';
 
 const mode = ref<'visiteurs' | 'cartes'>(new URLSearchParams(window.location.search).get('mode') === 'cartes' ? 'cartes' : 'visiteurs');
 type PermanentCard = { id: string; identifier: string; name: string; category: string | null; activated: boolean; printed: boolean };
@@ -163,13 +165,19 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
 <template>
   <AdminLayout active="atelier" :event="events.find(event => event.id === form.event) ?? null">
     <BadgesCartesShell active="impression" />
-    <div class="mb-6 space-y-2" data-testid="page-atelier">
-      <p class="text-sm font-bold uppercase tracking-widest text-blue-700">Atelier des badges · IKOMA ACCESS</p>
+    <div v-if="history" class="mb-6 space-y-2" data-testid="page-atelier">
+      <h1 class="text-display font-bold">Impression et historique</h1>
+      <p class="max-w-3xl">Le suivi de chaque tirage : document généré, impression demandée, impression confirmée. Pour imprimer ou réimprimer un badge ou une carte, ouvrez-le dans le registre (« Registre et cartes »). Imprimer ne donne <strong>aucun droit d’accès</strong>.</p>
+      <p><Link href="/administration/atelier?vue=atelier" class="underline" data-testid="ouvrir-atelier-lots">Atelier d’impression par lots (stock existant)</Link></p>
+    </div>
+    <div v-else class="mb-6 space-y-2" data-testid="page-atelier">
+      <p class="text-sm font-bold uppercase tracking-widest text-blue-700">Atelier des lots · stock existant</p>
+      <p><Link href="/administration/atelier" class="underline" data-testid="retour-historique">Retour à l’historique des tirages</Link></p>
       <h1 class="text-display font-bold">Atelier des badges</h1>
       <p class="max-w-3xl">Un seul endroit pour choisir un modèle, sélectionner des badges, les prévisualiser, les imprimer et suivre chaque tirage. Imprimer ne donne <strong>aucun droit d’accès</strong> et ne change ni l’état ni la réservation d’un badge.</p>
     </div>
 
-    <div class="mb-6 grid gap-4 sm:grid-cols-2" role="group" aria-label="Type de badge">
+    <div v-if="!history" class="mb-6 grid gap-4 sm:grid-cols-2" role="group" aria-label="Type de badge">
       <button type="button" class="rounded-xl border-2 p-4 text-left" :class="mode === 'visiteurs' ? 'border-blue-600 bg-blue-50' : 'bg-white'" :aria-pressed="mode === 'visiteurs'" data-testid="type-visiteurs" @click="mode = 'visiteurs'"><span class="block text-heading font-bold">Badges visiteurs</span><span>Badges temporaires d’un événement : lots, plages, étiquettes.</span></button>
       <button type="button" class="rounded-xl border-2 p-4 text-left" :class="mode === 'cartes' ? 'border-blue-600 bg-blue-50' : 'bg-white'" :aria-pressed="mode === 'cartes'" data-testid="type-permanents" @click="mode = 'cartes'"><span class="block text-heading font-bold">Cartes permanentes</span><span>Cartes des personnes du registre : choisissez les personnes et imprimez.</span></button>
     </div>
@@ -179,7 +187,7 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
 
     <div v-if="errors.length" role="alert" class="mb-6 rounded-xl border-2 border-red-700 bg-red-50 p-4" data-testid="erreurs-atelier"><p v-for="error in errors" :key="error">{{ error }}</p></div>
 
-    <div class="workshop-layout">
+    <div v-if="!history" class="workshop-layout">
       <div class="space-y-5">
         <section class="workshop-panel" aria-labelledby="etape-modele" data-testid="etape-modele">
           <h2 id="etape-modele">1. Choisir l’activité et l’aspect du badge</h2>
@@ -306,7 +314,7 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
     </section>
     </template>
 
-    <section v-if="mode === 'cartes'" class="space-y-4 rounded-xl border bg-white p-5" data-testid="cartes-permanentes" aria-label="Cartes permanentes">
+    <section v-if="mode === 'cartes' && !history" class="space-y-4 rounded-xl border bg-white p-5" data-testid="cartes-permanentes" aria-label="Cartes permanentes">
       <h2 class="text-heading font-bold">Cartes permanentes</h2>
       <p>Cochez les personnes dont vous voulez imprimer la carte. Une carte imprimée n’est utilisable qu’après le bouton « Remettre et activer » dans la fiche de la personne.</p>
       <p v-if="!canPrepare" class="font-semibold" role="status">Ce parcours demande le droit de gérer les listes de personnes.</p>

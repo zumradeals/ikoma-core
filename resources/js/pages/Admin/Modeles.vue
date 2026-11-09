@@ -21,11 +21,13 @@ const section = ref<'badges' | 'cartes'>(props.section);
       <h1 class="text-display font-bold">Modèles</h1>
       <p class="max-w-3xl">L’aspect de ce qui s’imprime. Un modèle ne donne <strong>aucun droit d’accès</strong> : il ne change que la présentation.</p>
     </div>
-    <div class="mb-6 grid gap-4 sm:grid-cols-2" role="group" aria-label="Type de modèle">
-      <button type="button" class="rounded-xl border-2 p-4 text-left" :class="section === 'badges' ? 'border-blue-600 bg-blue-50' : 'bg-white'" :aria-pressed="section === 'badges'" data-testid="modele-type-badges" @click="section = 'badges'"><span class="block text-heading font-bold">Badge visiteur</span><span class="block text-sm">Un modèle par activité</span></button>
-      <button type="button" class="rounded-xl border-2 p-4 text-left" :class="section === 'cartes' ? 'border-blue-600 bg-blue-50' : 'bg-white'" :aria-pressed="section === 'cartes'" data-testid="modele-type-cartes" @click="section = 'cartes'"><span class="block text-heading font-bold">Carte permanente</span><span class="block text-sm">Un modèle par catégorie institutionnelle</span></button>
-    </div>
-    <BadgeModelSection v-if="section === 'badges'" :events="events" :preferences="preferences" :initial-event="initialEvent" />
-    <CardModelSection v-else v-bind="cards" base-url="/administration/modeles" :extra-query="{ section: 'cartes' }" />
+    <!-- Modèles institutionnels : un modèle par catégorie, pour les cartes permanentes ET les badges temporaires (référentiel unique). -->
+    <CardModelSection v-bind="cards" base-url="/administration/modeles" :extra-query="{ section: 'cartes' }" />
+    <!-- Ancien modèle des badges de lots, par activité : conservé pour le stock existant, hors du parcours normal. -->
+    <details class="mt-8 rounded-xl border border-slate-300 bg-white p-4" :open="section === 'badges'" data-testid="modele-historique">
+      <summary class="cursor-pointer font-bold" data-testid="modele-type-badges" @click="section = 'badges'">Ancien modèle des badges de lots, par activité (stock existant)</summary>
+      <p class="mb-3 mt-2 text-sm">Ce modèle ne sert qu’à l’impression des lots historiques. Les badges préparés pour une personne suivent le modèle institutionnel de sa catégorie.</p>
+      <BadgeModelSection :events="events" :preferences="preferences" :initial-event="initialEvent" />
+    </details>
   </AdminLayout>
 </template>
