@@ -4,6 +4,8 @@ namespace App\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -182,8 +184,8 @@ final class PersonRegistry
      */
     private function grantOptions(?object $holder, array $participations): array
     {
-        $open = fn (\Illuminate\Database\Query\Builder $q): \Illuminate\Database\Query\Builder => $q->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
-        $zonesOf = fn (array $eventIds): \Illuminate\Support\Collection => DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name'])->groupBy('event_id');
+        $open = fn (Builder $q): Builder => $q->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
+        $zonesOf = fn (array $eventIds): Collection => DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name'])->groupBy('event_id');
 
         $permanent = null;
         if ($holder !== null && $holder->status === 'actif') {
