@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\Zone;
+use App\Services\ActivityRegistry;
 use App\Services\Audit;
 use App\Services\DataLifecycle;
 use Illuminate\Http\RedirectResponse;
@@ -23,11 +24,20 @@ final class EventsController
     public function index(Request $request): Response
     {
         Gate::authorize('evenements.gerer');
+        $input = $request->validate(['activite' => 'nullable|uuid', 'q' => 'nullable|string|max:160', 'page' => 'nullable|integer|min:1|max:100000']);
+        $registry = app(ActivityRegistry::class);
+        $user = $request->user();
+        $selected = $input['activite'] ?? null;
+        $canList = $user->can('listes.importer');
 
         return Inertia::render('Admin/Evenements', [
             'archives' => $request->boolean('archives'),
-            'events' => Event::query()->when($request->boolean('archives'), fn ($q) => $q->where('status', 'archive'), fn ($q) => $q->where(fn ($q) => $q->whereNull('status')->orWhere('status', '<>', 'archive')))->orderByDesc('starts_at')
-                ->get(['id', 'name', 'site', 'kind', 'starts_at', 'ends_at', 'status']),
+            'events' => $registry->rows($request->boolean('archives')),
+            'kpis' => fn (): array => $registry->kpis(),
+            'selected' => fn (): ?array => $selected === null ? null : $registry->profile($selected, $user->can('journal.consulter')),
+            'participants' => fn (): ?array => $selected !== null && $canList && DB::table('events')->where('id', $selected)->exists() ? $registry->participants($selected, $input['q'] ?? null, (int) ($input['page'] ?? 1)) : null,
+            'participantQuery' => (string) ($input['q'] ?? ''),
+            'can' => ['participants' => $canList, 'journal' => $user->can('journal.consulter'), 'groupes' => $user->can('groupes.gerer'), 'badges' => $user->can('badges.gerer'), 'site' => $user->can('postes.gerer'), 'zones' => $user->can('zones.gerer')],
         ]);
     }
 

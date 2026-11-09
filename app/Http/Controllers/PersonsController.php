@@ -9,6 +9,7 @@ use App\Services\Vehicles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -99,8 +100,12 @@ final class PersonsController
     public function enrol(Request $request, string $person): RedirectResponse
     {
         Gate::authorize('listes.importer');
-        $data = $request->validate(['event_id' => 'required|uuid', 'category_id' => 'required|uuid', 'host_id' => 'nullable|uuid', 'valid_from' => 'nullable|date', 'valid_until' => 'nullable|date']);
-        $this->participations->enrol($request->user(), $person, $data);
+        $data = $request->validate(['event_id' => 'required|uuid', 'category_id' => 'required|uuid', 'host_id' => 'nullable|uuid', 'valid_from' => 'nullable|date', 'valid_until' => 'nullable|date', 'retour' => 'nullable|in:activites']);
+        $this->participations->enrol($request->user(), $person, Arr::except($data, ['retour']));
+        // Retour à la fiche de l'activité quand l'inscription en vient : seule cette valeur est acceptée (jamais d'adresse libre).
+        if (($data['retour'] ?? null) === 'activites') {
+            return redirect('/administration/evenements?activite='.$data['event_id'].'&onglet=participants')->with('status', 'Participation enregistrée.');
+        }
 
         return redirect('/administration/personnes/'.$person)->with('status', 'Participation enregistrée.');
     }
@@ -108,9 +113,13 @@ final class PersonsController
     public function close(Request $request, string $participation): RedirectResponse
     {
         Gate::authorize('listes.importer');
-        $data = $request->validate(['reason' => 'required|string|max:200']);
+        $data = $request->validate(['reason' => 'required|string|max:200', 'retour' => 'nullable|in:activites']);
         $person = (string) DB::table('visitors')->where('id', $participation)->value('person_id');
+        $event = (string) DB::table('visitors')->where('id', $participation)->value('event_id');
         $this->participations->close($request->user(), $participation, $data['reason']);
+        if (($data['retour'] ?? null) === 'activites') {
+            return redirect('/administration/evenements?activite='.$event.'&onglet=participants')->with('status', 'Participation clôturée. La personne et ses autres participations sont conservées.');
+        }
 
         return redirect('/administration/personnes/'.$person)->with('status', 'Participation clôturée. La personne et ses autres participations sont conservées.');
     }
