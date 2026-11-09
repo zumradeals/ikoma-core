@@ -30,25 +30,35 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await expect(page.getByRole('status')).toContainText('Aucun compte ne correspond');
   await page.getByLabel('Rechercher un compte').clear();
   await expandMenu(page);
-  await page.getByTestId('menu-badges').click();
+  await page.getByTestId('menu-badges-cartes').click();
   await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible();
   await expect(page.getByTestId('admin-layout')).toHaveCount(1);
   await expandMenu(page);
   await page.getByTestId('menu-tableau').click();
   await expect(page).toHaveURL(/\/administration$/);
   await page.goBack();
-  await expect(page.getByTestId('menu-badges')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('menu-badges-cartes')).toHaveAttribute('aria-current', 'page');
   await page.goForward();
   await expect(page.getByTestId('menu-tableau')).toHaveAttribute('aria-current', 'page');
-  for (const key of ['zones', 'categories', 'imports', 'groupes', 'postes', 'journal', 'conservation']) {
+  for (const key of ['zones', 'categories', 'groupes', 'postes', 'journal', 'donnees']) {
     await expandMenu(page);
     await page.getByTestId(`menu-${key}`).click();
     await expect(page.getByTestId('admin-layout')).toHaveCount(1);
     await expect(page.getByTestId(`menu-${key}`)).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
   }
+  // Pages sorties du menu mais toujours atteignables : liste d'invités depuis Personnes, politique de conservation depuis Données.
+  await expandMenu(page);
+  await page.getByTestId('menu-personnes').click();
+  await page.getByTestId('importer-liste').click();
+  await expect(page).toHaveURL(/\/administration\/imports$/);
+  await expect(page.getByTestId('menu-personnes')).toHaveAttribute('aria-current', 'page');
+  await page.goto('/administration/donnees');
+  await page.getByRole('link', { name: 'Consulter la politique' }).click();
+  await expect(page).toHaveURL(/\/administration\/conservation$/);
+  await expect(page.getByTestId('menu-donnees')).toHaveAttribute('aria-current', 'page');
   await page.goto('/administration/badges?status=Disponible&page=2');
-  await expect(page.getByTestId('menu-badges')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('menu-badges-cartes')).toHaveAttribute('aria-current', 'page');
   await page.goto('/administration/zones');
   await page.screenshot({ path: 'test-results/administration/zones-bureau.png', fullPage: true });
   await page.goto('/espace');

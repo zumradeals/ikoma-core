@@ -5,7 +5,6 @@ use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminVisitorsController;
 use App\Http\Controllers\AtelierCartesController;
 use App\Http\Controllers\AtelierController;
-use App\Http\Controllers\AtelierParcoursController;
 use App\Http\Controllers\BadgeDetailsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
@@ -31,6 +30,7 @@ use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalExportController;
 use App\Http\Controllers\ListImportsController;
+use App\Http\Controllers\ModelesController;
 use App\Http\Controllers\ModulesController;
 use App\Http\Controllers\MonGroupeController;
 use App\Http\Controllers\PermanentHoldersController;
@@ -123,7 +123,9 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/administration/categories', [CategoriesController::class, 'index'])->middleware('can:categories.gerer');
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
-        Route::get('/administration/atelier/parcours', [AtelierParcoursController::class, 'index'])->middleware('can:badges.gerer');
+        // Ancien sommaire « Parcours badges et cartes » : remplacé par le cadre à quatre onglets de l'espace Badges et cartes. L'adresse reste valable (permission d'abord).
+        Route::get('/administration/atelier/parcours', fn () => redirect('/administration/badges'))->middleware('can:badges.gerer');
+        Route::get('/administration/modeles', [ModelesController::class, 'index'])->middleware('can:badges.gerer');
         Route::get('/administration/atelier', [AtelierController::class, 'index'])->middleware('can:badges.gerer');
         Route::post('/administration/atelier/apercu-fictif', [AtelierController::class, 'specimen'])->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::post('/administration/atelier/apercu', [BadgeWorkshopController::class, 'preview'])->middleware(['can:badges.gerer', 'throttle:atelier']);
@@ -225,7 +227,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/titulaires/{holder}/carte/remplacer', [HolderCardsController::class, 'replace'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
         Route::get('/administration/atelier/cartes', [AtelierCartesController::class, 'index'])->middleware(['can:listes.importer', 'can:badges.gerer']);
         Route::post('/administration/atelier/cartes', [AtelierCartesController::class, 'document'])->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:atelier']);
-        Route::get('/administration/titulaires/modeles', [HolderCardsController::class, 'models'])->middleware('can:badges.gerer');
+        // Ancienne page « Personnalisation des cartes » : les modèles de cartes sont dans l'espace Modèles ; la catégorie choisie est conservée.
+        Route::get('/administration/titulaires/modeles', fn (Request $request) => redirect('/administration/modeles?'.http_build_query(['section' => 'cartes', ...$request->only('categorie')])))->middleware('can:badges.gerer');
         Route::post('/administration/titulaires/modeles/{code}/apercu', [HolderCardsController::class, 'modelPreview'])->where('code', 'AILCT-0[1-8]')->middleware(['can:badges.gerer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/modeles/{code}', [HolderCardsController::class, 'saveModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/modeles/{code}/valider', [HolderCardsController::class, 'validateModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);

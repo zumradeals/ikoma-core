@@ -17,6 +17,7 @@ function create() { form.post('/administration/personnes', { onSuccess: () => fo
 <AdminLayout active="personnes">
 <h1 class="mb-4 text-display font-bold">Administration · Personnes</h1>
 <p class="mb-6">Une personne a une identité unique, réutilisée d’une activité à l’autre. Deux personnes ne sont jamais fusionnées automatiquement sur le seul nom.</p>
+<p class="mb-6"><Link href="/administration/imports" class="font-semibold underline" data-testid="importer-liste">Importer une liste d’invités (fichier CSV ou Excel)</Link> · <Link href="/administration/invites" class="font-semibold underline" data-testid="fiches-invites">Fiches des invités d’une activité</Link></p>
 <div class="space-y-6">
 <BaseCard>
 <h2 class="mb-4 text-heading font-bold">Rechercher une personne</h2>

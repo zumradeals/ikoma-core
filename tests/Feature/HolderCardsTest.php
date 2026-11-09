@@ -66,8 +66,10 @@ it('émet une carte pour chacune des huit catégories institutionnelles avec son
 });
 
 it('présente huit modèles d’exemple fictifs dont le QR ne correspond à aucun badge', function () {
-    $this->actingAs($this->admin)->get('/administration/titulaires/modeles')->assertOk()
-        ->assertInertia(fn ($page) => $page->component('Admin/PersonnalisationCartes')->has('categories', 8)->where('model.validated', false)->has('preview.recto'));
+    // L'ancienne adresse renvoie vers l'espace Modèles (permission vérifiée d'abord) ; les mêmes données y sont servies.
+    $this->actingAs($this->admin)->get('/administration/titulaires/modeles')->assertRedirect('/administration/modeles?section=cartes');
+    $this->get('/administration/modeles?section=cartes')->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Admin/Modeles')->has('cards.categories', 8)->where('cards.model.validated', false)->has('cards.preview.recto'));
     $specimen = $this->cards->specimen(collect(app(InstitutionalCategories::class)->all())->first());
     expect($specimen['specimen'])->toBeTrue()->and(DB::table('badges')->where('qr_token', str_repeat('0', 64))->exists())->toBeFalse();
 });

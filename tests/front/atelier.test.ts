@@ -21,7 +21,7 @@ const props = {
 };
 const specimen = { recto: '<article class="access-card">EXEMPLE recto</article>', verso: '<article class="access-card">EXEMPLE verso</article>', orientation: 'paysage' };
 const real = { html: '<article class="access-card">B-401</article>', count: 200, first: 'B-401', last: 'B-600', inactive: 0 };
-function render() { return mount(Atelier, { props: props as never, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' } } } }); }
+function render() { return mount(Atelier, { props: props as never, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' }, BadgesCartesShell: true } } }); }
 const calls = () => vi.mocked(fetch).mock.calls.map(([url, init]) => ({ url: String(url), method: (init as RequestInit | undefined)?.method ?? 'GET', body: (init as RequestInit | undefined)?.body ? JSON.parse((init as RequestInit).body as string) : null }));
 
 beforeEach(() => {
@@ -117,37 +117,18 @@ describe('Atelier des badges (parcours visiteurs)', () => {
   });
 });
 
-describe('Atelier des badges : gestion des modèles (S10)', () => {
-  const model = { design: 'vip', title: 'MODÈLE REPRIS', primary: '#0B3C6B', accent: '#C9962B', orientation: 'portrait' };
-  const answer = (reply: Record<string, unknown>) => vi.mocked(fetch).mockImplementation(async (url: unknown) => ({ ok: true, status: 200, json: async () => (String(url).includes('apercu-fictif') ? specimen : reply) }) as Response);
-
-  it('rétablit le modèle par défaut de l’événement et le dit', async () => {
+describe('Atelier des badges : la gestion des modèles est dans l’espace Modèles', () => {
+  it('renvoie vers la page Modèles et ne propose plus d’enregistrer, réinitialiser ni reprendre un modèle', async () => {
     const wrapper = render(); await flushPromises();
-    answer({ model: { design: 'visiteur', title: 'IKOMA ACCESS', primary: '#0066B3', accent: '#F75C03', orientation: 'paysage' } });
-    await wrapper.get('[data-testid="reinitialiser-modele"]').trigger('click'); await flushPromises();
-    const call = calls().find(c => c.url.endsWith('/administration/atelier/modeles/reinitialiser'))!;
-    expect(call.method).toBe('POST');
-    expect(call.body).toEqual({ event: 'event-a' });
-    expect(wrapper.get('[data-testid="message-modele"]').text()).toContain('Modèle par défaut rétabli');
+    expect(wrapper.get('[data-testid="rappel-modele"]').text()).toContain('ce tirage seulement');
+    expect(wrapper.get('[data-testid="lien-modeles-badges"]').text()).toContain('Gérer les modèles');
+    for (const id of ['enregistrer-modele', 'reinitialiser-modele', 'reprendre-modele', 'source-modele', 'gestion-modeles']) expect(wrapper.find(`[data-testid="${id}"]`).exists()).toBe(false);
   });
 
-  it('reprend le modèle d’une autre activité, applique ses valeurs et nomme la source', async () => {
+  it('garde les réglages d’aspect propres au tirage sans jamais enregistrer de modèle', async () => {
     const wrapper = render(); await flushPromises();
-    expect(wrapper.get('[data-testid="reprendre-modele"]').attributes('disabled')).toBeDefined();
-    expect(wrapper.findAll('[data-testid="source-modele"] option').map(o => o.text())).toEqual(['Choisir…', 'Événement B']);
-    answer({ model });
-    await wrapper.get('[data-testid="source-modele"]').setValue('event-b');
-    await wrapper.get('[data-testid="reprendre-modele"]').trigger('click'); await flushPromises();
-    const call = calls().find(c => c.url.endsWith('/administration/atelier/modeles/reprendre'))!;
-    expect(call.body).toEqual({ event: 'event-a', source: 'event-b' });
-    expect(wrapper.get('[data-testid="message-modele"]').text()).toContain('Événement B');
-  });
-
-  it('affiche l’erreur serveur sans prétendre avoir changé le modèle', async () => {
-    const wrapper = render(); await flushPromises();
-    vi.mocked(fetch).mockImplementation(async (url: unknown) => (String(url).includes('apercu-fictif') ? { ok: true, status: 200, json: async () => specimen } : { ok: false, status: 403, json: async () => ({}) }) as Response);
-    await wrapper.get('[data-testid="reinitialiser-modele"]').trigger('click'); await flushPromises();
-    expect(wrapper.find('[data-testid="message-modele"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Opération refusée');
+    expect(wrapper.find('input[name="design"]').exists()).toBe(true);
+    await wrapper.findAll('input[name="design"]')[1].setValue(true); await flushPromises();
+    expect(calls().some(c => c.url.endsWith('/administration/atelier/modeles') || c.url.includes('/modeles/'))).toBe(false);
   });
 });

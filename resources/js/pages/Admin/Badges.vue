@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
-import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue'; import BadgeState from '../../components/BadgeState.vue'; import CategorySwatch from '../../components/CategorySwatch.vue';
+import AdminLayout from '../../layouts/AdminLayout.vue';
+import BadgesCartesShell from '../../components/admin/BadgesCartesShell.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue'; import BadgeState from '../../components/BadgeState.vue'; import CategorySwatch from '../../components/CategorySwatch.vue';
 import BadgeLotForm from '../../components/BadgeLotForm.vue'; import BadgeReservationForm from '../../components/BadgeReservationForm.vue'; import BadgeSettingsForm from '../../components/BadgeSettingsForm.vue';
 type Batch = { id: string; name: string; event_id: string; event_name: string; quantity: number; margin: number; category_name: string | null; first_number: number | null; last_number: number | null };
 const props = defineProps<{
@@ -17,8 +18,10 @@ const available = computed(() => Object.values(props.batchCounts ?? {}).flat().f
 </script>
 <template>
 <AdminLayout active="badges">
+    <BadgesCartesShell active="visiteurs" />
 <h1 class="mb-3 text-display font-bold">Administration · Badges</h1>
 <p class="mb-4 max-w-4xl">Les badges des <strong>visiteurs temporaires</strong>, en trois temps : fabriquer un lot, l’affecter à un poste ou à un groupe, puis suivre. Aucun nom de personne n’apparaît ici. Les cartes des personnes permanentes se préparent depuis <Link href="/administration/titulaires" class="font-semibold underline" data-testid="lien-cartes-permanentes">le registre des personnes permanentes</Link> ou l’Atelier des badges (mode « Cartes permanentes »).</p>
+<p class="mb-4 max-w-4xl rounded-xl border border-blue-200 bg-blue-50 p-3" data-testid="rappel-accueil">L’attribution d’un badge à une personne et sa restitution se font à l’accueil, par l’agent : la restitution est un acte distinct de la sortie physique.</p>
 <p class="mb-4"><Link href="/administration/badges/registre" class="btn-soft" data-testid="aller-registre">Registre commun : mettre des badges disponibles à disposition d’une autre activité</Link></p>
 <nav class="mb-6 flex flex-wrap gap-3" aria-label="Les trois étapes" data-testid="etapes-badges">
   <a href="#fabriquer" class="rounded-xl border-2 border-[#0066B3] bg-white px-5 py-3 font-bold" data-testid="aller-fabriquer"><span class="mr-2 inline-grid size-8 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">1</span>Fabriquer</a>

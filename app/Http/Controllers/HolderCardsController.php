@@ -124,6 +124,17 @@ final class HolderCardsController
     /** Page « Personnalisation des cartes » : un modèle à la fois, choisi parmi les huit catégories. */
     public function models(Request $request, HolderCards $cards, InstitutionalCategories $categories, CardModels $models): \Inertia\Response
     {
+        return Inertia::render('Admin/PersonnalisationCartes', $this->modelProps($request, $cards, $categories, $models));
+    }
+
+    /**
+     * Données du modèle de carte choisi (paramètre `categorie`) : partagées par la page historique et par la page Modèles de l'espace « Badges et cartes ».
+     * Même permission (badges.gerer) ; l'enregistrement et la validation restent réservés à categories.gerer.
+     *
+     * @return array<string, mixed>
+     */
+    public function modelProps(Request $request, HolderCards $cards, InstitutionalCategories $categories, CardModels $models): array
+    {
         Gate::authorize('badges.gerer');
         $all = $categories->all();
         $codes = array_map(fn ($c) => $c->code, $all);
@@ -136,11 +147,11 @@ final class HolderCardsController
             $preview = ['recto' => view('badges.holder-card-recto', ['card' => $data])->render(), 'verso' => view('badges.holder-card-verso', ['card' => $data])->render()];
         }
 
-        return Inertia::render('Admin/PersonnalisationCartes', [
+        return [
             'categories' => array_map(fn ($c) => ['code' => $c->code, 'label' => $c->label], $all), 'selected' => $selected, 'model' => $model, 'preview' => $preview,
             'settings' => $cards->settings(), 'limits' => ['ligne1' => 80, 'ligne2' => 80, 'contact' => 80, 'avis' => 160],
             'initialized' => $categories->initialized(), 'canConfigure' => $request->user()->can('categories.gerer'),
-        ]);
+        ];
     }
 
     /** Aperçu en direct d'un modèle avec des valeurs pas encore enregistrées : exemple fictif, aucun vrai QR. */

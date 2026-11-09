@@ -28,6 +28,13 @@ describe('registre des personnes', () => {
     expect(wrapper.find('[data-testid=confirmer-homonyme]').exists()).toBe(false);
   });
 
+  it('garde un chemin vers l’import de liste et les fiches d’invités, retirés du menu', () => {
+    formErrors = {};
+    const wrapper = mount(Personnes, { props: { query: '', persons: [] } });
+    expect(wrapper.get('[data-testid=importer-liste]').attributes('href')).toBe('/administration/imports');
+    expect(wrapper.get('[data-testid=fiches-invites]').attributes('href')).toBe('/administration/invites');
+  });
+
   it('demande une confirmation explicite quand une personne de même nom existe', () => {
     formErrors = { full_name: 'Une personne de même nom existe déjà (1). Reprenez-la depuis la recherche, ou confirmez qu’il s’agit d’une autre personne.' };
     const wrapper = mount(Personnes, { props: { query: '', persons: [] } });
