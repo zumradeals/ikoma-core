@@ -133,11 +133,17 @@ function toggleEnrol() { enrolOpen.value = !enrolOpen.value; enrolForm.value = {
 
 // --- Clôture d'une participation (route existante : motif obligatoire, refus tant qu'un badge ou un véhicule est présent) ---
 const closing = ref<string | null>(null); const reason = ref('');
+// Préparer les badges : sélection de participants, puis le MÊME parcours que « Badges et cartes » (aucune règle ici).
+const picked = ref<string[]>([]);
+const canPrepare = computed(() => !!props.can?.participants && !!props.can?.badges && !!props.selected && !props.selected.event.closed);
+function togglePick(id: string) { picked.value = picked.value.includes(id) ? picked.value.filter(x => x !== id) : [...picked.value, id]; }
+function pickAll() { picked.value = (props.participants?.data ?? []).filter(p => p.can_close).map(p => p.id); }
+const prepareHref = computed(() => props.selected ? `/administration/badges/preparer?activite=${encodeURIComponent(props.selected.event.id)}${picked.value.length ? '&ids=' + picked.value.join(',') : ''}` : '#');
 function closeParticipation(p: Participant) {
   errors.value = [];
   router.post(`/administration/participations/${p.id}/cloturer`, { reason: reason.value.trim(), retour: 'activites' }, { preserveScroll: true, onSuccess: () => { closing.value = null; reason.value = ''; }, onError });
 }
-watch(() => props.selected?.event.id, () => { resetOps(); partQuery.value = ''; });
+watch(() => props.selected?.event.id, () => { resetOps(); partQuery.value = ''; picked.value = []; });
 const n = (v: number | string | undefined) => Number(v ?? 0);
 </script>
 
@@ -325,6 +331,13 @@ const n = (v: number | string | undefined) => Number(v ?? 0);
               </form>
             </div>
 
+            <div v-if="canPrepare" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3" data-testid="preparer-badges-bloc">
+              <p class="text-sm"><strong data-testid="nb-choisis">{{ picked.length }}</strong> participant{{ picked.length > 1 ? 's' : '' }} choisi{{ picked.length > 1 ? 's' : '' }} pour les badges.</p>
+              <span class="flex flex-wrap gap-2">
+                <button type="button" class="site-btn site-btn-outline !min-h-11" data-testid="choisir-tous" @click="pickAll">Choisir les participants actifs</button>
+                <Link :href="prepareHref" class="site-btn site-btn-accent !min-h-11" data-testid="preparer-badges">Préparer les badges</Link>
+              </span>
+            </div>
             <form class="flex gap-2" role="search" aria-label="Rechercher un participant" @submit.prevent="loadParticipants()">
               <label class="block grow"><span class="sr-only">Rechercher un participant</span><input v-model="partQuery" class="field !mt-0" maxlength="160" placeholder="Rechercher un participant (nom, organisation)" data-testid="recherche-participant"></label>
               <button type="submit" class="site-btn site-btn-blue">Rechercher</button>
@@ -333,7 +346,8 @@ const n = (v: number | string | undefined) => Number(v ?? 0);
             <ul v-else class="divide-y rounded-xl border" data-testid="liste-participants">
               <li v-for="p in participants.data" :key="p.id" class="space-y-2 p-3" :data-testid="'participant-' + p.id">
                 <div class="flex flex-wrap items-start justify-between gap-2">
-                  <div class="min-w-0"><strong class="block">{{ p.full_name }}</strong><small class="text-slate-600">{{ p.organisation ?? '—' }} · {{ p.category }}<template v-if="p.group"> · {{ p.group }}</template></small></div>
+                  <label v-if="canPrepare && p.can_close" class="flex min-h-11 items-center gap-2"><input type="checkbox" class="h-6 w-6" :checked="picked.includes(p.id)" :aria-label="'Choisir ' + p.full_name + ' pour un badge'" :data-testid="'choisir-badge-' + p.id" @change="togglePick(p.id)"></label>
+                  <div class="min-w-0 grow"><strong class="block">{{ p.full_name }}</strong><small class="text-slate-600">{{ p.organisation ?? '—' }} · {{ p.category }}<template v-if="p.group"> · {{ p.group }}</template></small></div>
                   <span class="rounded-full px-2.5 py-0.5 text-xs font-bold" :class="p.status === 'cloturee' ? 'bg-slate-200 text-slate-700' : p.status === 'present' ? 'bg-green-100 text-green-900' : 'bg-sky-100 text-sky-900'" :data-testid="'statut-' + p.id">{{ partStatus[p.status] ?? p.status }}</span>
                 </div>
                 <p class="text-sm text-slate-700"><span :data-testid="'habilitations-' + p.id">{{ p.habilitations }} habilitation{{ p.habilitations > 1 ? 's' : '' }} d’activité effective{{ p.habilitations > 1 ? 's' : '' }}</span> · <span :data-testid="'badge-' + p.id">{{ p.badge ? 'Badge ' + p.badge : 'Aucun badge attribué' }}</span></p>

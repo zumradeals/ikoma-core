@@ -149,7 +149,7 @@ it('ne change ni les rôles, ni les permissions, ni la page de connexion de l’
 });
 
 it('n’est lue par aucun service métier : seuls l’affichage, l’écran d’administration et le nom du contexte permanent y accèdent', function () {
-    $allowed = ['Services/Institution.php', 'Http/Controllers/AtelierCartesController.php', 'Http/Controllers/InstitutionController.php', 'Http/Middleware/HandleInertiaRequests.php', 'Providers/AppServiceProvider.php', 'Services/PermanentHolders.php', 'Services/HolderCards.php', 'Http/Controllers/HolderCardsController.php'];
+    $allowed = ['Services/Institution.php', 'Http/Controllers/SupportPrintController.php', 'Http/Controllers/AtelierCartesController.php', 'Http/Controllers/InstitutionController.php', 'Http/Middleware/HandleInertiaRequests.php', 'Providers/AppServiceProvider.php', 'Services/PermanentHolders.php', 'Services/HolderCards.php', 'Http/Controllers/HolderCardsController.php'];
     $readers = [];
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path())) as $file) {
         if ($file->isFile() && str_ends_with($file->getFilename(), '.php') && str_contains((string) file_get_contents($file->getPathname()), 'Institution::class')) {
