@@ -41,6 +41,14 @@ END $$;
 CREATE TRIGGER badge_print_items_immutable BEFORE UPDATE ON badge_print_items FOR EACH ROW EXECUTE FUNCTION public.ikoma_badge_print_item_immutable();
 SQL);
 
+        // Remise à zéro de démonstration (TRUNCATE d'une seule commande) : les nouvelles tables partent avec les tirages et les badges, comme leurs homologues.
+        $business = (string) DB::selectOne("SELECT pg_get_functiondef('public.ikoma_reset_demo_business(uuid,boolean)'::regprocedure) AS d")->d;
+        $business = str_replace('public.badge_print_events, public.badge_print_runs,', 'public.badge_print_items, public.badge_issuances, public.badge_print_events, public.badge_print_runs,', $business, $count);
+        if ($count !== 1) {
+            throw new RuntimeException('Fonction de remise à zéro (globale) inattendue : revue du contrat requise.');
+        }
+        DB::unprepared($business);
+
         DB::statement('ALTER TABLE badge_print_runs DROP CONSTRAINT badge_print_runs_kind_valid');
         DB::statement("ALTER TABLE badge_print_runs ADD CONSTRAINT badge_print_runs_kind_valid CHECK (kind IN ('visiteur', 'permanent', 'support'))");
         DB::statement('ALTER TABLE badge_print_runs DROP CONSTRAINT badge_print_runs_nature_batch');
@@ -52,6 +60,8 @@ SQL);
         if (DB::table('badge_print_items')->exists() || DB::table('badge_print_runs')->where('kind', 'support')->exists()) {
             throw new RuntimeException('Retour destructif interdit : des impressions de supports sont enregistrées.');
         }
+        $business = (string) DB::selectOne("SELECT pg_get_functiondef('public.ikoma_reset_demo_business(uuid,boolean)'::regprocedure) AS d")->d;
+        DB::unprepared(str_replace('public.badge_print_items, public.badge_issuances, ', '', $business));
         DB::statement('ALTER TABLE badge_print_runs DROP CONSTRAINT badge_print_runs_nature_batch');
         DB::statement("ALTER TABLE badge_print_runs ADD CONSTRAINT badge_print_runs_nature_batch CHECK ((kind = 'permanent' AND batch_id IS NULL) OR (kind = 'visiteur' AND ((nature = 'essai') = (batch_id IS NULL))))");
         DB::statement('ALTER TABLE badge_print_runs DROP CONSTRAINT badge_print_runs_kind_valid');
