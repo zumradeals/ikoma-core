@@ -41,9 +41,10 @@ final class PermanentHoldersController
     public function store(Request $request, PermanentHolders $holders): RedirectResponse
     {
         Gate::authorize('listes.importer');
-        $holders->create($this->input($request), $request->user(), $request->boolean('confirm_homonym'));
+        $personId = $request->validate(['person_id' => ['nullable', 'uuid']])['person_id'] ?? null;
+        $holders->create($this->input($request), $request->user(), $request->boolean('confirm_homonym'), $personId);
 
-        return back()->with('status', 'Titulaire enregistré.');
+        return back()->with('status', $personId === null ? 'Titulaire enregistré.' : 'Profil permanent ajouté à la personne. Son identité, ses participations et ses habilitations sont inchangées.');
     }
 
     public function update(Request $request, string $holder, PermanentHolders $holders): RedirectResponse

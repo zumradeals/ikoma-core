@@ -110,6 +110,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/administration/personnes', [PersonsController::class, 'index'])->middleware('can:listes.importer');
         Route::get('/administration/personnes/recherche', [PersonsController::class, 'lookup'])->middleware(['can:listes.importer', 'throttle:recherche']);
         Route::post('/administration/personnes', [PersonsController::class, 'store'])->middleware(['can:listes.importer', 'throttle:titulaires']);
+        Route::put('/administration/personnes/{person}', [PersonsController::class, 'correct'])->whereUuid('person')->middleware(['can:listes.importer', 'throttle:titulaires']);
         Route::get('/administration/personnes/{person}', [PersonsController::class, 'show'])->whereUuid('person')->middleware('can:listes.importer');
         Route::post('/administration/personnes/{person}/participations', [PersonsController::class, 'enrol'])->whereUuid('person')->middleware(['can:listes.importer', 'throttle:titulaires']);
         Route::post('/administration/participations/{participation}/cloturer', [PersonsController::class, 'close'])->whereUuid('participation')->middleware(['can:listes.importer', 'throttle:titulaires']);

@@ -67,6 +67,16 @@ final class PersonsController
         return redirect('/administration/personnes/'.$id)->with('status', 'Personne enregistrée. Elle n’est inscrite à aucune activité : inscrivez-la ci-dessous.');
     }
 
+    /** Correction d'identité : `persons` est la référence canonique (le profil permanent actif en est le miroir). */
+    public function correct(Request $request, string $person): RedirectResponse
+    {
+        Gate::authorize('listes.importer');
+        $data = $request->validate(['first_name' => 'nullable|string|max:100', 'last_name' => 'nullable|string|max:100', 'full_name' => 'nullable|string|max:160', 'organisation' => 'nullable|string|max:160', 'homonym_confirmed' => 'nullable|boolean']);
+        $changed = $this->persons->correct($request->user(), $person, $data, $request->boolean('homonym_confirmed'));
+
+        return back()->with('status', $changed === [] ? 'Aucune modification.' : 'Identité corrigée. Les participations, journaux, cartes et badges déjà émis ne sont pas réécrits.');
+    }
+
     public function show(string $person): Response
     {
         Gate::authorize('listes.importer');

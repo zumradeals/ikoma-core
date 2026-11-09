@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import AdminIcon from '../../components/admin/AdminIcon.vue';
@@ -80,9 +80,48 @@ const participationState = (p: Participation) => (p.closed_at ? 'Clôturée' : p
 const assignmentState = (a: Assignment) => (a.cancelled_at ? 'Annulé' : a.returned_at ? 'Restitué le ' + day(a.returned_at) : 'En cours');
 
 const creating = ref(false);
-const form = useForm({ first_name: '', last_name: '', full_name: '', organisation: '', homonym_confirmed: false });
+const form = useForm({ first_name: '', last_name: '', full_name: '', organisation: '', homonym_confirmed: false, position: '', quality: '', institutional_category: '', engagement_starts_on: '', engagement_ends_on: '' });
 const needsConfirmation = () => Object.values(form.errors).some(message => String(message).includes('de même nom'));
-function create() { form.post('/administration/personnes', { onSuccess: () => form.reset() }); }
+// Nouvelle personne (cas B) : la recherche précède la création ; avec « personnel permanent », l'identité et le profil s'enregistrent ensemble.
+const permanentToo = ref(false);
+function create() {
+  if (permanentToo.value) form.transform(d => ({ ...d, confirm_homonym: d.homonym_confirmed })).post('/administration/titulaires', { onSuccess: () => { form.reset(); creating.value = false; } });
+  else form.post('/administration/personnes', { onSuccess: () => form.reset() });
+}
+type Match = { id: string; full_name: string; organisation: string | null; participations: number | string; permanent: boolean | number | string };
+const matches = ref<Match[]>([]);
+let lookupTimer: ReturnType<typeof setTimeout> | null = null;
+watch(() => [form.first_name, form.last_name, form.full_name], () => {
+  if (lookupTimer) clearTimeout(lookupTimer);
+  const q = `${form.first_name} ${form.last_name}`.trim() || form.full_name.trim();
+  if (q.length < 2) { matches.value = []; return; }
+  lookupTimer = setTimeout(async () => {
+    try {
+      const response = await fetch('/administration/personnes/recherche?q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+      matches.value = response.ok ? ((await response.json()).results ?? []) : [];
+    } catch { matches.value = []; }
+  }, 300);
+});
+// Sélection explicite d'une identité existante : on ouvre sa fiche, où l'on ajoute le profil permanent (aucune nouvelle identité).
+function useExisting(match: Match) { creating.value = false; permanentToo.value = false; matches.value = []; open({ id: match.id } as Row); }
+
+// Profil permanent d'une personne existante (cas A) et correction d'identité : depuis la fiche.
+const addProfile = ref(false);
+const profile = useForm({ person_id: '', position: '', quality: '', institutional_category: '', engagement_starts_on: '', engagement_ends_on: '' });
+function submitProfile() {
+  profile.person_id = props.selected?.person.id ?? '';
+  profile.post('/administration/titulaires', { preserveScroll: true, onSuccess: () => { addProfile.value = false; profile.reset(); } });
+}
+const correcting = ref(false);
+const correction = useForm({ first_name: '', last_name: '', full_name: '', organisation: '', homonym_confirmed: false });
+function syncCorrection() {
+  const person = props.selected?.person;
+  correction.first_name = person?.first_name ?? ''; correction.last_name = person?.last_name ?? ''; correction.full_name = person?.full_name ?? ''; correction.organisation = person?.organisation ?? '';
+  correction.homonym_confirmed = false;
+}
+watch(() => props.selected?.person.id, () => { correcting.value = false; addProfile.value = false; syncCorrection(); }, { immediate: true });
+const correctionNeedsConfirmation = () => Object.values(correction.errors).some(message => String(message).includes('de même nom'));
+function submitCorrection() { correction.put('/administration/personnes/' + props.selected?.person.id, { preserveScroll: true, onSuccess: () => { correcting.value = false; } }); }
 const drawerOpen = computed(() => creating.value || (props.selected !== null && !wide.value));
 function closeAll() { creating.value = false; if (props.selected) closePanel(); }
 </script>
@@ -163,6 +202,20 @@ function closeAll() { creating.value = false; if (props.selected) closePanel(); 
             <label class="block">Nom<input v-model="form.last_name" class="field" maxlength="100"></label>
             <label class="block">Ou nom complet seul<input v-model="form.full_name" class="field" maxlength="160"></label>
             <label class="block">Organisation (facultatif)<input v-model="form.organisation" class="field" maxlength="160"></label>
+            <section v-if="matches.length" class="rounded-xl border-2 border-amber-500 bg-amber-50 p-3" aria-labelledby="proches-titre" data-testid="personnes-proches">
+              <h3 id="proches-titre" class="font-bold">Personnes déjà enregistrées portant un nom proche</h3>
+              <p class="text-sm">Si c’est la même personne, utilisez-la : aucune nouvelle identité n’est créée.</p>
+              <ul class="mt-2 space-y-2"><li v-for="m in matches" :key="m.id" class="flex flex-wrap items-center justify-between gap-2"><span><strong>{{ m.full_name }}</strong><small class="block text-slate-700">{{ m.organisation ?? '—' }}<template v-if="m.permanent"> · profil permanent existant</template></small></span><button type="button" class="site-btn site-btn-outline !min-h-11" :data-testid="'utiliser-personne-' + m.id" @click="useExisting(m)">Utiliser cette personne</button></li></ul>
+            </section>
+            <label class="flex min-h-12 items-center gap-3" data-testid="creer-permanent"><input v-model="permanentToo" type="checkbox" class="h-5 w-5">Cette personne est du personnel permanent (profil permanent créé avec l’identité)</label>
+            <fieldset v-if="permanentToo" class="space-y-3" data-testid="profil-nouvelle-personne">
+              <legend class="font-semibold">Profil permanent</legend>
+              <label class="block">Fonction<input v-model="form.position" class="field" maxlength="160"></label>
+              <label class="block">Qualité<input v-model="form.quality" class="field" maxlength="160"></label>
+              <label class="block">Statut institutionnel<select v-model="form.institutional_category" class="field"><option value="">Non renseigné</option><option v-for="c in institutionalOptions" :key="c.code" :value="c.code">{{ c.label }}</option></select></label>
+              <label class="block">Début d’engagement<input v-model="form.engagement_starts_on" type="date" class="field"></label>
+              <label class="block">Fin d’engagement<input v-model="form.engagement_ends_on" type="date" class="field"></label>
+            </fieldset>
             <label v-if="needsConfirmation()" class="flex min-h-14 items-center gap-3" data-testid="confirmer-homonyme"><input v-model="form.homonym_confirmed" type="checkbox" class="h-6 w-6">Je confirme qu’il s’agit d’une autre personne que celle déjà enregistrée.</label>
             <p v-for="error in form.errors" :key="error" role="alert">{{ error }}</p>
             <button type="submit" class="btn-main" :disabled="form.processing">Enregistrer la personne</button>
@@ -193,6 +246,17 @@ function closeAll() { creating.value = false; if (props.selected) closePanel(); 
           </div>
 
           <div v-if="ptab === 'identite'" id="ppanneau-identite" role="tabpanel" aria-labelledby="ptab-identite" class="space-y-4" data-testid="onglet-identite">
+            <p><button type="button" class="site-btn site-btn-outline !min-h-11" :aria-expanded="correcting" data-testid="corriger-identite" @click="correcting = !correcting">Corriger l’identité</button></p>
+            <form v-if="correcting" class="space-y-3 rounded-xl border bg-slate-50 p-4" aria-label="Corriger l’identité" data-testid="form-correction" @submit.prevent="submitCorrection">
+              <p class="text-sm text-slate-700">La correction s’applique à l’identité de la personne et à son profil permanent actif. Les participations, journaux, cartes et badges déjà émis ne sont pas réécrits.</p>
+              <label class="block">Prénom<input v-model="correction.first_name" class="field" maxlength="100"></label>
+              <label class="block">Nom<input v-model="correction.last_name" class="field" maxlength="100"></label>
+              <label class="block">Ou nom complet seul<input v-model="correction.full_name" class="field" maxlength="160"></label>
+              <label class="block">Organisation<input v-model="correction.organisation" class="field" maxlength="160"></label>
+              <label v-if="correctionNeedsConfirmation()" class="flex min-h-12 items-center gap-3" data-testid="confirmer-homonyme-correction"><input v-model="correction.homonym_confirmed" type="checkbox" class="h-5 w-5">Je confirme qu’il s’agit d’une autre personne que celle déjà enregistrée.</label>
+              <p v-for="error in correction.errors" :key="error" role="alert">{{ error }}</p>
+              <button type="submit" class="btn-main" :disabled="correction.processing" data-testid="enregistrer-correction">Enregistrer la correction</button>
+            </form>
             <dl class="site-info">
               <div><dt>Prénom</dt><dd>{{ selected.person.first_name ?? '—' }}</dd></div>
               <div><dt>Nom</dt><dd>{{ selected.person.last_name ?? '—' }}</dd></div>
@@ -200,7 +264,20 @@ function closeAll() { creating.value = false; if (props.selected) closePanel(); 
               <div><dt>Organisation</dt><dd>{{ selected.person.organisation ?? '—' }}</dd></div>
             </dl>
             <h3 class="font-bold">Profil permanent</h3>
-            <p v-if="!selected.holder" data-testid="sans-profil-permanent">Cette personne n’a pas de profil permanent. Son statut institutionnel n’est donc pas renseigné.</p>
+            <div v-if="!selected.holder" class="space-y-3" data-testid="sans-profil-permanent">
+              <p>Cette personne n’a pas de profil permanent. Son statut institutionnel n’est donc pas renseigné.</p>
+              <p><button type="button" class="site-btn site-btn-accent !min-h-11" :aria-expanded="addProfile" data-testid="ajouter-profil-permanent" @click="addProfile = !addProfile">Ajouter un profil permanent</button></p>
+              <form v-if="addProfile" class="space-y-3 rounded-xl border bg-slate-50 p-4" aria-label="Ajouter un profil permanent" data-testid="form-profil-permanent" @submit.prevent="submitProfile">
+                <p class="text-sm text-slate-700">Le profil se rattache à cette identité : aucune nouvelle personne n’est créée, et ses participations et habilitations ne changent pas.</p>
+                <label class="block">Fonction<input v-model="profile.position" class="field" maxlength="160"></label>
+                <label class="block">Qualité<input v-model="profile.quality" class="field" maxlength="160"></label>
+                <label class="block">Statut institutionnel<select v-model="profile.institutional_category" class="field" data-testid="profil-categorie"><option value="">Non renseigné</option><option v-for="c in institutionalOptions" :key="c.code" :value="c.code">{{ c.label }}</option></select></label>
+                <label class="block">Début d’engagement<input v-model="profile.engagement_starts_on" type="date" class="field"></label>
+                <label class="block">Fin d’engagement<input v-model="profile.engagement_ends_on" type="date" class="field"></label>
+                <p v-for="error in profile.errors" :key="error" role="alert">{{ error }}</p>
+                <button type="submit" class="btn-main" :disabled="profile.processing" data-testid="enregistrer-profil-permanent">Enregistrer le profil permanent</button>
+              </form>
+            </div>
             <dl v-else class="site-info" data-testid="profil-permanent">
               <div><dt>Identifiant</dt><dd>{{ selected.holder.identifier }}</dd></div>
               <div><dt>Statut institutionnel</dt><dd>{{ selected.holder.category_label ?? 'Non renseigné' }}</dd></div>

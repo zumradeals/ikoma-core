@@ -64,3 +64,10 @@ Journaux d'audit, registres d'impression et cartes en ajout seul ; politique de 
 ## Addendum — navigation réalisée et distinction sortie / restitution (PR 1)
 - Les sept menus sont réalisés dès la PR 1 (à plat, sans accordéon) ; les pages existantes s'y rangent en sous-menus. Le contrat de navigation de la PR #101 (cinq rubriques, accordéons) est remplacé.
 - La sortie du site et la restitution du badge restent deux opérations distinctes. Elles partagent aujourd'hui la capacité de poste « sortie » ; leur séparation en deux capacités est une décision ouverte (voir le journal des décisions).
+
+## Addendum — identités et titulaires permanents (lot P2)
+- `persons` est le référentiel canonique de l'identité (nom, prénom, organisation). `permanent_holders` est un rattachement permanent d'une personne, jamais une seconde identité : une personne a au plus un profil permanent (index unique) et un profil se rattache toujours à une personne existante.
+- Deux parcours : (A) une personne existante, choisie explicitement, reçoit un profil permanent (`person_id`) sans création d'identité ; (B) une nouvelle personne est créée avec son profil dans la même transaction. Aucun rapprochement ni fusion automatique sur le nom ; un nom déjà connu (profil permanent ou non) exige une confirmation explicite.
+- Les colonnes de nom du profil permanent sont un miroir de `persons` : un nom ne s'écrit plus sur le profil, il se corrige dans la personne puis se propage aux profils ACTIFS. Un profil clos garde le nom du moment de sa clôture ; participations, journaux, cartes et badges déjà émis ne sont pas réécrits. La correction est journalisée (`identite.corrigee`, champs seulement).
+- Imports : un import de titulaires n'identifie jamais une personne par son nom ; une ligne dont le nom existe déjà est signalée « homonyme » et n'est créée (comme nouvelle identité distincte) que sur confirmation explicite. Aucune règle de rapprochement n'est inventée.
+- Habilitations : les deux moteurs (permanentes, liées aux activités) restent distincts et inchangés ; ajouter un profil permanent ne crée ni ne modifie aucune habilitation.
