@@ -10,7 +10,7 @@ defineProps<CardModelProps>();
 <template>
   <AdminLayout active="modeles-cartes">
     <header class="mb-4 space-y-2">
-      <Link href="/administration/titulaires" class="font-semibold underline">← Registre des personnes</Link>
+      <Link href="/administration/titulaires" class="font-semibold underline">← Personnel permanent et cartes</Link>
       <h1 class="text-display font-bold">Personnalisation des cartes</h1>
     </header>
     <CardModelSection v-bind="$props" />

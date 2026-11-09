@@ -71,3 +71,8 @@ Journaux d'audit, registres d'impression et cartes en ajout seul ; politique de 
 - Les colonnes de nom du profil permanent sont un miroir de `persons` : un nom ne s'écrit plus sur le profil, il se corrige dans la personne puis se propage aux profils ACTIFS. Un profil clos garde le nom du moment de sa clôture ; participations, journaux, cartes et badges déjà émis ne sont pas réécrits. La correction est journalisée (`identite.corrigee`, champs seulement).
 - Imports : un import de titulaires n'identifie jamais une personne par son nom ; une ligne dont le nom existe déjà est signalée « homonyme » et n'est créée (comme nouvelle identité distincte) que sur confirmation explicite. Aucune règle de rapprochement n'est inventée.
 - Habilitations : les deux moteurs (permanentes, liées aux activités) restent distincts et inchangés ; ajouter un profil permanent ne crée ni ne modifie aucune habilitation.
+
+## Addendum — habilitations depuis la fiche (lots P3 et P4)
+- Les deux moteurs d'habilitation restent indépendants et inchangés ; la fiche d'une personne n'est qu'un point d'entrée qui appelle leurs routes existantes. Habilitation permanente : attribution et retrait seulement (la modification passe par un retrait puis une nouvelle attribution). Habilitation de participation : attribution, suspension, reprise, retrait, rattachée à sa participation.
+- Clôturer une participation ou une activité ne retire jamais une habilitation permanente ; retirer un droit permanent ne touche pas aux droits de participation, et inversement.
+- Aucun écran ne crée de second registre d'identité : « Personnes et habilitations » est le registre ; « Personnel permanent et cartes » (Badges et cartes) est une vue spécialisée des numéros et des cartes.

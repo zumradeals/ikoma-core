@@ -29,7 +29,7 @@ const menus: Menu[] = [
   ] },
   { key: 'personnes', label: 'Personnes et habilitations', icon: 'users', items: [
     { key: 'personnes', label: 'Personnes', icon: 'users', href: '/administration/personnes', permission: 'listes.importer', match: ['imports'] },
-    { key: 'habilitations', label: 'Personnel permanent', icon: 'shield', href: '/administration/habilitations', permission: 'listes.importer' },
+    { key: 'habilitations', label: 'Habilitations par zone', icon: 'shield', href: '/administration/habilitations', permission: 'listes.importer' },
     { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer' },
   ] },
   { key: 'activites', label: 'Activités', icon: 'calendar', items: [

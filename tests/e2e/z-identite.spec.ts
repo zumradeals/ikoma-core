@@ -48,6 +48,22 @@ test('Identité unique : profil permanent ajouté à une personne existante, pui
   await expect(page.locator('[data-testid^="selectionner-personne-"]')).toHaveCount(1);
   await page.screenshot({ path: 'test-results/identite-profil-ajoute.png', fullPage: true });
 
+  // 3 bis. Habilitation permanente accordée puis retirée depuis la fiche (moteur permanent existant, motif obligatoire au retrait)
+  await page.getByTestId('ptab-habilitations').click();
+  await expect(page.getByTestId('accorder-permanente')).toBeVisible();
+  await page.getByTestId('accorder-permanente').click();
+  await page.getByTestId('perm-enregistrer').click();
+  await expect(page.getByTestId('habilitations-permanentes')).toContainText('Origine : permanente');
+  await expect(page.getByTestId('habilitations-permanentes')).toContainText(/Active|À venir/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/identite-habilitation-accordee.png', fullPage: true });
+  await page.locator('[data-testid^="action-"][data-testid$="-retirer"]').first().click();
+  await page.locator('[data-testid^="motif-"]').first().fill('Fin de mission fictive');
+  await page.locator('[data-testid^="confirmer-"]').first().click();
+  await expect(page.getByTestId('habilitations-permanentes')).toContainText('Retirée');
+  await expect(page.locator('[data-testid^="action-"]')).toHaveCount(0);
+  expect((await page.getByTestId('kpi-personnes').innerText()).trim()).toBe(before);
+
   // 4. Correction d'identité : l'identité canonique est mise à jour et affichée
   await page.getByTestId('ptab-identite').click();
   await page.getByTestId('corriger-identite').click();

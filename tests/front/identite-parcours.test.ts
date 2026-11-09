@@ -27,7 +27,12 @@ describe('parcours de création d’identité', () => {
 
   it('le registre « Personnes » est le seul écran des deux entrées à créer une personne, avec confirmation d’homonyme', () => {
     // création d'une personne, correction d'identité (PUT), et profil permanent rattaché à une identité (person_id) ou créé avec une nouvelle personne
-    expect([...new Set(writes(page('Personnes')))].sort()).toEqual(['/administration/personnes', '/administration/personnes/', '/administration/titulaires']);
+    const calls = [...new Set(writes(page('Personnes')))].sort();
+    expect(calls.filter(c => IDENTITY.test(c))).toEqual(['/administration/personnes', '/administration/personnes/', '/administration/titulaires']);
+    // P3 : les opérations d'habilitation réutilisent les routes des deux moteurs existants, sans route nouvelle
+    expect(calls.filter(c => !IDENTITY.test(c))).toEqual(['/administration/acces/habilitations', '/administration/habilitations']);
+    expect(page('Personnes')).toContain('/administration/habilitations/${r.id}/retirer');
+    expect(page('Personnes')).toContain('/administration/acces/habilitations/${r.id}/');
     expect(page('Personnes')).toContain("person_id: ''");
     expect(page('Personnes')).toContain('confirmer-homonyme');
   });
