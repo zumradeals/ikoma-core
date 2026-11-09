@@ -20,8 +20,9 @@ Le détail technique de chaque CVE (vecteur, fonction concernée) n'a pas pu êt
 
 `docker/prod/Dockerfile`, étage `nginx` : `apk upgrade --no-cache` sous `USER root`, puis retour à `USER 101` (utilisateur sans privilèges de l'image amont). C'est le mécanisme déjà utilisé pour l'étage PHP. Aucun changement de contrat (ports, fichiers, utilisateur d'exécution). Aucun seuil ni contrôle CI modifié.
 
-## Statut
+## Statut (mis à jour après preuve CI)
 
-- Correctif appliqué dans le commit qui porte ce document : **non encore prouvé**. Les trois constats restent « à corriger » jusqu'à ce qu'une exécution CI montre un contrôle des images finales sans HIGH/CRITICAL.
-- Aucune acceptation de risque n'est proposée ni enregistrée. Toute acceptation exigerait la validation explicite du dirigeant.
-- Point de vigilance : `apk upgrade` rend la construction dépendante de l'état du dépôt Alpine au moment du build (même choix que l'étage PHP) ; l'image est réévaluée par Trivy à chaque exécution CI.
+- **Preuve** : exécution CI 42545445031 (commit `28d9cdb`, qui contient le correctif `62298c8`) : étapes « Analyser les trois images finales » et « Refuser une preuve finale manquante ou incohérente » en succès ; journal : « Total HIGH/CRITICAL : 0 » et « Contrôle complet : aucun HIGH/CRITICAL » ; l'exécution 42544753132 (`62298c8`) montrait déjà le même succès. Seuil et contrôles inchangés.
+- CVE-2026-107891 (musl, musl-utils) et CVE-2026-85091 (zlib) : **corrigées** dans l'image nginx (preuve CI ci-dessus).
+- Aucune acceptation de risque n'a été nécessaire ni enregistrée.
+- Limites : le rapport complet reste dans l'artefact `analyses-images-finales` (non lisible depuis la session de travail) ; seuls HIGH/CRITICAL sont qualifiés ici, pas les niveaux inférieurs. `apk upgrade` rend la construction dépendante de l'état du dépôt Alpine au moment du build (même choix que l'étage PHP) : un nouveau HIGH publié plus tard bloquera de nouveau le contrôle, ce qui est le comportement voulu.
