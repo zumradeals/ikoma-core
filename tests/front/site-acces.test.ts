@@ -38,6 +38,32 @@ describe('écran Site et accès', () => {
     expect(wrapper.find('[data-testid="nom-poste_2"]').exists()).toBe(false);
   });
 
+  it('compose la vue d’ensemble : registre, informations du site, zones et règles réelles, sans règle inventée', () => {
+    const wrapper = render();
+    for (const id of ['registre-postes', 'infos-site', 'resume-zones', 'resume-regles']) expect(wrapper.find(`[data-testid="${id}"]`).exists(), id).toBe(true);
+    expect(wrapper.get('[data-testid="infos-site"]').text()).toContain('Site fictif');
+    expect(wrapper.findAll('[data-testid^="zone-resume-"]').map(a => a.attributes('data-testid'))).toEqual(['zone-resume-z1', 'zone-resume-z2']);
+    expect(wrapper.get('[data-testid="zone-resume-z1"]').text()).toContain('Poste 2');
+    expect(wrapper.get('[data-testid="zone-resume-z2"]').text()).toContain('aucun poste');
+    // une seule correspondance poste–zone existe dans les données : une seule règle
+    expect(wrapper.findAll('[data-testid^="regle-resume-"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="resume-regles"]').text()).toContain('Règles d’accès (1)');
+    expect(wrapper.get('[data-testid="ajouter-zone"]').attributes('href')).toBe('/administration/zones');
+  });
+
+  it('ouvre la configuration dans un panneau modal qui se referme avec Échap ou le fond', async () => {
+    const wrapper = render();
+    await open(wrapper, 'poste_2');
+    const panel = wrapper.get('[data-testid="detail-poste"]');
+    expect(panel.attributes('role')).toBe('dialog');
+    expect(panel.attributes('aria-modal')).toBe('true');
+    await panel.trigger('keydown', { key: 'Escape' });
+    expect(wrapper.find('[data-testid="detail-poste"]').exists()).toBe(false);
+    await open(wrapper, 'poste_2');
+    await wrapper.get('[data-testid="fond-panneau"]').trigger('click');
+    expect(wrapper.find('[data-testid="detail-poste"]').exists()).toBe(false);
+  });
+
   it('affiche des indicateurs tirés des données réelles', () => {
     const wrapper = render();
     expect(wrapper.get('[data-testid="kpi-postes"]').text()).toBe('3');

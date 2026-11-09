@@ -9,6 +9,17 @@ const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as { 
 
 test.use({ actionTimeout: 15_000 });
 
+/** Le panneau de configuration est modal : on le referme avant de toucher au reste de la page. */
+async function closeDetail(page: import('@playwright/test').Page) {
+  if (await page.getByTestId('detail-poste').count() > 0) await page.getByTestId('fermer-detail').click();
+  await expect(page.getByTestId('detail-poste')).toHaveCount(0);
+}
+async function configure(page: import('@playwright/test').Page, code: string) {
+  await closeDetail(page);
+  await page.getByTestId(`selectionner-${code}`).click();
+  await expect(page.getByTestId('detail-poste')).toBeVisible();
+}
+
 test('Site et accès : registre des postes, configuration à la sélection, enregistrement, retour à l’état initial, puis usage sur téléphone', async ({ page, browser }) => {
   test.setTimeout(240_000);
   await loginWithSecondFactor(page, fx.admin.email, fx.admin.password, fx.admin.secret);
@@ -23,17 +34,18 @@ test('Site et accès : registre des postes, configuration à la sélection, enre
   await expect(page.getByTestId('kpi-postes')).toHaveText('5');
 
   // configuration par défaut = contrat V1 antérieur, lue à la sélection
-  await page.getByTestId('selectionner-poste_2').click();
+  await configure(page, 'poste_2');
   await expect(page.getByTestId('capacite-poste_2-accueil')).toBeChecked();
   await expect(page.getByTestId('capacite-poste_2-sortie')).toBeChecked();
   // les tablettes de la recette sont affectées à leur poste (plusieurs possibles) et l'historique existe
   await expect(page.getByTestId('tablettes-poste_2').locator('li').first()).toBeVisible();
-  await page.getByTestId('selectionner-poste_1').click();
+  await configure(page, 'poste_1');
   await expect(page.getByTestId('capacite-poste_1-scan')).not.toBeChecked();
   await expect(page.getByTestId('sens-poste_1')).toBeDisabled();
-  await page.getByTestId('selectionner-soute').click();
+  await configure(page, 'soute');
   await expect(page.getByTestId('capacite-soute-scan')).toBeChecked();
   await expect(page.getByTestId('sens-soute')).toBeChecked();
+  await closeDetail(page);
   await page.getByTestId('tab-parametres').click();
   await expect(page.getByTestId('historique-affectations')).toBeVisible();
   await page.getByTestId('tab-tablettes').click();
@@ -43,14 +55,17 @@ test('Site et accès : registre des postes, configuration à la sélection, enre
   await page.getByTestId('tab-regles').click();
   await expect(page.getByTestId('regle-poste_2')).toBeVisible();
   await page.getByTestId('tab-postes').click();
+  await expect(page.getByTestId('resume-zones')).toBeVisible();
+  await expect(page.getByTestId('resume-regles')).toBeVisible();
+  await expect(page.getByTestId('infos-site')).toBeVisible();
 
   // activer le contrôle de badge au poste 1, enregistrer, retrouver la configuration après rechargement
-  await page.getByTestId('selectionner-poste_1').click();
+  await configure(page, 'poste_1');
   await page.getByTestId('capacite-poste_1-scan').check();
   await page.getByTestId('enregistrer-poste_1').click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuration du poste enregistrée' })).toBeVisible();
   await page.reload();
-  await page.getByTestId('selectionner-poste_1').click();
+  await configure(page, 'poste_1');
   await expect(page.getByTestId('capacite-poste_1-scan')).toBeChecked();
 
   // retour à l'état initial
@@ -58,7 +73,7 @@ test('Site et accès : registre des postes, configuration à la sélection, enre
   await page.getByTestId('enregistrer-poste_1').click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuration du poste enregistrée' })).toBeVisible();
   await page.reload();
-  await page.getByTestId('selectionner-poste_1').click();
+  await configure(page, 'poste_1');
   await expect(page.getByTestId('capacite-poste_1-scan')).not.toBeChecked();
 
   // ── Téléphone : mêmes capacités, ergonomie mesurée ──

@@ -41,7 +41,6 @@ describe('navigation d’administration', () => {
 
   it('garde toutes les pages existantes accessibles, en onglets du menu qui les regroupe', () => {
     const expected: Record<string, string[]> = {
-      'site-acces': ['site-acces', 'zones', 'acces-zones'],
       'personnes': ['personnes', 'habilitations', 'categories-institutionnelles'],
       'evenements': ['evenements', 'categories'],
       'postes': ['postes', 'groupes'],
@@ -49,6 +48,8 @@ describe('navigation d’administration', () => {
     };
     for (const [active, onglets] of Object.entries(expected)) expect(tabs(menu(active, ALL).wrapper), active).toEqual(onglets);
     expect(tabs(menu('tableau', ALL).wrapper)).toEqual([]);
+    // Site et accès : une seule entrée ; zones et accès des participants y restent rattachés, sans navigation concurrente
+    expect(tabs(menu('site-acces', ALL).wrapper)).toEqual([]);
     expect(tabs(menu('badges', ALL).wrapper)).toEqual([]);
     expect(tabs(menu('comptes', ALL, true).wrapper)).toContain('demonstration');
     // chaque ancienne entrée reste atteignable : un onglet ou un menu pour chacune des 19 pages
@@ -57,7 +58,7 @@ describe('navigation d’administration', () => {
       const m = menu(active, ALL, true);
       m.ids.forEach(i => reachable.add(i)); tabs(m.wrapper).forEach(i => reachable.add(i));
     }
-    for (const key of ['tableau', 'evenements', 'zones', 'categories', 'personnes', 'badges-cartes', 'acces-zones', 'habilitations', 'categories-institutionnelles', 'site-acces', 'postes', 'groupes', 'identite', 'modules', 'comptes', 'donnees', 'journal', 'securite', 'demonstration']) {
+    for (const key of ['tableau', 'evenements', 'categories', 'personnes', 'badges-cartes', 'habilitations', 'categories-institutionnelles', 'site', 'postes', 'groupes', 'identite', 'modules', 'comptes', 'donnees', 'journal', 'securite', 'demonstration']) {
       expect(reachable.has(key), key).toBe(true);
     }
   });
@@ -65,7 +66,7 @@ describe('navigation d’administration', () => {
   it('marque le menu de la page en cours, y compris les pages rattachées à Badges et cartes, Personnes et Données', () => {
     expect(menu('tableau', ALL).wrapper.get('[data-testid="menu-tableau"]').attributes('aria-current')).toBe('page');
     expect(menu('site-acces', ALL).wrapper.get('[data-testid="menu-site"]').attributes('aria-current')).toBe('page');
-    expect(menu('zones', ALL).wrapper.get('[data-testid="menu-site"]').attributes('aria-current')).toBe('page');
+    for (const active of ['zones', 'acces-zones']) expect(menu(active, ALL).wrapper.get('[data-testid="menu-site"]').attributes('aria-current'), active).toBe('page');
     expect(menu('habilitations', ALL).wrapper.get('[data-testid="menu-personnes"]').attributes('aria-current')).toBe('page');
     expect(menu('postes', ALL).wrapper.get('[data-testid="menu-operations"]').attributes('aria-current')).toBe('page');
     for (const active of ['badges', 'titulaires', 'modeles', 'modeles-cartes', 'atelier', 'atelier-parcours']) {

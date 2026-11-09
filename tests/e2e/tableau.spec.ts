@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { expandMenu, openMenu, openPage } from './menu';
+import { expandMenu, openMenu, openPage, openZones } from './menu';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 
@@ -39,13 +39,16 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await expect(page.getByTestId('menu-badges-cartes')).toHaveAttribute('aria-current', 'page');
   await page.goForward();
   await expect(page.getByTestId('menu-tableau')).toHaveAttribute('aria-current', 'page');
-  for (const [menu, key] of [['site', 'zones'], ['activites', 'categories'], ['operations', 'groupes'], ['operations', 'postes'], ['administration', 'journal'], ['administration', 'donnees']]) {
+  for (const [menu, key] of [['activites', 'categories'], ['operations', 'groupes'], ['operations', 'postes'], ['administration', 'journal'], ['administration', 'donnees']]) {
     await openPage(page, menu, key);
     await expect(page.getByTestId('admin-layout')).toHaveCount(1);
     await expect(page.getByTestId(`menu-${menu}`)).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId(`sous-menu-${key}`)).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
   }
+  await openZones(page);
+  await expect(page).toHaveURL(/\/administration\/zones$/);
+  await expect(page.getByTestId('menu-site')).toHaveAttribute('aria-current', 'page');
   // Pages sorties du menu mais toujours atteignables : liste d'invités depuis Personnes, politique de conservation depuis Données.
   await expandMenu(page);
   await page.getByTestId('menu-personnes').click();

@@ -2,9 +2,11 @@
 import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
-import BrandName from '../components/BrandName.vue';
 import BrandLogo from '../components/BrandLogo.vue';
 import { wipePilotageLocal } from '../pilotage/evacuation';
+import { useInstitution } from '../composables/useInstitution';
+
+const institution = useInstitution();
 
 type EventRef = { id: string; name: string };
 const props = withDefaults(defineProps<{ active: string; event?: EventRef | null; events?: EventRef[] }>(), { event: null, events: () => [] });
@@ -21,10 +23,9 @@ const menus: Menu[] = [
   { key: 'tableau', label: 'Tableau de bord', icon: 'home', items: [
     { key: 'tableau', label: 'Tableau de bord', icon: 'home', href: '/administration', permission: 'evenements.gerer' },
   ] },
-  { key: 'site', label: 'Site et accès', icon: 'map', items: [
-    { key: 'site-acces', label: 'Site et accès', icon: 'map', href: '/administration/site', permission: 'postes.gerer' },
-    { key: 'zones', label: 'Définition des zones', icon: 'map', href: '/administration/zones', permission: 'zones.gerer' },
-    { key: 'acces-zones', label: 'Accès des participants', icon: 'map', href: '/administration/acces', permission: 'zones.gerer' },
+  { key: 'site', label: 'Site et accès', icon: 'pin', items: [
+    // Les pages « zones » et « accès des participants » restent atteignables par les sections de Site et accès ; elles n'ajoutent pas de navigation concurrente.
+    { key: 'site-acces', label: 'Site et accès', icon: 'pin', href: '/administration/site', permission: 'postes.gerer', match: ['zones', 'acces-zones'] },
   ] },
   { key: 'personnes', label: 'Personnes et habilitations', icon: 'users', items: [
     { key: 'personnes', label: 'Personnes', icon: 'users', href: '/administration/personnes', permission: 'listes.importer', match: ['imports'] },
@@ -63,7 +64,8 @@ function change(e: Event) { router.get('/administration', { event: (e.target as 
   <div class="admin-shell" data-testid="admin-layout">
     <a href="#contenu" class="admin-skip">Aller au contenu</a>
     <header class="admin-header">
-      <div class="admin-brand"><span class="admin-logo"><BrandLogo :size="36" /></span><p><BrandName variant="strong" /></p></div>
+      <div class="admin-brand"><span class="admin-logo"><BrandLogo :size="36" /></span><p class="admin-brand-name"><span><strong>IKOMA</strong> ACCESS</span><small v-if="institution.custom">{{ institution.name }}</small></p></div>
+      <div v-if="institution.custom && institution.fullName" class="admin-institution" data-testid="institution-entete"><p class="admin-institution-name">{{ institution.fullName }}</p><p v-if="institution.tagline" class="admin-institution-tagline">{{ institution.tagline }}</p></div>
       <div class="admin-event">
         <label v-if="eventRef && events.length > 1 && active === 'tableau'" class="admin-event-select"><span class="sr-only">Événement</span>
           <select :value="eventRef.id" data-testid="choix-evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
@@ -80,8 +82,9 @@ function change(e: Event) { router.get('/administration', { event: (e.target as 
       <aside class="admin-sidebar">
         <button type="button" class="admin-menu-toggle" :aria-expanded="open" aria-controls="menu-admin" data-testid="ouvrir-menu" @click="open = !open"><span>Menu administrateur</span><AdminIcon name="menu" /></button>
         <nav id="menu-admin" aria-label="Menu administrateur" :class="{ 'is-open': open }">
-          <Link v-for="m in shownMenus" :key="m.key" :href="m.items[0].href" :aria-current="currentMenu?.key === m.key ? 'page' : undefined" class="admin-nav-link" :data-testid="'menu-' + m.key" @click="open = false"><AdminIcon :name="m.icon" :size="24" /><span>{{ m.label }}</span></Link>
+          <Link v-for="m in shownMenus" :key="m.key" :href="m.items[0].href" :aria-current="currentMenu?.key === m.key ? 'page' : undefined" class="admin-nav-link" :data-testid="'menu-' + m.key" @click="open = false"><AdminIcon :name="m.icon" :size="24" /><span>{{ m.label }}</span><AdminIcon name="chevron" :size="16" class="admin-nav-chevron" /></Link>
         </nav>
+        <p v-if="institution.custom" class="admin-sidebar-foot" data-testid="pied-menu"><BrandLogo :size="44" /><strong>{{ institution.name }}</strong></p>
       </aside>
       <main id="contenu" class="admin-main" tabindex="-1">
         <nav v-if="currentMenu && currentMenu.items.length > 1" class="admin-tabs" :aria-label="currentMenu.label" data-testid="sous-menus">

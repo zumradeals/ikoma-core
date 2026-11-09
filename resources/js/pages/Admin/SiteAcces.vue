@@ -2,6 +2,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
+import AdminIcon from '../../components/admin/AdminIcon.vue';
 import { displayDate } from '../../labels';
 
 /**
@@ -25,8 +26,8 @@ const stateLabel = { non_enrole: 'Non enrôlée', enrole: 'Enrôlée', revoque: 
 const short = (capability: string) => (props.catalogue[capability] ?? capability).split(/[:(]/)[0].trim();
 
 const TABS = [
-  { key: 'postes', label: 'Postes de contrôle' }, { key: 'zones', label: 'Zones' }, { key: 'tablettes', label: 'Tablettes' },
-  { key: 'regles', label: 'Règles d’accès' }, { key: 'parametres', label: 'Paramètres' },
+  { key: 'postes', label: 'Postes de contrôle', icon: 'monitor' }, { key: 'zones', label: 'Zones', icon: 'layers' }, { key: 'tablettes', label: 'Tablettes', icon: 'tablet' },
+  { key: 'regles', label: 'Règles d’accès', icon: 'shield' }, { key: 'parametres', label: 'Paramètres', icon: 'settings' },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 const tab = ref<TabKey>('postes');
@@ -44,6 +45,9 @@ function onTabKey(event: KeyboardEvent) {
 const activePosts = computed(() => props.checkpoints.filter(p => p.active));
 const assignedTablets = computed(() => props.checkpoints.reduce((n, p) => n + p.tablets.length, 0));
 const guardedZones = computed(() => props.checkpoints.reduce((n, p) => n + p.zones.length, 0));
+// Règles d'accès réelles = correspondances poste–zone ; une règle est active tant que son poste l'est.
+const rules = computed(() => props.checkpoints.flatMap(p => p.zones.map(z => ({ ...z, post: p, active: p.active }))));
+const PREVIEW = 4;
 const allTablets = computed(() => [
   ...props.checkpoints.flatMap(p => p.tablets.map(t => ({ ...t, post: p.name }))),
   ...props.unassigned.map(t => ({ ...t, post: null as string | null })),
@@ -55,6 +59,9 @@ const creating = ref(false);
 const selected = computed(() => props.checkpoints.find(p => p.id === selectedId.value) ?? null);
 function choose(p: Checkpoint) { creating.value = false; selectedId.value = selectedId.value === p.id ? null : p.id; }
 function configure(p: Checkpoint) { tab.value = 'postes'; creating.value = false; selectedId.value = p.id; }
+const drawer = ref<HTMLElement | null>(null);
+function closeDrawer() { selectedId.value = null; creating.value = false; }
+watch(() => [selectedId.value, creating.value], async ([id, c]) => { if (id || c) { await nextTick(); (drawer.value?.querySelector('[data-testid="fermer-detail"]') as HTMLElement | null)?.focus(); } });
 function startCreate() { tab.value = 'postes'; selectedId.value = null; creating.value = !creating.value; }
 
 const siteName = ref(props.site?.name ?? '');
@@ -100,114 +107,102 @@ function toggleCreate(capability: string, on: boolean) {
 
 <template>
   <AdminLayout active="site-acces">
-    <div class="flex max-w-6xl flex-col gap-5" data-testid="page-site-acces">
+    <div class="flex max-w-[1500px] flex-col gap-5" data-testid="page-site-acces">
       <header class="flex flex-wrap items-start justify-between gap-3">
-        <div class="space-y-1">
-          <h1 class="text-display font-bold">Site et accès</h1>
-          <p class="max-w-3xl text-slate-700"><strong v-if="site" data-testid="nom-site">{{ site.name }}</strong><span v-else data-testid="aucun-site">Aucun site n’est enregistré.</span> · Postes de contrôle, opérations autorisées, tablettes et zones gardées.</p>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 text-blue-700" aria-hidden="true"><AdminIcon name="pin" :size="34" /></span>
+          <div>
+            <h1 class="text-display font-bold">Site et accès</h1>
+            <p class="max-w-3xl text-slate-700">Configuration du site, des postes de contrôle, des zones et des règles d’accès.<span v-if="!site" data-testid="aucun-site"> Aucun site n’est enregistré.</span></p>
+          </div>
         </div>
-        <button type="button" class="btn-main !w-auto" :aria-expanded="creating" data-testid="ajouter-poste" @click="startCreate">Ajouter un poste</button>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="site-btn site-btn-outline" data-testid="historique-lien" @click="tab = 'parametres'"><AdminIcon name="history" :size="18" />Historique des affectations</button>
+          <button type="button" class="site-btn site-btn-accent" :aria-expanded="creating" data-testid="ajouter-poste" @click="startCreate"><AdminIcon name="plus" :size="18" />Ajouter un poste</button>
+        </div>
       </header>
 
       <div v-if="errors.length" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4" data-testid="erreurs-site"><p v-for="error in errors" :key="error">{{ error }}</p></div>
 
-      <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="indicateurs">
-        <div class="admin-card !p-4"><dt class="text-sm font-semibold text-slate-700">Postes de contrôle</dt><dd class="text-2xl font-bold" data-testid="kpi-postes">{{ checkpoints.length }}</dd><dd class="text-sm text-slate-600">{{ activePosts.length }} actif<template v-if="activePosts.length > 1">s</template></dd></div>
-        <div class="admin-card !p-4"><dt class="text-sm font-semibold text-slate-700">Zones définies</dt><dd class="text-2xl font-bold" data-testid="kpi-zones">{{ zones.length }}</dd><dd class="text-sm text-slate-600">dans les activités</dd></div>
-        <div class="admin-card !p-4"><dt class="text-sm font-semibold text-slate-700">Tablettes affectées</dt><dd class="text-2xl font-bold" data-testid="kpi-tablettes">{{ assignedTablets }}</dd><dd class="text-sm text-slate-600">{{ unassigned.length }} sans poste</dd></div>
-        <div class="admin-card !p-4"><dt class="text-sm font-semibold text-slate-700">Zones gardées</dt><dd class="text-2xl font-bold" data-testid="kpi-correspondances">{{ guardedZones }}</dd><dd class="text-sm text-slate-600">correspondances poste–zone</dd></div>
-      </dl>
-
-      <div ref="tabs" role="tablist" aria-label="Sections de Site et accès" class="flex flex-wrap gap-2" @keydown="onTabKey">
-        <button v-for="t in TABS" :id="'tab-' + t.key" :key="t.key" type="button" role="tab" class="min-h-11 rounded-full border px-4 py-2 text-sm font-bold"
-          :class="tab === t.key ? 'border-transparent bg-[var(--inst-accent-ui)] text-slate-900' : 'border-slate-300 bg-white text-blue-900'"
-          :aria-selected="tab === t.key" :aria-controls="'panneau-' + t.key" :tabindex="tab === t.key ? 0 : -1" :data-testid="'tab-' + t.key" @click="tab = t.key">{{ t.label }}</button>
+      <div ref="tabs" role="tablist" aria-label="Sections de Site et accès" class="site-tabs" @keydown="onTabKey">
+        <button v-for="t in TABS" :id="'tab-' + t.key" :key="t.key" type="button" role="tab" class="site-tab"
+          :aria-selected="tab === t.key" :aria-controls="'panneau-' + t.key" :tabindex="tab === t.key ? 0 : -1" :data-testid="'tab-' + t.key" @click="tab = t.key"><AdminIcon :name="t.icon" :size="20" /><span>{{ t.label }}</span></button>
       </div>
 
-      <!-- Postes de contrôle : registre synthétique ; configuration détaillée à la sélection -->
-      <section v-if="tab === 'postes'" id="panneau-postes" role="tabpanel" aria-labelledby="tab-postes" class="space-y-4" data-testid="panneau-postes">
-        <div class="grid items-start gap-4" :class="selected || creating ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]' : ''">
-          <div class="admin-card !p-0 overflow-hidden" data-testid="registre-postes">
+      <!-- Vue d'ensemble : indicateurs, registre des postes, informations du site, zones, règles -->
+      <section v-if="tab === 'postes'" id="panneau-postes" role="tabpanel" aria-labelledby="tab-postes" class="space-y-5" data-testid="panneau-postes">
+        <dl class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="indicateurs">
+          <div class="site-kpi bg-sky-50"><span class="site-kpi-icon text-sky-700"><AdminIcon name="monitor" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-postes">{{ checkpoints.length }}</dd><dt class="font-semibold text-slate-800">Postes configurés</dt><dd class="text-sm text-slate-600">{{ activePosts.length }} actif<template v-if="activePosts.length > 1">s</template></dd></div></div>
+          <div class="site-kpi bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="layers" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-zones">{{ zones.length }}</dd><dt class="font-semibold text-slate-800">Zones définies</dt><dd class="text-sm text-slate-600">dans les activités</dd></div></div>
+          <div class="site-kpi bg-amber-50"><span class="site-kpi-icon text-amber-700"><AdminIcon name="tablet" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-tablettes">{{ assignedTablets }}</dd><dt class="font-semibold text-slate-800">Tablettes affectées</dt><dd class="text-sm text-slate-600">{{ unassigned.length }} sans poste</dd></div></div>
+          <div class="site-kpi bg-violet-50"><span class="site-kpi-icon text-violet-700"><AdminIcon name="shield" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-correspondances">{{ guardedZones }}</dd><dt class="font-semibold text-slate-800">Zones gardées</dt><dd class="text-sm text-slate-600">correspondances poste–zone</dd></div></div>
+        </dl>
+
+        <div class="site-grid">
+         <div class="site-col">
+          <!-- Registre des postes -->
+          <section class="site-card" aria-labelledby="postes-titre" data-testid="registre-postes">
+            <header class="site-card-head"><h2 id="postes-titre"><AdminIcon name="monitor" :size="22" />Postes de contrôle ({{ checkpoints.length }})</h2><button type="button" class="site-btn site-btn-blue" data-testid="ajouter-poste-registre" @click="startCreate"><AdminIcon name="plus" :size="16" />Ajouter un poste</button></header>
             <p v-if="!checkpoints.length" class="p-4" data-testid="aucun-poste">Aucun poste n’est configuré : utilisez « Ajouter un poste ».</p>
-            <ul v-else class="divide-y">
-              <li class="hidden grid-cols-[minmax(0,1.3fr)_minmax(0,1.4fr)_5rem_7.5rem] gap-3 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 md:grid" aria-hidden="true"><span>Poste</span><span>Opérations autorisées</span><span>État</span><span /></li>
-              <li v-for="p in checkpoints" :key="p.id" class="grid gap-2 px-4 py-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.4fr)_5rem_7.5rem] md:items-center md:gap-3" :class="selectedId === p.id ? 'bg-blue-50' : ''" :data-testid="'poste-' + p.code">
-                <div class="min-w-0"><p class="font-bold">{{ p.name }} <small class="font-normal text-slate-600">({{ p.code }})</small></p><p v-if="p.function_label" class="text-sm text-slate-700">{{ p.function_label }}</p><p class="text-sm text-slate-600" :data-testid="'nombre-tablettes-' + p.code">{{ p.tablets.length }} tablette<template v-if="p.tablets.length > 1">s</template> · {{ p.zones.length }} zone<template v-if="p.zones.length > 1">s</template></p></div>
-                <p class="flex flex-wrap gap-1" :data-testid="'operations-' + p.code">
+            <ul v-else class="site-table">
+              <li class="site-row site-row-head" aria-hidden="true"><span>Code</span><span>Intitulé du poste</span><span>Opérations autorisées</span><span>Fonction</span><span>Tablette(s)</span><span>État</span><span>Actions</span></li>
+              <li v-for="p in checkpoints" :key="p.id" class="site-row" :class="selectedId === p.id ? 'bg-blue-50' : ''" :data-testid="'poste-' + p.code">
+                <span class="site-code site-c-code"><span class="rounded-md bg-blue-700 px-2 py-1 text-xs font-bold text-white">{{ p.code }}</span></span>
+                <span class="site-c-name font-semibold">{{ p.name }}</span>
+                <span class="site-c-ops flex flex-wrap gap-1" :data-testid="'operations-' + p.code">
                   <span v-for="c in p.capabilities" :key="c" class="rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-900">{{ short(c) }}</span>
                   <span v-if="p.direction_required" class="rounded-full border border-slate-300 px-2 py-0.5 text-xs text-slate-700">Sens obligatoire</span>
                   <span v-if="!p.capabilities.length" class="text-sm text-slate-600">Aucune opération</span>
-                </p>
-                <p><span class="rounded-full border px-2 py-0.5 text-xs font-bold" :class="p.active ? 'border-green-700 text-green-900' : 'border-slate-500 text-slate-700'" :data-testid="'etat-' + p.code">{{ p.active ? 'Actif' : 'Désactivé' }}</span></p>
-                <p><button type="button" class="btn-soft w-full !min-h-11 !px-3 !py-1 text-sm" :aria-expanded="selectedId === p.id" :aria-label="(selectedId === p.id ? 'Fermer la configuration de ' : 'Configurer ') + p.name" :data-testid="'selectionner-' + p.code" @click="choose(p)">{{ selectedId === p.id ? 'Fermer' : 'Configurer' }}</button></p>
+                </span>
+                <span class="site-c-fn text-sm text-slate-700">{{ p.function_label ?? '—' }}</span>
+                <span class="site-c-tab text-sm" :data-testid="'nombre-tablettes-' + p.code"><strong>{{ p.tablets.length }}</strong><span class="site-mobile-only"> tablette<template v-if="p.tablets.length > 1">s</template></span><template v-if="p.tablets.length"> · {{ p.tablets[0].name }}<template v-if="p.tablets.length > 1"> +{{ p.tablets.length - 1 }}</template></template></span>
+                <span class="site-c-etat"><span class="inline-flex items-center gap-1.5 text-sm font-semibold" :class="p.active ? 'text-green-800' : 'text-slate-600'" :data-testid="'etat-' + p.code"><span class="h-2.5 w-2.5 rounded-full" :class="p.active ? 'bg-green-600' : 'bg-slate-400'" aria-hidden="true" />{{ p.active ? 'Actif' : 'Désactivé' }}</span></span>
+                <span class="site-c-act"><button type="button" class="site-icon-btn" :aria-label="'Configurer ' + p.name" title="Configurer" :aria-expanded="selectedId === p.id" :data-testid="'selectionner-' + p.code" @click="choose(p)"><AdminIcon name="pencil" :size="18" /><span class="site-icon-label">Configurer</span></button></span>
               </li>
             </ul>
-          </div>
+          </section>
 
-          <!-- Création d'un poste -->
-          <aside v-if="creating" class="admin-card space-y-3" aria-labelledby="creer-poste-titre" data-testid="panneau-creation">
-            <h2 id="creer-poste-titre" class="text-heading font-bold">Ajouter un poste</h2>
-            <form class="space-y-3" @submit.prevent="createPost">
-              <label class="block">Code (minuscules, chiffres, tiret bas)<input v-model="create.code" class="field" maxlength="20" required data-testid="nouveau-code"></label>
-              <label class="block">Nom<input v-model="create.name" class="field" maxlength="120" required data-testid="nouveau-nom"></label>
-              <label class="block">Fonction<input v-model="create.function_label" class="field" maxlength="160" data-testid="nouvelle-fonction"></label>
-              <fieldset class="space-y-1">
-                <legend class="font-semibold">Opérations autorisées</legend>
-                <label v-for="(label, capability) in catalogue" :key="capability" class="flex min-h-12 items-start gap-3 py-1"><input type="checkbox" class="mt-1 h-5 w-5 shrink-0" :checked="create.capabilities.includes(capability)" :data-testid="'nouvelle-capacite-' + capability" @change="toggleCreate(capability, ($event.target as HTMLInputElement).checked)"><span>{{ label }}</span></label>
-                <label class="flex min-h-12 items-start gap-3 py-1"><input v-model="create.direction_required" type="checkbox" class="mt-1 h-5 w-5 shrink-0" :disabled="!create.capabilities.includes('scan')"><span>Choix Entrée / Sortie obligatoire</span></label>
-              </fieldset>
-              <div class="flex flex-wrap gap-3"><button type="submit" class="btn-main" data-testid="creer-poste">Créer le poste</button><button type="button" class="btn-soft" @click="creating = false">Annuler</button></div>
-            </form>
-          </aside>
+          <!-- Zones du site -->
+          <section class="site-card" aria-labelledby="zones-resume-titre" data-testid="resume-zones">
+            <header class="site-card-head"><h2 id="zones-resume-titre"><AdminIcon name="layers" :size="22" />Zones du site ({{ zones.length }})</h2><Link href="/administration/zones" class="site-btn site-btn-blue" data-testid="ajouter-zone"><AdminIcon name="plus" :size="16" />Ajouter une zone</Link></header>
+            <p v-if="!zones.length" class="p-4" data-testid="aucune-zone-resume">Aucune zone n’est définie.</p>
+            <ul v-else class="site-table site-table-zones">
+              <li class="site-row site-row-head" aria-hidden="true"><span>Zone</span><span>Activité</span><span>Gardée par</span></li>
+              <li v-for="z in zones.slice(0, PREVIEW + 1)" :key="z.id" class="site-row" :data-testid="'zone-resume-' + z.id">
+                <span class="font-semibold">{{ z.name }}</span><span class="text-sm text-slate-700">{{ z.event_name }}</span>
+                <span class="text-sm">{{ postsOfZone(z.id).map(p => p.name).join(', ') || 'aucun poste' }}</span>
+              </li>
+            </ul>
+            <p v-if="zones.length > PREVIEW + 1" class="site-more"><button type="button" class="font-semibold text-blue-800 underline" @click="tab = 'zones'">Voir toutes les zones ({{ zones.length }})</button></p>
+          </section>
+         </div>
+         <div class="site-col">
+          <!-- Informations du site -->
+          <section class="site-card" aria-labelledby="infos-titre" data-testid="infos-site">
+            <header class="site-card-head"><h2 id="infos-titre"><AdminIcon name="pin" :size="22" />Informations du site</h2><button type="button" class="site-icon-btn" aria-label="Modifier les informations du site" @click="tab = 'parametres'"><AdminIcon name="pencil" :size="18" /></button></header>
+            <dl class="site-info">
+              <div><dt>Nom du site</dt><dd data-testid="nom-site">{{ site?.name ?? '—' }}</dd></div>
+              <div><dt>Nombre de postes</dt><dd>{{ checkpoints.length }}</dd></div>
+              <div><dt>Postes actifs</dt><dd>{{ activePosts.length }}</dd></div>
+              <div><dt>Nombre de zones</dt><dd>{{ zones.length }}</dd></div>
+              <div><dt>Tablettes affectées</dt><dd>{{ assignedTablets }}</dd></div>
+              <div><dt>Tablettes sans poste</dt><dd>{{ unassigned.length }}</dd></div>
+            </dl>
+          </section>
 
-          <!-- Configuration détaillée du poste sélectionné -->
-          <aside v-else-if="selected" class="admin-card space-y-5" :aria-label="'Configuration de ' + selected.name" data-testid="detail-poste">
-            <div class="flex items-start justify-between gap-3">
-              <h2 class="text-heading font-bold">{{ selected.name }} <small class="font-normal text-slate-600">({{ selected.code }})</small></h2>
-              <button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" data-testid="fermer-detail" @click="selectedId = null">Fermer</button>
-            </div>
-
-            <form class="space-y-3" @submit.prevent="save(selected)">
-              <label class="block">Nom du poste<input v-model="edit[selected.id].name" class="field" maxlength="120" required :data-testid="'nom-' + selected.code"></label>
-              <label class="block">Fonction<input v-model="edit[selected.id].function_label" class="field" maxlength="160" :data-testid="'fonction-' + selected.code"></label>
-              <fieldset class="space-y-1">
-                <legend class="font-semibold">Opérations autorisées à ce poste</legend>
-                <p class="text-sm text-slate-700">Aucune lecture de badge n’est imposée : chaque opération s’active selon la configuration. L’agent doit en plus détenir le droit correspondant.</p>
-                <label v-for="(label, capability) in catalogue" :key="capability" class="flex min-h-12 items-start gap-3 py-1"><input type="checkbox" class="mt-1 h-5 w-5 shrink-0" :checked="edit[selected.id].capabilities.includes(capability)" :data-testid="'capacite-' + selected.code + '-' + capability" @change="toggle(selected.id, capability, ($event.target as HTMLInputElement).checked)"><span>{{ label }}</span></label>
-                <label class="flex min-h-12 items-start gap-3 py-1"><input v-model="edit[selected.id].direction_required" type="checkbox" class="mt-1 h-5 w-5 shrink-0" :disabled="!edit[selected.id].capabilities.includes('scan')" :data-testid="'sens-' + selected.code"><span>Choix Entrée / Sortie obligatoire avant chaque contrôle</span></label>
-              </fieldset>
-              <div class="flex flex-wrap gap-3">
-                <button type="submit" class="btn-main" :data-testid="'enregistrer-' + selected.code">Enregistrer la configuration</button>
-                <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :data-testid="'activation-' + selected.code" @click="activation(selected)">{{ selected.active ? 'Désactiver ce poste' : 'Réactiver ce poste' }}</button>
-              </div>
-            </form>
-
-            <div class="space-y-2" :data-testid="'tablettes-' + selected.code">
-              <h3 class="font-bold">Tablettes affectées ({{ selected.tablets.length }})</h3>
-              <p v-if="!selected.tablets.length" class="text-slate-700">Aucune tablette affectée à ce poste. Affectez-en une depuis la section « Tablettes ».</p>
-              <ul v-else class="space-y-2">
-                <li v-for="t in selected.tablets" :key="t.id" class="space-y-2 rounded-lg border p-3" :data-testid="'tablette-' + t.id">
-                  <p><strong>{{ t.name }}</strong><template v-if="t.station"> · {{ t.station }}</template> · {{ t.event_name }} · {{ stateLabel[t.state] }}<template v-if="t.last_synced_at"> · synchronisée {{ displayDate(t.last_synced_at) }}</template></p>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <select v-model="target[t.id]" class="field !mt-0 grow" :aria-label="'Nouveau poste de ' + t.name" :data-testid="'cible-' + t.id"><option value="">Changer de poste…</option><option v-for="q in activePosts.filter(x => x.id !== selected!.id)" :key="q.id" :value="q.id">{{ q.name }}</option></select>
-                    <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!target[t.id]" :data-testid="'affecter-' + t.id" @click="assign(t)">Déplacer</button>
-                  </div>
-                </li>
-              </ul>
-            </div>
-
-            <div class="space-y-2" :data-testid="'zones-' + selected.code">
-              <h3 class="font-bold">Zones gardées ({{ selected.zones.length }})</h3>
-              <p v-if="!selected.zones.length" class="text-slate-700">Ce poste ne juge aucune zone : sans correspondance, il ne refuse pas pour une zone.</p>
-              <ul v-else class="space-y-1">
-                <li v-for="z in selected.zones" :key="z.mapping_id" class="flex items-center justify-between gap-3" :data-testid="'zone-' + z.mapping_id"><span><strong>{{ z.name }}</strong> · {{ z.event_name }}</span><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" :aria-label="'Retirer la zone ' + z.name" @click="removeZone(z)">Retirer</button></li>
-              </ul>
-              <div v-if="zones.length" class="flex flex-wrap items-center gap-2">
-                <select v-model="zoneChoice[selected.id]" class="field !mt-0 grow" :aria-label="'Zone à associer à ' + selected.name" :data-testid="'zone-choix-' + selected.code"><option value="">Choisir une zone…</option><option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }} · {{ z.event_name }}</option></select>
-                <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!zoneChoice[selected.id]" :data-testid="'zone-ajouter-' + selected.code" @click="addZone(selected)">Associer</button>
-              </div>
-            </div>
-          </aside>
+          <!-- Règles d'accès -->
+          <section class="site-card" aria-labelledby="regles-resume-titre" data-testid="resume-regles">
+            <header class="site-card-head"><h2 id="regles-resume-titre"><AdminIcon name="shield" :size="22" />Règles d’accès ({{ rules.length }})</h2><Link href="/administration/acces" class="site-btn site-btn-blue" data-testid="ajouter-regle"><AdminIcon name="plus" :size="16" />Ajouter une règle</Link></header>
+            <p v-if="!rules.length" class="p-4" data-testid="aucune-regle-resume">Aucune règle poste–zone : sans correspondance, un poste ne refuse pas pour une zone.</p>
+            <ul v-else class="divide-y">
+              <li v-for="r in rules.slice(0, PREVIEW)" :key="r.mapping_id" class="flex items-center justify-between gap-3 px-4 py-2.5" :data-testid="'regle-resume-' + r.mapping_id">
+                <span class="min-w-0"><strong>{{ r.name }}</strong><span class="block text-sm text-slate-600">{{ r.post.name }} · {{ r.event_name }}</span></span>
+                <span class="shrink-0 rounded-md px-2 py-0.5 text-xs font-bold" :class="r.active ? 'bg-green-100 text-green-900' : 'bg-slate-200 text-slate-700'">{{ r.active ? 'Active' : 'Poste désactivé' }}</span>
+              </li>
+            </ul>
+            <p v-if="rules.length" class="site-more"><button type="button" class="font-semibold text-blue-800 underline" data-testid="voir-regles" @click="tab = 'regles'">Voir toutes les règles ({{ rules.length }})</button></p>
+          </section>
+         </div>
         </div>
       </section>
 
@@ -273,6 +268,74 @@ function toggleCreate(capability: string, on: boolean) {
           </ul>
         </div>
       </section>
+
+      <!-- Panneau contextuel : création ou configuration détaillée d'un poste -->
+      <template v-if="creating || selected">
+        <button type="button" class="site-backdrop" aria-label="Fermer le panneau" tabindex="-1" data-testid="fond-panneau" @click="closeDrawer" />
+        <aside ref="drawer" class="site-drawer" role="dialog" aria-modal="true" :aria-label="creating ? 'Ajouter un poste' : 'Configuration de ' + selected!.name" :data-testid="creating ? 'panneau-creation' : 'detail-poste'" @keydown.esc="closeDrawer">
+          <template v-if="creating">
+            <div class="flex items-start justify-between gap-3"><h2 id="creer-poste-titre" class="text-heading font-bold">Ajouter un poste</h2><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" data-testid="fermer-detail" @click="closeDrawer">Fermer</button></div>
+            <form class="space-y-3" @submit.prevent="createPost">
+              <label class="block">Code (minuscules, chiffres, tiret bas)<input v-model="create.code" class="field" maxlength="20" required data-testid="nouveau-code"></label>
+              <label class="block">Nom<input v-model="create.name" class="field" maxlength="120" required data-testid="nouveau-nom"></label>
+              <label class="block">Fonction<input v-model="create.function_label" class="field" maxlength="160" data-testid="nouvelle-fonction"></label>
+              <fieldset class="space-y-1">
+                <legend class="font-semibold">Opérations autorisées</legend>
+                <label v-for="(label, capability) in catalogue" :key="capability" class="flex min-h-12 items-start gap-3 py-1"><input type="checkbox" class="mt-1 h-5 w-5 shrink-0" :checked="create.capabilities.includes(capability)" :data-testid="'nouvelle-capacite-' + capability" @change="toggleCreate(capability, ($event.target as HTMLInputElement).checked)"><span>{{ label }}</span></label>
+                <label class="flex min-h-12 items-start gap-3 py-1"><input v-model="create.direction_required" type="checkbox" class="mt-1 h-5 w-5 shrink-0" :disabled="!create.capabilities.includes('scan')"><span>Choix Entrée / Sortie obligatoire</span></label>
+              </fieldset>
+              <div class="flex flex-wrap gap-3"><button type="submit" class="btn-main" data-testid="creer-poste">Créer le poste</button><button type="button" class="btn-soft" @click="closeDrawer">Annuler</button></div>
+            </form>
+          </template>
+          <template v-else-if="selected">
+            <div class="flex items-start justify-between gap-3">
+              <h2 class="text-heading font-bold">{{ selected.name }} <small class="font-normal text-slate-600">({{ selected.code }})</small></h2>
+              <button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" data-testid="fermer-detail" @click="closeDrawer">Fermer</button>
+            </div>
+
+            <form class="space-y-3" @submit.prevent="save(selected)">
+              <label class="block">Nom du poste<input v-model="edit[selected.id].name" class="field" maxlength="120" required :data-testid="'nom-' + selected.code"></label>
+              <label class="block">Fonction<input v-model="edit[selected.id].function_label" class="field" maxlength="160" :data-testid="'fonction-' + selected.code"></label>
+              <fieldset class="space-y-1">
+                <legend class="font-semibold">Opérations autorisées à ce poste</legend>
+                <p class="text-sm text-slate-700">Aucune lecture de badge n’est imposée : chaque opération s’active selon la configuration. L’agent doit en plus détenir le droit correspondant.</p>
+                <label v-for="(label, capability) in catalogue" :key="capability" class="flex min-h-12 items-start gap-3 py-1"><input type="checkbox" class="mt-1 h-5 w-5 shrink-0" :checked="edit[selected.id].capabilities.includes(capability)" :data-testid="'capacite-' + selected.code + '-' + capability" @change="toggle(selected.id, capability, ($event.target as HTMLInputElement).checked)"><span>{{ label }}</span></label>
+                <label class="flex min-h-12 items-start gap-3 py-1"><input v-model="edit[selected.id].direction_required" type="checkbox" class="mt-1 h-5 w-5 shrink-0" :disabled="!edit[selected.id].capabilities.includes('scan')" :data-testid="'sens-' + selected.code"><span>Choix Entrée / Sortie obligatoire avant chaque contrôle</span></label>
+              </fieldset>
+              <div class="flex flex-wrap gap-3">
+                <button type="submit" class="btn-main" :data-testid="'enregistrer-' + selected.code">Enregistrer la configuration</button>
+                <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :data-testid="'activation-' + selected.code" @click="activation(selected)">{{ selected.active ? 'Désactiver ce poste' : 'Réactiver ce poste' }}</button>
+              </div>
+            </form>
+
+            <div class="space-y-2" :data-testid="'tablettes-' + selected.code">
+              <h3 class="font-bold">Tablettes affectées ({{ selected.tablets.length }})</h3>
+              <p v-if="!selected.tablets.length" class="text-slate-700">Aucune tablette affectée à ce poste. Affectez-en une depuis la section « Tablettes ».</p>
+              <ul v-else class="space-y-2">
+                <li v-for="t in selected.tablets" :key="t.id" class="space-y-2 rounded-lg border p-3" :data-testid="'tablette-' + t.id">
+                  <p><strong>{{ t.name }}</strong><template v-if="t.station"> · {{ t.station }}</template> · {{ t.event_name }} · {{ stateLabel[t.state] }}<template v-if="t.last_synced_at"> · synchronisée {{ displayDate(t.last_synced_at) }}</template></p>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <select v-model="target[t.id]" class="field !mt-0 grow" :aria-label="'Nouveau poste de ' + t.name" :data-testid="'cible-' + t.id"><option value="">Changer de poste…</option><option v-for="q in activePosts.filter(x => x.id !== selected!.id)" :key="q.id" :value="q.id">{{ q.name }}</option></select>
+                    <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!target[t.id]" :data-testid="'affecter-' + t.id" @click="assign(t)">Déplacer</button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div class="space-y-2" :data-testid="'zones-' + selected.code">
+              <h3 class="font-bold">Zones gardées ({{ selected.zones.length }})</h3>
+              <p v-if="!selected.zones.length" class="text-slate-700">Ce poste ne juge aucune zone : sans correspondance, il ne refuse pas pour une zone.</p>
+              <ul v-else class="space-y-1">
+                <li v-for="z in selected.zones" :key="z.mapping_id" class="flex items-center justify-between gap-3" :data-testid="'zone-' + z.mapping_id"><span><strong>{{ z.name }}</strong> · {{ z.event_name }}</span><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" :aria-label="'Retirer la zone ' + z.name" @click="removeZone(z)">Retirer</button></li>
+              </ul>
+              <div v-if="zones.length" class="flex flex-wrap items-center gap-2">
+                <select v-model="zoneChoice[selected.id]" class="field !mt-0 grow" :aria-label="'Zone à associer à ' + selected.name" :data-testid="'zone-choix-' + selected.code"><option value="">Choisir une zone…</option><option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }} · {{ z.event_name }}</option></select>
+                <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!zoneChoice[selected.id]" :data-testid="'zone-ajouter-' + selected.code" @click="addZone(selected)">Associer</button>
+              </div>
+            </div>
+          </template>
+        </aside>
+      </template>
     </div>
   </AdminLayout>
 </template>
