@@ -324,3 +324,86 @@ it('refuse de reprendre un modèle de l’événement lui-même ou d’un contex
     }
     $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reinitialiser', ['event' => 'pas-un-uuid'])->assertUnprocessable();
 });
+
+// --- Soute P5 : synchronisation hors ligne du sens Entrée / Sortie ---------------------------------------------------------------------
+
+/** Opération telle que la tablette de la soute l'enverrait après une coupure : contrôle jugé valide localement, sens choisi, âge de la copie déclaré. */
+function s10SouteOp(int $seq, string $code, ?string $direction, array $point): array
+{
+    $payload = array_filter(['code' => $code, 'point' => $point, 'direction' => $direction, 'local_valid' => true, 'offline' => true, 'known_at' => now()->subMinute()->toIso8601String()], fn ($v) => $v !== null);
+
+    return ['id' => (string) Str::uuid(), 'seq' => $seq, 'type' => 'controle', 'agent_id' => test()->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => $payload];
+}
+
+function s10SouteSync(array $operations)
+{
+    return test()->postJson('/poste/api/sync', ['operations' => $operations], ['X-Device-Token' => S10_TOKEN, 'Accept' => 'application/json']);
+}
+
+it('rejoue à la soute les contrôles Entrée et Sortie faits hors ligne, avec le sens, les habilitations et sans effet sur la présence', function () {
+    // tablette réellement enrôlée, habilitée à la soute ; délai hors ligne approuvé par l'institution (réglage existant)
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'soute']);
+    DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '12']);
+    DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->update(['value' => '1']);
+    expect(DB::table('devices')->where('id', $this->deviceId)->whereNotNull('enrolled_at')->whereNull('revoked_at')->exists())->toBeTrue();
+    s10Enter($this->visitorBadges[0], 1);
+    s10Enter($this->visitorBadges[1], 2);
+    $this->actingAs($this->agent);
+    $presence = app(Presence::class);
+    $present = $presence->count($this->event);
+    $siteMovements = fn () => DB::table('access_events')->whereIn('type', ['entree', 'sortie'])->count();
+    $siteBefore = $siteMovements();
+    $statusBefore = DB::table('visitors')->whereIn('id', [s10Visitor(1), s10Visitor(2)])->orderBy('id')->pluck('status', 'id')->all();
+    $zone1 = ['type' => 'zone', 'id' => DemoSeeder::id('zone1')];
+    $zone2 = ['type' => 'zone', 'id' => DemoSeeder::id('zone2')];
+    $code1 = $this->visitorBadges[0]->code;
+    $knownControls = DB::table('access_events')->where('type', 'controle')->pluck('id')->all();
+
+    $entree = s10SouteOp(1, $code1, 'entree', $zone1);
+    $sortie = s10SouteOp(2, $code1, 'sortie', $zone1);
+    $denied = s10SouteOp(3, $code1, 'entree', $zone2);
+    $missing = s10SouteOp(4, $code1, null, $zone1);
+    $invalid = s10SouteOp(5, $code1, 'nord', $zone1);
+    $byId = collect(s10SouteSync([$entree, $sortie, $denied, $missing, $invalid])->assertOk()->json('results'))->keyBy('id');
+
+    // (2)(3)(4) Entrée et Sortie appliquées, sens conservé dans le mouvement
+    expect($byId[$entree['id']])->toMatchArray(['status' => 'applique', 'valid' => true, 'direction' => 'entree'])
+        ->and($byId[$sortie['id']])->toMatchArray(['status' => 'applique', 'valid' => true, 'direction' => 'sortie']);
+    $events = DB::table('access_events')->where('type', 'controle')->whereNotIn('id', $knownControls)->get();
+    $directions = $events->map(fn ($e) => json_decode($e->details, true)['direction'] ?? null)->sort()->values()->all();
+    expect($directions)->toBe(['entree', 'entree', 'sortie']);
+    // (5) l'habilitation est appliquée : zone non autorisée = passage valide mais zone refusée, tracé avec son sens
+    expect($byId[$denied['id']])->toMatchArray(['status' => 'applique', 'zone_ok' => false, 'direction' => 'entree']);
+    // (7) sans sens, ou avec un sens invalide : refusé, mis en quarantaine, aucun mouvement écrit
+    expect($byId[$missing['id']])->toMatchArray(['status' => 'conflit', 'code' => 'sens_requis'])
+        ->and($byId[$invalid['id']])->toMatchArray(['status' => 'conflit', 'code' => 'sens_invalide']);
+    expect(DB::table('sync_conflicts')->whereIn('operation_id', [$missing['id'], $invalid['id']])->count())->toBe(2);
+    expect($events)->toHaveCount(3);
+    // (6) la présence du site et le statut des personnes ne changent pas
+    expect($presence->count($this->event))->toBe($present)->and($siteMovements())->toBe($siteBefore)
+        ->and(DB::table('visitors')->whereIn('id', [s10Visitor(1), s10Visitor(2)])->orderBy('id')->pluck('status', 'id')->all())->toBe($statusBefore);
+
+    // (8) rejeu du même lot : mêmes identifiants, aucun mouvement en double
+    $count = DB::table('access_events')->where('type', 'controle')->count();
+    $replay = collect(s10SouteSync([$entree, $sortie, $denied, $missing, $invalid])->assertOk()->json('results'))->keyBy('id');
+    foreach ([$entree, $sortie, $denied, $missing, $invalid] as $op) {
+        expect($replay[$op['id']]['replayed'] ?? false)->toBeTrue()->and($replay[$op['id']]['status'])->toBe($byId[$op['id']]['status']);
+    }
+    expect(DB::table('access_events')->where('type', 'controle')->count())->toBe($count)
+        ->and(DB::table('sync_conflicts')->whereIn('operation_id', [$missing['id'], $invalid['id']])->count())->toBe(2);
+
+    // (5) badge annulé entre-temps : jugé valide hors ligne, refusé par le serveur — refus tracé avec son sens, conflit signalé
+    app(BadgeService::class)->annuler($this->visitorBadges[1], $this->sup, 'Perdu');
+    $cancelled = s10SouteOp(6, $this->visitorBadges[1]->code, 'sortie', $zone1);
+    s10SouteSync([$cancelled])->assertOk()->assertJsonPath('results.0.status', 'conflit')->assertJsonPath('results.0.code', 'annule_entre_temps');
+    $refused = DB::table('access_events')->where('type', 'controle')->whereNotIn('id', [...$knownControls, ...$events->pluck('id')->all()])->get();
+    expect($refused)->toHaveCount(1)->and(json_decode($refused[0]->details, true))->toMatchArray(['verdict' => 'refuse', 'direction' => 'sortie'])
+        ->and($presence->count($this->event))->toBe($present);
+
+    // le poste redevenu non habilité à la soute est refusé par la même règle qu'en ligne (S02), sans mouvement
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'poste_1']);
+    $count = DB::table('access_events')->where('type', 'controle')->count();
+    $notAllowed = s10SouteOp(7, $code1, 'entree', $zone1);
+    s10SouteSync([$notAllowed])->assertOk()->assertJsonPath('results.0.status', 'conflit')->assertJsonPath('results.0.code', 'poste_non_habilite');
+    expect(DB::table('access_events')->where('type', 'controle')->count())->toBe($count);
+});
