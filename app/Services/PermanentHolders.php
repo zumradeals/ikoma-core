@@ -133,6 +133,8 @@ final class PermanentHolders
      *    Le nom et l'organisation viennent de la personne (référence canonique) ; seuls les champs du profil (fonction, qualité, catégorie, engagement) sont saisis.
      *  - Cas B (sans `$personId`) : nouvelle personne + profil dans la même transaction. Si une personne de même nom existe déjà, la création n'a lieu
      *    que sur confirmation explicite (`$confirmHomonym`) : aucun rapprochement ni fusion automatique sur le nom.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function create(array $data, User $actor, bool $confirmHomonym = false, ?string $personId = null): string
     {
