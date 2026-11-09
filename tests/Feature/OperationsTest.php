@@ -222,8 +222,12 @@ it('distingue les postes administrativement actifs, les appareils synchronisés 
     expect($after['appareils_enroles'])->toBe($before['appareils_enroles'] + 2)->and($after['appareils_synchronises'])->toBe($before['appareils_synchronises'] + 1)
         ->and($after['appareils_silencieux'])->toBe($before['appareils_silencieux'] + 1)->and($after['actifs'])->toBe($before['actifs']); // l'état administratif des postes ne change pas
     // l'écran du centre ne dit jamais « en ligne » : l'état est « actif » (synchronisé récemment) ou « silencieux »
-    $this->actingAs($this->admin)->get('/administration/operations?event='.$event)->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('centre.postes', fn ($rows) => collect($rows)->pluck('state', 'id')->only([$recent, $silent])->all() === [$recent => 'actif', $silent => 'silencieux']));
+    $rows = [];
+    $this->actingAs($this->admin)->get('/administration/operations?event='.$event)->assertOk()->assertInertia(function (Assert $page) use (&$rows): void {
+        $rows = $page->toArray()['props']['centre']['postes'] ?? [];
+    });
+    $states = collect($rows)->pluck('state', 'id')->all();
+    expect($states[$recent] ?? null)->toBe('actif')->and($states[$silent] ?? null)->toBe('silencieux');
 });
 
 it('ne fait jamais dépendre les indicateurs du site entier de l’activité consultée', function () {
