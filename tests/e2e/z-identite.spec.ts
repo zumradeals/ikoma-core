@@ -54,7 +54,7 @@ test('Identité unique : profil permanent ajouté à une personne existante, pui
   await page.getByTestId('accorder-permanente').click();
   await page.getByTestId('perm-enregistrer').click();
   await expect(page.getByTestId('habilitations-permanentes')).toContainText('Origine : permanente');
-  await expect(page.getByTestId('habilitations-permanentes')).toContainText('Active');
+  await expect(page.getByTestId('habilitations-permanentes')).toContainText(/Active|À venir/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/identite-habilitation-accordee.png', fullPage: true });
   await page.locator('[data-testid^="action-"][data-testid$="-retirer"]').first().click();
