@@ -121,7 +121,7 @@ test('soute P5 : sens Entrée / Sortie choisi avant le scan, habilitations dans 
 test('le superviseur retrouve les passages de la soute, avec leur sens, dans le journal des mouvements', async ({ page }) => {
   await loginWithSecondFactor(page, fx.supervisor.email, fx.supervisor.password, fx.supervisor.secret);
   await page.goto(`/pilotage/mouvements?event=${fx.event}&type=controle`);
-  const list = page.getByTestId('liste-mouvements').or(page.locator('main'));
+  const list = page.getByTestId('liste-mouvements');
   await expect(list).toContainText('entrée');
   await expect(list).toContainText('sortie');
   await expect(list).toContainText('Zone non autorisée');

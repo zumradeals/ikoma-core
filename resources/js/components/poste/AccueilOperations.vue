@@ -22,7 +22,7 @@ const can = (capability: string) => caps.value.includes(capability);
 const links = computed(() => [
   { key: 'controle', href: '/controle?mode=controle', label: 'Scanner un badge', hint: 'Contrôle d’accès d’un badge', show: can('scan') },
   { key: 'sortie', href: '/controle?mode=sortie', label: 'Enregistrer une sortie', hint: 'Sortie individuelle : le badge n’est pas restitué', show: can('sortie') },
-  { key: 'restitution', href: '/controle?mode=restitution', label: 'Restituer un badge', hint: 'Acte distinct de la sortie, en ligne uniquement', show: can('sortie') },
+  { key: 'restitution', href: '/controle?mode=restitution', label: 'Restituer un badge', hint: 'Acte distinct de la sortie ; nécessite le réseau', show: can('sortie') },
 ].filter(l => l.show));
 const toggle = (next: 'attendus' | 'incidents') => { panel.value = panel.value === next ? null : next; };
 </script>
