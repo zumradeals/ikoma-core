@@ -30,12 +30,13 @@ final class SiteControl
      * @param  array{type:string,id:string}|null  $point
      * @return array<string, mixed>
      */
-    public function control(Device $poste, User $agent, string $code, ?array $point, ?string $declaredAt = null, ?bool $localValid = null, ?string $knownAt = null): array
+    public function control(Device $poste, User $agent, string $code, ?array $point, ?string $declaredAt = null, ?bool $localValid = null, ?string $knownAt = null, ?string $direction = null): array
     {
         PostCapabilities::require($poste, $agent, 'scan');
+        $direction = $this->direction($poste, $direction);
         $checkpoint = $this->point($poste, $point);
         if (($card = $this->permanent->resolveCard($code)) !== null) {
-            return $this->permanentControl($poste, $agent, $card, $checkpoint, $declaredAt, $localValid, $knownAt);
+            return $this->permanentControl($poste, $agent, $card, $checkpoint, $declaredAt, $localValid, $knownAt, $direction);
         }
         $verdict = $this->badges->controler($code, $poste->event_id, $agent, false);
         $badge = $verdict->badgeId ? DB::table('badges')->where('id', $verdict->badgeId)->first(['id', 'event_id', 'code']) : null;
@@ -57,7 +58,7 @@ final class SiteControl
         }
         $now = now();
         $eventId = (string) Str::uuid();
-        DB::table('access_events')->insert(['id' => $eventId, 'event_id' => $poste->event_id, 'visitor_id' => $valid ? $verdict->person['id'] : null, 'badge_id' => $badge?->id, 'actor_id' => $agent->id, 'type' => 'controle', 'checkpoint' => $checkpoint['name'], 'occurred_at' => $now, 'details' => json_encode(array_filter(['verdict' => $valid ? 'valide' : 'refuse', 'raison' => $reason, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'zone_ok' => $zoneOk, 'poste_id' => $poste->id, 'heure_declaree' => $declaredAt, 'differe' => $declaredAt !== null ? true : null, 'verdict_tablette' => $localValid === null ? null : ($localValid ? 'valide' : 'refuse')], fn ($v) => $v !== null), JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('access_events')->insert(['id' => $eventId, 'event_id' => $poste->event_id, 'visitor_id' => $valid ? $verdict->person['id'] : null, 'badge_id' => $badge?->id, 'actor_id' => $agent->id, 'type' => 'controle', 'checkpoint' => $checkpoint['name'], 'occurred_at' => $now, 'details' => json_encode(array_filter(['verdict' => $valid ? 'valide' : 'refuse', 'direction' => $direction, 'raison' => $reason, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'zone_ok' => $zoneOk, 'poste_id' => $poste->id, 'heure_declaree' => $declaredAt, 'differe' => $declaredAt !== null ? true : null, 'verdict_tablette' => $localValid === null ? null : ($localValid ? 'valide' : 'refuse')], fn ($v) => $v !== null), JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
         if (! $valid || $zoneOk === false) {
             $this->audit->append('controle.refuse', $agent->id, ['access_event_id' => $eventId, 'event_id' => $poste->event_id, 'device_id' => $poste->id, 'badge_id' => $badge?->id, 'raison' => $valid ? 'zone_non_autorisee' : $reason, 'point_id' => $checkpoint['id']]);
             // Le superviseur est prévenu tout de suite (audit global B2) : un badge annulé qui se présente n'est plus seulement dans le journal.
@@ -75,7 +76,7 @@ final class SiteControl
             'valid' => $valid, 'reason' => $reason, 'message' => $message, 'badge_code' => $badge?->code, 'zone_ok' => $zoneOk, 'point' => $checkpoint['name'],
             'person' => $valid ? ['name' => $verdict->person['name']] : null, 'organisation' => $valid ? $verdict->organisation : null,
             'category' => $category ? ['id' => $category->id, 'name' => $category->name, 'color' => $category->color, 'priority_circuit' => (bool) $category->priority_circuit] : null,
-            'zones' => $zones instanceof Collection ? $zones->pluck('name')->all() : [], 'source' => 'serveur',
+            'zones' => $zones instanceof Collection ? $zones->pluck('name')->all() : [], 'source' => 'serveur', 'direction' => $direction,
         ];
     }
 
@@ -236,7 +237,7 @@ final class SiteControl
      * @param  array{type:string,id:?string,name:string}  $checkpoint
      * @return array<string, mixed>
      */
-    private function permanentControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $declaredAt, ?bool $localValid, ?string $knownAt): array
+    private function permanentControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $declaredAt, ?bool $localValid, ?string $knownAt, ?string $direction = null): array
     {
         $now = now();
         $decision = $this->permanent->decide($card, $poste->event_id, $checkpoint, $now);
@@ -253,7 +254,7 @@ final class SiteControl
             }
         }
         $eventId = (string) Str::uuid();
-        $details = array_filter(['verdict' => $valid ? 'valide' : 'refuse', 'raison' => $decision['reason'], 'permanent' => true, 'holder_id' => $card->holder_id, 'identifiant' => $card->identifier, 'carte_rang' => $card->rank,
+        $details = array_filter(['verdict' => $valid ? 'valide' : 'refuse', 'direction' => $direction, 'raison' => $decision['reason'], 'permanent' => true, 'holder_id' => $card->holder_id, 'identifiant' => $card->identifier, 'carte_rang' => $card->rank,
             'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id, 'heure_declaree' => $declaredAt, 'differe' => $declaredAt !== null ? true : null, 'verdict_tablette' => $localValid === null ? null : ($localValid ? 'valide' : 'refuse')], fn ($v) => $v !== null);
         DB::table('access_events')->insert(['id' => $eventId, 'event_id' => $poste->event_id, 'visitor_id' => $visitorId, 'badge_id' => null, 'actor_id' => $agent->id, 'type' => $type, 'checkpoint' => $checkpoint['name'], 'occurred_at' => $now, 'details' => json_encode($details, JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
         if ($type === 'entree') {
@@ -270,7 +271,7 @@ final class SiteControl
         return [
             'valid' => $valid, 'reason' => $decision['reason'], 'message' => $decision['message'], 'badge_code' => $card->identifier, 'zone_ok' => $valid && $checkpoint['type'] === 'zone' ? true : null, 'point' => $checkpoint['name'],
             'person' => $valid ? ['name' => $card->full_name] : null, 'organisation' => $valid ? $card->organisation : null, 'category' => $valid ? $this->permanent->categoryOf($card->institutional_category) : null, 'zones' => $decision['zones'], 'source' => 'serveur',
-            'permanent' => ['identifier' => $card->identifier, 'entered' => $type === 'entree'],
+            'permanent' => ['identifier' => $card->identifier, 'entered' => $type === 'entree'], 'direction' => $direction,
         ];
     }
 
@@ -303,6 +304,23 @@ final class SiteControl
 
             return ['ok' => true, 'badge_code' => $card->identifier, 'badge_status' => 'Carte conservée', 'person' => ['name' => $visitor->full_name], 'point' => $checkpoint['name'], 'presents' => $this->presence->count($poste->event_id), 'source' => 'serveur', 'permanent' => ['identifier' => $card->identifier, 'card_kept' => true], 'warning' => $inactive ? 'Carte non valable : la sortie est enregistrée, le superviseur est prévenu.' : null];
         });
+    }
+
+    /**
+     * Sens du passage d'un contrôle (S10) : « entree » ou « sortie ». À la soute il est OBLIGATOIRE et choisi avant le scan ; ailleurs il est facultatif.
+     * Le sens est inscrit dans le mouvement « contrôle » (journal de supervision) ; il ne crée ni entrée ni sortie du site et ne change donc jamais la présence.
+     * Les habilitations (zones de la catégorie + habilitations de participation) s'appliquent de la même façon dans les deux sens.
+     */
+    private function direction(Device $poste, ?string $direction): ?string
+    {
+        if ($direction !== null && ! in_array($direction, ['entree', 'sortie'], true)) {
+            throw new DeskRefused('sens_invalide', 'Sens de passage inconnu : choisissez Entrée ou Sortie.', 422);
+        }
+        if ($direction === null && $poste->point_code === 'soute') {
+            throw new DeskRefused('sens_requis', 'Choisissez Entrée ou Sortie avant de scanner un badge.', 422, 'Touchez « Entrée » ou « Sortie », puis scannez.');
+        }
+
+        return $direction;
     }
 
     /** @return array<string, mixed> */

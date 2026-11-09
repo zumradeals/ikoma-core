@@ -188,6 +188,21 @@ class DeskFixtures extends Command
         $carAgentPassword = Str::password(24);
         $carAgent = User::create(['name' => "Agent cars {$s}", 'email' => Str::uuid().'@exemple.test', 'password' => $carAgentPassword]);
         $carAgent->assignRole('agent_accueil');
+        // S10 : deux tablettes de plus (poste d'accueil et soute) pour le parcours de tablettes enrôlées, et deux personnes badgées pour la soute.
+        $device5 = (string) Str::uuid();
+        DB::table('devices')->insert(['id' => $device5, 'event_id' => $event, 'name' => "Tablette accueil S10 {$s}", 'station' => "Poste accueil S10 {$s}", 'point_code' => 'poste_2', 'created_at' => $now, 'updated_at' => $now]);
+        $device6 = (string) Str::uuid();
+        DB::table('devices')->insert(['id' => $device6, 'event_id' => $event, 'name' => "Tablette soute S10 {$s}", 'station' => "Soute S10 {$s}", 'point_code' => 'soute', 'created_at' => $now, 'updated_at' => $now]);
+        $enrolCode5 = app(Devices::class)->issueCode(Device::findOrFail($device5), $admin);
+        $enrolCode6 = app(Devices::class)->issueCode(Device::findOrFail($device6), $admin);
+        DB::table('devices')->whereIn('id', [$device5, $device6])->update(['enrollment_expires_at' => now()->addHours(6)]);
+        $souteNames = ["Soute Alpha {$s}", "Soute Bravo {$s}"];
+        $souteBatch = $lots->generate($event, $categories['Visiteur'], 3, $admin);
+        $souteBadges = Badge::where('badge_batch_id', $souteBatch->id)->orderBy('code')->get();
+        foreach ($souteNames as $i => $name) {
+            app(BadgeService::class)->associer($souteBadges[$i], $visitor($name, 'Visiteur'), $agent);
+        }
+        $s10 = ['enrolCodeP2' => $enrolCode5, 'enrolCodeSoute' => $enrolCode6, 'posteP2' => "Poste accueil S10 {$s}", 'posteSoute' => "Soute S10 {$s}", 'badges' => [$souteBadges[0]->code, $souteBadges[1]->code], 'names' => $souteNames];
         // S09 : événement fictif distinct (jamais l'événement affiché par défaut) pour le parcours visites annoncées, véhicules et clôture VIP du superviseur.
         $e9 = (string) Str::uuid();
         DB::table('events')->insert(['id' => $e9, 'name' => "Recette S09 visites {$s}", 'starts_at' => $now->copy()->subHours(3), 'ends_at' => $now->copy()->addDays(2), 'created_at' => $now, 'updated_at' => $now]);
@@ -209,6 +224,7 @@ class DeskFixtures extends Command
         $s9People = array_map(fn (string $id) => (string) DB::table('visitors')->where('id', $id)->value('person_id'), $s9);
         $this->output->writeln(json_encode([
             'cars' => $cars, 'enrolCode4' => $enrolCode4, 'posteCars' => "Poste cars {$s}", 'encadreur' => ['email' => $encadreur->email, 'password' => $encadreurPassword], 'liveEncadreur' => ['email' => $liveEncadreur->email, 'password' => $liveEncadreurPassword], 'carAgent' => ['email' => $carAgent->email, 'password' => $carAgentPassword],
+            's10' => $s10,
             's09' => ['event' => $e9, 'ids' => $s9, 'people' => $s9People, 'names' => ['announced' => "Diabaté Annoncé {$s}", 'absent' => "Sanogo Absent {$s}", 'vip' => "Gnagne Honneur {$s}"], 'vipBadge' => $s9Badge->code],
             'event' => $event, 'enrolCode' => $enrolCode, 'enrolCode2' => $enrolCode2, 'enrolCode3' => $enrolCode3, 'poste3' => "Poste supervision {$s}", 'pilotageNames' => $pilotageNames, 'pilotageBadges' => $pilotageBadges->pluck('code')->values(), 'supervisor' => ['email' => $supervisor->email, 'password' => $supervisorPassword, 'secret' => $supervisorSecret], 'poste2' => "Poste contrôle {$s}", 'controlNames' => $controlNames, 'controlBadges' => $controlBadges->pluck('code')->values(), 'controlQrSvg' => app(QrSvg::class)->render(QrSvg::payload((string) DB::table('badges')->where('id', $controlBadges[0]->id)->value('qr_token')), 'QR du badge '.$controlBadges[0]->code), 'zonesNames' => array_keys($zones), 'admin' => ['email' => $admin->email, 'password' => $adminPassword, 'secret' => $secret], 'bulk' => $bulk, 'bulkPrefix' => 'Rafale Fictif',
             'email' => $agent->email, 'password' => $password, 'suffix' => $s, 'poste' => "Poste recette {$s}", 'names' => $names, 'ids' => $ids,

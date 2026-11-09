@@ -26,6 +26,7 @@ const groups: Group[] = [
     { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
   ] },
   { key: 'badges', label: 'Badges et cartes', items: [
+    { key: 'atelier-parcours', label: 'Parcours badges et cartes', icon: 'list', href: '/administration/atelier/parcours', permission: 'badges.gerer' },
     { key: 'atelier', label: 'Atelier des badges', icon: 'qr', href: '/administration/atelier', permission: 'badges.gerer' },
     { key: 'badges', label: 'Badges visiteurs', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer' },
     { key: 'titulaires', label: 'Personnes et cartes permanentes', icon: 'users', href: '/administration/titulaires', permission: 'listes.importer' },

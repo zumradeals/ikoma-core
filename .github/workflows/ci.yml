@@ -174,6 +174,9 @@ jobs:
       - name: Refuser une preuve finale manquante ou incohérente
         if: ${{ !cancelled() }}
         run: python3 scripts/security/final-images.py verify --output security-production
+      - name: Lister les constats HIGH/CRITICAL (lecture seule, sans effet sur le blocage)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/security/summarize-findings.py security-production || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -239,7 +239,7 @@ final class SyncProcessor
                 return $this->desk->enter($device, $agent, (string) $visitor, (int) ($p['duration_ms'] ?? 0), true, $clientTime);
             case 'controle':
                 [$code] = $need('code');
-                $verdict = $this->site->control($device, $agent, (string) $code, $this->point($p), $clientTime, isset($p['local_valid']) ? (bool) $p['local_valid'] : null, isset($p['known_at']) ? (string) $p['known_at'] : null);
+                $verdict = $this->site->control($device, $agent, (string) $code, $this->point($p), $clientTime, isset($p['local_valid']) ? (bool) $p['local_valid'] : null, isset($p['known_at']) ? (string) $p['known_at'] : null, isset($p['direction']) ? (string) $p['direction'] : null);
                 // Le contrôle hors ligne avait jugé le badge valide alors que le serveur le refuse (annulé entre-temps, restitué…) : à signaler.
                 if (($p['local_valid'] ?? null) === true && ! $verdict['valid']) {
                     return ['refus' => true, 'reason' => $verdict['reason'] === 'annule' ? 'annule_entre_temps' : (string) $verdict['reason'], 'message' => 'Ce badge a été jugé valide hors ligne mais le serveur le refuse : '.$verdict['message']];

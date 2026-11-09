@@ -165,7 +165,9 @@ it('refuse tout scan, toute sortie et toute opération d’accueil aux points sa
 
 it('limite la soute au contrôle individuel et le poste 2 à l’ensemble des opérations d’agent', function () {
     s02Point('soute');
-    $this->postJson('/poste/api/controle', ['code' => 'B-999999'], s02Headers())->assertOk();
+    // S10 : à la soute le sens du passage est obligatoire avant le scan.
+    $this->postJson('/poste/api/controle', ['code' => 'B-999999'], s02Headers())->assertStatus(422)->assertJsonPath('code', 'sens_requis');
+    $this->postJson('/poste/api/controle', ['code' => 'B-999999', 'direction' => 'entree'], s02Headers())->assertOk();
     $this->postJson('/poste/api/sortie', ['code' => 'B-999999'], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
     $this->postJson('/poste/api/refuser', ['visitor_id' => DemoSeeder::id('visitor1'), 'motif' => 'essai'], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
     s02Point('poste_2');

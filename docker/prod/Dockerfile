@@ -77,6 +77,10 @@ CMD ["php-fpm"]
 
 # 5) Image Nginx : seule porte d'entrée ; sert l'interface construite et transmet le reste à PHP-FPM. Sans privilèges (ports 8080 et 8443).
 FROM nginxinc/nginx-unprivileged:stable-alpine-slim AS nginx
+# Mise à jour des paquets du système de base (corrections de sécurité publiées par Alpine, p. ex. musl et zlib), puis retour à l'utilisateur sans privilèges de l'image amont (UID 101).
+USER root
+RUN apk upgrade --no-cache
+USER 101
 COPY --from=assets /app/public/build /var/www/html/public/build
 COPY public/favicon.ico public/icon.svg public/robots.txt /var/www/html/public/
 COPY public/brand /var/www/html/public/brand

@@ -6,6 +6,7 @@ use App\Models\Device;
 use App\Services\HostNotifications;
 use App\Services\Poste\Desk;
 use App\Services\Poste\Operations;
+use App\Services\Poste\PosteConsultation;
 use App\Services\Poste\SiteControl;
 use App\Services\Presence;
 use App\Services\Vehicles;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Gate;
 /** Routes JSON du poste d'accueil. Les permissions sont portées par les routes ; chaque écriture est idempotente (X-Operation-Id). */
 final class PosteApiController
 {
-    public function __construct(private readonly Desk $desk, private readonly Operations $operations, private readonly SiteControl $site, private readonly Presence $presence, private readonly Vehicles $vehicles) {}
+    public function __construct(private readonly Desk $desk, private readonly Operations $operations, private readonly SiteControl $site, private readonly Presence $presence, private readonly Vehicles $vehicles, private readonly PosteConsultation $consultation) {}
 
     public function postes(): JsonResponse
     {
@@ -102,10 +103,10 @@ final class PosteApiController
 
     public function controle(Request $r): JsonResponse
     {
-        $data = $r->validate(['code' => 'required|string|max:100', 'point' => 'nullable|array', 'point.type' => 'required_with:point|in:zone,poste', 'point.id' => 'required_with:point|uuid']);
+        $data = $r->validate(['code' => 'required|string|max:100', 'point' => 'nullable|array', 'point.type' => 'required_with:point|in:zone,poste', 'point.id' => 'required_with:point|uuid', 'direction' => 'nullable|in:entree,sortie']);
         $poste = $this->poste($r);
 
-        return $this->operations->run($r, 'controle', hash('sha256', $data['code']).'|'.json_encode($data['point'] ?? null), fn () => $this->site->control($poste, $r->user(), $data['code'], $data['point'] ?? null));
+        return $this->operations->run($r, 'controle', hash('sha256', $data['code']).'|'.json_encode($data['point'] ?? null).'|'.($data['direction'] ?? ''), fn () => $this->site->control($poste, $r->user(), $data['code'], $data['point'] ?? null, null, null, null, $data['direction'] ?? null));
     }
 
     public function sortie(Request $r): JsonResponse
@@ -129,6 +130,16 @@ final class PosteApiController
         $data = $r->validate(['code' => 'required|string|max:100']);
 
         return response()->json($this->site->giveBackCheck($this->poste($r), $r->user(), $data['code']));
+    }
+
+    public function attendus(Request $r): JsonResponse
+    {
+        return response()->json(['results' => $this->consultation->expected($this->poste($r), $r->user())]);
+    }
+
+    public function incidents(Request $r): JsonResponse
+    {
+        return response()->json($this->consultation->incidents($this->poste($r), $r->user()));
     }
 
     public function vehicules(Request $r): JsonResponse

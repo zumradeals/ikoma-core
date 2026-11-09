@@ -27,7 +27,7 @@ final class Supervision
     {
         return $this->movementQuery($eventId, $filters)->orderByDesc('e.occurred_at')->orderByDesc('e.id')->offset($offset)->limit($limit)
             ->get(['e.id', 'e.occurred_at', 'e.type', 'e.checkpoint', 'e.visitor_id', 'v.person_id', 'v.full_name', 'b.code as badge_code', 'e.corrige_id',
-                DB::raw("e.details->>'verdict' as verdict"), DB::raw("e.details->>'zone_ok' as zone_ok"),
+                DB::raw("e.details->>'verdict' as verdict"), DB::raw("e.details->>'zone_ok' as zone_ok"), DB::raw("e.details->>'direction' as direction"),
                 DB::raw('EXISTS (SELECT 1 FROM access_events c WHERE c.corrige_id = e.id) as corrected')]);
     }
 

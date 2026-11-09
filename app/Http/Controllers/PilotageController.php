@@ -9,6 +9,7 @@ use App\Services\BadgeService;
 use App\Services\Pilotage;
 use App\Services\Poste\DeskRefused;
 use App\Services\Supervision;
+use App\Services\SupervisionCentre;
 use App\Services\SupervisorClosure;
 use App\Services\Vehicles;
 use App\Services\Visits;
@@ -26,7 +27,7 @@ use Inertia\Response;
  */
 final class PilotageController
 {
-    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision, private readonly Visits $visits, private readonly Vehicles $vehicles, private readonly SupervisorClosure $closure) {}
+    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision, private readonly Visits $visits, private readonly Vehicles $vehicles, private readonly SupervisorClosure $closure, private readonly SupervisionCentre $centre) {}
 
     private function event(Request $r): ?object
     {
@@ -54,6 +55,7 @@ final class PilotageController
             'counters' => fn () => $event ? $this->pilotage->counters($event->id) : null,
             'alerts' => fn () => $event ? $this->pilotage->alerts($event->id, 'a_traiter', 5) : [],
             'overview' => fn () => $event ? $this->pilotage->overview($event->id) : null,
+            'centre' => fn () => $event ? $this->centre->build($event->id, $r->user()) : null,
         ]);
     }
 

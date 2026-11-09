@@ -3,10 +3,11 @@ import AgentLayout from '../../layouts/AgentLayout.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import CategorySwatch from '../CategorySwatch.vue';
 import StatusBar from './StatusBar.vue';
+import IncidentsPanel from './IncidentsPanel.vue';
 import { startScan, type ScanHandle } from '../../poste/media';
 import type { SitePosteRepository } from '../../poste/repository';
 import type { SyncState } from '../../poste/local/sync';
-import { ApiError, type Checkpoint, type ControlResult, type ExitResult, type GiveBackResult } from '../../poste/types';
+import { ApiError, type Checkpoint, type ControlResult, type ExitResult, type GiveBackResult, type PassageDirection } from '../../poste/types';
 
 const props = defineProps<{ agent: string; repository: SitePosteRepository; sync?: SyncState | null }>();
 const emit = defineEmits<{ sync: []; lock: [] }>();
@@ -15,7 +16,19 @@ type Mode = 'controle' | 'sortie' | 'restitution';
 
 const points = ref<Checkpoint[]>([]);
 const point = ref<Checkpoint | null>(null);
-const mode = ref<Mode>('controle');
+// Capacités du point tenu par la tablette (S02) : l'écran n'offre que les opérations permises ; le serveur les revérifie à chaque opération.
+// Contrôle d'un badge = « scan » ; sortie et restitution = « sortie ». Sans capacités connues, aucune restriction n'est appliquée ici.
+const caps = computed(() => props.repository.capabilities?.() ?? null);
+const MODE_CAPABILITY: Record<Mode, string> = { controle: 'scan', sortie: 'sortie', restitution: 'sortie' };
+const MODE_LABEL: Record<Mode, string> = { controle: 'Contrôle d’un badge', sortie: 'Sortie individuelle', restitution: 'Restitution d’un badge' };
+const allowedModes = computed<Mode[]>(() => (['controle', 'sortie', 'restitution'] as Mode[]).filter(m => caps.value === null || caps.value.includes(MODE_CAPABILITY[m])));
+const requestedMode = new URLSearchParams(window.location.search).get('mode') as Mode | null;
+const mode = ref<Mode>(requestedMode && requestedMode in MODE_CAPABILITY ? requestedMode : 'controle');
+const showIncidents = ref(false);
+// Sens du passage (S10) : à la soute, l'agent choisit Entrée ou Sortie AVANT de scanner ; le choix reste affiché tant qu'il ne le change pas.
+const needsDirection = computed(() => props.repository.requiresDirection?.() === true);
+const direction = ref<PassageDirection | null>(null);
+const DIRECTION_LABEL: Record<PassageDirection, string> = { entree: 'Entrée', sortie: 'Sortie' };
 const control = ref<ControlResult | null>(null);
 const exit = ref<ExitResult | null>(null);
 // Restitution (en ligne uniquement) : vérification serveur → confirmation de l'agent → restitution, contrôlée de nouveau par le serveur.
@@ -33,6 +46,7 @@ let handle: ScanHandle | null = null;
 let lastCamera = { text: '', at: 0 };
 let dismissTimer: number | undefined; let presentTimer: number | undefined;
 
+watch(allowedModes, modes => { if (modes.length && !modes.includes(mode.value)) mode.value = modes[0]; }, { immediate: true });
 const showing = computed(() => control.value !== null || exit.value !== null);
 const good = computed(() => (control.value ? control.value.valid : exit.value?.ok === true));
 const known = computed(() => {
@@ -52,7 +66,7 @@ const trust = computed(() => {
     : { state: 'expiree', text: 'Confiance hors ligne EXPIRÉE : les nouvelles entrées de titulaires permanents sont refusées jusqu’à la synchronisation. Les sorties restent possibles.' };
 });
 const lastSync = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSyncAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais'));
-const reasonLabels: Record<string, string> = { inconnu: 'Badge inconnu', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti', personne_sortie: 'Personne sortie : badge à restituer', personne_presente: 'Personne encore présente', carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', habilitation_non_commencee: 'Habilitation pas encore valable', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée' };
+const reasonLabels: Record<string, string> = { sens_requis: 'Sens du passage à choisir', inconnu: 'Badge inconnu', zone_non_autorisee: 'Zone non autorisée', annule: 'Badge annulé', restitue: 'Badge restitué', non_associe: 'Badge non associé', hors_periode: 'Hors période', autre_evenement: 'Autre événement', sortie_sans_entree: 'Sortie sans entrée', deja_sorti: 'Déjà sorti', personne_sortie: 'Personne sortie : badge à restituer', personne_presente: 'Personne encore présente', carte_perdue: 'Carte perdue', carte_volee: 'Carte volée', carte_revoquee: 'Carte révoquée', titulaire_clos: 'Titulaire clos', engagement_termine: 'Engagement terminé', engagement_non_commence: 'Engagement non commencé', evenement_indisponible: 'Événement clos', habilitation_absente: 'Habilitation absente', habilitation_expiree: 'Habilitation expirée', habilitation_non_commencee: 'Habilitation pas encore valable', zone_sans_politique: 'Zone sans politique', hors_ligne_non_autorise: 'Hors ligne non autorisé', confiance_expiree: 'Confiance hors ligne expirée' };
 
 function readStored(): { type: string; id: string } | null {
   try { const raw = window.localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -61,7 +75,7 @@ function choose(p: Checkpoint) {
   point.value = p;
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ type: p.type, id: p.id })); } catch { /* le point reste valable pour cette session */ }
 }
-function changePoint() { stopCamera(); point.value = null; dismiss(); }
+function changePoint() { stopCamera(); point.value = null; direction.value = null; dismiss(); }
 
 async function startCamera() {
   scanError.value = '';
@@ -92,6 +106,7 @@ function chooseMode(next: Mode) { mode.value = next; cancelGiveBack(); }
 async function submit(raw: string, fromCamera = false) {
   const value = raw.trim();
   if (!value || busy.value || showing.value || !point.value || giveBackCheck.value) return;
+  if (mode.value === 'controle' && needsDirection.value && !direction.value) { error.value = 'Choisissez Entrée ou Sortie avant de scanner un badge.'; return; }
   // Le badge est encore devant la caméra quand l'agent referme le résultat : la même lecture n'est pas refaite avant 5 s.
   if (fromCamera && value === lastCamera.text && Date.now() - lastCamera.at < 5000) return;
   if (fromCamera) lastCamera.text = value;
@@ -107,7 +122,7 @@ async function submit(raw: string, fromCamera = false) {
       code.value = '';
       return;
     }
-    if (mode.value === 'controle') control.value = await props.repository.control(operationId, value, where);
+    if (mode.value === 'controle') control.value = await props.repository.control(operationId, value, where, needsDirection.value ? direction.value ?? undefined : undefined);
     else { exit.value = await props.repository.exit(operationId, value, where); void refreshPresent(); }
     code.value = '';
     await nextTick();
@@ -133,7 +148,7 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
 </script>
 
 <template>
-  <AgentLayout active="controle" :agent="agent" :online="online">
+  <AgentLayout active="controle" :agent="agent" :online="online" :capabilities="caps">
     <template #header-context><span v-if="point?.name ?? null">Point de contrôle : {{ point?.name ?? null }}</span></template>
     <template #status><StatusBar context-label="Point de contrôle" :poste="point?.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" /></template>
     <div class="agent-workspace agent-controle-workspace">
@@ -152,10 +167,12 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
         </div>
         <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="situation-connue"><span aria-hidden="true">⚠</span> Hors ligne : les contrôles s’appuient sur la situation connue à {{ lastSync }}. Un badge annulé depuis peut apparaître valide.</p>
         <p v-if="trust" role="status" class="rounded-xl border-2 p-3 font-semibold" :class="trust.state === 'valide' ? 'border-amber-700 bg-amber-50 text-amber-950' : 'border-red-700 bg-red-50 text-red-900'" :data-testid="'confiance-' + trust.state"><span aria-hidden="true">⏱</span> {{ trust.text }}</p>
-        <div class="grid grid-cols-3 gap-3" role="group" aria-label="Mode">
-          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'controle' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'controle'" data-testid="mode-controle" @click="chooseMode('controle')">Contrôle</button>
-          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'sortie' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'sortie'" data-testid="mode-sortie" @click="chooseMode('sortie')">Sortie</button>
-          <button type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'restitution' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'restitution'" data-testid="mode-restitution" @click="chooseMode('restitution')">Restitution</button>
+        <p v-if="!allowedModes.length" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="aucune-operation"><span aria-hidden="true">⚠</span> Ce poste n’est habilité à aucune opération de contrôle : l’administrateur doit préciser son point de contrôle.</p>
+        <p v-else-if="allowedModes.length === 1" class="rounded-xl bg-white px-4 py-3 text-lg" data-testid="operations-autorisees">Opération autorisée à ce poste : <strong>{{ MODE_LABEL[allowedModes[0]] }}</strong>. Les autres opérations (accueil, sortie, restitution) se font aux postes prévus.</p>
+        <div v-if="allowedModes.length > 1" class="grid gap-3" :style="{ gridTemplateColumns: 'repeat(' + allowedModes.length + ', minmax(0, 1fr))' }" role="group" aria-label="Mode">
+          <button v-if="allowedModes.includes('controle')" type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'controle' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'controle'" data-testid="mode-controle" @click="chooseMode('controle')">Contrôle</button>
+          <button v-if="allowedModes.includes('sortie')" type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'sortie' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'sortie'" data-testid="mode-sortie" @click="chooseMode('sortie')">Sortie</button>
+          <button v-if="allowedModes.includes('restitution')" type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-xl font-bold" :class="mode === 'restitution' ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="mode === 'restitution'" data-testid="mode-restitution" @click="chooseMode('restitution')">Restitution</button>
         </div>
         <p v-if="mode === 'restitution' && !online" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="restitution-hors-ligne"><span aria-hidden="true">⚠</span> La restitution d’un badge n’est possible qu’en ligne. Reconnectez le poste pour restituer.</p>
         <section v-if="mode === 'restitution' && giveBackCheck" class="space-y-3 rounded-2xl border-4 border-ikoma-blue bg-white p-4" role="alertdialog" aria-labelledby="titre-restitution" data-testid="confirmation-restitution">
@@ -171,12 +188,22 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
           <button type="button" class="btn-soft" data-testid="restitution-suivante" @click="cancelGiveBack">Restitution suivante</button>
         </section>
         <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur"><span aria-hidden="true">⚠</span> {{ error }}</div>
+        <fieldset v-if="needsDirection && mode === 'controle'" class="space-y-2 rounded-2xl border-2 border-ikoma-blue bg-white p-4" data-testid="sens-passage">
+          <legend class="px-1 text-xl font-bold">Sens du passage</legend>
+          <div class="grid grid-cols-2 gap-3" role="group" aria-label="Sens du passage">
+            <button v-for="d in (['entree', 'sortie'] as PassageDirection[])" :key="d" type="button" class="min-h-16 rounded-xl border-2 px-4 py-3 text-2xl font-bold" :class="direction === d ? 'border-ikoma-blue bg-ikoma-blue text-white' : 'border-ikoma-blue bg-white text-ikoma-navy'" :aria-pressed="direction === d" :data-testid="'sens-' + d" @click="direction = d">{{ DIRECTION_LABEL[d] }}</button>
+          </div>
+          <p v-if="!direction" role="status" class="font-semibold text-amber-950" data-testid="sens-requis"><span aria-hidden="true">⚠</span> Choisissez Entrée ou Sortie avant de scanner : aucun badge n’est lu tant que le sens n’est pas choisi.</p>
+          <p v-else class="text-lg" data-testid="sens-choisi">Sens choisi : <strong>{{ DIRECTION_LABEL[direction] }}</strong>. Les habilitations s’appliquent de la même façon dans les deux sens.</p>
+        </fieldset>
         <div class="overflow-hidden rounded-2xl bg-slate-900"><video ref="video" class="mx-auto max-h-[40vh] w-full object-contain" playsinline muted aria-label="Caméra de lecture du badge"></video></div>
         <p v-if="scanError" role="alert" class="font-semibold text-red-800"><span aria-hidden="true">⚠</span> {{ scanError }}</p>
         <form class="space-y-3" aria-label="Saisir le code du badge" @submit.prevent="submit(code)">
           <label class="block text-xl font-semibold">QR illisible ? Saisissez le code imprimé (exemple : B-014)<input v-model="code" class="field !min-h-16 !text-2xl uppercase" autocomplete="off" maxlength="100" data-testid="code-manuel"></label>
-          <button type="submit" class="btn-main" :disabled="!code.trim() || busy || (mode === 'restitution' && (!online || !!giveBackCheck))" data-testid="valider-code">{{ mode === 'controle' ? 'Contrôler ce badge' : mode === 'sortie' ? 'Enregistrer la sortie' : 'Vérifier le badge à restituer' }}</button>
+          <button type="submit" class="btn-main" :disabled="!code.trim() || busy || (mode === 'controle' && needsDirection && !direction) || (mode === 'restitution' && (!online || !!giveBackCheck))" data-testid="valider-code">{{ mode === 'controle' ? 'Contrôler ce badge' : mode === 'sortie' ? 'Enregistrer la sortie' : 'Vérifier le badge à restituer' }}</button>
         </form>
+        <button type="button" class="btn-soft" :aria-expanded="showIncidents" data-testid="ouvrir-incidents" @click="showIncidents = !showIncidents">{{ showIncidents ? 'Fermer les refus et incidents' : 'Refus et incidents de ce poste' }}</button>
+        <IncidentsPanel v-if="showIncidents && repository.incidents" :repository="repository" :reasons="reasonLabels" />
         <button type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Changer de point de contrôle</button>
       </template>
     </div>
@@ -185,6 +212,7 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
       <template v-if="control">
         <p class="text-[clamp(3rem,12vw,6rem)] font-extrabold leading-none" data-testid="verdict"><span aria-hidden="true">{{ control.valid ? '✓' : '✕' }}</span> {{ control.valid ? 'VALIDE' : 'NON VALIDE' }}</p>
         <template v-if="control.valid && control.person">
+          <p v-if="control.direction" class="rounded-2xl bg-white px-4 py-2 text-3xl font-extrabold text-ikoma-navy" data-testid="sens-resultat">{{ DIRECTION_LABEL[control.direction] }}</p>
           <p class="text-4xl font-bold" data-testid="nom">{{ control.person.name }}</p>
           <div v-if="control.category" class="rounded-2xl bg-white px-4 py-2 text-ikoma-navy"><CategorySwatch :name="control.category.name" :color="control.category.color" :priority="control.category.priority_circuit" /></div>
           <p class="text-2xl">{{ control.organisation || 'Organisation non indiquée' }}</p>
@@ -192,6 +220,7 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
           <p v-if="control.zone_ok === false" class="rounded-2xl border-4 border-white bg-amber-300 px-5 py-3 text-3xl font-extrabold text-red-900" data-testid="zone-non-autorisee"><span aria-hidden="true">⚠</span> ZONE NON AUTORISÉE : {{ control.point }}</p>
         </template>
         <template v-else>
+          <p v-if="control.direction" class="rounded-2xl bg-white px-4 py-2 text-3xl font-extrabold text-ikoma-navy" data-testid="sens-resultat">{{ DIRECTION_LABEL[control.direction] }}</p>
           <p class="text-4xl font-bold" data-testid="raison">{{ reasonLabels[control.reason ?? ''] ?? control.reason }}</p>
           <p class="text-2xl">{{ control.message }}</p>
         </template>

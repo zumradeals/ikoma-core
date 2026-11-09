@@ -116,3 +116,38 @@ describe('Atelier des badges (parcours visiteurs)', () => {
     expect(wrapper.get('[data-testid="rappel-trace"]').text()).toContain('jamais la preuve');
   });
 });
+
+describe('Atelier des badges : gestion des modèles (S10)', () => {
+  const model = { design: 'vip', title: 'MODÈLE REPRIS', primary: '#0B3C6B', accent: '#C9962B', orientation: 'portrait' };
+  const answer = (reply: Record<string, unknown>) => vi.mocked(fetch).mockImplementation(async (url: unknown) => ({ ok: true, status: 200, json: async () => (String(url).includes('apercu-fictif') ? specimen : reply) }) as Response);
+
+  it('rétablit le modèle par défaut de l’événement et le dit', async () => {
+    const wrapper = render(); await flushPromises();
+    answer({ model: { design: 'visiteur', title: 'IKOMA ACCESS', primary: '#0066B3', accent: '#F75C03', orientation: 'paysage' } });
+    await wrapper.get('[data-testid="reinitialiser-modele"]').trigger('click'); await flushPromises();
+    const call = calls().find(c => c.url.endsWith('/administration/atelier/modeles/reinitialiser'))!;
+    expect(call.method).toBe('POST');
+    expect(call.body).toEqual({ event: 'event-a' });
+    expect(wrapper.get('[data-testid="message-modele"]').text()).toContain('Modèle par défaut rétabli');
+  });
+
+  it('reprend le modèle d’une autre activité, applique ses valeurs et nomme la source', async () => {
+    const wrapper = render(); await flushPromises();
+    expect(wrapper.get('[data-testid="reprendre-modele"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.findAll('[data-testid="source-modele"] option').map(o => o.text())).toEqual(['Choisir…', 'Événement B']);
+    answer({ model });
+    await wrapper.get('[data-testid="source-modele"]').setValue('event-b');
+    await wrapper.get('[data-testid="reprendre-modele"]').trigger('click'); await flushPromises();
+    const call = calls().find(c => c.url.endsWith('/administration/atelier/modeles/reprendre'))!;
+    expect(call.body).toEqual({ event: 'event-a', source: 'event-b' });
+    expect(wrapper.get('[data-testid="message-modele"]').text()).toContain('Événement B');
+  });
+
+  it('affiche l’erreur serveur sans prétendre avoir changé le modèle', async () => {
+    const wrapper = render(); await flushPromises();
+    vi.mocked(fetch).mockImplementation(async (url: unknown) => (String(url).includes('apercu-fictif') ? { ok: true, status: 200, json: async () => specimen } : { ok: false, status: 403, json: async () => ({}) }) as Response);
+    await wrapper.get('[data-testid="reinitialiser-modele"]').trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid="message-modele"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Opération refusée');
+  });
+});
