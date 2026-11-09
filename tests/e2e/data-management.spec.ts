@@ -19,7 +19,7 @@ test('centre de gestion, analyse refusée et archives sur données fictives', as
   await expect(page.getByRole('button', { name: 'Confirmer la suppression définitive' })).toHaveCount(0);
   await page.screenshot({ path: 'test-results/l33-suppression-refusee.png', fullPage: true });
   await page.goto('/administration/evenements?archives=1');
-  await expect(page.getByRole('link', { name: 'Voir les événements opérationnels' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Voir les activités opérationnelles' })).toBeVisible();
   await page.screenshot({ path: 'test-results/l33-archives.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/administration/donnees');

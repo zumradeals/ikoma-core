@@ -310,8 +310,9 @@ it('n’est lu par aucun service de contrôle, d’autorisation ni de badge : se
             $readers[] = str_replace(app_path().'/', '', $file->getPathname());
         }
     }
+    // Chantier Activités : ActivityRegistry (registre des activités, lecture seule) exclut seulement les participations de titulaires (holder_id IS NULL) ; il ne lit jamais le registre permanent ni ses habilitations.
     // Outils d'invités temporaires : ils ne font que EXCLURE les fiches de participation des titulaires (holder_id IS NULL) ; ils ne lisent jamais le registre.
-    $exclusionOnly = ['Services/HostGuests.php', 'Services/VisitorSearch.php', 'Services/Poste/Desk.php', 'Services/Poste/ListSnapshot.php', 'Http/Controllers/AdminVisitorsController.php', 'Http/Controllers/AtelierController.php', 'Http/Controllers/ZoneAccessController.php'];
+    $exclusionOnly = ['Services/ActivityRegistry.php', 'Services/HostGuests.php', 'Services/VisitorSearch.php', 'Services/Poste/Desk.php', 'Services/Poste/ListSnapshot.php', 'Http/Controllers/AdminVisitorsController.php', 'Http/Controllers/AtelierController.php', 'Http/Controllers/ZoneAccessController.php'];
     foreach (array_intersect($readers, $exclusionOnly) as $file) {
         $rest = preg_replace("/whereNull\\('(?:v\\.)?holder_id'\\)|whereNotNull\\('holder_id'\\)|\\b[a-z]\\.holder_id IS NULL/", '', (string) file_get_contents(app_path($file)));
         expect(preg_match('/institutional_categor|institutional_code|permanent_holders|holder_id/', (string) $rest), $file)->toBe(0);
