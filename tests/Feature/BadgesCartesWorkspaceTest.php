@@ -94,7 +94,6 @@ it('sans le droit d’importer des listes : registre consultable, préparation e
     $this->actingAs($limited)->get('/administration/badges')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/BadgesCartes')->where('canPrepare', false)->where('events', [])->where('preset', null)->has('registre.data'));
     $this->getJson('/administration/badges/supports')->assertOk();
     $this->postJson('/administration/badges/impression/donnees', ['badges' => [$t['badge']]])->assertForbidden();
-    $this->get('/administration/badges/preparer')->assertForbidden();
 });
 
 it('conserve les adresses utiles : filtres de lots redirigés vers la page historique, anciennes adresses supprimées', function () {

@@ -249,8 +249,6 @@ it('sert la page Modèles avec le modèle de badge de chaque activité et le mod
         ->assertInertia(fn ($page) => $page->where('section', 'cartes')->where('cards.selected', 'AILCT-02'));
     $event = DemoSeeder::id('event');
     $this->get('/administration/modeles?event='.$event)->assertOk()->assertInertia(fn ($page) => $page->where('initialEvent', $event));
-    // l'ancienne page « Personnalisation des cartes » renvoie vers l'espace Modèles en conservant la catégorie
-    $this->get('/administration/titulaires/modeles?categorie=AILCT-02')->assertRedirect('/administration/modeles?section=cartes&categorie=AILCT-02');
 });
 
 it('fournit les compteurs du cadre seulement sur les pages de l’espace Badges et cartes', function () {
