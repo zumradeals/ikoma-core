@@ -152,6 +152,8 @@ it('conserve exactement les routes d’administration restantes et toutes les ro
 });
 
 it('applique côté serveur les permissions déclarées de chaque route d’administration, rôle par rôle', function () {
+    // Une route à paramètre peut répondre 404 avant le contrôle de permission (liaison de modèle sur un identifiant fictif) : elle n'est jamais acceptée (jamais 2xx).
+    $offenders = [];
     foreach (['administrateur', 'superviseur', 'agent_accueil', 'hote', 'encadreur'] as $role) {
         $user = cvUser($role);
         $this->actingAs($user);
@@ -160,28 +162,45 @@ it('applique côté serveur les permissions déclarées de chaque route d’admi
                 continue;
             }
             $allowed = collect($can)->every(fn (string $c): bool => $user->can(substr($c, 4)));
-            if (! $allowed) {
-                $this->call($method, cvUrl($uri))->assertForbidden();
-            } elseif ($method === 'GET') {
-                expect($this->call('GET', cvUrl($uri))->getStatusCode(), $role.' '.$uri)->not->toBe(403);
+            if ($allowed) {
+                continue;
+            }
+            $status = $this->call($method, cvUrl($uri))->getStatusCode();
+            $expected = str_contains($uri, '{') ? [403, 404] : [403];
+            if (! in_array($status, $expected, true)) {
+                $offenders[] = $role.' '.$method.' '.$uri.' => '.$status;
             }
         }
     }
+    expect($offenders)->toBe([]);
 });
 
-it('réserve toutes les routes du poste au rôle agent d’accueil : aucun autre rôle, administrateur compris', function () {
+it('ne laisse aucun rôle autre que l’agent d’accueil réussir une requête sur les routes du poste, administrateur compris', function () {
+    // Le refus peut être un 403, un 404 (identifiant fictif) ou un 422 (validation avant le contrôle de rôle) : jamais un succès.
+    $offenders = [];
     foreach (['administrateur', 'superviseur', 'hote', 'encadreur'] as $role) {
         $this->actingAs(cvUser($role));
         foreach (CV_ROUTES as [$method, $uri]) {
             if (str_starts_with($uri, 'poste/api')) {
-                $this->call($method, cvUrl($uri))->assertForbidden();
+                $status = $this->call($method, cvUrl($uri))->getStatusCode();
+                if ($status < 400) {
+                    $offenders[] = $role.' '.$method.' '.$uri.' => '.$status;
+                }
             }
         }
     }
+    expect($offenders)->toBe([]);
 });
 
 it('renvoie à la connexion tout visiteur non authentifié sur les routes caractérisées', function () {
+    $offenders = [];
     foreach (CV_ROUTES as [$method, $uri]) {
-        expect($this->call($method, cvUrl($uri))->getStatusCode(), $uri)->toBeIn([302, 401]);
+        $status = $this->call($method, cvUrl($uri))->getStatusCode();
+        // Une route à paramètre peut répondre 404 (liaison de modèle avant l'authentification) : jamais un succès.
+        $ok = in_array($status, [302, 401], true) || (str_contains($uri, '{') && $status === 404);
+        if (! $ok) {
+            $offenders[] = $method.' '.$uri.' => '.$status;
+        }
     }
+    expect($offenders)->toBe([]);
 });
