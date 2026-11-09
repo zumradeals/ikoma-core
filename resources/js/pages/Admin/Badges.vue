@@ -32,7 +32,7 @@ const available = computed(() => Object.values(props.batchCounts ?? {}).flat().f
 
 <div class="mb-8 space-y-6">
 <BaseCard id="fabriquer">
-<h2 class="mb-2 text-heading font-bold">1. Fabriquer des badges</h2><p class="mb-4">Choisissez l’événement, la catégorie et le nombre de personnes attendues. Une marge est ajoutée automatiquement.</p><BadgeLotForm :events="events" :categories="categories" :margin="settings.margin" />
+<p class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm" data-testid="note-lots-historiques"><strong>Fonctions historiques.</strong> Pour préparer le badge d’une ou de plusieurs personnes, utilisez « Préparer un badge » : sans lot ni réservation. Les lots et réservations ci-dessous restent disponibles pour le stock existant.</p><h2 class="mb-2 text-heading font-bold">1. Fabriquer des badges</h2><p class="mb-4">Choisissez l’événement, la catégorie et le nombre de personnes attendues. Une marge est ajoutée automatiquement.</p><BadgeLotForm :events="events" :categories="categories" :margin="settings.margin" />
 <details class="mt-5 rounded-xl border p-4" data-testid="reglages-badges"><summary class="cursor-pointer font-bold">Réglages (marge de fabrication, badge restitué)</summary><div class="mt-4"><BadgeSettingsForm :settings="settings" /></div></details>
 </BaseCard>
 <BaseCard id="affecter">

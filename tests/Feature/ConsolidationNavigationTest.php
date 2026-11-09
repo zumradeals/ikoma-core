@@ -125,6 +125,10 @@ const CN_ADDED = [
     ['POST', 'administration/site/postes/{checkpoint}/activation', ['can:postes.gerer'], []],
     ['POST', 'administration/site/tablettes/{device}/affectation', ['can:postes.gerer'], []],
     // Badges et cartes : contrat d'impression unique des supports émis (récapitulatif, aperçu, impression).
+    ['GET', 'administration/badges/preparer', ['can:badges.gerer', 'can:listes.importer'], []],
+    ['GET', 'administration/badges/preparer/personnes', ['can:badges.gerer', 'can:listes.importer'], ['throttle:recherche']],
+    ['POST', 'administration/badges/preparer/recapitulatif', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
+    ['POST', 'administration/badges/preparer/generer', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression/recapitulatif', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression/apercu', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],

@@ -8,6 +8,7 @@ use App\Http\Controllers\AtelierController;
 use App\Http\Controllers\BadgeDetailsController;
 use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
+use App\Http\Controllers\BadgePreparerController;
 use App\Http\Controllers\BadgeRegistryController;
 use App\Http\Controllers\BadgeReservationsController;
 use App\Http\Controllers\BadgesController;
@@ -143,6 +144,10 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/atelier/tirages/{run}/demande', [AtelierController::class, 'requested'])->whereUuid('run')->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::post('/administration/atelier/tirages/{run}/confirmation', [AtelierController::class, 'confirmed'])->whereUuid('run')->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::get('/administration/atelier/alignement', [AtelierController::class, 'alignment'])->middleware('can:badges.gerer');
+        Route::get('/administration/badges/preparer', [BadgePreparerController::class, 'page'])->middleware(['can:badges.gerer', 'can:listes.importer']);
+        Route::get('/administration/badges/preparer/personnes', [BadgePreparerController::class, 'people'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:recherche']);
+        Route::post('/administration/badges/preparer/recapitulatif', [BadgePreparerController::class, 'summary'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
+        Route::post('/administration/badges/preparer/generer', [BadgePreparerController::class, 'generate'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression/recapitulatif', [SupportPrintController::class, 'plan'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression/apercu', [SupportPrintController::class, 'preview'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression', [SupportPrintController::class, 'print'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
