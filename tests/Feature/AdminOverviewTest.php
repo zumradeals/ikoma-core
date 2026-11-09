@@ -80,7 +80,7 @@ beforeEach(function () {
     $this->actingAs($this->admin);
 });
 
-it('sert le tableau général à l’administrateur en conservant la préparation de l’activité, et le refuse aux autres', function () {
+it('sert le tableau général à l’administrateur, et le refuse aux autres', function () {
     $this->get('/administration')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/Tableau')->has('general.indicateurs.presents')->has('general.priorites')->has('general.activites')
         ->has('general.badges.cartes')->has('general.personnes.verifications')->has('general.operations.derniers')->has('steps')->has('tiles'));
     $this->actingAs($this->agent)->get('/administration')->assertForbidden();
@@ -175,4 +175,19 @@ it('ne fait que lire : aucune écriture ni entrée de journal à l’affichage',
     $audit = DB::table('audit_logs')->count();
     $this->get('/administration')->assertOk();
     expect($counts())->toBe($before)->and(DB::table('audit_logs')->count())->toBe($audit);
+});
+
+it('fournit les données du tableau de la maquette : titulaires, accès par heure, refus récents, véhicules et dernière synchronisation', function () {
+    $a = aoActivity();
+    DB::table('access_events')->insert(['id' => (string) Str::uuid(), 'event_id' => $a['event'], 'visitor_id' => $a['visitor'], 'type' => 'entree', 'checkpoint' => 'accueil', 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('refusals')->insert(['id' => (string) Str::uuid(), 'visitor_id' => $a['visitor'], 'reason' => 'Refus fictif', 'refused_at' => now()->addMinute(), 'created_at' => now(), 'updated_at' => now()]);
+    $g = aoGeneral();
+    $parHeure = $g['operations']['par_heure'];
+    expect($g['indicateurs']['titulaires']['actifs'])->toBe((int) DB::table('permanent_holders')->where('status', 'actif')->count())
+        ->and($parHeure)->toHaveCount(24)->and(array_sum(array_column($parHeure, 'entrees')))->toBe($g['operations']['mouvements']['entrees'])
+        ->and($g['operations']['vehicules_presents'])->toBe((int) DB::table('vehicles')->where('status', 'present')->count())
+        ->and($g['operations']['derniere_synchro'])->toBe(DB::table('devices')->whereNotNull('token_hash')->whereNull('revoked_at')->max('last_synced_at'));
+    $derniers = $g['operations']['derniers'];
+    expect($derniers[0]['type'])->toBe('refus')->and($derniers[0]['resultat'])->toBe('refuse')->and($derniers[0]['name'])->toContain('Zztableau')
+        ->and(collect($derniers)->firstWhere('type', 'entree')['resultat'])->toBe('autorise');
 });

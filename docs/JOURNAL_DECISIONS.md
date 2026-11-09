@@ -796,3 +796,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **Impression et historique** : `/administration/atelier` s'ouvre sur le seul suivi des tirages (généré · demandé · confirmé). L'atelier par lots (modèle, lot, plage, format) s'ouvre avec `?vue=atelier` ou par les anciens liens (`person`, `batch`, `format`, `from`, `to`, `cols`, `rows`, `mode`), et depuis « Lots et réservations ». Imprimer ou réimprimer un support se fait depuis le registre.
 - **Registre** : le stock de lots sans titulaire est masqué par défaut ; il reste visible par le filtre « Disponible (stock) » et par la recherche d'un numéro.
 - Aucune route, donnée ni moteur supprimé ou modifié.
+
+## V1 — Tableau de bord administrateur : conformité à la maquette
+- **Constat** (retour du dirigeant) : la première version ne reprenait pas la maquette (sections empilées, indicateurs différents, pas de graphique) et laissait l'ancienne page de préparation pas à pas dessous.
+- **Décision** : le tableau de bord est UNE vue en lecture seule, calquée sur la maquette : sept indicateurs, activité des accès (24 h, barres entrées/sorties), mouvements récents, état du site, activités en cours, visites et véhicules, badges et cartes, accès rapides, alertes et actions. L'ancienne préparation pas à pas n'est plus affichée (chaque fonction a son menu).
+- **Données ajoutées à `AdminOverview`** (lecture seule) : titulaires actifs, accès par heure (déjà calculés par `OperationsOverview`), véhicules présents, dernière synchronisation des appareils, refus récents parmi les mouvements.
+- **Écarts assumés** : « (jour) » devient « (24 h) » (fenêtre réelle de calcul) ; pas de photo sur les mouvements (initiales) ; sélecteurs de date et de périmètre affichés en lecture seule (périmètre fixe : tout le site) ; « En ligne » remplacé par « Synchronisés » (preuve = dernière synchronisation) ; ligne « Mode hors ligne » omise (aucune donnée serveur fiable).
