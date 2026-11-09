@@ -42,6 +42,7 @@ use App\Http\Controllers\PostesController;
 use App\Http\Controllers\PosteSyncController;
 use App\Http\Controllers\PresencesController;
 use App\Http\Controllers\RetentionController;
+use App\Http\Controllers\SiteAccesController;
 use App\Http\Controllers\VisitsController;
 use App\Http\Controllers\ZoneAccessController;
 use App\Http\Controllers\ZonesController;
@@ -189,6 +190,12 @@ Route::middleware(['auth'])->group(function (): void {
             });
         });
 
+        Route::get('/administration/site', [SiteAccesController::class, 'index'])->middleware('can:postes.gerer');
+        Route::put('/administration/site', [SiteAccesController::class, 'rename'])->middleware('can:postes.gerer');
+        Route::post('/administration/site/postes', [SiteAccesController::class, 'createCheckpoint'])->middleware('can:postes.gerer');
+        Route::put('/administration/site/postes/{checkpoint}', [SiteAccesController::class, 'updateCheckpoint'])->whereUuid('checkpoint')->middleware('can:postes.gerer');
+        Route::post('/administration/site/postes/{checkpoint}/activation', [SiteAccesController::class, 'activation'])->whereUuid('checkpoint')->middleware('can:postes.gerer');
+        Route::post('/administration/site/tablettes/{device}/affectation', [SiteAccesController::class, 'assign'])->whereUuid('device')->middleware('can:postes.gerer');
         Route::get('/administration/postes', [PostesController::class, 'index'])->middleware('can:postes.gerer');
         Route::post('/administration/postes', [PostesController::class, 'store'])->middleware('can:postes.gerer');
         Route::put('/administration/postes/reglages', [PostesController::class, 'settings'])->middleware('can:postes.gerer');

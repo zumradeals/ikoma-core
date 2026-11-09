@@ -41,7 +41,8 @@ final class ZoneAccess
         if ($checkpoint['type'] === 'zone') {
             return [(string) $checkpoint['id']];
         }
-        $ids = DB::table('checkpoint_zones')->where('event_id', $eventId)->where('device_id', $checkpoint['id'])->pluck('zone_id')->all();
+        // La correspondance est portée par le POSTE : la tablette (point de type « poste ») juge les zones du poste auquel elle est affectée.
+        $ids = DB::table('checkpoint_zones as c')->join('devices as d', 'd.checkpoint_id', '=', 'c.checkpoint_id')->where('c.event_id', $eventId)->where('d.id', $checkpoint['id'])->pluck('c.zone_id')->all();
 
         return $ids === [] ? null : array_values($ids);
     }
@@ -65,27 +66,27 @@ final class ZoneAccess
     /** @return list<object> */
     public function mappings(string $eventId): array
     {
-        return DB::table('checkpoint_zones as c')->join('devices as d', 'd.id', '=', 'c.device_id')->join('zones as z', 'z.id', '=', 'c.zone_id')->where('c.event_id', $eventId)
-            ->orderBy('d.name')->orderBy('z.name')->get(['c.id', 'c.device_id', DB::raw('coalesce(d.station, d.name) as point'), 'c.zone_id', 'z.name as zone'])->all();
+        return DB::table('checkpoint_zones as c')->join('checkpoints as p', 'p.id', '=', 'c.checkpoint_id')->join('zones as z', 'z.id', '=', 'c.zone_id')->where('c.event_id', $eventId)
+            ->orderBy('p.code')->orderBy('z.name')->get(['c.id', 'c.checkpoint_id', DB::raw("CASE WHEN p.function_label IS NULL THEN p.name ELSE p.name || ' — ' || p.function_label END as point"), 'c.zone_id', 'z.name as zone'])->all();
     }
 
-    public function map(string $eventId, string $deviceId, string $zoneId, User $actor): void
+    public function map(string $eventId, string $checkpointId, string $zoneId, User $actor): void
     {
         $this->authorize($actor);
-        DB::transaction(function () use ($eventId, $deviceId, $zoneId, $actor): void {
-            if (! DB::table('devices')->where('id', $deviceId)->where('event_id', $eventId)->whereNull('revoked_at')->exists()) {
-                throw ValidationException::withMessages(['device_id' => 'Point de contrôle inconnu pour cet événement.']);
+        DB::transaction(function () use ($eventId, $checkpointId, $zoneId, $actor): void {
+            if (! DB::table('checkpoints')->where('id', $checkpointId)->where('active', true)->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages(['checkpoint_id' => 'Poste inconnu ou désactivé.']);
             }
             if (! DB::table('zones')->where('id', $zoneId)->where('event_id', $eventId)->exists()) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
             }
-            if (DB::table('checkpoint_zones')->where('device_id', $deviceId)->where('zone_id', $zoneId)->exists()) {
-                throw ValidationException::withMessages(['zone_id' => 'Cette zone est déjà associée à ce point.']);
+            if (DB::table('checkpoint_zones')->where('checkpoint_id', $checkpointId)->where('zone_id', $zoneId)->exists()) {
+                throw ValidationException::withMessages(['zone_id' => 'Cette zone est déjà associée à ce poste.']);
             }
             $id = (string) Str::uuid();
-            DB::table('checkpoint_zones')->insert(['id' => $id, 'event_id' => $eventId, 'device_id' => $deviceId, 'zone_id' => $zoneId, 'created_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('checkpoint_zones')->insert(['id' => $id, 'event_id' => $eventId, 'checkpoint_id' => $checkpointId, 'zone_id' => $zoneId, 'created_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]);
             DB::table('events')->where('id', $eventId)->increment('list_revision');
-            $this->audit->append('point.zone_associee', $actor->id, ['correspondance_id' => $id, 'event_id' => $eventId, 'device_id' => $deviceId, 'zone_id' => $zoneId]);
+            $this->audit->append('point.zone_associee', $actor->id, ['correspondance_id' => $id, 'event_id' => $eventId, 'checkpoint_id' => $checkpointId, 'zone_id' => $zoneId]);
         });
     }
 
@@ -97,7 +98,7 @@ final class ZoneAccess
             abort_unless($row !== null, 404);
             DB::table('checkpoint_zones')->where('id', $mappingId)->delete();
             DB::table('events')->where('id', $row->event_id)->increment('list_revision');
-            $this->audit->append('point.zone_dissociee', $actor->id, ['correspondance_id' => $mappingId, 'event_id' => $row->event_id, 'device_id' => $row->device_id, 'zone_id' => $row->zone_id]);
+            $this->audit->append('point.zone_dissociee', $actor->id, ['correspondance_id' => $mappingId, 'event_id' => $row->event_id, 'checkpoint_id' => $row->checkpoint_id, 'zone_id' => $row->zone_id]);
         });
     }
 

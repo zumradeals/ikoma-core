@@ -36,7 +36,7 @@ final class ListSnapshot
 
         // Cartes permanentes, habilitations et politiques de zone : toute révocation ou habilitation modifiée change la version et est donc reprise à la prochaine synchronisation.
         // Le point de contrôle du poste (et donc ses capacités) fait partie de la copie : le modifier change la version.
-        return sha1((string) $row->v.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-'));
+        return sha1((string) $row->v.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-').'|'.md5(json_encode([PostCapabilities::capabilities($poste), PostCapabilities::requiresDirection($poste)], JSON_THROW_ON_ERROR)));
     }
 
     private function groupMode(): string
@@ -64,7 +64,7 @@ final class ListSnapshot
         return [
             'version' => $this->version($poste),
             'server_time' => now()->utc()->format('Y-m-d\TH:i:s.u\Z'),
-            'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $e, 'point_code' => $poste->point_code, 'capabilities' => PostCapabilities::capabilities($poste)],
+            'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $e, 'point_code' => $poste->point_code, 'capabilities' => PostCapabilities::capabilities($poste), 'direction_required' => PostCapabilities::requiresDirection($poste)],
             'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at']),
             'settings' => ['inactivity_minutes' => $setting('poste_inactivite_minutes', 5), 'clock_skew_seconds' => $setting('poste_ecart_horloge_secondes', 300), 'pin_max_failures' => $setting('poste_echecs_pin_max', 15), 'controle_stagiaires' => $this->groupMode(), 'f06_active' => $f06Active,
                 'identity_document' => Desk::documentRequired(), 'offline_call_minutes' => $setting('poste_delai_appel_minutes', 15), 'offline_max_hours' => $setting('poste_hors_reseau_max_heures', 12), 'offline_trust_hours' => PostCapabilities::offlineTrustHours(), 'low_badges_percent' => $setting('poste_badges_bas_pourcent', 10), 'low_badges_min' => $setting('poste_badges_bas_minimum', 5)],
@@ -72,7 +72,8 @@ final class ListSnapshot
             'zones' => DB::table('zones')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
             // S06 : zones gardées par chaque point, et habilitations de participation actives (ni retirées ni suspendues) ; la période est jugée par la tablette.
-            'point_zones' => DB::table('checkpoint_zones')->where('event_id', $e)->get(['device_id', 'zone_id']),
+            // La correspondance est portée par le poste : chaque tablette de l'activité affectée à ce poste en hérite (format inchangé pour les tablettes).
+            'point_zones' => DB::table('checkpoint_zones as c')->join('devices as d', 'd.checkpoint_id', '=', 'c.checkpoint_id')->where('c.event_id', $e)->where('d.event_id', $e)->orderBy('d.id')->orderBy('c.zone_id')->get(['d.id as device_id', 'c.zone_id']),
             'entitlements' => DB::table('participation_entitlements')->where('event_id', $e)->whereNull('revoked_at')->whereNull('suspended_at')->where('valid_until', '>=', now())->get(['visitor_id', 'zone_id', 'valid_from', 'valid_until']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
             'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),

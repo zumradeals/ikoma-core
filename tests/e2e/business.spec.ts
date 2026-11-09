@@ -1,15 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
-import { expandMenu } from './menu';
+import { openZones } from './menu';
 test('un administrateur crée une zone puis une catégorie qui l’utilise', async ({ page }) => {
  test.setTimeout(180_000); // inclut toute attente temporaire imposée par la connexion
 
  const user = JSON.parse(readFileSync('.secrets/screen-business.json', 'utf8')) as { email: string; password: string; secret: string };
  await page.setViewportSize({ width: 820, height: 1180 });
  await loginWithSecondFactor(page, user.email, user.password, user.secret);
- await expandMenu(page);
- await page.getByRole('link', { name: 'Zones', exact: true }).click();
+ await openZones(page);
  const zone = `Zone fictive recette ${Date.now()}`; const zoneForm = page.getByRole('form', { name: 'Créer une zone' });
  await zoneForm.getByLabel('Nom de la zone').fill(zone); await zoneForm.getByRole('button', { name: 'Créer la zone', exact: true }).click();
  await expect(page.getByRole('heading', { name: zone, exact: true })).toBeVisible(); await page.screenshot({ path: 'test-results/l2-zones.png', fullPage: true });

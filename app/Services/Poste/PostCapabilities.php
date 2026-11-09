@@ -7,26 +7,76 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Capacités d'un poste (S02). Un agent ne dispose que des capacités du point de contrôle que tient sa tablette ; le rôle seul ne suffit plus.
+ * Capacités d'un poste (S02, V1). Un agent ne dispose que des capacités du poste que tient sa tablette ; le rôle seul ne suffit plus.
  *
- * Décisions validées (cahier des charges AILCT V1, §2 et §8) :
- *  - poste 1 : aucun scan ni confirmation numérique en V1 ;
+ * V1 : les postes sont des objets PERMANENTS du site (table `checkpoints`) et leur configuration est une DONNÉE, administrable sans toucher au code
+ * (docs/ailct/V1-INVARIANTS-SITE-ET-CONTROLE.md). Le catalogue des capacités, lui, est celui qui est réellement implémenté ; le serveur refuse toute autre valeur.
+ * Configuration par défaut = contrat antérieur validé (S02) :
  *  - poste 2 : contrôle individuel à l'entrée, accueil (identité, badge, admission) et sortie ;
- *  - soute : contrôle individuel bidirectionnel, rien d'autre ;
- *  - hôtel : lieu de regroupement des stagiaires, HORS des postes de l'Académie : aucune capacité de poste (ni accueil, ni scan, ni sortie). Les opérations de
- *    préparation du transport (appel nominal), de remise des badges de groupe et de départ du car sont autorisées par leurs permissions de rôle (groupes.*),
- *    pas par un point de contrôle : une tablette de l'hôtel n'est jamais typée « poste 2 ». L'arrivée du car est, elle, un scan physique à un poste de l'Académie.
- * Postes 3 et 4 : procédures numériques « à confirmer » (§13). Tant qu'elles ne sont pas décidées, ces points n'ont AUCUNE capacité (refus par défaut).
- * Poste non identifié (point_code nul) : AUCUNE capacité (refus par défaut). Le point de contrôle est obligatoire pour toute tablette
- * opérationnelle : à la création, à l'émission du code d'enrôlement, à l'enrôlement et, en base, pour tout appareil muni d'un jeton.
+ *  - soute (point 5) : contrôle individuel, sens Entrée / Sortie obligatoire, rien d'autre ;
+ *  - postes 1, 3 et 4 : aucune opération (procédures numériques non décidées) ; refus par défaut ;
+ *  - tablette sans poste (ancien point « hotel », groupes et cars) : aucune capacité de poste ; les opérations de groupe restent autorisées par leurs permissions de rôle.
+ * Un poste désactivé n'a plus aucune capacité. Poste non identifié (point_code nul) : AUCUNE capacité (refus par défaut).
  *
- * Capacités : « accueil » (identité, validation, refus, badge, entrée, non listé), « scan » (contrôle d'un badge), « sortie » (sortie et restitution).
+ * Capacités : « accueil » (identité, validation, refus, badge, entrée, non listé), « scan » (contrôle d'un badge), « sortie » : la sortie du site et la restitution du badge sont DEUX opérations distinctes (la restitution exige une personne déjà sortie et une vérification physique) ; elles partagent aujourd'hui la même porte de poste. Les séparer en deux capacités est une décision ouverte (journal des décisions).
  */
 final class PostCapabilities
 {
-    public const POINTS = ['poste_1' => 'Poste 1 — entrée principale', 'poste_2' => 'Poste 2 — accès terrestre', 'poste_3' => 'Poste 3 — chef du village', 'poste_4' => 'Poste 4 — Porton', 'soute' => 'Soute (point 5)', 'hotel' => 'Hôtel — regroupement et départ des cars (hors postes de l’Académie)'];
+    /** Catalogue des capacités réellement implémentées (code => libellé). */
+    public const CATALOGUE = [
+        'accueil' => 'Accueil : identité, admission et attribution de badge',
+        'scan' => 'Contrôle d’un badge (entrée ou passage)',
+        'sortie' => 'Sortie du site (la restitution du badge reste une opération distincte, permise par la même capacité)',
+    ];
 
-    private const ALLOWED = ['poste_2' => ['accueil', 'scan', 'sortie'], 'soute' => ['scan']];
+    /** Point hérité des tablettes sans poste (groupes et cars). */
+    public const NO_POST = 'hotel';
+
+    /**
+     * Postes du site (code => libellé), plus le point hérité « tablette sans poste ».
+     *
+     * @return array<string, string>
+     */
+    public static function points(bool $activeOnly = true): array
+    {
+        $rows = DB::table('checkpoints')->when($activeOnly, fn ($q) => $q->where('active', true))->orderBy('code')->get(['code', 'name', 'function_label']);
+        $points = [];
+        foreach ($rows as $row) {
+            $points[$row->code] = $row->function_label ? $row->name.' — '.$row->function_label : $row->name;
+        }
+        $points[self::NO_POST] = 'Sans poste — tablette mobile (groupes et cars)';
+
+        return $points;
+    }
+
+    /** @return list<string> capacités configurées d'un poste actif (ordre du catalogue) */
+    public static function ofCheckpoint(string $code): array
+    {
+        $row = DB::table('checkpoints')->where('code', $code)->where('active', true)->first(['capabilities']);
+
+        return $row === null ? [] : self::normalize(json_decode((string) $row->capabilities, true));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function normalize(mixed $values): array
+    {
+        $values = is_array($values) ? $values : [];
+
+        return array_values(array_filter(array_keys(self::CATALOGUE), fn (string $capability): bool => in_array($capability, $values, true)));
+    }
+
+    /** Le poste exige-t-il le choix explicite Entrée / Sortie avant un scan (S10) ? */
+    public static function requiresDirection(Device $poste): bool
+    {
+        if ($poste->point_code === null) {
+            return false;
+        }
+        $row = DB::table('checkpoints')->where('code', $poste->point_code)->where('active', true)->first(['direction_required', 'capabilities']);
+
+        return $row !== null && (bool) $row->direction_required && in_array('scan', self::normalize(json_decode((string) $row->capabilities, true)), true);
+    }
 
     /**
      * Délai (en heures) pendant lequel une tablette sans réseau peut prendre une décision FAVORABLE (admission, badge, scan valide) sur sa copie locale.
@@ -44,7 +94,7 @@ final class PostCapabilities
     /** @return list<string> */
     public static function capabilities(Device $poste): array
     {
-        return $poste->point_code === null ? [] : self::ALLOWED[$poste->point_code] ?? [];
+        return $poste->point_code === null ? [] : self::ofCheckpoint($poste->point_code);
     }
 
     public static function allows(Device $poste, string $capability): bool

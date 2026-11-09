@@ -23,7 +23,7 @@ final class Devices
 
     public function create(string $eventId, string $name, ?string $station, User $actor, string $pointCode): Device
     {
-        if (! array_key_exists($pointCode, PostCapabilities::POINTS)) {
+        if (! array_key_exists($pointCode, PostCapabilities::points())) {
             throw new DeskRefused('point_inconnu', 'Point de contrôle inconnu.', 422);
         }
 

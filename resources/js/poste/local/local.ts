@@ -205,7 +205,7 @@ export class LocalPosteRepository implements GroupPosteRepository {
     }
   }
 
-  requiresDirection(): boolean { return this.list.snapshot.poste.point_code === 'soute'; }
+  requiresDirection(): boolean { return this.list.snapshot.poste.direction_required ?? this.list.snapshot.poste.point_code === 'soute'; }
 
   async control(operationId: string, code: string, point: PointRef | null, direction?: PassageDirection): Promise<ControlResult> {
     if (this.requiresDirection() && !direction) throw new ApiError('sens_requis', 'Choisissez Entrée ou Sortie avant de scanner un badge.');

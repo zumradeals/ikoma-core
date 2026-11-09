@@ -35,7 +35,7 @@ final class ZoneAccessController
         return Inertia::render('Admin/AccesZones', [
             'events' => $events, 'eventId' => $eventId, 'q' => $q,
             'zones' => $eventId ? DB::table('zones')->where('event_id', $eventId)->orderBy('name')->get(['id', 'name']) : [],
-            'points' => $eventId ? DB::table('devices')->where('event_id', $eventId)->whereNull('revoked_at')->orderBy('name')->get(['id', DB::raw('coalesce(station, name) as name')]) : [],
+            'points' => DB::table('checkpoints')->where('active', true)->orderBy('code')->get(['id', DB::raw("CASE WHEN function_label IS NULL THEN name ELSE name || ' — ' || function_label END as name")]),
             'mappings' => $eventId ? $access->mappings($eventId) : [],
             'entitlements' => $eventId ? $entitlements->forEvent($eventId) : [],
             'participants' => $participants,
@@ -46,8 +46,8 @@ final class ZoneAccessController
 
     public function map(Request $r, ZoneAccess $access): RedirectResponse
     {
-        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'device_id' => 'required|uuid', 'zone_id' => 'required|uuid']);
-        $access->map($data['event_id'], $data['device_id'], $data['zone_id'], $r->user());
+        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'checkpoint_id' => 'required|uuid', 'zone_id' => 'required|uuid']);
+        $access->map($data['event_id'], $data['checkpoint_id'], $data['zone_id'], $r->user());
 
         return back()->with('status', 'Correspondance enregistrée. Synchronisez les postes.');
     }

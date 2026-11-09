@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { expandMenu } from './menu';
+import { expandMenu, openMenu, openPage, openZones } from './menu';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from './otp';
 
@@ -21,16 +21,15 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   for (const key of ['zones', 'liste', 'badges', 'tablettes', 'groupes', 'comptes']) await expect(page.getByTestId(`statut-${key}`)).toHaveText(/(✓ Fait|● En cours|○ À faire)/);
   expect(await noHorizontalScroll(page)).toBe(true);
   await page.screenshot({ path: 'test-results/administration/tableau-bureau.png', fullPage: true });
-  await expandMenu(page);
-  await page.getByTestId('menu-comptes').click();
+  await openPage(page, 'administration', 'comptes');
   await expect(page.getByRole('heading', { name: 'Administration · Comptes' })).toBeVisible();
-  await expect(page.getByTestId('menu-comptes')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('menu-administration')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('sous-menu-comptes')).toHaveAttribute('aria-current', 'page');
   await page.screenshot({ path: 'test-results/administration/comptes-bureau.png', fullPage: true });
   await page.getByLabel('Rechercher un compte').fill('compte introuvable 987654');
   await expect(page.getByRole('status')).toContainText('Aucun compte ne correspond');
   await page.getByLabel('Rechercher un compte').clear();
-  await expandMenu(page);
-  await page.getByTestId('menu-badges-cartes').click();
+  await openMenu(page, 'badges-cartes');
   await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible();
   await expect(page.getByTestId('admin-layout')).toHaveCount(1);
   await expandMenu(page);
@@ -40,13 +39,16 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await expect(page.getByTestId('menu-badges-cartes')).toHaveAttribute('aria-current', 'page');
   await page.goForward();
   await expect(page.getByTestId('menu-tableau')).toHaveAttribute('aria-current', 'page');
-  for (const key of ['zones', 'categories', 'groupes', 'postes', 'journal', 'donnees']) {
-    await expandMenu(page);
-    await page.getByTestId(`menu-${key}`).click();
+  for (const [menu, key] of [['activites', 'categories'], ['operations', 'groupes'], ['operations', 'postes'], ['administration', 'journal'], ['administration', 'donnees']]) {
+    await openPage(page, menu, key);
     await expect(page.getByTestId('admin-layout')).toHaveCount(1);
-    await expect(page.getByTestId(`menu-${key}`)).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId(`menu-${menu}`)).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId(`sous-menu-${key}`)).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
   }
+  await openZones(page);
+  await expect(page).toHaveURL(/\/administration\/zones$/);
+  await expect(page.getByTestId('menu-site')).toHaveAttribute('aria-current', 'page');
   // Pages sorties du menu mais toujours atteignables : liste d'invités depuis Personnes, politique de conservation depuis Données.
   await expandMenu(page);
   await page.getByTestId('menu-personnes').click();
@@ -56,7 +58,7 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await page.goto('/administration/donnees');
   await page.getByRole('link', { name: 'Consulter la politique' }).click();
   await expect(page).toHaveURL(/\/administration\/conservation$/);
-  await expect(page.getByTestId('menu-donnees')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('sous-menu-donnees')).toHaveAttribute('aria-current', 'page');
   await page.goto('/administration/badges?status=Disponible&page=2');
   await expect(page.getByTestId('menu-badges-cartes')).toHaveAttribute('aria-current', 'page');
   await page.goto('/administration/zones');
@@ -69,9 +71,8 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
     await expect(page.getByTestId('menu-tableau')).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
     await page.getByTestId('ouvrir-menu').click();
-    await expandMenu(page);
-    await page.getByTestId('menu-comptes').click();
-    await expect(page.getByTestId('menu-comptes')).toHaveAttribute('aria-current', 'page');
+    await openPage(page, 'administration', 'comptes');
+    await expect(page.getByTestId('sous-menu-comptes')).toHaveAttribute('aria-current', 'page');
     expect(await noHorizontalScroll(page)).toBe(true);
     await page.screenshot({ path: `test-results/administration/comptes-${width}.png`, fullPage: true });
     await page.getByTestId('ouvrir-menu').click();
@@ -91,12 +92,11 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await tablet.screenshot({ path: 'test-results/administration/comptes-tablette-tactile.png', fullPage: true });
   await touch.close();
   await page.setViewportSize({ width: 1448, height: 1086 });
-  await expandMenu(page);
-  await page.getByTestId('menu-securite').click();
+  await openPage(page, 'administration', 'securite');
   await expect(page.getByRole('heading', { name: 'Confirmer votre mot de passe' })).toBeVisible();
   await expect(page.getByTestId('admin-layout')).toHaveCount(1);
   await page.getByLabel('Mot de passe', { exact: true }).fill(fx.admin.password);
   await page.getByRole('button', { name: 'Confirmer', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sécuriser mon compte' })).toBeVisible();
-  await expect(page.getByTestId('menu-securite')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('sous-menu-securite')).toHaveAttribute('aria-current', 'page');
 });
