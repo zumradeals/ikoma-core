@@ -133,7 +133,7 @@ it('retire seulement les droits de la participation clôturée et laisse l’hab
     expect($profile['entitlements']['permanentes'][0]['state'])->toBe('active')->and($profile['entitlements']['activites'][0]['state'])->toBe('participation_close')
         ->and((int) prgRow($person, $name)->habilitations_actives)->toBe(1)->and($profile['access']['effective'])->toBe(1);
     // l'identité, le profil permanent et la participation restent consultables
-    expect($profile['person']['status'])->toBe('actif')->and($profile['participations'])->toHaveCount(1);
+    expect($profile['person']->status)->toBe('actif')->and($profile['participations'])->toHaveCount(1);
 });
 
 it('expire les droits à leur échéance, sans rien supprimer, et les compte parmi les droits terminés', function () {
