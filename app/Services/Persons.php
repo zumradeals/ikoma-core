@@ -83,7 +83,7 @@ final class Persons
         $person = DB::table('persons')->where('id', $personId)->first() ?? abort(404);
         $participations = DB::table('visitors as v')->join('events as e', 'e.id', '=', 'v.event_id')->join('categories as c', 'c.id', '=', 'v.category_id')
             ->where('v.person_id', $personId)->orderByDesc('e.starts_at')
-            ->get(['v.id', 'v.event_id', 'e.name as event_name', 'e.kind as event_kind', 'e.status as event_status', 'c.name as category', 'v.status', 'v.valid_from', 'v.valid_until', 'v.withdrawn_at', 'v.closed_at', 'v.closure_reason', 'v.holder_id'])->all();
+            ->get(['v.id', 'v.event_id', 'e.name as event_name', 'e.kind as event_kind', 'e.status as event_status', 'c.name as category', 'v.status', 'v.valid_from', 'v.valid_until', 'v.withdrawn_at', 'v.closed_at', 'v.closure_reason', 'v.holder_id', 'v.created_at', 'v.source'])->all();
         $assignments = DB::table('badge_assignments as a')->join('visitors as v', 'v.id', '=', 'a.visitor_id')->join('badges as b', 'b.id', '=', 'a.badge_id')->join('events as e', 'e.id', '=', 'a.event_id')
             ->where('v.person_id', $personId)->orderByDesc('a.assigned_at')
             ->get(['a.id', 'b.code as badge_code', 'b.id as badge_id', 'e.name as event_name', 'a.assigned_at', 'a.returned_at', 'a.cancelled_at', 'a.cancellation_reason'])->all();
