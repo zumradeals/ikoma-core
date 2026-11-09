@@ -345,7 +345,7 @@ it('rejoue à la soute les contrôles Entrée et Sortie faits hors ligne, avec l
     DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'soute']);
     DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->update(['value' => '12']);
     DB::table('settings')->where('key', 'poste_hors_reseau_approuve')->update(['value' => '1']);
-    expect(DB::table('devices')->where('id', $this->deviceId)->whereNotNull('enrolled_at')->whereNull('revoked_at')->exists())->toBeTrue();
+    expect(DB::table('devices')->where('id', $this->deviceId)->where('token_hash', hash('sha256', S10_TOKEN))->whereNull('revoked_at')->exists())->toBeTrue();
     s10Enter($this->visitorBadges[0], 1);
     s10Enter($this->visitorBadges[1], 2);
     $this->actingAs($this->agent);
