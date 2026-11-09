@@ -160,13 +160,11 @@ it('refuse les participations non éligibles et signale la raison', function () 
     app(Participations::class)->close($this->admin, $closed['id'], 'Fin du stage');
     $withdrawn = biParticipation($this->event);
     DB::table('visitors')->where('id', $withdrawn['id'])->update(['withdrawn_at' => now()]);
-    $unlinked = (string) Str::uuid();
-    DB::table('visitors')->insert(['id' => $unlinked, 'event_id' => $this->event['id'], 'person_id' => null, 'full_name' => 'Invité sans identité', 'category_id' => $this->event['category'], 'valid_from' => '2027-01-01 08:00:00+00',
-        'valid_until' => '2027-03-01 18:00:00+00', 'source' => 'listé', 'status' => 'attendu', 'created_at' => now(), 'updated_at' => now()]);
+    // Une participation sans personne n'existe pas en base (rattachement automatique) : la garde « identite_non_rattachee » du service reste défensive.
     $ended = biEvent();
     $inEnded = biParticipation($ended);
     DB::table('events')->where('id', $ended['id'])->update(['status' => 'clos']);
-    $cases = [[$closed['id'], 'participation_cloturee'], [$withdrawn['id'], 'invite_retire'], [$unlinked, 'identite_non_rattachee'], [$inEnded['id'], 'evenement_indisponible'], [(string) Str::uuid(), 'participation_inconnue']];
+    $cases = [[$closed['id'], 'participation_cloturee'], [$withdrawn['id'], 'invite_retire'], [$inEnded['id'], 'evenement_indisponible'], [(string) Str::uuid(), 'participation_inconnue']];
     foreach ($cases as [$id, $reason]) {
         try {
             $this->issuance->issueTemporary($id, biOp(), $this->admin);
@@ -175,7 +173,7 @@ it('refuse les participations non éligibles et signale la raison', function () 
             expect($e->reason)->toBe($reason);
         }
     }
-    expect(DB::table('badges')->whereIn('printed_for_visitor_id', [$closed['id'], $withdrawn['id'], $unlinked, $inEnded['id']])->count())->toBe(0);
+    expect(DB::table('badges')->whereIn('printed_for_visitor_id', [$closed['id'], $withdrawn['id'], $inEnded['id']])->count())->toBe(0);
 });
 
 it('refuse les opérations non autorisées côté serveur', function () {
