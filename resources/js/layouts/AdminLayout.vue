@@ -40,6 +40,7 @@ const menus: Menu[] = [
     { key: 'badges-cartes', label: 'Badges et cartes', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer', match: ['badges', 'titulaires', 'modeles', 'modeles-cartes', 'atelier', 'atelier-parcours'] },
   ] },
   { key: 'operations', label: 'Opérations', icon: 'monitor', items: [
+    { key: 'supervision', label: 'Supervision', icon: 'monitor', href: '/administration/operations', permission: 'pilotage.consulter' },
     { key: 'postes', label: 'Postes et tablettes', icon: 'monitor', href: '/administration/postes', permission: 'postes.gerer' },
     { key: 'groupes', label: 'Groupes et cars', icon: 'bus', href: '/administration/groupes', permission: 'groupes.gerer' },
   ] },

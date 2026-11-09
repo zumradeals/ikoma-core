@@ -96,6 +96,12 @@ describe('navigation d’administration', () => {
     expect(menu('tableau', ['postes.gerer']).ids).toEqual(['site', 'operations', 'administration']);
   });
 
+  it('place « Supervision » en tête du menu Opérations, seulement pour qui consulte le pilotage', () => {
+    expect(tabs(menu('postes', [...ALL, 'pilotage.consulter']).wrapper)).toEqual(['supervision', 'postes', 'groupes']);
+    expect(menu('tableau', ['pilotage.consulter']).hrefs).toContain('/administration/operations');
+    expect(tabs(menu('postes', ALL).wrapper)).not.toContain('supervision');
+  });
+
   it('n’affiche le message d’état que lorsque le serveur en a posé un', () => {
     const none = menu('site-acces', ALL).wrapper;
     expect(none.find('.admin-flash').exists()).toBe(false);
