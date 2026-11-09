@@ -166,7 +166,8 @@ it('applique côté serveur les permissions déclarées de chaque route d’admi
                 continue;
             }
             $status = $this->call($method, cvUrl($uri))->getStatusCode();
-            $expected = str_contains($uri, '{') ? [403, 404] : [403];
+            // 429 : la limitation de débit d'une route s'applique avant le refus de rôle quand la même route est appelée plusieurs fois par le test.
+            $expected = str_contains($uri, '{') ? [403, 404, 429] : [403, 429];
             if (! in_array($status, $expected, true)) {
                 $offenders[] = $role.' '.$method.' '.$uri.' => '.$status;
             }
