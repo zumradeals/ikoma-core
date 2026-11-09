@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Participations;
+use App\Services\PersonRegistry;
 use App\Services\Persons;
 use App\Services\Vehicles;
 use Illuminate\Http\JsonResponse;
@@ -16,14 +17,36 @@ use Inertia\Response;
 /** Registre des personnes : recherche, création explicite, fiche (historique), inscription à une activité et clôture d'une participation. */
 final class PersonsController
 {
-    public function __construct(private readonly Persons $persons, private readonly Participations $participations) {}
+    public function __construct(private readonly Persons $persons, private readonly Participations $participations, private readonly PersonRegistry $registry) {}
 
+    /**
+     * Registre unifié (lecture) : recherche, filtres, indicateurs et, sur demande (`personne`), la fiche en panneau.
+     * Les propriétés lourdes sont paresseuses : le panneau se recharge seul (rechargement partiel).
+     */
     public function index(Request $request): Response
     {
         Gate::authorize('listes.importer');
-        $query = (string) ($request->validate(['q' => 'nullable|string|max:160'])['q'] ?? '');
+        $filters = $request->validate([
+            'q' => 'nullable|string|max:160', 'statut' => 'nullable|in:actif,archive', 'institutionnel' => ['nullable', 'regex:/^(aucun|AILCT-0[1-8])$/'],
+            'habilitations' => 'nullable|in:avec,sans', 'personne' => 'nullable|uuid', 'page' => 'nullable|integer|min:1',
+        ]);
 
-        return Inertia::render('Admin/Personnes', ['query' => $query, 'persons' => $this->persons->search($query, 50)]);
+        $page = null;
+        $paginated = function () use (&$page, $filters) {
+            return $page ??= $this->registry->list($filters);
+        };
+
+        return Inertia::render('Admin/Personnes', [
+            'query' => (string) ($filters['q'] ?? ''),
+            'filters' => ['statut' => $filters['statut'] ?? '', 'institutionnel' => $filters['institutionnel'] ?? '', 'habilitations' => $filters['habilitations'] ?? ''],
+            'persons' => fn (): array => $paginated()->items(),
+            'meta' => fn (): array => ['current_page' => $paginated()->currentPage(), 'last_page' => $paginated()->lastPage(), 'total' => $paginated()->total(),
+                'from' => $paginated()->firstItem(), 'to' => $paginated()->lastItem()],
+            'kpis' => fn (): array => $this->registry->kpis(),
+            'institutionalOptions' => fn (): array => $this->registry->institutionalOptions(),
+            'selected' => fn (): ?array => isset($filters['personne']) ? $this->registry->profile($filters['personne']) : null,
+            'can' => ['habilitations' => $request->user()->can('zones.gerer')],
+        ]);
     }
 
     /** Recherche pour sélectionner une personne connue (inscription, saisie d'un invité). */

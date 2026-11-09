@@ -1,51 +1,278 @@
 <script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
 import AdminLayout from '../../layouts/AdminLayout.vue';
-import BaseCard from '../../components/BaseCard.vue';
-import FormButton from '../../components/FormButton.vue';
+import AdminIcon from '../../components/admin/AdminIcon.vue';
 
-type Row = { id: string; full_name: string; organisation: string | null; status: string; participations: number | string; permanent: boolean };
-const props = defineProps<{ query: string; persons: Row[] }>();
+/**
+ * Personnes et habilitations (lot P1, consultation) : registre unifié des identités et fiche en panneau.
+ * L'identité reste celle de `persons` ; le statut institutionnel, les participations et les habilitations sont présentés séparément.
+ * Aucune habilitation ne se crée ici : les actions renvoient vers les écrans existants.
+ */
+type Row = {
+  id: string; full_name: string; organisation: string | null; status: string; holder_id: string | null; identifier: string | null; holder_status: string | null;
+  institutional_category: string | null; category_label: string | null; category_color: string | null; has_photo: boolean;
+  participations_actives: number | string; participations_total: number | string; habilitations_actives: number | string;
+};
+type Right = { id: string; origin: 'permanente' | 'activite'; zone: string; event: string; kind: string | null; reason: string | null; valid_from: string; valid_until: string; state: string };
+type Participation = { id: string; event_name: string; event_kind: string; category: string; status: string | null; valid_from: string; valid_until: string; withdrawn_at: string | null; closed_at: string | null; holder_id: string | null; source?: string | null };
+type Assignment = { id: string; badge_id: string; badge_code: string; event_name: string; assigned_at: string; returned_at: string | null; cancelled_at: string | null };
+type Profile = {
+  person: { id: string; first_name: string | null; last_name: string | null; full_name: string; organisation: string | null; status: string; created_at: string; updated_at: string };
+  holder: { id: string; identifier: string; position: string | null; quality: string | null; status: string; institutional_category: string | null; category_label: string | null; engagement_starts_on: string | null; engagement_ends_on: string | null; has_photo: boolean } | null;
+  participations: Participation[]; assignments: Assignment[]; entitlements: { permanentes: Right[]; activites: Right[] };
+  access: { zones: string[]; posts: { id: string; code: string; name: string }[]; next_expiry: string | null; effective: number };
+  timeline: { at: string; label: string }[];
+};
+const props = defineProps<{
+  query: string; filters: { statut: string; institutionnel: string; habilitations: string }; persons: Row[];
+  meta: { current_page: number; last_page: number; total: number; from: number | null; to: number | null };
+  kpis: { personnes: number; habilitations_actives: number; a_echeance: number; retirees_ou_expirees: number; jours_echeance: number };
+  institutionalOptions: { code: string; label: string }[]; selected: Profile | null; can: { habilitations: boolean };
+}>();
+
 const search = ref(props.query);
+const statut = ref(props.filters.statut);
+const institutionnel = ref(props.filters.institutionnel);
+const habilitations = ref(props.filters.habilitations);
+const params = (extra: Record<string, string | number | null> = {}) => {
+  const all: Record<string, string | number | null> = { q: search.value, statut: statut.value, institutionnel: institutionnel.value, habilitations: habilitations.value, ...extra };
+  return Object.fromEntries(Object.entries(all).filter(([, v]) => v !== '' && v !== null)) as Record<string, string | number>;
+};
+function find() { router.get('/administration/personnes', params(), { preserveState: true, preserveScroll: true }); }
+function goto(page: number) { router.get('/administration/personnes', params({ page }), { preserveState: true, preserveScroll: true }); }
+function open(row: Row) { creating.value = false; ptab.value = 'identite'; router.get('/administration/personnes', params({ personne: row.id, page: props.meta.current_page }), { only: ['selected'], preserveState: true, preserveScroll: true, replace: true }); }
+function closePanel() { router.get('/administration/personnes', params({ page: props.meta.current_page }), { only: ['selected'], preserveState: true, preserveScroll: true, replace: true }); }
+
+// Fiche : tiroir sur écran étroit, panneau fixe sur grand écran.
+const wide = ref(false);
+let media: MediaQueryList | null = null;
+const onMedia = () => { wide.value = media?.matches ?? false; };
+onMounted(() => { if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') { media = window.matchMedia('(min-width: 1360px)'); onMedia(); media.addEventListener?.('change', onMedia); } });
+onBeforeUnmount(() => media?.removeEventListener?.('change', onMedia));
+const panel = ref<HTMLElement | null>(null);
+
+const TABS = [
+  { key: 'identite', label: 'Identité', icon: 'users' }, { key: 'habilitations', label: 'Habilitations', icon: 'shield' }, { key: 'badges', label: 'Badges', icon: 'qr' },
+  { key: 'activites', label: 'Activités', icon: 'calendar' }, { key: 'historique', label: 'Historique', icon: 'clock' },
+] as const;
+type TabKey = typeof TABS[number]['key'];
+const ptab = ref<TabKey>('identite');
+function onTabKey(event: KeyboardEvent) {
+  const index = TABS.findIndex(t => t.key === ptab.value);
+  const next = event.key === 'ArrowRight' ? index + 1 : event.key === 'ArrowLeft' ? index - 1 : null;
+  if (next === null) return;
+  event.preventDefault();
+  ptab.value = TABS[(next + TABS.length) % TABS.length].key;
+  nextTick(() => (panel.value?.querySelector('[role="tab"][aria-selected="true"]') as HTMLElement | null)?.focus());
+}
+
+const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('fr-FR') : '—');
+const dateTime = (iso: string) => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');
+const n = (value: number | string) => Number(value);
+const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite', permanent: 'Contexte permanent' };
+const stateLabel: Record<string, string> = {
+  active: 'Active', suspendue: 'Suspendue', retiree: 'Retirée', expiree: 'Expirée', a_venir: 'À venir', participation_close: 'Participation clôturée', activite_close: 'Activité terminée', profil_clos: 'Profil clos',
+};
+const stateClass = (s: string) => (s === 'active' ? 'bg-green-100 text-green-900' : s === 'suspendue' || s === 'a_venir' ? 'bg-amber-100 text-amber-900' : 'bg-slate-200 text-slate-700');
+const participationState = (p: Participation) => (p.closed_at ? 'Clôturée' : p.withdrawn_at ? 'Retirée' : ({ attendu: 'Attendue', present: 'Présente', sorti: 'Sortie', refuse: 'Accès refusé' } as Record<string, string>)[p.status ?? 'attendu'] ?? 'En cours');
+const assignmentState = (a: Assignment) => (a.cancelled_at ? 'Annulé' : a.returned_at ? 'Restitué le ' + day(a.returned_at) : 'En cours');
+
+const creating = ref(false);
 const form = useForm({ first_name: '', last_name: '', full_name: '', organisation: '', homonym_confirmed: false });
 const needsConfirmation = () => Object.values(form.errors).some(message => String(message).includes('de même nom'));
-function find() { router.get('/administration/personnes', { q: search.value }, { preserveState: true }); }
 function create() { form.post('/administration/personnes', { onSuccess: () => form.reset() }); }
+const drawerOpen = computed(() => creating.value || (props.selected !== null && !wide.value));
+function closeAll() { creating.value = false; if (props.selected) closePanel(); }
 </script>
+
 <template>
-<AdminLayout active="personnes">
-<h1 class="mb-4 text-display font-bold">Administration · Personnes</h1>
-<p class="mb-6">Une personne a une identité unique, réutilisée d’une activité à l’autre. Deux personnes ne sont jamais fusionnées automatiquement sur le seul nom.</p>
-<p class="mb-6"><Link href="/administration/imports" class="font-semibold underline" data-testid="importer-liste">Importer une liste d’invités (fichier CSV ou Excel)</Link> · <Link href="/administration/invites" class="font-semibold underline" data-testid="fiches-invites">Fiches des invités d’une activité</Link></p>
-<div class="space-y-6">
-<BaseCard>
-<h2 class="mb-4 text-heading font-bold">Rechercher une personne</h2>
-<form class="flex flex-wrap items-end gap-3" role="search" aria-label="Rechercher une personne" @submit.prevent="find">
-<label class="block grow">Nom, prénom ou organisation<input v-model="search" class="field" maxlength="160" data-testid="recherche-personne"></label>
-<FormButton>Rechercher</FormButton>
-</form>
-<ul v-if="persons.length" class="mt-5 space-y-3" data-testid="liste-personnes">
-<li v-for="person in persons" :key="person.id" class="rounded-xl border border-slate-200 p-4">
-<Link :href="'/administration/personnes/' + person.id" class="font-bold" :data-testid="'ouvrir-personne-' + person.id">{{ person.full_name }}</Link>
-<p class="text-sm text-slate-600"><template v-if="person.organisation">{{ person.organisation }} · </template>{{ Number(person.participations) }} participation{{ Number(person.participations) > 1 ? 's' : '' }}<template v-if="person.permanent"> · Personnel permanent</template><template v-if="person.status === 'archive'"> · Archivée</template></p>
-</li>
-</ul>
-<p v-else class="mt-5" data-testid="aucune-personne">Aucune personne ne correspond.</p>
-</BaseCard>
-<BaseCard>
-<h2 class="mb-4 text-heading font-bold">Enregistrer une nouvelle personne</h2>
-<p class="mb-4 text-sm text-slate-600">Vérifiez d’abord la recherche ci-dessus : si la personne existe, ouvrez sa fiche et inscrivez-la à l’activité, sans créer de doublon.</p>
-<form class="space-y-4" aria-label="Enregistrer une personne" data-testid="form-personne" @submit.prevent="create">
-<label class="block">Prénom<input v-model="form.first_name" class="field" maxlength="100"></label>
-<label class="block">Nom<input v-model="form.last_name" class="field" maxlength="100"></label>
-<label class="block">Ou nom complet seul<input v-model="form.full_name" class="field" maxlength="160"></label>
-<label class="block">Organisation (facultatif)<input v-model="form.organisation" class="field" maxlength="160"></label>
-<label v-if="needsConfirmation()" class="flex min-h-14 items-center gap-3" data-testid="confirmer-homonyme"><input v-model="form.homonym_confirmed" type="checkbox" class="h-6 w-6">Je confirme qu’il s’agit d’une autre personne que celles de même nom</label>
-<p v-for="error in form.errors" :key="error" role="alert">{{ error }}</p>
-<FormButton :busy="form.processing">Enregistrer la personne</FormButton>
-</form>
-</BaseCard>
-</div>
-</AdminLayout>
+  <AdminLayout active="personnes">
+    <div class="flex max-w-[1500px] flex-col gap-5" data-testid="page-personnes">
+      <header class="flex flex-wrap items-start justify-between gap-3">
+        <div class="flex min-w-0 flex-1 basis-96 items-start gap-3">
+          <span class="mt-1 text-blue-700" aria-hidden="true"><AdminIcon name="users" :size="34" /></span>
+          <div>
+            <h1 class="text-display font-bold" data-testid="titre-personnes">Personnes et habilitations</h1>
+            <p class="max-w-2xl text-slate-700">Registre des personnes, de leur statut institutionnel, de leurs participations et de leurs habilitations d’accès. Une personne a une identité unique ; deux personnes ne sont jamais fusionnées sur le seul nom.</p>
+            <p class="mt-1 text-sm"><Link href="/administration/invites" class="font-semibold underline" data-testid="fiches-invites">Fiches d’invités</Link></p>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <Link href="/administration/imports" class="site-btn site-btn-outline" data-testid="importer-liste"><AdminIcon name="arrow" :size="18" />Importer (CSV)</Link>
+          <button type="button" class="site-btn site-btn-accent" :aria-expanded="creating" data-testid="ajouter-personne" @click="creating = !creating"><AdminIcon name="plus" :size="18" />Ajouter une personne</button>
+        </div>
+      </header>
+
+      <dl class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="indicateurs-personnes">
+        <div class="site-kpi bg-sky-50"><span class="site-kpi-icon text-sky-700"><AdminIcon name="users" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-personnes">{{ kpis.personnes }}</dd><dt class="font-semibold text-slate-800">Personnes enregistrées</dt></div></div>
+        <div class="site-kpi bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="shield" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-actives">{{ kpis.habilitations_actives }}</dd><dt class="font-semibold text-slate-800">Habilitations actives</dt></div></div>
+        <div class="site-kpi bg-amber-50"><span class="site-kpi-icon text-amber-700"><AdminIcon name="calendar" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-echeance">{{ kpis.a_echeance }}</dd><dt class="font-semibold text-slate-800">À échéance (≤ {{ kpis.jours_echeance }} j)</dt></div></div>
+        <div class="site-kpi bg-rose-50"><span class="site-kpi-icon text-rose-700"><AdminIcon name="alert" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-terminees">{{ kpis.retirees_ou_expirees }}</dd><dt class="font-semibold text-slate-800">Retirées ou expirées</dt></div></div>
+      </dl>
+
+      <div class="pers-grid">
+        <!-- Registre -->
+        <section class="site-card" aria-labelledby="registre-titre" data-testid="registre-personnes">
+          <header class="site-card-head"><h2 id="registre-titre"><AdminIcon name="list" :size="22" />Registre des personnes ({{ meta.total }})</h2></header>
+          <form class="space-y-3 px-4 pb-4" role="search" aria-label="Rechercher une personne" @submit.prevent="find">
+            <label class="block"><span class="sr-only">Rechercher</span><input v-model="search" class="field !mt-0" maxlength="160" placeholder="Rechercher (nom, organisation, identifiant)" data-testid="recherche-personne"></label>
+            <div class="pers-filters">
+              <label class="block"><span class="sr-only">Statut institutionnel</span>
+                <select v-model="institutionnel" class="field !mt-0" data-testid="filtre-institutionnel" @change="find"><option value="">Tous statuts institutionnels</option><option value="aucun">Sans statut institutionnel</option><option v-for="c in institutionalOptions" :key="c.code" :value="c.code">{{ c.label }}</option></select></label>
+              <label class="block"><span class="sr-only">Habilitations</span>
+                <select v-model="habilitations" class="field !mt-0" data-testid="filtre-habilitations" @change="find"><option value="">Avec ou sans habilitation</option><option value="avec">Avec habilitation active</option><option value="sans">Sans habilitation active</option></select></label>
+              <label class="block"><span class="sr-only">Statut de la personne</span>
+                <select v-model="statut" class="field !mt-0" data-testid="filtre-statut" @change="find"><option value="">Tous statuts</option><option value="actif">Actives</option><option value="archive">Archivées</option></select></label>
+            </div>
+            <button type="submit" class="site-btn site-btn-blue" data-testid="lancer-recherche">Rechercher</button>
+          </form>
+          <p v-if="!persons.length" class="px-4 pb-4" data-testid="aucune-personne">Aucune personne ne correspond.</p>
+          <ul v-else class="site-table" data-testid="liste-personnes">
+            <li class="site-row site-row-head pers-row" aria-hidden="true"><span>Personne</span><span>Statut institutionnel</span><span>Rattachements</span></li>
+            <li v-for="row in persons" :key="row.id" class="site-row pers-row" :class="selected?.person.id === row.id ? 'bg-blue-50' : ''" :data-testid="'personne-' + row.id">
+              <button type="button" class="pers-name" :aria-expanded="selected?.person.id === row.id" :aria-label="'Consulter la fiche de ' + row.full_name" :data-testid="'selectionner-personne-' + row.id" @click="open(row)">
+                <span class="pers-avatar" aria-hidden="true"><img v-if="row.has_photo && row.holder_id" :src="'/administration/titulaires/' + row.holder_id + '/portrait'" alt="" loading="lazy"><template v-else>{{ initials(row.full_name) }}</template></span>
+                <span class="min-w-0 text-left"><strong class="block">{{ row.full_name }}</strong><small class="block text-slate-600">{{ row.identifier ?? row.organisation ?? '—' }}</small></span>
+              </button>
+              <span class="text-sm" :data-testid="'institutionnel-' + row.id"><span v-if="row.category_label" class="rounded-full border px-2 py-0.5 text-xs font-semibold" :style="row.category_color ? { borderColor: row.category_color } : {}">{{ row.category_label }}</span><span v-else class="text-slate-500">—</span></span>
+              <span class="text-sm"><span :data-testid="'synthese-' + row.id" class="block">{{ n(row.participations_actives) }} participation<template v-if="n(row.participations_actives) > 1">s</template> · {{ n(row.habilitations_actives) }} habilitation<template v-if="n(row.habilitations_actives) > 1">s</template></span>
+                <span class="inline-flex items-center gap-1.5 font-semibold" :class="row.status === 'actif' ? 'text-green-800' : 'text-slate-600'"><span class="h-2.5 w-2.5 rounded-full" :class="row.status === 'actif' ? 'bg-green-600' : 'bg-slate-400'" aria-hidden="true" />{{ row.status === 'actif' ? 'Actif' : 'Archivée' }}</span></span>
+            </li>
+          </ul>
+          <nav v-if="meta.last_page > 1" class="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm" aria-label="Pagination du registre" data-testid="pagination">
+            <span>{{ meta.from }} – {{ meta.to }} sur {{ meta.total }}</span>
+            <span class="flex gap-2">
+              <button type="button" class="site-btn site-btn-outline !min-h-11" :disabled="meta.current_page <= 1" data-testid="page-precedente" @click="goto(meta.current_page - 1)">Précédent</button>
+              <button type="button" class="site-btn site-btn-outline !min-h-11" :disabled="meta.current_page >= meta.last_page" data-testid="page-suivante" @click="goto(meta.current_page + 1)">Suivant</button>
+            </span>
+          </nav>
+        </section>
+
+        <p v-if="!selected && !creating" class="pers-placeholder site-card p-6 text-slate-600" data-testid="fiche-vide">Sélectionnez une personne pour consulter sa fiche : identité, habilitations, badges, activités et historique.</p>
+
+        <button v-if="drawerOpen" type="button" class="pers-backdrop" aria-label="Fermer le panneau" tabindex="-1" data-testid="fond-panneau" @click="closeAll" />
+
+        <!-- Création : la recherche précède toute création -->
+        <aside v-if="creating" class="pers-fiche" role="dialog" aria-modal="true" aria-label="Ajouter une personne" data-testid="panneau-creation-personne" @keydown.esc="closeAll">
+          <div class="flex items-start justify-between gap-3"><h2 class="text-heading font-bold">Ajouter une personne</h2><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" data-testid="fermer-creation" @click="creating = false">Fermer</button></div>
+          <p class="text-sm text-slate-700">Vérifiez d’abord la recherche : si la personne existe, ouvrez sa fiche plutôt que d’en créer une seconde. Aucun rapprochement automatique n’est fait sur le nom.</p>
+          <form class="space-y-4" aria-label="Enregistrer une personne" data-testid="form-personne" @submit.prevent="create">
+            <label class="block">Prénom<input v-model="form.first_name" class="field" maxlength="100"></label>
+            <label class="block">Nom<input v-model="form.last_name" class="field" maxlength="100"></label>
+            <label class="block">Ou nom complet seul<input v-model="form.full_name" class="field" maxlength="160"></label>
+            <label class="block">Organisation (facultatif)<input v-model="form.organisation" class="field" maxlength="160"></label>
+            <label v-if="needsConfirmation()" class="flex min-h-14 items-center gap-3" data-testid="confirmer-homonyme"><input v-model="form.homonym_confirmed" type="checkbox" class="h-6 w-6">Je confirme qu’il s’agit d’une autre personne que celle déjà enregistrée.</label>
+            <p v-for="error in form.errors" :key="error" role="alert">{{ error }}</p>
+            <button type="submit" class="btn-main" :disabled="form.processing">Enregistrer la personne</button>
+          </form>
+        </aside>
+
+        <!-- Fiche individuelle -->
+        <aside v-else-if="selected" ref="panel" class="pers-fiche" :role="wide ? 'region' : 'dialog'" :aria-modal="wide ? undefined : 'true'" :aria-label="'Fiche de ' + selected.person.full_name" data-testid="fiche-personne" @keydown.esc="closeAll">
+          <div class="flex items-start gap-4">
+            <span class="pers-avatar pers-avatar-lg" aria-hidden="true"><img v-if="selected.holder?.has_photo" :src="'/administration/titulaires/' + selected.holder.id + '/portrait'" alt="" loading="lazy"><template v-else>{{ initials(selected.person.full_name) }}</template></span>
+            <div class="min-w-0 grow space-y-1">
+              <h2 class="text-heading font-bold" data-testid="nom-personne">{{ selected.person.full_name }}
+                <span class="ml-1 rounded-full px-2 py-0.5 align-middle text-xs font-bold" :class="selected.person.status === 'actif' ? 'bg-green-100 text-green-900' : 'bg-slate-200 text-slate-700'">{{ selected.person.status === 'actif' ? 'Actif' : 'Archivée' }}</span></h2>
+              <p v-if="selected.holder" class="text-sm"><span class="text-slate-600">Identifiant :</span> <strong data-testid="fiche-identifiant">{{ selected.holder.identifier }}</strong></p>
+              <p v-if="selected.holder?.category_label" class="text-sm"><span class="text-slate-600">Statut institutionnel :</span> <strong data-testid="fiche-institutionnel">{{ selected.holder.category_label }}</strong></p>
+              <p v-if="selected.holder?.position" class="text-sm"><span class="text-slate-600">Fonction :</span> {{ selected.holder.position }}</p>
+              <p v-if="selected.person.organisation" class="text-sm"><span class="text-slate-600">Organisation :</span> {{ selected.person.organisation }}</p>
+            </div>
+            <div class="flex shrink-0 flex-col items-end gap-2">
+              <button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" data-testid="fermer-fiche" @click="closeAll">Fermer</button>
+              <Link :href="'/administration/personnes/' + selected.person.id" class="text-sm font-semibold text-blue-800 underline" :data-testid="'ouvrir-personne-' + selected.person.id">Fiche complète</Link>
+            </div>
+          </div>
+          <p class="text-sm text-slate-600">Enregistrée le {{ day(selected.person.created_at) }} · mise à jour le {{ day(selected.person.updated_at) }}<template v-if="selected.holder?.engagement_ends_on"> · fin d’engagement le {{ day(selected.holder.engagement_ends_on) }}</template></p>
+
+          <div role="tablist" aria-label="Sections de la fiche" class="site-tabs" @keydown="onTabKey">
+            <button v-for="t in TABS" :id="'ptab-' + t.key" :key="t.key" type="button" role="tab" class="site-tab pers-tab" :aria-selected="ptab === t.key" :aria-controls="'ppanneau-' + t.key" :tabindex="ptab === t.key ? 0 : -1" :data-testid="'ptab-' + t.key" @click="ptab = t.key"><AdminIcon :name="t.icon" :size="18" class="pers-tab-icon" /><span>{{ t.label }}</span></button>
+          </div>
+
+          <div v-if="ptab === 'identite'" id="ppanneau-identite" role="tabpanel" aria-labelledby="ptab-identite" class="space-y-4" data-testid="onglet-identite">
+            <dl class="site-info">
+              <div><dt>Prénom</dt><dd>{{ selected.person.first_name ?? '—' }}</dd></div>
+              <div><dt>Nom</dt><dd>{{ selected.person.last_name ?? '—' }}</dd></div>
+              <div><dt>Nom complet</dt><dd>{{ selected.person.full_name }}</dd></div>
+              <div><dt>Organisation</dt><dd>{{ selected.person.organisation ?? '—' }}</dd></div>
+            </dl>
+            <h3 class="font-bold">Profil permanent</h3>
+            <p v-if="!selected.holder" data-testid="sans-profil-permanent">Cette personne n’a pas de profil permanent. Son statut institutionnel n’est donc pas renseigné.</p>
+            <dl v-else class="site-info" data-testid="profil-permanent">
+              <div><dt>Identifiant</dt><dd>{{ selected.holder.identifier }}</dd></div>
+              <div><dt>Statut institutionnel</dt><dd>{{ selected.holder.category_label ?? 'Non renseigné' }}</dd></div>
+              <div><dt>Fonction</dt><dd>{{ selected.holder.position ?? '—' }}</dd></div>
+              <div><dt>Qualité</dt><dd>{{ selected.holder.quality ?? '—' }}</dd></div>
+              <div><dt>Engagement</dt><dd>{{ day(selected.holder.engagement_starts_on) }} → {{ day(selected.holder.engagement_ends_on) }}</dd></div>
+              <div><dt>Profil</dt><dd>{{ selected.holder.status === 'actif' ? 'Actif' : 'Clos' }}</dd></div>
+            </dl>
+          </div>
+
+          <div v-else-if="ptab === 'habilitations'" id="ppanneau-habilitations" role="tabpanel" aria-labelledby="ptab-habilitations" class="space-y-4" data-testid="onglet-habilitations">
+            <section aria-labelledby="hab-perm" data-testid="habilitations-permanentes">
+              <h3 id="hab-perm" class="font-bold">Habilitations permanentes ({{ selected.entitlements.permanentes.length }})</h3>
+              <p v-if="!selected.entitlements.permanentes.length" class="text-sm text-slate-600">Aucune habilitation permanente.</p>
+              <ul v-else class="divide-y">
+                <li v-for="r in selected.entitlements.permanentes" :key="r.id" class="flex flex-wrap items-center justify-between gap-2 py-2" :data-testid="'habilitation-' + r.id">
+                  <span class="min-w-0"><strong>{{ r.zone }}</strong><span class="block text-sm text-slate-600">Origine : permanente · {{ r.event }} · {{ day(r.valid_from) }} → {{ day(r.valid_until) }}</span></span>
+                  <span class="rounded-md px-2 py-0.5 text-xs font-bold" :class="stateClass(r.state)">{{ stateLabel[r.state] ?? r.state }}</span>
+                </li>
+              </ul>
+            </section>
+            <section aria-labelledby="hab-act" data-testid="habilitations-activites">
+              <h3 id="hab-act" class="font-bold">Habilitations liées aux activités ({{ selected.entitlements.activites.length }})</h3>
+              <p v-if="!selected.entitlements.activites.length" class="text-sm text-slate-600">Aucune habilitation liée à une activité.</p>
+              <ul v-else class="divide-y">
+                <li v-for="r in selected.entitlements.activites" :key="r.id" class="flex flex-wrap items-center justify-between gap-2 py-2" :data-testid="'habilitation-' + r.id">
+                  <span class="min-w-0"><strong>{{ r.zone }}</strong><span class="block text-sm text-slate-600">Origine : activité « {{ r.event }} » · {{ r.kind === 'exceptionnelle' ? 'exceptionnelle' : 'standard' }} · {{ day(r.valid_from) }} → {{ day(r.valid_until) }}</span></span>
+                  <span class="rounded-md px-2 py-0.5 text-xs font-bold" :class="stateClass(r.state)">{{ stateLabel[r.state] ?? r.state }}</span>
+                </li>
+              </ul>
+            </section>
+            <section class="rounded-xl border bg-slate-50 p-4" aria-labelledby="resume-acces" data-testid="resume-acces">
+              <h3 id="resume-acces" class="font-bold">Résumé des accès</h3>
+              <p v-if="!selected.access.effective" class="text-sm text-slate-600">Aucun accès effectif aujourd’hui.</p>
+              <dl v-else class="mt-2 space-y-1 text-sm">
+                <div><dt class="inline font-semibold">Zones autorisées : </dt><dd class="inline" data-testid="resume-zones-personne">{{ selected.access.zones.join(' ; ') }}</dd></div>
+                <div><dt class="inline font-semibold">Postes concernés : </dt><dd class="inline" data-testid="resume-postes-personne">{{ selected.access.posts.length ? selected.access.posts.map(p => p.name).join(', ') : 'aucun poste associé à ces zones' }}</dd></div>
+                <div><dt class="inline font-semibold">Prochaine échéance : </dt><dd class="inline">{{ day(selected.access.next_expiry) }}</dd></div>
+              </dl>
+            </section>
+            <p v-if="can.habilitations" class="flex flex-wrap gap-3 text-sm">
+              <Link href="/administration/habilitations" class="site-btn site-btn-outline !min-h-11" data-testid="gerer-permanentes">Gérer les habilitations permanentes</Link>
+              <Link href="/administration/acces" class="site-btn site-btn-outline !min-h-11" data-testid="gerer-participants">Habilitations des participants</Link>
+            </p>
+          </div>
+
+          <div v-else-if="ptab === 'badges'" id="ppanneau-badges" role="tabpanel" aria-labelledby="ptab-badges" class="space-y-3" data-testid="onglet-badges">
+            <p class="text-sm text-slate-600">Le badge est un support physique d’identification, pas une habilitation. Son cycle de vie se gère dans « Badges et cartes ».</p>
+            <ul v-if="selected.assignments.length" class="space-y-2" data-testid="liste-attributions">
+              <li v-for="a in selected.assignments" :key="a.id" class="rounded-xl border p-3"><Link :href="'/administration/badges/' + a.badge_id" class="font-bold">{{ a.badge_code }}</Link> · {{ a.event_name }} · {{ assignmentState(a) }}</li>
+            </ul>
+            <p v-else data-testid="aucun-badge">Aucun badge n’a été attribué à cette personne.</p>
+          </div>
+
+          <div v-else-if="ptab === 'activites'" id="ppanneau-activites" role="tabpanel" aria-labelledby="ptab-activites" class="space-y-3" data-testid="onglet-activites">
+            <p class="text-sm text-slate-600">Participations en consultation. La catégorie d’une participation est propre à son activité ; elle ne désigne pas un statut institutionnel.</p>
+            <ul v-if="selected.participations.length" class="space-y-2" data-testid="liste-participations">
+              <li v-for="p in selected.participations" :key="p.id" class="rounded-xl border p-3" :data-testid="'participation-' + p.id">
+                <p class="font-bold">{{ p.event_name }} <span class="text-sm font-normal text-slate-600">({{ kinds[p.event_kind] ?? p.event_kind }})</span></p>
+                <p class="text-sm text-slate-600">Catégorie de l’activité : {{ p.category }} · {{ day(p.valid_from) }} → {{ day(p.valid_until) }} · {{ participationState(p) }}</p>
+              </li>
+            </ul>
+            <p v-else data-testid="aucune-participation">Cette personne ne participe à aucune activité.</p>
+          </div>
+
+          <div v-else id="ppanneau-historique" role="tabpanel" aria-labelledby="ptab-historique" class="space-y-2" data-testid="onglet-historique">
+            <ul class="divide-y">
+              <li v-for="(e, i) in selected.timeline" :key="i" class="flex flex-wrap items-baseline justify-between gap-2 py-2 text-sm"><span>{{ e.label }}</span><time class="text-slate-600" :datetime="e.at">{{ dateTime(e.at) }}</time></li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </AdminLayout>
 </template>
