@@ -56,7 +56,7 @@ final class AtelierCartesController
         // Impression par le contrat UNIQUE (SupportPrinting) : mêmes règles, même rendu, même traçage que pour les badges temporaires.
         $badgeIds = DB::table('holder_cards')->whereIn('holder_id', $ids)->where('status', 'active')->pluck('badge_id', 'holder_id');
         abort_if($badgeIds->count() !== count($ids), 404);
-        $result = [app(SupportPrinting::class)->print($user, array_values(array_map(fn (string $h): string => (string) $badgeIds[$h], $ids)), $data['reason'] ?? null)['views']];
+        $result = [app(SupportPrinting::class)->print($user, array_map(fn (string $h): string => (string) $badgeIds[$h], $ids), $data['reason'] ?? null)['views']];
         $nonce = base64_encode(random_bytes(16));
         $request->attributes->set('csp_style_nonce', $nonce);
 

@@ -19,7 +19,7 @@ final class SupportPrintController
         /** @var array{badges: list<string>, reason?: ?string} $data */
         $data = $request->validate(['badges' => 'required|array|min:1|max:'.SupportPrinting::MAX_PER_CALL, 'badges.*' => 'required|uuid|distinct', 'reason' => 'nullable|string|max:200']);
 
-        return ['badges' => array_values($data['badges']), 'reason' => $data['reason'] ?? null];
+        return ['badges' => $data['badges'], 'reason' => $data['reason'] ?? null];
     }
 
     private function user(Request $request): User

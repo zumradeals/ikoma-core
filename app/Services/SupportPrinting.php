@@ -124,7 +124,10 @@ final class SupportPrinting
         return $views;
     }
 
-    /** @param array<string, mixed> $d */
+    /**
+     * @param  array<string, mixed>  $d
+     * @return array<string, mixed>
+     */
     private function view(array $d): array
     {
         return $d['support_type'] === BadgeIssuance::CARD ? $this->cards->cardData((string) $d['holder_id']) : $this->cards->temporaryData((string) $d['badge_id']);
