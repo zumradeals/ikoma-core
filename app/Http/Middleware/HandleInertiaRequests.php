@@ -18,7 +18,7 @@ class HandleInertiaRequests extends Middleware
     {
         return [...parent::share($request), 'flash' => ['status' => $request->session()->get('status')], 'institution' => fn () => app(Institution::class)->shared(), 'demoLabAvailable' => DemoLab::available(), 'f06Active' => fn () => app(FoundingModules::class)->f06Active(), 'auth' => ! in_array($request->path(), ['/', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'], true) && $request->user() ? ['id' => $request->user()->id, 'name' => $request->user()->name, 'isAdmin' => $request->user()->hasRole('administrateur'), 'permissions' => $request->user()->getAllPermissions()->pluck('name')] : null, 'adminContext' => fn () => $request->user()?->hasRole('administrateur') && ($request->is('administration', 'administration/*', 'securite', 'user/confirm-password'))
             ? $this->adminContext($request) : null,
-            'badgesCartes' => fn () => $this->badgesCartes($request)];
+            ...($this->inBadgesCartes($request) ? ['badgesCartes' => fn () => $this->badgesCartes($request)] : [])];
     }
 
     /**
@@ -28,11 +28,13 @@ class HandleInertiaRequests extends Middleware
      */
     private function badgesCartes(Request $request): ?array
     {
-        if (! $request->isMethod('GET') || ! $request->is('administration/badges', 'administration/badges/*', 'administration/titulaires', 'administration/titulaires/*', 'administration/atelier', 'administration/modeles') || $request->user()?->can('badges.gerer') !== true) {
-            return null;
-        }
+        return $request->user()?->can('badges.gerer') === true ? app(BadgesCartesSummary::class)->get() : null;
+    }
 
-        return app(BadgesCartesSummary::class)->get();
+    /** Pages de l'espace « Badges et cartes » : la propriété n'existe que là (aucun ajout aux pages publiques). */
+    private function inBadgesCartes(Request $request): bool
+    {
+        return $request->isMethod('GET') && $request->is('administration/badges', 'administration/badges/*', 'administration/titulaires', 'administration/titulaires/*', 'administration/atelier', 'administration/modeles');
     }
 
     /**

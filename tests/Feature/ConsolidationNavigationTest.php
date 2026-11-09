@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Services\BadgesCartesSummary;
+use App\Services\InstitutionalCategories;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
@@ -218,7 +219,7 @@ it('laisse l’administrateur atteindre chaque page de consultation de ces domai
 it('garde les anciens liens et leurs paramètres : Atelier, étiquettes, anciens modèles', function () {
     $this->actingAs(cnUser('administrateur'));
     $this->get('/administration/atelier?mode=cartes&format=a4&from=1&to=5&cols=2&rows=3')->assertOk()
-        ->assertInertia(fn ($page) => $page->component('Admin/Atelier')->where('initial.format', 'a4')->where('initial.from', 1)->where('initial.to', 5)->where('initial.cols', 2)->where('initial.rows', 3));
+        ->assertInertia(fn ($page) => $page->component('Admin/Atelier')->where('initial.format', 'a4')->where('initial.from', fn ($v) => (int) $v === 1)->where('initial.to', fn ($v) => (int) $v === 5)->where('initial.cols', fn ($v) => (int) $v === 2)->where('initial.rows', fn ($v) => (int) $v === 3));
     $this->get('/administration/badges/modeles?format=a4')->assertRedirect('/administration/atelier?format=a4');
     $this->get('/administration/badges/modeles')->assertRedirect('/administration/atelier');
     expect((string) $this->get('/administration/badges/etiquettes?batch='.DemoSeeder::id('batch'))->headers->get('Location'))->toContain('/administration/atelier?')->toContain('format=etiquettes');
@@ -236,7 +237,9 @@ it('conserve les contrats des documents imprimés : demande et confirmation de t
 });
 
 it('sert la page Modèles avec le modèle de badge de chaque activité et le modèle de carte choisi, sans droit nouveau', function () {
-    $this->actingAs(cnUser('administrateur'));
+    $admin = cnUser('administrateur');
+    app(InstitutionalCategories::class)->initialize($admin);
+    $this->actingAs($admin);
     $this->get('/administration/modeles')->assertOk()
         ->assertInertia(fn ($page) => $page->component('Admin/Modeles')->where('section', 'badges')->has('events')->has('preferences')->has('cards.categories', 8)->where('cards.canConfigure', true));
     $this->get('/administration/modeles?section=cartes&categorie=AILCT-02')->assertOk()
@@ -252,7 +255,7 @@ it('fournit les compteurs du cadre seulement sur les pages de l’espace Badges 
     foreach (['/administration/badges', '/administration/titulaires', '/administration/atelier', '/administration/modeles'] as $url) {
         $this->get($url)->assertOk()->assertInertia(fn ($page) => $page->has('badgesCartes.visitors.available')->has('badgesCartes.visitors.to_return')->has('badgesCartes.cards.active')->has('badgesCartes.cards.holders'));
     }
-    $this->get('/administration/postes')->assertOk()->assertInertia(fn ($page) => $page->where('badgesCartes', null));
+    $this->get('/administration/postes')->assertOk()->assertInertia(fn ($page) => $page->missing('badgesCartes'));
 });
 
 it('compte les badges disponibles et les badges à restituer d’après les tables existantes', function () {
