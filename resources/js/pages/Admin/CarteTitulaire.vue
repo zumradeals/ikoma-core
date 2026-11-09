@@ -52,7 +52,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
     <BadgesCartesShell active="cartes" />
     <div class="space-y-6" data-testid="page-carte-titulaire">
       <header class="space-y-3">
-        <Link href="/administration/titulaires" class="font-semibold underline" data-testid="retour-titulaires">← Registre des personnes</Link>
+        <Link href="/administration/titulaires" class="font-semibold underline" data-testid="retour-titulaires">← Personnel permanent et cartes</Link>
         <h1 class="text-display font-bold">Carte de {{ holder.full_name }}</h1>
         <p class="font-mono text-lg font-bold" data-testid="identifiant-carte">{{ holder.identifier }}</p>
         <ol class="flex flex-wrap gap-2" aria-label="Étapes">
@@ -69,7 +69,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
           <h2 class="text-heading font-bold">Préparation</h2>
           <ul class="list-disc space-y-1 pl-6" data-testid="preparation">
             <li :data-ok="category !== null">Catégorie institutionnelle : <strong>{{ category ? category.code + ' · ' + category.label : 'à choisir dans la fiche du titulaire' }}</strong></li>
-            <li :data-ok="permanentContext">Registre des cartes : <strong>{{ permanentContext ? 'prêt' : 'à créer depuis la page Registre des personnes' }}</strong></li>
+            <li :data-ok="permanentContext">Registre des cartes : <strong>{{ permanentContext ? 'prêt' : 'à créer depuis la page Personnel permanent et cartes' }}</strong></li>
             <li :data-ok="holder.has_photo">Photo : <strong>{{ holder.has_photo ? (holder.photo_print_allowed ? 'présente, imprimée sur la carte' : 'présente, non imprimée') : 'obligatoire pour préparer la carte' }}</strong></li>
           </ul>
           <form class="space-y-3 border-t pt-3" @submit.prevent="sendPortrait">

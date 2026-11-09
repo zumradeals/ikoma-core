@@ -112,8 +112,8 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
     <BadgesCartesShell active="cartes" />
     <div class="space-y-6" data-testid="page-titulaires">
       <header class="col-span-full space-y-2">
-        <h1 class="text-display font-bold">Registre des personnes</h1>
-        <p>Les personnes de l’institution (personnel, partenaires, stagiaires…), enregistrées une seule fois. Chacune reçoit un numéro stable, jamais réattribué. <strong>Enregistrer une personne ne crée aucune carte et ne donne aucun accès</strong> : la carte se prépare à part, depuis la fiche.</p>
+        <h1 class="text-display font-bold">Personnel permanent et cartes</h1>
+        <p>Vue spécialisée du personnel permanent : numéros, cartes, import et classement par lot. L’identité d’une personne se consulte et se corrige dans le <Link href="/administration/personnes" class="font-semibold underline" data-testid="ouvrir-registre-unifie">registre unifié « Personnes et habilitations »</Link>, sans second registre. Les personnes de l’institution (personnel, partenaires, stagiaires…) sont enregistrées une seule fois. Chacune reçoit un numéro stable, jamais réattribué. <strong>Enregistrer une personne ne crée aucune carte et ne donne aucun accès</strong> : la carte se prépare à part, depuis la fiche.</p>
         <p class="text-sm font-semibold" data-testid="contexte-permanent">
           Espace des cartes permanentes :
           <span v-if="permanentContext">en place ({{ permanentContext.name }}), il ne se ferme ni ne se supprime.</span>

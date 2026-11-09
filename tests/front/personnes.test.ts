@@ -255,3 +255,107 @@ describe('lot P2 : réutilisation d’une identité et correction', () => {
     expect(post).toHaveBeenCalledWith('/administration/titulaires', expect.anything());
   });
 });
+
+describe('lot P3 : opérations d’habilitation dans la fiche', () => {
+  const grant = {
+    permanent: { holder_id: 'h1', events: [{ id: 'e1', name: 'Stage fictif', starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-02-01T18:00:00Z', zones: [{ id: 'z1', name: 'Accueil' }, { id: 'z2', name: 'Salle' }] }] },
+    activites: [{ participation_id: 'v1', event_id: 'e1', event: 'Stage fictif', valid_from: '2027-01-01T08:00:00Z', valid_until: '2027-02-01T18:00:00Z', zones: [{ id: 'z1', name: 'Accueil' }, { id: 'z2', name: 'Salle' }] }], max_exceptional_hours: 12,
+  };
+  const entitlements = {
+    permanentes: [right({ id: 'r0', origin: 'permanente', kind: null, zone: 'Zone permanente', actions: ['retirer'] })],
+    activites: [right({ id: 'r1', actions: ['suspendre', 'retirer'] }), right({ id: 'r2', zone: 'Zone suspendue', state: 'suspendue', actions: ['reprendre', 'retirer'] }), right({ id: 'r3', zone: 'Zone retirée', state: 'retiree', actions: [] })],
+  };
+  const open = (props: object = {}) => mount(Personnes, { props: { ...base, selected: profile({ entitlements, grant }), ...props } });
+  const lastPost = () => post.mock.calls.at(-1) as [string, Record<string, unknown>, { onSuccess?: () => void; onError?: (e: Record<string, string>) => void }];
+  const tab = async (wrapper: ReturnType<typeof open>) => { await wrapper.get('[data-testid=ptab-habilitations]').trigger('click'); return wrapper; };
+
+  it('n’offre que les opérations permises par l’état et par le moteur d’origine : retrait seul pour une habilitation permanente', async () => {
+    const wrapper = await tab(open());
+    expect(wrapper.find('[data-testid=action-r0-retirer]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid=action-r0-suspendre]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid=action-r0-reprendre]').exists()).toBe(false);
+    expect(['suspendre', 'retirer'].map(a => wrapper.find(`[data-testid=action-r1-${a}]`).exists())).toEqual([true, true]);
+    expect(['reprendre', 'retirer'].map(a => wrapper.find(`[data-testid=action-r2-${a}]`).exists())).toEqual([true, true]);
+    expect(wrapper.find('[data-testid=action-r2-suspendre]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid^="action-r3-"]')).toHaveLength(0);
+  });
+
+  it('retire une habilitation permanente par la route du moteur permanent, avec un motif obligatoire', async () => {
+    post.mockReset();
+    const wrapper = await tab(open());
+    await wrapper.get('[data-testid=action-r0-retirer]').trigger('click');
+    await wrapper.get('[data-testid=motif-r0]').setValue('Fin de mission');
+    await wrapper.get('[data-testid=confirmer-r0]').trigger('submit');
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(lastPost()[0]).toBe('/administration/habilitations/r0/retirer');
+    expect(lastPost()[1]).toEqual({ reason: 'Fin de mission' });
+  });
+
+  it('suspend, reprend et retire une habilitation d’activité par les routes du moteur de participation', async () => {
+    post.mockReset();
+    const wrapper = await tab(open());
+    await wrapper.get('[data-testid=action-r1-suspendre]').trigger('click');
+    await wrapper.get('[data-testid=motif-r1]').setValue('Contrôle en cours');
+    await wrapper.get('[data-testid=confirmer-r1]').trigger('submit');
+    expect(lastPost()[0]).toBe('/administration/acces/habilitations/r1/suspendre');
+    expect(lastPost()[1]).toEqual({ reason: 'Contrôle en cours' });
+    await wrapper.get('[data-testid=action-r2-reprendre]').trigger('click');
+    expect(lastPost()[0]).toBe('/administration/acces/habilitations/r2/reprendre');
+    expect(lastPost()[1]).toEqual({});
+    await wrapper.get('[data-testid=action-r1-retirer]').trigger('click');
+    await wrapper.get('[data-testid=motif-r1]').setValue('Fin de session');
+    await wrapper.get('[data-testid=confirmer-r1]').trigger('submit');
+    expect(lastPost()[0]).toBe('/administration/acces/habilitations/r1/retirer');
+  });
+
+  it('affiche le refus explicite du serveur sans masquer la fiche', async () => {
+    post.mockReset();
+    const wrapper = await tab(open());
+    await wrapper.get('[data-testid=action-r2-reprendre]').trigger('click');
+    lastPost()[2].onError?.({ id: 'Cette habilitation n’est pas suspendue.' });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('[data-testid=erreurs-habilitation]').text()).toContain('n’est pas suspendue');
+  });
+
+  it('accorde une habilitation permanente (moteur permanent) avec les dates de l’activité par défaut', async () => {
+    post.mockReset();
+    const wrapper = await tab(open());
+    await wrapper.get('[data-testid=accorder-permanente]').trigger('click');
+    expect((wrapper.get('[data-testid=perm-zone]').element as HTMLSelectElement).value).toBe('z1');
+    await wrapper.get('[data-testid=perm-zone]').setValue('z2');
+    await wrapper.get('[data-testid=form-accorder-permanente]').trigger('submit');
+    const [url, data] = lastPost();
+    expect(url).toBe('/administration/habilitations');
+    expect(data).toMatchObject({ holder_id: 'h1', event_id: 'e1', zone_id: 'z2' });
+    expect(new Date(String(data.valid_from)).toISOString()).toBe('2027-01-01T08:00:00.000Z');
+    expect(new Date(String(data.valid_until)).toISOString()).toBe('2027-02-01T18:00:00.000Z');
+  });
+
+  it('accorde une habilitation d’activité rattachée à sa participation ; le motif n’est demandé que pour une habilitation exceptionnelle', async () => {
+    post.mockReset();
+    const wrapper = await tab(open());
+    await wrapper.get('[data-testid=accorder-activite]').trigger('click');
+    expect(wrapper.find('[data-testid=act-motif]').exists()).toBe(false);
+    await wrapper.get('[data-testid=form-accorder-activite]').trigger('submit');
+    expect(lastPost()[0]).toBe('/administration/acces/habilitations');
+    expect(lastPost()[1]).toMatchObject({ visitor_id: 'v1', zone_id: 'z1', kind: 'standard', reason: null });
+    await wrapper.get('[data-testid=act-type]').setValue('exceptionnelle');
+    expect(wrapper.find('[data-testid=act-motif]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid=form-accorder-activite]').text()).toContain('12 h');
+    await wrapper.get('[data-testid=act-motif]').setValue('Visite autorisée');
+    await wrapper.get('[data-testid=form-accorder-activite]').trigger('submit');
+    expect(lastPost()[1]).toMatchObject({ kind: 'exceptionnelle', reason: 'Visite autorisée' });
+  });
+
+  it('n’affiche aucune action sans la permission, ni attribution permanente sans profil permanent actif', async () => {
+    const without = await tab(open({ can: { habilitations: false } }));
+    expect(without.findAll('[data-testid^="action-"]')).toHaveLength(0);
+    expect(without.find('[data-testid=accorder-permanente]').exists()).toBe(false);
+    expect(without.find('[data-testid=accorder-activite]').exists()).toBe(false);
+    const noProfile = await tab(open({ selected: profile({ holder: null, entitlements, grant: { ...grant, permanent: null } }) }));
+    expect(noProfile.find('[data-testid=accorder-permanente]').exists()).toBe(false);
+    expect(noProfile.get('[data-testid=sans-profil-habilitation]').text()).toContain('Aucun profil permanent');
+    const noParticipation = await tab(open({ selected: profile({ entitlements, grant: { ...grant, activites: [] } }) }));
+    expect(noParticipation.find('[data-testid=sans-participation-ouverte]').exists()).toBe(true);
+  });
+});

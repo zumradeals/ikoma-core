@@ -156,6 +156,53 @@ final class PersonRegistry
     }
 
     /**
+     * Opérations que le moteur d'origine PERMET dans l'état courant (la permission, elle, reste contrôlée côté serveur par les routes et services existants).
+     * Habilitation permanente : retrait seulement (ni suspension, ni reprise, ni modification). Habilitation d'activité : suspension, reprise, retrait.
+     *
+     * @return list<string>
+     */
+    private function actions(string $origin, string $state): array
+    {
+        if ($origin === 'permanente') {
+            return in_array($state, ['active', 'a_venir'], true) ? ['retirer'] : [];
+        }
+
+        return match ($state) {
+            'active', 'a_venir' => ['suspendre', 'retirer'],
+            'suspendue' => ['reprendre', 'retirer'],
+            default => [],
+        };
+    }
+
+    /**
+     * Choix proposés aux formulaires d'attribution : activités ouvertes et leurs zones (permanent, si le profil est actif) ; participations ouvertes et zones de leur activité.
+     *
+     * @param  list<object>  $participations
+     * @return array{permanent: array<string, mixed>|null, activites: list<array<string, mixed>>, max_exceptional_hours: int}
+     */
+    private function grantOptions(?object $holder, array $participations): array
+    {
+        $open = fn (\Illuminate\Database\Query\Builder $q): \Illuminate\Database\Query\Builder => $q->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
+        $zonesOf = fn (array $eventIds): \Illuminate\Support\Collection => DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name'])->groupBy('event_id');
+
+        $permanent = null;
+        if ($holder !== null && $holder->status === 'actif') {
+            $events = $open(DB::table('events'))->orderByDesc('starts_at')->limit(50)->get(['id', 'name', 'starts_at', 'ends_at']);
+            $zones = $zonesOf($events->pluck('id')->all());
+            $permanent = ['holder_id' => $holder->id, 'events' => $events->map(fn (object $e): array => ['id' => $e->id, 'name' => $e->name, 'starts_at' => $e->starts_at, 'ends_at' => $e->ends_at,
+                'zones' => ($zones[$e->id] ?? collect())->map(fn (object $z): array => ['id' => $z->id, 'name' => $z->name])->values()->all()])->all()];
+        }
+
+        $eligible = array_values(array_filter($participations, fn (object $p): bool => $p->holder_id === null && $p->closed_at === null && $p->withdrawn_at === null && $p->status !== 'refuse'
+            && ! in_array($p->event_status, ['clos', 'archive'], true)));
+        $zones = $zonesOf(array_values(array_unique(array_map(fn (object $p): string => $p->event_id, $eligible))));
+        $activities = array_map(fn (object $p): array => ['participation_id' => $p->id, 'event_id' => $p->event_id, 'event' => $p->event_name, 'valid_from' => $p->valid_from, 'valid_until' => $p->valid_until,
+            'zones' => ($zones[$p->event_id] ?? collect())->map(fn (object $z): array => ['id' => $z->id, 'name' => $z->name])->values()->all()], $eligible);
+
+        return ['permanent' => $permanent, 'activites' => $activities, 'max_exceptional_hours' => ParticipationEntitlements::maxExceptionalHours()];
+    }
+
+    /**
      * Fiche d'une personne : identité, profil permanent, participations, habilitations par origine, badges (consultation), historique dérivé.
      *
      * @return array<string, mixed>|null
@@ -178,13 +225,15 @@ final class PersonRegistry
             ->get(['pe.id', 'pe.kind', 'pe.reason', 'pe.valid_from', 'pe.valid_until', 'pe.suspended_at', 'pe.revoked_at', 'pe.created_at', 'v.closed_at as participation_closed_at', 'v.withdrawn_at as participation_withdrawn_at', ...$zoneCols])
             ->map(fn (object $r): array => ['id' => $r->id, 'origin' => 'activite', 'zone_id' => $r->zone_id, 'zone' => $r->zone_name, 'event_id' => $r->event_id, 'event' => $r->event_name,
                 'kind' => $r->kind, 'reason' => $r->kind === 'exceptionnelle' ? $r->reason : null, 'valid_from' => $r->valid_from, 'valid_until' => $r->valid_until, 'created_at' => $r->created_at,
-                'suspended_at' => $r->suspended_at, 'revoked_at' => $r->revoked_at, 'state' => $this->state($r, $r->participation_closed_at, $r->participation_withdrawn_at)])->all();
+                'suspended_at' => $r->suspended_at, 'revoked_at' => $r->revoked_at, 'state' => $state = $this->state($r, $r->participation_closed_at, $r->participation_withdrawn_at),
+                'actions' => $this->actions('activite', $state)])->all();
         $permanentRights = DB::table('holder_entitlements as he')->join('permanent_holders as hh', 'hh.id', '=', 'he.holder_id')->join('events as e', 'e.id', '=', 'he.event_id')->join('zones as z', 'z.id', '=', 'he.zone_id')
             ->where('hh.person_id', $personId)->orderByDesc('he.valid_until')
             ->get(['he.id', 'he.valid_from', 'he.valid_until', 'he.revoked_at', 'he.created_at', 'hh.status as holder_status', ...$zoneCols])
             ->map(fn (object $r): array => ['id' => $r->id, 'origin' => 'permanente', 'zone_id' => $r->zone_id, 'zone' => $r->zone_name, 'event_id' => $r->event_id, 'event' => $r->event_name,
                 'kind' => null, 'reason' => null, 'valid_from' => $r->valid_from, 'valid_until' => $r->valid_until, 'created_at' => $r->created_at,
-                'suspended_at' => null, 'revoked_at' => $r->revoked_at, 'state' => $this->state($r, null, null, $r->holder_status !== 'actif')])->all();
+                'suspended_at' => null, 'revoked_at' => $r->revoked_at, 'state' => $state = $this->state($r, null, null, $r->holder_status !== 'actif'),
+                'actions' => $this->actions('permanente', $state)])->all();
 
         // Synthèse des accès : uniquement ce que les habilitations effectives ouvrent réellement.
         $effective = array_values(array_filter([...$permanentRights, ...$activityRights], fn (array $r): bool => $r['state'] === 'active'));
@@ -203,6 +252,7 @@ final class PersonRegistry
             'participations' => $history['participations'],
             'assignments' => $history['assignments'],
             'entitlements' => ['permanentes' => $permanentRights, 'activites' => $activityRights],
+            'grant' => $this->grantOptions($holder, $history['participations']),
             'access' => ['zones' => $zones, 'posts' => $posts, 'next_expiry' => $next, 'effective' => count($effective)],
             'timeline' => $this->timeline($person, $holder, $history, [...$permanentRights, ...$activityRights]),
         ];

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import AdminIcon from '../../components/admin/AdminIcon.vue';
@@ -14,7 +14,12 @@ type Row = {
   institutional_category: string | null; category_label: string | null; category_color: string | null; has_photo: boolean;
   participations_actives: number | string; participations_total: number | string; habilitations_actives: number | string;
 };
-type Right = { id: string; origin: 'permanente' | 'activite'; zone: string; event: string; kind: string | null; reason: string | null; valid_from: string; valid_until: string; state: string };
+type Right = { id: string; origin: 'permanente' | 'activite'; zone: string; event: string; kind: string | null; reason: string | null; valid_from: string; valid_until: string; state: string; actions?: string[] };
+type Zone = { id: string; name: string };
+type Grant = {
+  permanent: { holder_id: string; events: { id: string; name: string; starts_at: string; ends_at: string; zones: Zone[] }[] } | null;
+  activites: { participation_id: string; event_id: string; event: string; valid_from: string; valid_until: string; zones: Zone[] }[]; max_exceptional_hours: number;
+};
 type Participation = { id: string; event_name: string; event_kind: string; category: string; status: string | null; valid_from: string; valid_until: string; withdrawn_at: string | null; closed_at: string | null; holder_id: string | null; source?: string | null };
 type Assignment = { id: string; badge_id: string; badge_code: string; event_name: string; assigned_at: string; returned_at: string | null; cancelled_at: string | null };
 type Profile = {
@@ -22,6 +27,7 @@ type Profile = {
   holder: { id: string; identifier: string; position: string | null; quality: string | null; status: string; institutional_category: string | null; category_label: string | null; engagement_starts_on: string | null; engagement_ends_on: string | null; has_photo: boolean } | null;
   participations: Participation[]; assignments: Assignment[]; entitlements: { permanentes: Right[]; activites: Right[] };
   access: { zones: string[]; posts: { id: string; code: string; name: string }[]; next_expiry: string | null; effective: number };
+  grant?: Grant;
   timeline: { at: string; label: string }[];
 };
 const props = defineProps<{
@@ -66,6 +72,63 @@ function onTabKey(event: KeyboardEvent) {
   ptab.value = TABS[(next + TABS.length) % TABS.length].key;
   nextTick(() => (panel.value?.querySelector('[role="tab"][aria-selected="true"]') as HTMLElement | null)?.focus());
 }
+
+// --- Habilitations (P3) : les opérations passent par les routes et services EXISTANTS de chaque moteur ; l'interface ne remplace aucun contrôle serveur.
+type Action = 'retirer' | 'suspendre' | 'reprendre';
+const pending = ref<{ id: string; action: Action } | null>(null);
+const reason = ref('');
+const opErrors = ref<string[]>([]);
+const actionLabel: Record<string, string> = { retirer: 'Retirer', suspendre: 'Suspendre', reprendre: 'Reprendre' };
+const actionUrl = (r: Right, action: Action) => (r.origin === 'permanente' ? `/administration/habilitations/${r.id}/retirer` : `/administration/acces/habilitations/${r.id}/${action === 'retirer' ? 'retirer' : action === 'suspendre' ? 'suspendre' : 'reprendre'}`);
+const onOpError = (errors: Record<string, string>) => { opErrors.value = Object.values(errors); };
+function run(r: Right, action: Action) {
+  opErrors.value = [];
+  router.post(actionUrl(r, action), action === 'reprendre' ? {} : { reason: reason.value.trim() }, { preserveScroll: true, onSuccess: () => { pending.value = null; reason.value = ''; }, onError: onOpError });
+}
+function startAction(r: Right, action: Action) {
+  opErrors.value = [];
+  if (action === 'reprendre') { run(r, action); return; }
+  pending.value = pending.value?.id === r.id && pending.value.action === action ? null : { id: r.id, action };
+  reason.value = '';
+}
+const pad = (n: number) => String(n).padStart(2, '0');
+const toLocalInput = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const toIso = (local: string) => new Date(local).toISOString();
+const grantP = reactive({ open: false, event_id: '', zone_id: '', from: '', until: '' });
+const permEvent = computed(() => props.selected?.grant?.permanent?.events.find(e => e.id === grantP.event_id) ?? null);
+function toggleGrantP() {
+  grantP.open = !grantP.open; opErrors.value = [];
+  const first = props.selected?.grant?.permanent?.events[0];
+  if (grantP.open && first && !grantP.event_id) pickEventP(first.id);
+}
+function pickEventP(id: string) {
+  const e = props.selected?.grant?.permanent?.events.find(x => x.id === id);
+  grantP.event_id = id; grantP.zone_id = e?.zones[0]?.id ?? ''; grantP.from = e ? toLocalInput(e.starts_at) : ''; grantP.until = e ? toLocalInput(e.ends_at) : '';
+}
+function submitGrantP() {
+  const holder = props.selected?.grant?.permanent;
+  if (!holder) return;
+  opErrors.value = [];
+  router.post('/administration/habilitations', { holder_id: holder.holder_id, event_id: grantP.event_id, zone_id: grantP.zone_id, valid_from: toIso(grantP.from), valid_until: toIso(grantP.until) },
+    { preserveScroll: true, onSuccess: () => { grantP.open = false; }, onError: onOpError });
+}
+const grantA = reactive({ open: false, participation_id: '', zone_id: '', kind: 'standard', reason: '', from: '', until: '' });
+const partA = computed(() => props.selected?.grant?.activites.find(a => a.participation_id === grantA.participation_id) ?? null);
+function pickParticipation(id: string) {
+  const a = props.selected?.grant?.activites.find(x => x.participation_id === id);
+  grantA.participation_id = id; grantA.zone_id = a?.zones[0]?.id ?? ''; grantA.from = a ? toLocalInput(a.valid_from) : ''; grantA.until = a ? toLocalInput(a.valid_until) : '';
+}
+function toggleGrantA() {
+  grantA.open = !grantA.open; opErrors.value = [];
+  const first = props.selected?.grant?.activites[0];
+  if (grantA.open && first && !grantA.participation_id) pickParticipation(first.participation_id);
+}
+function submitGrantA() {
+  opErrors.value = [];
+  router.post('/administration/acces/habilitations', { visitor_id: grantA.participation_id, zone_id: grantA.zone_id, kind: grantA.kind, reason: grantA.reason.trim() || null, valid_from: toIso(grantA.from), valid_until: toIso(grantA.until) },
+    { preserveScroll: true, onSuccess: () => { grantA.open = false; grantA.reason = ''; }, onError: onOpError });
+}
+watch(() => props.selected?.person.id, () => { pending.value = null; opErrors.value = []; grantP.open = false; grantA.open = false; grantP.event_id = ''; grantA.participation_id = ''; });
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('fr-FR') : '—');
 const dateTime = (iso: string) => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
@@ -135,7 +198,7 @@ function closeAll() { creating.value = false; if (props.selected) closePanel(); 
           <div>
             <h1 class="text-display font-bold" data-testid="titre-personnes">Personnes et habilitations</h1>
             <p class="max-w-2xl text-slate-700">Registre des personnes, de leur statut institutionnel, de leurs participations et de leurs habilitations d’accès. Une personne a une identité unique ; deux personnes ne sont jamais fusionnées sur le seul nom.</p>
-            <p class="mt-1 text-sm"><Link href="/administration/invites" class="font-semibold underline" data-testid="fiches-invites">Fiches d’invités</Link></p>
+            <p class="mt-1 flex flex-wrap gap-x-4 text-sm"><Link href="/administration/invites" class="font-semibold underline" data-testid="fiches-invites">Fiches d’invités</Link><Link href="/administration/titulaires" class="font-semibold underline" data-testid="personnel-permanent-cartes">Personnel permanent et cartes</Link><Link href="/administration/habilitations" class="font-semibold underline" data-testid="habilitations-par-zone">Habilitations par zone</Link></p>
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -293,21 +356,59 @@ function closeAll() { creating.value = false; if (props.selected) closePanel(); 
               <h3 id="hab-perm" class="font-bold">Habilitations permanentes ({{ selected.entitlements.permanentes.length }})</h3>
               <p v-if="!selected.entitlements.permanentes.length" class="text-sm text-slate-600">Aucune habilitation permanente.</p>
               <ul v-else class="divide-y">
-                <li v-for="r in selected.entitlements.permanentes" :key="r.id" class="flex flex-wrap items-center justify-between gap-2 py-2" :data-testid="'habilitation-' + r.id">
-                  <span class="min-w-0"><strong>{{ r.zone }}</strong><span class="block text-sm text-slate-600">Origine : permanente · {{ r.event }} · {{ day(r.valid_from) }} → {{ day(r.valid_until) }}</span></span>
-                  <span class="rounded-md px-2 py-0.5 text-xs font-bold" :class="stateClass(r.state)">{{ stateLabel[r.state] ?? r.state }}</span>
+                <li v-for="r in selected.entitlements.permanentes" :key="r.id" class="space-y-2 py-2" :data-testid="'habilitation-' + r.id">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="min-w-0"><strong>{{ r.zone }}</strong><span class="block text-sm text-slate-600">Origine : permanente · {{ r.event }} · {{ day(r.valid_from) }} → {{ day(r.valid_until) }}</span></span>
+                    <span class="rounded-md px-2 py-0.5 text-xs font-bold" :class="stateClass(r.state)">{{ stateLabel[r.state] ?? r.state }}</span>
+                  </div>
+                  <p v-if="can.habilitations && r.actions?.length" class="flex flex-wrap gap-2">
+                    <button v-for="a in r.actions" :key="a" type="button" class="site-btn site-btn-outline !min-h-11" :data-testid="'action-' + r.id + '-' + a" @click="startAction(r, a as Action)">{{ actionLabel[a] }}</button>
+                  </p>
+                  <form v-if="pending && pending.id === r.id" class="space-y-2 rounded-lg border bg-slate-50 p-3" :aria-label="actionLabel[pending.action] + ' l’habilitation'" @submit.prevent="run(r, pending.action)">
+                    <label class="block text-sm">Motif (obligatoire, 200 caractères au plus)<input v-model="reason" class="field" maxlength="200" required :data-testid="'motif-' + r.id"></label>
+                    <button type="submit" class="btn-main !min-h-11 !text-sm" :data-testid="'confirmer-' + r.id">Confirmer : {{ actionLabel[pending.action].toLowerCase() }}</button>
+                  </form>
                 </li>
               </ul>
+              <p v-if="can.habilitations && selected.grant?.permanent" class="pt-1"><button type="button" class="site-btn site-btn-accent !min-h-11" :aria-expanded="grantP.open" data-testid="accorder-permanente" @click="toggleGrantP">Accorder une habilitation permanente</button></p>
+              <p v-else-if="can.habilitations && !selected.holder" class="text-sm text-slate-600" data-testid="sans-profil-habilitation">Aucun profil permanent : ajoutez-en un depuis l’onglet Identité pour accorder des habilitations permanentes.</p>
+              <form v-if="grantP.open && selected.grant?.permanent" class="space-y-3 rounded-xl border bg-slate-50 p-4" aria-label="Accorder une habilitation permanente" data-testid="form-accorder-permanente" @submit.prevent="submitGrantP">
+                <label class="block">Activité<select :value="grantP.event_id" class="field" data-testid="perm-evenement" required @change="pickEventP(($event.target as HTMLSelectElement).value)"><option v-for="e in selected.grant.permanent.events" :key="e.id" :value="e.id">{{ e.name }}</option></select></label>
+                <label class="block">Zone<select v-model="grantP.zone_id" class="field" data-testid="perm-zone" required><option v-for="z in permEvent?.zones ?? []" :key="z.id" :value="z.id">{{ z.name }}</option></select></label>
+                <label class="block">Début<input v-model="grantP.from" type="datetime-local" class="field" required data-testid="perm-debut"></label>
+                <label class="block">Fin<input v-model="grantP.until" type="datetime-local" class="field" required data-testid="perm-fin"></label>
+                <button type="submit" class="btn-main" data-testid="perm-enregistrer">Accorder l’habilitation</button>
+              </form>
             </section>
             <section aria-labelledby="hab-act" data-testid="habilitations-activites">
               <h3 id="hab-act" class="font-bold">Habilitations liées aux activités ({{ selected.entitlements.activites.length }})</h3>
               <p v-if="!selected.entitlements.activites.length" class="text-sm text-slate-600">Aucune habilitation liée à une activité.</p>
               <ul v-else class="divide-y">
-                <li v-for="r in selected.entitlements.activites" :key="r.id" class="flex flex-wrap items-center justify-between gap-2 py-2" :data-testid="'habilitation-' + r.id">
-                  <span class="min-w-0"><strong>{{ r.zone }}</strong><span class="block text-sm text-slate-600">Origine : activité « {{ r.event }} » · {{ r.kind === 'exceptionnelle' ? 'exceptionnelle' : 'standard' }} · {{ day(r.valid_from) }} → {{ day(r.valid_until) }}</span></span>
-                  <span class="rounded-md px-2 py-0.5 text-xs font-bold" :class="stateClass(r.state)">{{ stateLabel[r.state] ?? r.state }}</span>
+                <li v-for="r in selected.entitlements.activites" :key="r.id" class="space-y-2 py-2" :data-testid="'habilitation-' + r.id">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="min-w-0"><strong>{{ r.zone }}</strong><span class="block text-sm text-slate-600">Origine : activité « {{ r.event }} » · {{ r.kind === 'exceptionnelle' ? 'exceptionnelle' : 'standard' }} · {{ day(r.valid_from) }} → {{ day(r.valid_until) }}</span></span>
+                    <span class="rounded-md px-2 py-0.5 text-xs font-bold" :class="stateClass(r.state)">{{ stateLabel[r.state] ?? r.state }}</span>
+                  </div>
+                  <p v-if="can.habilitations && r.actions?.length" class="flex flex-wrap gap-2">
+                    <button v-for="a in r.actions" :key="a" type="button" class="site-btn site-btn-outline !min-h-11" :data-testid="'action-' + r.id + '-' + a" @click="startAction(r, a as Action)">{{ actionLabel[a] }}</button>
+                  </p>
+                  <form v-if="pending && pending.id === r.id" class="space-y-2 rounded-lg border bg-slate-50 p-3" :aria-label="actionLabel[pending.action] + ' l’habilitation'" @submit.prevent="run(r, pending.action)">
+                    <label class="block text-sm">Motif (obligatoire, 200 caractères au plus)<input v-model="reason" class="field" maxlength="200" required :data-testid="'motif-' + r.id"></label>
+                    <button type="submit" class="btn-main !min-h-11 !text-sm" :data-testid="'confirmer-' + r.id">Confirmer : {{ actionLabel[pending.action].toLowerCase() }}</button>
+                  </form>
                 </li>
               </ul>
+              <p v-if="can.habilitations && selected.grant?.activites.length" class="pt-1"><button type="button" class="site-btn site-btn-accent !min-h-11" :aria-expanded="grantA.open" data-testid="accorder-activite" @click="toggleGrantA">Accorder une habilitation d’activité</button></p>
+              <p v-else-if="can.habilitations" class="text-sm text-slate-600" data-testid="sans-participation-ouverte">Aucune participation ouverte : une habilitation d’activité se rattache à une participation en cours (Activités).</p>
+              <form v-if="grantA.open && selected.grant?.activites.length" class="space-y-3 rounded-xl border bg-slate-50 p-4" aria-label="Accorder une habilitation d’activité" data-testid="form-accorder-activite" @submit.prevent="submitGrantA">
+                <label class="block">Participation<select :value="grantA.participation_id" class="field" data-testid="act-participation" required @change="pickParticipation(($event.target as HTMLSelectElement).value)"><option v-for="a in selected.grant.activites" :key="a.participation_id" :value="a.participation_id">{{ a.event }}</option></select></label>
+                <label class="block">Zone<select v-model="grantA.zone_id" class="field" data-testid="act-zone" required><option v-for="z in partA?.zones ?? []" :key="z.id" :value="z.id">{{ z.name }}</option></select></label>
+                <label class="block">Type<select v-model="grantA.kind" class="field" data-testid="act-type"><option value="standard">Standard</option><option value="exceptionnelle">Exceptionnelle (limitée à {{ selected.grant.max_exceptional_hours }} h, motif obligatoire)</option></select></label>
+                <label v-if="grantA.kind === 'exceptionnelle'" class="block">Motif<input v-model="grantA.reason" class="field" maxlength="200" required data-testid="act-motif"></label>
+                <label class="block">Début<input v-model="grantA.from" type="datetime-local" class="field" required data-testid="act-debut"></label>
+                <label class="block">Fin<input v-model="grantA.until" type="datetime-local" class="field" required data-testid="act-fin"></label>
+                <button type="submit" class="btn-main" data-testid="act-enregistrer">Accorder l’habilitation</button>
+              </form>
             </section>
             <section class="rounded-xl border bg-slate-50 p-4" aria-labelledby="resume-acces" data-testid="resume-acces">
               <h3 id="resume-acces" class="font-bold">Résumé des accès</h3>
@@ -318,8 +419,9 @@ function closeAll() { creating.value = false; if (props.selected) closePanel(); 
                 <div><dt class="inline font-semibold">Prochaine échéance : </dt><dd class="inline">{{ day(selected.access.next_expiry) }}</dd></div>
               </dl>
             </section>
+            <div v-if="opErrors.length" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3" data-testid="erreurs-habilitation"><p v-for="e in opErrors" :key="e">{{ e }}</p></div>
             <p v-if="can.habilitations" class="flex flex-wrap gap-3 text-sm">
-              <Link href="/administration/habilitations" class="site-btn site-btn-outline !min-h-11" data-testid="gerer-permanentes">Gérer les habilitations permanentes</Link>
+              <Link href="/administration/habilitations" class="site-btn site-btn-outline !min-h-11" data-testid="gerer-permanentes">Habilitations par zone</Link>
               <Link href="/administration/acces" class="site-btn site-btn-outline !min-h-11" data-testid="gerer-participants">Habilitations des participants</Link>
             </p>
           </div>
