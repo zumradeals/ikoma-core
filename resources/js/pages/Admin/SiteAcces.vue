@@ -58,7 +58,7 @@ function toggleCreate(capability: string, on: boolean) {
 
 <template>
   <AdminLayout active="site-acces">
-    <div class="space-y-6" data-testid="page-site-acces">
+    <div class="flex max-w-5xl flex-col gap-6" data-testid="page-site-acces">
       <header class="space-y-2">
         <h1 class="text-display font-bold">Site et accès</h1>
         <p class="max-w-3xl">Les postes de contrôle du site, ce que chacun est autorisé à faire, les tablettes qui lui sont affectées et les zones qu’il garde. Un poste peut avoir plusieurs tablettes. Un poste se désactive, il ne se supprime pas.</p>
