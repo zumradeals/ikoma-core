@@ -252,10 +252,11 @@ it('sert la page Modèles avec le modèle de badge de chaque activité et le mod
 
 it('fournit les compteurs du cadre seulement sur les pages de l’espace Badges et cartes', function () {
     $this->actingAs(cnUser('administrateur'));
+    // D'abord une page hors de l'espace : les propriétés partagées s'accumulent dans un même processus de test, pas entre deux requêtes réelles.
+    $this->get('/administration/postes')->assertOk()->assertInertia(fn ($page) => $page->missing('badgesCartes'));
     foreach (['/administration/badges', '/administration/titulaires', '/administration/atelier', '/administration/modeles'] as $url) {
         $this->get($url)->assertOk()->assertInertia(fn ($page) => $page->has('badgesCartes.visitors.available')->has('badgesCartes.visitors.to_return')->has('badgesCartes.cards.active')->has('badgesCartes.cards.holders'));
     }
-    $this->get('/administration/postes')->assertOk()->assertInertia(fn ($page) => $page->missing('badgesCartes'));
 });
 
 it('compte les badges disponibles et les badges à restituer d’après les tables existantes', function () {
