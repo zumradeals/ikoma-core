@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\BadgesCartesSummary;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
@@ -114,7 +115,7 @@ const CN_ROUTES = [
 
 /** Routes ajoutées volontairement par la consolidation (déclarées ici pour rester visibles). */
 const CN_ADDED = [
-    // ['GET', 'administration/modeles', ['can:badges.gerer'], []],
+    ['GET', 'administration/modeles', ['can:badges.gerer'], []],
 ];
 
 function cnUser(string $role): User
@@ -232,4 +233,31 @@ it('conserve les contrats des documents imprimés : demande et confirmation de t
         expect($status)->toBeIn([404, 422]);
     }
     expect(DB::table('badge_print_runs')->count())->toBe(0);
+});
+
+it('sert la page Modèles avec le modèle de badge de chaque activité et le modèle de carte choisi, sans droit nouveau', function () {
+    $this->actingAs(cnUser('administrateur'));
+    $this->get('/administration/modeles')->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Admin/Modeles')->where('section', 'badges')->has('events')->has('preferences')->has('cards.categories', 8)->where('cards.canConfigure', true));
+    $this->get('/administration/modeles?section=cartes&categorie=AILCT-02')->assertOk()
+        ->assertInertia(fn ($page) => $page->where('section', 'cartes')->where('cards.selected', 'AILCT-02'));
+    $event = DemoSeeder::id('event');
+    $this->get('/administration/modeles?event='.$event)->assertOk()->assertInertia(fn ($page) => $page->where('initialEvent', $event));
+    // la page historique des cartes garde exactement les mêmes données
+    $this->get('/administration/titulaires/modeles?categorie=AILCT-02')->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Admin/PersonnalisationCartes')->where('selected', 'AILCT-02')->has('categories', 8));
+});
+
+it('fournit les compteurs du cadre seulement sur les pages de l’espace Badges et cartes', function () {
+    $this->actingAs(cnUser('administrateur'));
+    foreach (['/administration/badges', '/administration/titulaires', '/administration/atelier', '/administration/modeles'] as $url) {
+        $this->get($url)->assertOk()->assertInertia(fn ($page) => $page->has('badgesCartes.visitors.available')->has('badgesCartes.visitors.to_return')->has('badgesCartes.cards.active')->has('badgesCartes.cards.holders'));
+    }
+    $this->get('/administration/postes')->assertOk()->assertInertia(fn ($page) => $page->where('badgesCartes', null));
+});
+
+it('compte les badges disponibles et les badges à restituer d’après les tables existantes', function () {
+    $summary = app(BadgesCartesSummary::class)->get();
+    expect($summary['visitors']['available'])->toBe((int) DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->where('b.status', 'Disponible')->count())
+        ->and($summary['cards']['active'])->toBe((int) DB::table('holder_cards')->where('status', 'active')->count());
 });

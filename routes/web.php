@@ -31,6 +31,7 @@ use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalExportController;
 use App\Http\Controllers\ListImportsController;
+use App\Http\Controllers\ModelesController;
 use App\Http\Controllers\ModulesController;
 use App\Http\Controllers\MonGroupeController;
 use App\Http\Controllers\PermanentHoldersController;
@@ -124,6 +125,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
         Route::get('/administration/atelier/parcours', [AtelierParcoursController::class, 'index'])->middleware('can:badges.gerer');
+        Route::get('/administration/modeles', [ModelesController::class, 'index'])->middleware('can:badges.gerer');
         Route::get('/administration/atelier', [AtelierController::class, 'index'])->middleware('can:badges.gerer');
         Route::post('/administration/atelier/apercu-fictif', [AtelierController::class, 'specimen'])->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::post('/administration/atelier/apercu', [BadgeWorkshopController::class, 'preview'])->middleware(['can:badges.gerer', 'throttle:atelier']);

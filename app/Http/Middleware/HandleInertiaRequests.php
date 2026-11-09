@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\BadgesCartesSummary;
 use App\Services\DemoLab;
 use App\Services\FoundingModules;
 use App\Services\Institution;
@@ -16,7 +17,22 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         return [...parent::share($request), 'flash' => ['status' => $request->session()->get('status')], 'institution' => fn () => app(Institution::class)->shared(), 'demoLabAvailable' => DemoLab::available(), 'f06Active' => fn () => app(FoundingModules::class)->f06Active(), 'auth' => ! in_array($request->path(), ['/', 'poste/shell', 'controle/shell', 'groupe/shell', 'pilotage/evacuation/shell'], true) && $request->user() ? ['id' => $request->user()->id, 'name' => $request->user()->name, 'isAdmin' => $request->user()->hasRole('administrateur'), 'permissions' => $request->user()->getAllPermissions()->pluck('name')] : null, 'adminContext' => fn () => $request->user()?->hasRole('administrateur') && ($request->is('administration', 'administration/*', 'securite', 'user/confirm-password'))
-            ? $this->adminContext($request) : null];
+            ? $this->adminContext($request) : null,
+            'badgesCartes' => fn () => $this->badgesCartes($request)];
+    }
+
+    /**
+     * Compteurs du cadre « Badges et cartes » : seulement sur les pages de cet espace et pour qui peut gérer les badges (aucune donnée personnelle).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function badgesCartes(Request $request): ?array
+    {
+        if (! $request->isMethod('GET') || ! $request->is('administration/badges', 'administration/badges/*', 'administration/titulaires', 'administration/titulaires/*', 'administration/atelier', 'administration/modeles') || $request->user()?->can('badges.gerer') !== true) {
+            return null;
+        }
+
+        return app(BadgesCartesSummary::class)->get();
     }
 
     /**
