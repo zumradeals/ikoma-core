@@ -33,7 +33,7 @@ const menus: Menu[] = [
     { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer' },
   ] },
   { key: 'activites', label: 'Activités', icon: 'calendar', items: [
-    { key: 'evenements', label: 'Événements', icon: 'calendar', href: '/administration/evenements', permission: 'evenements.gerer' },
+    { key: 'evenements', label: 'Registre des activités', icon: 'calendar', href: '/administration/evenements', permission: 'evenements.gerer' },
     { key: 'categories', label: 'Catégories', icon: 'tag', href: '/administration/categories', permission: 'categories.gerer' },
   ] },
   { key: 'badges-cartes', label: 'Badges et cartes', icon: 'qr', items: [

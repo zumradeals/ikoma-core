@@ -294,3 +294,8 @@ html { scroll-padding-bottom: 6rem; }
 @media (min-width:1700px) { .pers-tab-icon { display:inline; } }
 .pers-filters { display:grid; gap:8px; grid-template-columns:minmax(0,1fr); }
 @media (min-width:640px) and (max-width:1359px) { .pers-filters { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+/* Activités : registre (activité, période, effectifs, état). */
+@media (min-width:900px) {
+  .act-row { grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr); }
+}
