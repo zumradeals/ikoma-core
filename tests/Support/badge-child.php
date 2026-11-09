@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\BadgeIssuance;
 use App\Services\BadgeLots;
 use App\Services\BadgeRefused;
 use App\Services\BadgeService;
@@ -23,6 +24,10 @@ try {
         // Arguments : catégorie, événement, administrateur.
         app(BadgeLots::class)->generate($visitor, $badge, 3, User::findOrFail($user));
         echo json_encode(['ok' => true]);
+    } elseif ($operation === 'emettre') {
+        // Arguments : participation, identifiant d'opération, administrateur.
+        $r = app(BadgeIssuance::class)->issueTemporary($badge, $visitor, User::findOrFail($user));
+        echo json_encode(['ok' => true, 'badge' => $r['badge_id'], 'created' => $r['created']]);
     } else {
         DB::table('badge_assignments')->insert(['id' => (string) Str::uuid(), 'event_id' => $user, 'badge_id' => $badge, 'visitor_id' => $visitor, 'assigned_at' => now()]);
         echo json_encode(['ok' => true]);

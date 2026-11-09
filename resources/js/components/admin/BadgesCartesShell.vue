@@ -7,7 +7,7 @@ import { Link, usePage } from '@inertiajs/vue3';
  * Un onglet n'est affiché que si l'utilisateur détient la permission de sa page d'arrivée ; le serveur reste l'autorité.
  */
 type Summary = { visitors: { available: number; to_return: number; batches: number; print_runs: number }; cards: { holders: number; active: number; prints: number } };
-defineProps<{ active: 'visiteurs' | 'cartes' | 'modeles' | 'impression' }>();
+defineProps<{ active: 'visiteurs' | 'cartes' | 'modeles' | 'impression' | 'preparer' }>();
 const page = usePage<{ auth?: { permissions: string[] } | null; badgesCartes?: Summary | null }>();
 const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
 const tabs = [
@@ -22,6 +22,9 @@ const summary = computed(() => page.props.badgesCartes ?? null);
 
 <template>
   <div class="mb-6 space-y-4" data-testid="cadre-badges-cartes">
+    <div v-if="can('badges.gerer') && can('listes.importer')" class="flex justify-end">
+      <Link href="/administration/badges/preparer" class="admin-primary inline-flex min-h-14 items-center gap-2" :aria-current="active === 'preparer' ? 'page' : undefined" data-testid="preparer-badge">Préparer un badge</Link>
+    </div>
     <nav aria-label="Badges et cartes">
       <ul class="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <li v-for="tab in shown" :key="tab.key">
