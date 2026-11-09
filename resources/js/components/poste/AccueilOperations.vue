@@ -30,7 +30,7 @@ const toggle = (next: 'attendus' | 'incidents') => { panel.value = panel.value =
 <template>
   <section class="space-y-4" aria-labelledby="operations-titre" data-testid="operations-accueil">
     <h2 id="operations-titre" class="text-2xl font-bold">Autres opérations</h2>
-    <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="operations-hors-ligne"><span aria-hidden="true">⚠</span> Hors ligne : changer d’écran, consulter les visites attendues ou les incidents nécessite le réseau.</p>
+    <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="operations-hors-ligne"><span aria-hidden="true">⚠</span> Sans réseau : changer d’écran, consulter les visites attendues ou les incidents nécessite le réseau.</p>
     <ul class="grid gap-3 sm:grid-cols-3" aria-label="Opérations">
       <li v-for="l in links" :key="l.key">
         <a v-if="online" :href="l.href" class="btn-soft !h-full !flex-col !items-start text-left" :data-testid="'operation-' + l.key"><strong>{{ l.label }}</strong><span class="text-base font-normal">{{ l.hint }}</span></a>
