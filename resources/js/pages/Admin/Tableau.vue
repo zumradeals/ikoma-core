@@ -3,13 +3,14 @@ import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AdminIcon from '../../components/admin/AdminIcon.vue';
 import AdminLayout from '../../layouts/AdminLayout.vue';
+import AdminGeneral, { type General } from '../../components/admin/AdminGeneral.vue';
 import { actionLabels } from '../../labels';
 
 type Step = { key: string; title: string; status: 'fait' | 'en_cours' | 'a_faire'; detail: string; href: string };
 type Watch = { severity: 'haute' | 'normale' | 'info'; title: string; text: string; href: string };
 type Tile = { value: number; total?: number; caption: string };
 const props = defineProps<{
-  event: { id: string; name: string } | null; events: { id: string; name: string }[]; steps: Step[];
+  general?: General | null; event: { id: string; name: string } | null; events: { id: string; name: string }[]; steps: Step[];
   summary: { done: number; total: number; next: { title: string; href: string; text: string } | null };
   tiles: { invites: Tile; badges: Tile; tablettes: Tile; comptes: Tile } | null; watch: Watch[]; recent: { action: string; occurred_at: string }[];
 }>();
@@ -41,8 +42,9 @@ const time = (at: string) => new Date(at).toLocaleTimeString('fr-FR', { hour: '2
 
 <template>
   <AdminLayout active="tableau" :event="event" :events="events">
+    <AdminGeneral v-if="general" :general="general" class="mb-8" />
     <div v-if="!event" class="rounded-2xl border border-slate-200 bg-white p-6" data-testid="aucun-evenement">
-      <h1 class="text-display font-bold">Tableau de bord</h1>
+      <component :is="general ? 'h2' : 'h1'" class="text-display font-bold">{{ general ? 'Préparer une activité' : 'Tableau de bord' }}</component>
       <p class="mt-2">Aucun événement n’est encore enregistré. Créez votre premier événement pour préparer ensuite les zones, les badges et les tablettes.</p>
       <Link href="/administration/evenements" class="admin-primary mt-5 inline-flex min-h-14 items-center gap-3" data-testid="creer-premier-evenement"><AdminIcon name="plus" :size="20" />Créer mon premier événement</Link>
     </div>
@@ -52,7 +54,7 @@ const time = (at: string) => new Date(at).toLocaleTimeString('fr-FR', { hour: '2
       <section aria-labelledby="titre-etat" class="dashboard-hero" data-testid="tableau-admin">
         <div class="min-w-0 flex-1 basis-80">
           <p class="text-sm font-bold uppercase tracking-wide text-orange-200">Bonjour</p>
-          <h1 id="titre-etat" class="mt-1 text-3xl font-extrabold leading-tight" data-testid="titre-etat">{{ ready ? 'Votre événement est prêt' : summary.done === 0 ? 'Préparons votre événement' : summary.done < summary.total / 2 ? 'Votre événement se prépare' : 'Votre événement est presque prêt' }}</h1>
+          <component :is="general ? 'h2' : 'h1'" id="titre-etat" class="mt-1 text-3xl font-extrabold leading-tight" data-testid="titre-etat">{{ ready ? 'Votre événement est prêt' : summary.done === 0 ? 'Préparons votre événement' : summary.done < summary.total / 2 ? 'Votre événement se prépare' : 'Votre événement est presque prêt' }}</component>
           <p class="mt-2 text-lg text-blue-100" data-testid="avancement">
             {{ summary.done }} étape{{ summary.done > 1 ? 's' : '' }} sur {{ summary.total }} {{ summary.done > 1 ? 'sont terminées' : 'est terminée' }}.<template v-if="summary.next"> Prochaine étape : {{ summary.next.title.toLowerCase() }}.</template>
           </p>

@@ -68,7 +68,9 @@ html { scroll-padding-bottom: 6rem; }
 .admin-user { display:flex; align-items:center; gap:10px; min-width:0; overflow-wrap:anywhere; }
 .admin-avatar { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; background:#eff6ff; color:var(--inst-primary); font-weight:800; }
 .admin-logout { min-height:48px; flex:none; border:1px solid white; border-radius:8px; padding:8px 16px; font-weight:650; }
-.admin-frame { display:grid; grid-template-columns:256px minmax(0,1fr); max-width:1800px; margin:auto; }
+/* Pleine largeur : la barre latérale reste collée au bord gauche (un cadre centré laissait une bande vide à gauche sur les grands écrans) ; seul le contenu est borné. */
+.admin-frame { display:grid; grid-template-columns:256px minmax(0,1fr); }
+.admin-main > * { max-width:1700px; }
 .admin-sidebar { align-self:stretch; background:white; border-right:1px solid #e5edf6; padding:24px 16px; }
 .admin-sidebar nav { display:flex; flex-direction:column; gap:5px; position:sticky; top:16px; }
 .admin-nav-link { display:flex; align-items:center; gap:20px; min-height:56px; padding:10px 20px; border-radius:10px; font-weight:650; color:#00469c; }
