@@ -46,6 +46,18 @@ final class SupportPrintController
         return $this->document($request, $printing->preview($this->user($request), $this->input($request)['badges']), 'apercu');
     }
 
+    /**
+     * Aperçu en données (colonne « Aperçu » de l'espace de travail) : le même composeur que l'impression ; seuls les supports ÉMIS sont lisibles ; aucun tirage ni activation n'est créé.
+     * Le numéro et le QR retournés sont ceux du support réellement émis.
+     */
+    public function previewData(Request $request, SupportPrinting $printing): JsonResponse
+    {
+        Gate::authorize('badges.gerer');
+        Gate::authorize('listes.importer');
+
+        return response()->json(['supports' => $printing->preview($this->user($request), $this->input($request)['badges'])])->header('Cache-Control', 'no-store, private');
+    }
+
     public function print(Request $request, SupportPrinting $printing): Response
     {
         Gate::authorize('badges.gerer');

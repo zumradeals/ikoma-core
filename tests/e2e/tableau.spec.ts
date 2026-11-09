@@ -30,7 +30,7 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await expect(page.getByRole('status')).toContainText('Aucun compte ne correspond');
   await page.getByLabel('Rechercher un compte').clear();
   await openMenu(page, 'badges-cartes');
-  await expect(page.getByRole('heading', { name: 'Administration · Badges' })).toBeVisible();
+  await expect(page.getByTestId('titre-badges-cartes')).toHaveText('Badges et cartes');
   await expect(page.getByTestId('admin-layout')).toHaveCount(1);
   await expandMenu(page);
   await page.getByTestId('menu-tableau').click();
@@ -59,7 +59,7 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await page.getByRole('link', { name: 'Consulter la politique' }).click();
   await expect(page).toHaveURL(/\/administration\/conservation$/);
   await expect(page.getByTestId('sous-menu-donnees')).toHaveAttribute('aria-current', 'page');
-  await page.goto('/administration/badges?status=Disponible&page=2');
+  await page.goto('/administration/badges/lots?status=Disponible&page=2');
   await expect(page.getByTestId('menu-badges-cartes')).toHaveAttribute('aria-current', 'page');
   await page.goto('/administration/zones');
   await page.screenshot({ path: 'test-results/administration/zones-bureau.png', fullPage: true });

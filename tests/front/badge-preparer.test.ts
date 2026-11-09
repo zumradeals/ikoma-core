@@ -4,8 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const page = vi.hoisted(() => ({ props: { auth: { permissions: ['badges.gerer', 'listes.importer', 'evenements.gerer'], name: 'Administrateur fictif' }, badgesCartes: null as unknown } }));
 vi.mock('@inertiajs/vue3', () => ({ usePage: () => page, router: { get: vi.fn() }, Link: { props: ['href'], template: '<a :href="href"><slot /></a>' } }));
 
-import BadgePreparer from '../../resources/js/pages/Admin/BadgePreparer.vue';
-import BadgesCartesShell from '../../resources/js/components/admin/BadgesCartesShell.vue';
+import BadgePreparer from '../../resources/js/components/admin/BadgePreparerPanel.vue';
 
 const events = [{ id: 'e1', name: 'Stage fictif', kind: 'stage', starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-03-01T18:00:00Z' }];
 const people = [
@@ -28,15 +27,7 @@ const mountPage = () => mount(BadgePreparer, { props: { events, max: 100 } });
 describe('Préparer un badge : parcours unique', () => {
   beforeEach(() => { vi.unstubAllGlobals(); });
 
-  it('propose l’action principale dans le cadre « Badges et cartes », seulement avec les deux droits', () => {
-    page.props.auth.permissions = ['badges.gerer', 'listes.importer'];
-    expect(mount(BadgesCartesShell, { props: { active: 'visiteurs' } }).get('[data-testid=preparer-badge]').attributes('href')).toBe('/administration/badges/preparer');
-    page.props.auth.permissions = ['badges.gerer'];
-    expect(mount(BadgesCartesShell, { props: { active: 'visiteurs' } }).find('[data-testid=preparer-badge]').exists()).toBe(false);
-    page.props.auth.permissions = ['badges.gerer', 'listes.importer'];
-  });
-
-  it('parcourt personnes → vérification → génération → impression, sans lot ni réservation, avec un résultat honnête', async () => {
+  it('parcourt personne → détails → génération → impression, sans lot ni réservation, avec un résultat honnête', async () => {
     mockFetch({ '/preparer/personnes': { people }, '/preparer/recapitulatif': { plan }, '/preparer/generer': { complete: true, created: [{ badge_id: 'b1', code: 'B-009', visitor_id: 'p1', holder_id: null }], existing: [], failed: [], printable: ['b1'] } });
     const w = mountPage();
     expect(w.text()).toContain('aucune habilitation');

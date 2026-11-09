@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\BadgeIssuance;
 use App\Services\BadgeRefused;
+use App\Services\CardModels;
+use App\Services\SupportRegistry;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia;
 use Inertia\Response;
 
 /**
@@ -33,19 +35,33 @@ final class BadgePreparerController
         return $user;
     }
 
-    public function page(Request $request): Response
+    public function page(Request $request): Response|RedirectResponse
     {
         $this->authorize();
-        // Présélection venant d'une fiche d'activité : seuls des identifiants valides sont retenus ; l'éligibilité reste vérifiée côté serveur à chaque étape.
+
+        // Ancienne adresse du parcours : même espace de travail (registre, préparation, aperçu), présélection d'une fiche d'activité comprise.
+        return app(BadgesController::class)($request, app(SupportRegistry::class), $this);
+    }
+
+    /**
+     * Données de la colonne « Préparer un badge ». Présélection venant d'une fiche d'activité : seuls des identifiants valides sont retenus ; l'éligibilité reste vérifiée côté serveur à chaque étape.
+     *
+     * @return array<string, mixed>
+     */
+    public function workspaceProps(Request $request): array
+    {
+        // Le registre est ouvert à qui gère les badges ; la préparation exige en plus l'import des listes (le serveur le refuse de toute façon sur chaque appel).
+        $can = Gate::allows('listes.importer');
         $input = $request->validate(['activite' => 'nullable|uuid', 'ids' => 'nullable|string|max:4000']);
         $ids = array_values(array_filter(array_map('trim', explode(',', (string) ($input['ids'] ?? ''))), fn (string $id): bool => preg_match('/^[0-9a-f-]{36}$/i', $id) === 1));
         $preset = ! empty($input['activite']) && DB::table('events')->where('id', $input['activite'])->where('is_permanent', false)->exists() ? ['event' => $input['activite'], 'ids' => array_slice($ids, 0, BadgeIssuance::MAX_PER_CALL)] : null;
 
-        return Inertia::render('Admin/BadgePreparer', [
-            'events' => DB::table('events')->where('is_permanent', false)->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']))->whereNull('anonymized_at')->orderByDesc('starts_at')->get(['id', 'name', 'kind', 'starts_at', 'ends_at']),
+        return [
+            'canPrepare' => $can,
+            'events' => ! $can ? [] : DB::table('events')->where('is_permanent', false)->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']))->whereNull('anonymized_at')->orderByDesc('starts_at')->get(['id', 'name', 'kind', 'starts_at', 'ends_at']),
             'max' => BadgeIssuance::MAX_PER_CALL,
-            'preset' => $preset,
-        ]);
+            'preset' => $can ? $preset : null,
+        ];
     }
 
     /**
@@ -63,7 +79,7 @@ final class BadgePreparerController
             }
             $rows = DB::table('visitors as v')->join('categories as c', 'c.id', '=', 'v.category_id')->where('v.event_id', $data['event'])->whereNull('v.holder_id')->whereNull('v.withdrawn_at')
                 ->when($term !== '', fn ($q) => $q->whereRaw('lower(v.full_name) LIKE ?', [$like]))->orderByRaw('v.full_name COLLATE "C" ASC')->orderBy('v.id')->limit(100)
-                ->get(['v.id', 'v.full_name', 'v.organisation', 'c.name as category']);
+                ->get(['v.id', 'v.full_name', 'v.organisation', 'c.name as category', 'c.institutional_code as inst_code']);
             $ids = [];
             foreach ($rows as $r) {
                 $ids[] = (string) $r->id;
@@ -72,7 +88,7 @@ final class BadgePreparerController
         } else {
             $rows = DB::table('permanent_holders as h')->leftJoin('institutional_categories as c', 'c.code', '=', 'h.institutional_category')->where('h.status', 'actif')
                 ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->whereRaw('lower(h.full_name) LIKE ?', [$like])->orWhereRaw('lower(h.identifier) LIKE ?', [$like])))->orderBy('h.full_name')->limit(100)
-                ->get(['h.id', 'h.full_name', DB::raw('NULL as organisation'), 'c.label as category']);
+                ->get(['h.id', 'h.full_name', DB::raw('NULL as organisation'), 'c.label as category', 'h.institutional_category as inst_code']);
             $ids = [];
             foreach ($rows as $r) {
                 $ids[] = (string) $r->id;
@@ -85,10 +101,17 @@ final class BadgePreparerController
             $refused[$r['id']] = $r;
         }
         $people = [];
+        $models = [];
         foreach ($rows as $r) {
             $state = isset($existing[$r->id]) ? 'existant' : (isset($refused[$r->id]) ? 'non_eligible' : 'a_generer');
+            // Modèle institutionnel de la catégorie de la personne (référentiel unique CardModels) : indicatif avant génération ; sans catégorie institutionnelle, modèle neutre provisoire.
+            $code = $r->inst_code === null ? null : (string) $r->inst_code;
+            if ($code !== null && ! isset($models[$code])) {
+                $m = app(CardModels::class)->forCategory($code);
+                $models[$code] = ['code' => $code, 'label' => $m['label'], 'color' => $m['color'], 'mention' => $m['mention'], 'version' => $m['version'], 'validated' => $m['validated']];
+            }
             $people[] = ['id' => $r->id, 'name' => $r->full_name, 'organisation' => $r->organisation, 'category' => $r->category, 'state' => $state, 'code' => $existing[$r->id] ?? null,
-                'reason' => $refused[$r->id]['message'] ?? null];
+                'reason' => $refused[$r->id]['message'] ?? null, 'model' => $code === null ? null : $models[$code]];
         }
 
         return response()->json(['people' => $people])->header('Cache-Control', 'no-store, private');

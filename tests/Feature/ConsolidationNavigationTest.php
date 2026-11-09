@@ -51,6 +51,8 @@ const CN_ROUTES = [
     ['POST', 'administration/atelier/tirages/{run}/confirmation', ['can:badges.gerer'], ['throttle:atelier']],
     ['GET', 'administration/atelier/alignement', ['can:badges.gerer'], []],
     ['GET', 'administration/badges', ['can:badges.gerer'], []],
+    ['GET', 'administration/badges/supports', ['can:badges.gerer'], ['throttle:recherche']],
+    ['GET', 'administration/badges/lots', ['can:badges.gerer'], []],
     ['GET', 'administration/badges/modeles', ['can:badges.gerer'], []],
     ['POST', 'administration/badges/modeles/apercu', ['can:badges.gerer'], []],
     ['POST', 'administration/badges/modeles/personnes', ['can:badges.gerer', 'can:listes.importer'], []],
@@ -130,6 +132,7 @@ const CN_ADDED = [
     ['POST', 'administration/badges/preparer/recapitulatif', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/preparer/generer', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression/recapitulatif', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
+    ['POST', 'administration/badges/impression/donnees', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression/apercu', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
 ];

@@ -178,7 +178,7 @@ it('refuse des zones d’un autre événement et ne crée aucun journal en cas d
 it('affiche les badges en lecture seule sans jeton QR et filtre les réservations', function () {
     $admin = businessAccount('administrateur');
     $admin->update(['two_factor_confirmed_at' => now()]);
-    $this->actingAs($admin)->get('/administration/badges?reserved=oui')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Badges')->where('badges.total', 60)->missing('badges.data.0.qr_token'));
+    $this->actingAs($admin)->get('/administration/badges/lots?reserved=oui')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Badges')->where('badges.total', 60)->missing('badges.data.0.qr_token'));
     $this->post('/administration/badges', [])->assertStatus(405);
 });
 it('reçoit les droits sur les nouvelles tables sans élargir ceux du journal', function () {
