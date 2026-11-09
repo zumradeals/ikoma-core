@@ -211,7 +211,8 @@ it('distingue les postes administrativement actifs, les appareils synchronisés 
     $event = opActivityVisitor()['event'];
     $recent = (string) Str::uuid();
     $silent = (string) Str::uuid();
-    $base = ['event_id' => $event, 'token_hash' => hash('sha256', Str::random(16)), 'created_at' => now(), 'updated_at' => now()];
+    // Un appareil enrôlé porte toujours un poste (contrainte devices_enrolled_has_point).
+    $base = ['event_id' => $event, 'token_hash' => hash('sha256', Str::random(16)), 'point_code' => 'poste_2', 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()];
     $columns = collect(DB::getSchemaBuilder()->getColumnListing('devices'));
     foreach ([[$recent, now()->subMinute()], [$silent, now()->subDays(2)]] as [$id, $sync]) {
         $row = ['id' => $id, 'name' => 'Tablette fictive '.Str::random(4), ...$base, 'last_synced_at' => $sync];
