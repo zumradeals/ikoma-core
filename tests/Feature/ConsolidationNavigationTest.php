@@ -116,6 +116,7 @@ const CN_ROUTES = [
 
 /** Routes ajoutées volontairement par la consolidation (déclarées ici pour rester visibles). */
 const CN_ADDED = [
+    ['PUT', 'administration/personnes/{person}', ['can:listes.importer'], ['throttle:titulaires']],
     ['GET', 'administration/modeles', ['can:badges.gerer'], []],
     ['GET', 'administration/site', ['can:postes.gerer'], []],
     ['PUT', 'administration/site', ['can:postes.gerer'], []],

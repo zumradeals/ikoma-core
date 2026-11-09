@@ -1,14 +1,14 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
-const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
+const { post, get, put } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), put: vi.fn() }));
 let formErrors: Record<string, string> = {};
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => ({ props: { auth: { name: 'IKOMA ADMIN', permissions: ['listes.importer'] } } }),
   router: { get, post },
   Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
-  useForm: (data: object) => { const form: Record<string, unknown> = reactive({ ...data, errors: formErrors, processing: false, post, reset: vi.fn() }); form.transform = () => form; return form; },
+  useForm: (data: object) => { const form: Record<string, unknown> = reactive({ ...data, errors: formErrors, processing: false, post, put, reset: vi.fn() }); form.transform = () => form; return form; },
 }));
 
 import Personnes from '../../resources/js/pages/Admin/Personnes.vue';
@@ -191,5 +191,67 @@ describe('fiche d’une personne', () => {
     expect(wrapper.find('[data-testid=aucune-participation]').exists()).toBe(true);
     expect(wrapper.find('[data-testid=aucun-badge]').exists()).toBe(true);
     expect(wrapper.find('[data-testid=aucune-activite]').exists()).toBe(true);
+  });
+});
+
+describe('lot P2 : réutilisation d’une identité et correction', () => {
+  const open = (over: object = {}) => mount(Personnes, { props: { ...base, selected: profile({ holder: null, ...over }) } });
+  const lastForm = (mock: { mock: { contexts: unknown[] } }) => mock.mock.contexts.at(-1) as Record<string, unknown>;
+
+  it('ajoute un profil permanent à une personne existante, rattaché à son identité (aucune création de personne)', async () => {
+    post.mockReset();
+    const wrapper = open();
+    await wrapper.get('[data-testid=ajouter-profil-permanent]').trigger('click');
+    expect(wrapper.get('[data-testid=form-profil-permanent]').text()).toContain('aucune nouvelle personne');
+    await wrapper.get('[data-testid=form-profil-permanent]').trigger('submit');
+    expect(post).toHaveBeenCalledWith('/administration/titulaires', expect.objectContaining({ preserveScroll: true }));
+    expect(lastForm(post).person_id).toBe('p2');
+  });
+
+  it('n’offre pas d’ajouter un second profil permanent à une personne qui en a déjà un', () => {
+    const wrapper = mount(Personnes, { props: { ...base, selected: profile() } });
+    expect(wrapper.find('[data-testid=ajouter-profil-permanent]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid=form-profil-permanent]').exists()).toBe(false);
+  });
+
+  it('corrige l’identité par la route de la personne, avec confirmation d’homonyme si le serveur la demande', async () => {
+    put.mockReset();
+    formErrors = {};
+    const wrapper = open({ holder: null });
+    await wrapper.get('[data-testid=corriger-identite]').trigger('click');
+    expect((wrapper.get('[data-testid=form-correction]').find('input').element as HTMLInputElement).value).toBe('Awa');
+    await wrapper.get('[data-testid=form-correction]').trigger('submit');
+    expect(put).toHaveBeenCalledWith('/administration/personnes/p2', expect.objectContaining({ preserveScroll: true }));
+    expect(wrapper.find('[data-testid=confirmer-homonyme-correction]').exists()).toBe(false);
+  });
+
+  it('montre les personnes proches pendant la saisie et permet de les utiliser plutôt que d’en créer une autre', async () => {
+    get.mockReset();
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ results: [{ id: 'p9', full_name: 'Awa Fictive', organisation: 'Autre', participations: 1, permanent: false }] }) }));
+    vi.stubGlobal('fetch', fetchMock);
+    const wrapper = mount(Personnes, { props: base });
+    await wrapper.get('[data-testid=ajouter-personne]').trigger('click');
+    const inputs = wrapper.get('[data-testid=form-personne]').findAll('input');
+    await inputs[0].setValue('Awa');
+    await inputs[1].setValue('Fictive');
+    await new Promise(resolve => setTimeout(resolve, 450));
+    await flushPromises();
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining('/administration/personnes/recherche?q=Awa%20Fictive'), expect.anything());
+    expect(wrapper.get('[data-testid=personnes-proches]').text()).toContain('aucune nouvelle identité');
+    await wrapper.get('[data-testid=utiliser-personne-p9]').trigger('click');
+    expect(get).toHaveBeenCalledWith('/administration/personnes', expect.objectContaining({ personne: 'p9' }), expect.objectContaining({ only: ['selected', 'flash'] }));
+    expect(wrapper.find('[data-testid=form-personne]').exists()).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('crée une nouvelle personne permanente en une seule opération vers le registre des titulaires, avec la confirmation d’homonyme', async () => {
+    post.mockReset();
+    const wrapper = mount(Personnes, { props: base });
+    await wrapper.get('[data-testid=ajouter-personne]').trigger('click');
+    expect(wrapper.find('[data-testid=profil-nouvelle-personne]').exists()).toBe(false);
+    await wrapper.get('[data-testid=creer-permanent] input').setValue(true);
+    expect(wrapper.find('[data-testid=profil-nouvelle-personne]').exists()).toBe(true);
+    await wrapper.get('[data-testid=form-personne]').trigger('submit');
+    expect(post).toHaveBeenCalledWith('/administration/titulaires', expect.anything());
   });
 });

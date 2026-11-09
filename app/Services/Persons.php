@@ -74,6 +74,66 @@ final class Persons
     }
 
     /**
+     * Correction d'identité : `persons` est la référence canonique du nom, du prénom et de l'organisation.
+     * La correction s'écrit dans la personne ; le profil permanent ACTIF en est le miroir (propagé par la base) ; un profil clos, les participations,
+     * les journaux, les cartes et les badges déjà émis ne sont pas réécrits. Le journal ne contient que les champs corrigés, jamais les valeurs.
+     *
+     * @param  array{first_name?: ?string, last_name?: ?string, full_name?: ?string, organisation?: ?string}  $data
+     * @return list<string> champs modifiés
+     */
+    public function correct(User $actor, string $personId, array $data, bool $homonymConfirmed = false): array
+    {
+        abort_unless($actor->can('listes.importer'), 403);
+        $cleaner = app(Imports\ListAnalysis::class);
+
+        return DB::transaction(function () use ($actor, $personId, $data, $homonymConfirmed, $cleaner): array {
+            DB::statement('SELECT pg_advisory_xact_lock(hashtextextended(?, 7))', ['personnes']);
+            $person = DB::table('persons')->where('id', $personId)->lockForUpdate()->first() ?? abort(404);
+            // Seuls les champs FOURNIS sont corrigés : une correction du nom n'efface jamais l'organisation.
+            $new = ['first_name' => $person->first_name, 'last_name' => $person->last_name, 'full_name' => $person->full_name, 'organisation' => $person->organisation];
+            if (array_key_exists('first_name', $data) || array_key_exists('last_name', $data) || array_key_exists('full_name', $data)) {
+                $first = $cleaner->clean($data['first_name'] ?? '');
+                $last = $cleaner->clean($data['last_name'] ?? '');
+                $full = $first !== '' && $last !== '' ? $first.' '.$last : $cleaner->clean($data['full_name'] ?? '');
+                if (($first === '') !== ($last === '')) {
+                    throw ValidationException::withMessages(['last_name' => 'Indiquez le prénom et le nom ensemble, ou seulement le nom complet.']);
+                }
+                if ($full === '' || mb_strlen($full) > 160) {
+                    throw ValidationException::withMessages(['full_name' => 'Indiquez un nom de 1 à 160 caractères.']);
+                }
+                $new['first_name'] = $first !== '' ? $first : null;
+                $new['last_name'] = $last !== '' ? $last : null;
+                $new['full_name'] = $full;
+            }
+            if (array_key_exists('organisation', $data)) {
+                $org = $cleaner->clean($data['organisation'] ?? '');
+                $new['organisation'] = $org !== '' ? $org : null;
+            }
+            $changed = array_values(array_filter(array_keys($new), fn (string $f): bool => (string) ($person->{$f} ?? '') !== (string) ($new[$f] ?? '')));
+            if ($changed === []) {
+                return [];
+            }
+            $holder = DB::table('permanent_holders')->where('person_id', $personId)->first(['id', 'status']);
+            if (array_intersect($changed, ['full_name', 'organisation']) !== [] && $holder !== null && $holder->status === 'actif') {
+                // Même règle que pour un profil permanent : pas de doublon actif nom + organisation.
+                if (app(PermanentHolders::class)->classify($new, $holder->id, $personId) === 'doublon') {
+                    throw ValidationException::withMessages(['full_name' => 'Un titulaire actif porte déjà ce nom dans cette organisation : aucun doublon n’est créé.']);
+                }
+            }
+            if (in_array('full_name', $changed, true)) {
+                $other = array_filter($this->homonyms($new['full_name']), fn (object $h): bool => $h->id !== $personId);
+                if ($other !== [] && ! $homonymConfirmed) {
+                    throw ValidationException::withMessages(['full_name' => 'Une personne de même nom existe déjà ('.count($other).'). Confirmez qu’il s’agit bien d’une autre personne pour continuer.']);
+                }
+            }
+            DB::table('persons')->where('id', $personId)->update([...$new, 'updated_at' => now()]);
+            $this->audit->append('identite.corrigee', $actor->id, ['person_id' => $personId, 'champs' => $changed]);
+
+            return $changed;
+        });
+    }
+
+    /**
      * Historique complet d'une personne : identité, participations (toutes activités) et attributions de badges.
      *
      * @return array<string, mixed>

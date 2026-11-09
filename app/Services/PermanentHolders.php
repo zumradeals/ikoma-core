@@ -127,15 +127,49 @@ final class PermanentHolders
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data, User $actor, bool $confirmHomonym = false): string
+    /**
+     * Crée un profil permanent.
+     *  - Cas A (`$personId` fourni) : le profil se RATTACHE à une personne existante, explicitement choisie ; aucune ligne n'est créée dans `persons`.
+     *    Le nom et l'organisation viennent de la personne (référence canonique) ; seuls les champs du profil (fonction, qualité, catégorie, engagement) sont saisis.
+     *  - Cas B (sans `$personId`) : nouvelle personne + profil dans la même transaction. Si une personne de même nom existe déjà, la création n'a lieu
+     *    que sur confirmation explicite (`$confirmHomonym`) : aucun rapprochement ni fusion automatique sur le nom.
+     */
+    public function create(array $data, User $actor, bool $confirmHomonym = false, ?string $personId = null): string
     {
+        if ($personId !== null) {
+            return $this->guardRace(fn () => DB::transaction(fn (): string => $this->attachToPerson($personId, $data, $actor)));
+        }
         $clean = $this->clean($data);
 
         return $this->guardRace(fn () => DB::transaction(function () use ($clean, $actor, $confirmHomonym): string {
+            DB::statement('SELECT pg_advisory_xact_lock(hashtextextended(?, 7))', ['personnes']);
             $this->preventDuplicates($clean, null, $confirmHomonym);
 
             return $this->insertHolder($clean, $actor);
         }));
+    }
+
+    /**
+     * Rattache un profil permanent à une personne EXISTANTE (cas A). Verrouille la personne : deux demandes simultanées pour la même personne se
+     * suivent, la seconde est refusée (et l'index unique `permanent_holders_person_unique` reste le dernier garde-fou).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function attachToPerson(string $personId, array $data, User $actor): string
+    {
+        $person = DB::table('persons')->where('id', $personId)->lockForUpdate()->first()
+            ?? throw ValidationException::withMessages(['person_id' => 'Personne introuvable : sélectionnez une identité existante.']);
+        if ($person->status !== 'actif') {
+            throw ValidationException::withMessages(['person_id' => 'Cette personne est archivée : aucun profil permanent ne peut lui être ajouté.']);
+        }
+        if (DB::table('permanent_holders')->where('person_id', $personId)->exists()) {
+            throw ValidationException::withMessages(['person_id' => 'Cette personne a déjà un profil permanent : aucun second profil n’est créé.']);
+        }
+        $clean = $this->clean([...$data, 'full_name' => $person->full_name, 'first_name' => $person->first_name, 'last_name' => $person->last_name, 'organisation' => $person->organisation]);
+        // Référence canonique : l'identité est celle de `persons`, telle quelle.
+        $clean = [...$clean, 'full_name' => $person->full_name, 'first_name' => $person->first_name, 'last_name' => $person->last_name, 'organisation' => $person->organisation];
+
+        return $this->insertHolder($clean, $actor, ['identite' => 'reutilisee'], $personId);
     }
 
     /**
@@ -145,16 +179,16 @@ final class PermanentHolders
      * @param  array<string, mixed>  $clean
      * @param  array<string, mixed>  $audit  éléments non personnels ajoutés au journal (par exemple l'identifiant de l'import)
      */
-    public function insertHolder(array $clean, User $actor, array $audit = []): string
+    public function insertHolder(array $clean, User $actor, array $audit = [], ?string $personId = null): string
     {
         $sequence = (int) DB::selectOne("SELECT nextval('permanent_holder_identifier_seq') AS n")->n;
         $id = (string) Str::uuid();
         $identifier = $this->formatIdentifier($sequence);
         DB::table('permanent_holders')->insert([
-            'id' => $id, 'identifier' => $identifier, 'identifier_seq' => $sequence, ...$clean, 'status' => 'actif',
+            'id' => $id, 'identifier' => $identifier, 'identifier_seq' => $sequence, ...$clean, ...($personId !== null ? ['person_id' => $personId] : []), 'status' => 'actif',
             'created_by' => $actor->id, 'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
-        app(Audit::class)->append('titulaire.cree', $actor->id, ['holder_id' => $id, 'identifiant' => $identifier, ...$audit]);
+        app(Audit::class)->append('titulaire.cree', $actor->id, ['holder_id' => $id, 'identifiant' => $identifier, ...($personId !== null ? ['person_id' => $personId] : []), ...$audit]);
 
         return $id;
     }
@@ -250,8 +284,14 @@ final class PermanentHolders
             if ($changed === []) {
                 return [];
             }
-            if (array_intersect($changed, ['full_name', 'organisation']) !== []) {
-                $this->preventDuplicates($clean, $id, $confirmHomonym);
+            $identityFields = array_values(array_intersect($changed, ['full_name', 'first_name', 'last_name', 'organisation']));
+            if ($identityFields !== []) {
+                DB::statement('SELECT pg_advisory_xact_lock(hashtextextended(?, 7))', ['personnes']);
+                $this->preventDuplicates($clean, $id, $confirmHomonym, $holder->person_id);
+                // `persons` est la référence canonique : la correction s'y écrit d'abord ; le titulaire actif n'en est que le miroir (garde en base).
+                DB::table('persons')->where('id', $holder->person_id)->update(['first_name' => $clean['first_name'], 'last_name' => $clean['last_name'],
+                    'full_name' => $clean['full_name'], 'organisation' => $clean['organisation'], 'updated_at' => now()]);
+                app(Audit::class)->append('identite.corrigee', $actor->id, ['person_id' => $holder->person_id, 'holder_id' => $id, 'champs' => $identityFields]);
             }
             DB::table('permanent_holders')->where('id', $id)->update([...$clean, 'updated_by' => $actor->id, 'updated_at' => now()]);
             // La catégorie institutionnelle est une étiquette : la changer ne modifie aucune autorisation d'accès.
@@ -267,6 +307,9 @@ final class PermanentHolders
         try {
             return $action();
         } catch (QueryException $e) {
+            if ($e->getCode() === '23505' && str_contains($e->getMessage(), 'permanent_holders_person_unique')) {
+                throw ValidationException::withMessages(['person_id' => 'Cette personne a déjà un profil permanent : aucun second profil n’est créé.']);
+            }
             if ($e->getCode() === '23505') {
                 throw ValidationException::withMessages(['full_name' => 'Un titulaire actif porte déjà ce nom dans cette organisation : aucun doublon n’est créé.']);
             }
@@ -403,7 +446,7 @@ final class PermanentHolders
      *
      * @param  array<string, mixed>  $clean
      */
-    public function classify(array $clean, ?string $ignoreId = null): string
+    public function classify(array $clean, ?string $ignoreId = null, ?string $ignorePersonId = null): string
     {
         $same = DB::table('permanent_holders')->whereRaw('public.ikoma_normalize(full_name) = public.ikoma_normalize(?)', [$clean['full_name']])
             ->when($ignoreId !== null, fn ($q) => $q->where('id', '<>', $ignoreId))->lockForUpdate()->get(['id', 'status', 'organisation']);
@@ -415,18 +458,22 @@ final class PermanentHolders
             }
         }
 
-        return $same->isNotEmpty() ? 'homonyme' : 'ok';
+        // Une personne de même nom (profil permanent ou non) est signalée : jamais rapprochée ni fusionnée automatiquement, seulement confirmée ou choisie par l'administrateur.
+        $samePerson = DB::table('persons')->whereRaw('public.ikoma_normalize(full_name) = public.ikoma_normalize(?)', [$clean['full_name']])
+            ->when($ignorePersonId !== null, fn ($q) => $q->where('id', '<>', $ignorePersonId))->exists();
+
+        return $same->isNotEmpty() || $samePerson ? 'homonyme' : 'ok';
     }
 
     /** @param array<string, mixed> $clean */
-    private function preventDuplicates(array $clean, ?string $ignoreId, bool $confirmHomonym): void
+    private function preventDuplicates(array $clean, ?string $ignoreId, bool $confirmHomonym, ?string $ignorePersonId = null): void
     {
-        $state = $this->classify($clean, $ignoreId);
+        $state = $this->classify($clean, $ignoreId, $ignorePersonId);
         if ($state === 'doublon') {
             throw ValidationException::withMessages(['full_name' => 'Un titulaire actif porte déjà ce nom dans cette organisation : aucun doublon n’est créé.']);
         }
         if ($state === 'homonyme' && ! $confirmHomonym) {
-            throw ValidationException::withMessages(['confirm_homonym' => 'Un titulaire de même nom existe déjà (autre organisation ou titulaire clos). Confirmez qu’il s’agit d’une autre personne pour continuer.']);
+            throw ValidationException::withMessages(['confirm_homonym' => 'Une personne de même nom existe déjà (autre organisation, titulaire clos ou personne sans profil permanent). Si c’est la même personne, sélectionnez-la depuis « Personnes et habilitations » pour lui ajouter un profil permanent ; sinon confirmez qu’il s’agit d’une autre personne pour continuer.']);
         }
     }
 }
