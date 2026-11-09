@@ -75,7 +75,7 @@ describe('registre des personnes', () => {
     get.mockReset();
     const wrapper = mount(Personnes, { props: base });
     await wrapper.get('[data-testid=selectionner-personne-p2]').trigger('click');
-    expect(get).toHaveBeenCalledWith('/administration/personnes', { personne: 'p2', page: 1 }, expect.objectContaining({ only: ['selected'], preserveState: true }));
+    expect(get).toHaveBeenCalledWith('/administration/personnes', { personne: 'p2', page: 1 }, expect.objectContaining({ only: ['selected', 'flash'], preserveState: true }));
   });
 
   it('demande une confirmation explicite quand une personne de même nom existe, depuis le panneau de création', async () => {
@@ -146,7 +146,7 @@ describe('fiche en panneau', () => {
     get.mockReset();
     const wrapper = open();
     await wrapper.get('[data-testid=fermer-fiche]').trigger('click');
-    expect(get).toHaveBeenLastCalledWith('/administration/personnes', { page: 1 }, expect.objectContaining({ only: ['selected'] }));
+    expect(get).toHaveBeenLastCalledWith('/administration/personnes', { page: 1 }, expect.objectContaining({ only: ['selected', 'flash'] }));
     await wrapper.get('[data-testid=fiche-personne]').trigger('keydown', { key: 'Escape' });
     expect(get).toHaveBeenCalledTimes(2);
   });

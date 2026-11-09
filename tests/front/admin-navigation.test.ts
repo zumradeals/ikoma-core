@@ -96,6 +96,15 @@ describe('navigation d’administration', () => {
     expect(menu('tableau', ['postes.gerer']).ids).toEqual(['site', 'operations', 'administration']);
   });
 
+  it('n’affiche le message d’état que lorsque le serveur en a posé un', () => {
+    const none = menu('site-acces', ALL).wrapper;
+    expect(none.find('.admin-flash').exists()).toBe(false);
+    page.props.flash = { status: 'Configuration du poste enregistrée.' } as never;
+    expect(mount(AdminLayout, { props: { active: 'site-acces' } }).get('.admin-flash').text()).toContain('Configuration du poste enregistrée');
+    page.props.flash = {} as never;
+    expect(mount(AdminLayout, { props: { active: 'personnes' } }).find('.admin-flash').exists()).toBe(false);
+  });
+
   it('s’ouvre et se referme sur petit écran par un seul bouton', async () => {
     const { wrapper } = menu('tableau', ALL);
     const toggle = wrapper.get('[data-testid="ouvrir-menu"]');

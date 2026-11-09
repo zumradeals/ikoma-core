@@ -41,8 +41,8 @@ const params = (extra: Record<string, string | number | null> = {}) => {
 };
 function find() { router.get('/administration/personnes', params(), { preserveState: true, preserveScroll: true }); }
 function goto(page: number) { router.get('/administration/personnes', params({ page }), { preserveState: true, preserveScroll: true }); }
-function open(row: Row) { creating.value = false; ptab.value = 'identite'; router.get('/administration/personnes', params({ personne: row.id, page: props.meta.current_page }), { only: ['selected'], preserveState: true, preserveScroll: true, replace: true }); }
-function closePanel() { router.get('/administration/personnes', params({ page: props.meta.current_page }), { only: ['selected'], preserveState: true, preserveScroll: true, replace: true }); }
+function open(row: Row) { creating.value = false; ptab.value = 'identite'; router.get('/administration/personnes', params({ personne: row.id, page: props.meta.current_page }), { only: ['selected', 'flash'], preserveState: true, preserveScroll: true, replace: true }); }
+function closePanel() { router.get('/administration/personnes', params({ page: props.meta.current_page }), { only: ['selected', 'flash'], preserveState: true, preserveScroll: true, replace: true }); }
 
 // Fiche : tiroir sur écran étroit, panneau fixe sur grand écran.
 const wide = ref(false);

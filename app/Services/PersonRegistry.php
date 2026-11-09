@@ -55,6 +55,7 @@ final class PersonRegistry
 
     /**
      * @param  array{q?: ?string, statut?: ?string, institutionnel?: ?string, habilitations?: ?string}  $filters
+     * @return LengthAwarePaginator<int, \stdClass>
      */
     public function list(array $filters): LengthAwarePaginator
     {
@@ -95,7 +96,11 @@ final class PersonRegistry
         return $q->orderByRaw('public.ikoma_normalize(p.full_name)')->orderBy('p.id')->paginate(self::PER_PAGE)->withQueryString();
     }
 
-    /** Indicateurs réels : aucun chiffre illustratif. */
+    /**
+     * Indicateurs réels : aucun chiffre illustratif.
+     *
+     * @return array{personnes: int, habilitations_actives: int, a_echeance: int, retirees_ou_expirees: int, jours_echeance: int}
+     */
     public function kpis(): array
     {
         $now = $this->now();
@@ -111,7 +116,11 @@ final class PersonRegistry
         return ['personnes' => DB::table('persons')->count(), 'habilitations_actives' => $active, 'a_echeance' => $expiring, 'retirees_ou_expirees' => $ended, 'jours_echeance' => self::EXPIRY_DAYS];
     }
 
-    /** Statuts institutionnels disponibles pour le filtre (catégories réellement initialisées). */
+    /**
+     * Statuts institutionnels disponibles pour le filtre (catégories réellement initialisées).
+     *
+     * @return array<int, array{code: string, label: string}>
+     */
     public function institutionalOptions(): array
     {
         return DB::table('institutional_categories')->orderBy('code')->get(['code', 'label'])->map(fn ($c): array => ['code' => $c->code, 'label' => $c->label])->all();
