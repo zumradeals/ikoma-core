@@ -24,7 +24,7 @@ describe('Page Modèles institutionnels', () => {
   it('montre le cadre à trois onglets et les modèles institutionnels par catégorie', async () => {
     const wrapper = mountPage(); await flushPromises();
     expect(wrapper.get('[data-testid="onglet-modeles"]').attributes('aria-current')).toBe('page');
-    expect(wrapper.findAll('[data-testid^="onglet-"]').map(a => a.attributes('data-testid'))).toEqual(['onglet-registre', 'onglet-modeles', 'onglet-impression', 'onglet-cartes']);
+    expect(wrapper.findAll('[data-testid^="onglet-"]').map(a => a.attributes('data-testid'))).toEqual(['onglet-registre', 'onglet-modeles', 'onglet-impression', 'onglet-lots']);
     expect(wrapper.find('[data-testid="page-modeles-cartes"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="choix-categorie"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="enregistrer-modele"]').exists()).toBe(true);

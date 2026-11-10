@@ -18,7 +18,7 @@ const available = computed(() => Object.values(props.batchCounts ?? {}).flat().f
 </script>
 <template>
 <AdminLayout active="badges">
-    <BadgesCartesShell active="visiteurs" />
+    <BadgesCartesShell active="lots" />
 <h1 class="mb-3 text-display font-bold">Administration · Lots et réservations de badges</h1>
 <p class="mb-4"><Link href="/administration/badges" class="site-btn site-btn-blue" data-testid="retour-espace-travail">Retour à l’espace de travail « Badges et cartes »</Link></p>
 <p class="mb-4 max-w-4xl">Les badges des <strong>visiteurs temporaires</strong>, en trois temps : fabriquer un lot, l’affecter à un poste ou à un groupe, puis suivre. Aucun nom de personne n’apparaît ici.</p>

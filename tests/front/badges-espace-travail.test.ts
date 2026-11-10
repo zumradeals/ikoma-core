@@ -41,8 +41,8 @@ describe('espace de travail « Badges et cartes »', () => {
     expect(w.find('[data-testid=colonne-apercu]').exists()).toBe(true);
     expect(w.text()).not.toMatch(/Fabriquer|Affecter à un poste/);
     expect(w.get('[data-testid=registre-total]').text()).toBe('(9)');
-    expect(w.get('[data-testid=lien-lots]').attributes('href')).toBe('/administration/badges/lots');
-    expect(w.get('[data-testid=lien-lots]').text()).toContain('stock existant');
+    expect(w.find('[data-testid=lien-lots]').exists()).toBe(false);
+    expect(w.find('[data-testid=lien-mise-a-disposition]').exists()).toBe(false);
   });
 
   it('liste cartes et badges dans un même registre, avec type, état et impression, et filtre côté serveur', async () => {

@@ -73,12 +73,7 @@ const hide = (key: string) => (panel.value === key ? '' : 'hidden min-[1180px]:b
 
     <div class="grid items-start gap-4 min-[1180px]:grid-cols-[minmax(270px,1fr)_minmax(330px,1.15fr)_minmax(260px,.9fr)]" data-testid="espace-travail">
       <div class="min-w-0" :class="hide('registre')">
-        <SupportRegistryPanel ref="registry" :initial="registre" :filters="filters" :states="states" :selected-id="selected?.id ?? null" @select="select">
-          <template #footer>
-            <Link href="/administration/badges/lots" class="underline" data-testid="lien-lots">Lots et réservations (stock existant)</Link> ·
-            <Link href="/administration/badges/registre" class="underline" data-testid="lien-mise-a-disposition">Mise à disposition entre activités</Link>
-          </template>
-        </SupportRegistryPanel>
+        <SupportRegistryPanel ref="registry" :initial="registre" :filters="filters" :states="states" :selected-id="selected?.id ?? null" @select="select" />
       </div>
 
       <div class="min-w-0" :class="hide('preparer')">

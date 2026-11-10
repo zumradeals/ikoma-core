@@ -27,17 +27,22 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     // L'espace : quatre responsabilités, compteurs, rappel du poste d'accueil.
     await page.getByTestId('menu-badges-cartes').click();
     await expect(page).toHaveURL(/\/administration\/badges$/);
-    for (const key of ['registre', 'modeles', 'impression', 'cartes']) await expect(page.getByTestId(`onglet-${key}`)).toBeVisible();
+    for (const key of ['registre', 'modeles', 'impression', 'lots']) await expect(page.getByTestId(`onglet-${key}`)).toBeVisible();
     await expect(page.getByTestId('onglet-registre')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('compteurs-badges-cartes')).toBeVisible();
     await expect(page.getByTestId('rappel-accueil')).toContainText('acte distinct de la sortie physique');
     await noHorizontalScroll(page, `badges ${label}`);
     await page.screenshot({ path: `test-results/consolidation-badges-visiteurs-${label}.png`, fullPage: true });
 
-    // Personnel permanent : onglet dédié, actif sur sa page.
-    await page.getByTestId('onglet-cartes').click();
+    // Lots et réservations : onglet dédié (stock pour les visiteurs non annoncés), actif sur sa page.
+    await page.getByTestId('onglet-lots').click();
+    await expect(page.getByRole('heading', { name: 'Administration · Lots et réservations de badges' })).toBeVisible();
+    await expect(page.getByTestId('onglet-lots')).toHaveAttribute('aria-current', 'page');
+    await noHorizontalScroll(page, `lots ${label}`);
+    await page.screenshot({ path: `test-results/consolidation-lots-${label}.png`, fullPage: true });
+    // Personnel permanent : page toujours accessible (Personnes), sans onglet propre.
+    await page.goto('/administration/titulaires');
     await expect(page.getByTestId('page-titulaires')).toBeVisible();
-    await expect(page.getByTestId('onglet-cartes')).toHaveAttribute('aria-current', 'page');
     await noHorizontalScroll(page, `titulaires ${label}`);
     await page.screenshot({ path: `test-results/consolidation-cartes-${label}.png`, fullPage: true });
 

@@ -4,7 +4,7 @@ import { Link, usePage } from '@inertiajs/vue3';
 import AdminIcon from './AdminIcon.vue';
 
 /**
- * Cadre de l'espace « Badges et cartes » : quatre onglets (registre et cartes, modèles institutionnels, impression et historique, personnel permanent) et quatre compteurs réels.
+ * Cadre de l'espace « Badges et cartes » : quatre onglets (registre et cartes, modèles institutionnels, impression et historique, lots et réservations) et quatre compteurs réels.
  * Ce n'est pas une page : chaque onglet est la page existante de sa responsabilité. « Préparer un badge » est l'action principale de l'espace de travail, pas un onglet.
  * Un onglet n'est affiché que si l'utilisateur détient la permission de sa page d'arrivée ; le serveur reste l'autorité.
  */
@@ -12,17 +12,17 @@ type Summary = {
   visitors: { available: number; to_return: number; batches: number; print_runs: number }; cards: { holders: number; active: number; prints: number };
   totals?: { supports_actifs: number; cartes_permanentes: number; badges_visiteurs: number; tirages_30j: number };
 };
-const props = defineProps<{ active: 'registre' | 'visiteurs' | 'cartes' | 'modeles' | 'impression' | 'preparer'; titre?: boolean }>();
+const props = defineProps<{ active: 'registre' | 'visiteurs' | 'lots' | 'cartes' | 'modeles' | 'impression' | 'preparer'; titre?: boolean }>();
 const page = usePage<{ auth?: { permissions: string[] } | null; badgesCartes?: Summary | null }>();
 const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
 const tabs = [
   { key: 'registre', label: 'Registre et cartes', hint: 'Supports, préparer, consulter', href: '/administration/badges', permission: 'badges.gerer', icon: 'qr' },
   { key: 'modeles', label: 'Modèles institutionnels', hint: 'Aspect des badges et des cartes', href: '/administration/modeles', permission: 'badges.gerer', icon: 'pencil' },
   { key: 'impression', label: 'Impression et historique', hint: 'Suivi des tirages et réimpressions', href: '/administration/atelier', permission: 'badges.gerer', icon: 'print' },
-  { key: 'cartes', label: 'Personnel permanent', hint: 'Personnes permanentes et leurs cartes', href: '/administration/titulaires', permission: 'listes.importer', icon: 'users' },
+  { key: 'lots', label: 'Lots et réservations', hint: 'Stock de badges, réservations aux postes et aux cars', href: '/administration/badges/lots', permission: 'badges.gerer', icon: 'layers' },
 ] as const;
 const shown = computed(() => tabs.filter(tab => can(tab.permission)));
-// Les anciennes pages (lots, registre commun, fiche d'un badge) appartiennent à la responsabilité « Registre et cartes » ; le personnel permanent a son propre onglet.
+// La fiche d'un badge et la préparation relèvent de « Registre et cartes » ; les lots, réservations et mises à disposition (stock des visiteurs non annoncés) ont leur onglet.
 const current = computed(() => (['visiteurs', 'preparer'].includes(props.active) ? 'registre' : props.active));
 const summary = computed(() => page.props.badgesCartes ?? null);
 const kpis = computed(() => {

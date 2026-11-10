@@ -23,7 +23,7 @@ function submit() {
 </script>
 <template>
 <AdminLayout active="badges">
-    <BadgesCartesShell active="visiteurs" />
+    <BadgesCartesShell active="lots" />
 <h1 class="mb-3 text-display font-bold">Administration · Registre commun des badges</h1>
 <p class="mb-5 max-w-4xl">Un badge physique n’appartient à aucune activité : il est <strong>attribué pour un temps</strong> à une participation, <strong>restitué</strong>, puis peut servir une autre activité. Ici, vous mettez des badges <strong>disponibles</strong> à disposition d’une autre activité. Un badge attribué ou non restitué ne peut pas être déplacé.</p>
 <section class="admin-card mb-6 space-y-4" data-testid="mise-a-disposition-form">
