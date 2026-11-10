@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROD = ROOT / "scripts/security/s07-adoption-preflight.sh"
 DEV = ROOT / "scripts/security/s07-dev-preflight.sh"
 DIGEST = ("ghcr.io/zumradeals/ikoma-access-postgres-candidate@sha256:"
-          "972db7acac7096fe75a5918b8d4692f2199bdb07599d055082b0b2a5b88c731d")
+          "d98609e21a7a130dd6d7e308f072a3d4592bc6c54f3b1a0bcef4c3507bff78ab")
 
 class S07Safety(unittest.TestCase):
     def setUp(self):
