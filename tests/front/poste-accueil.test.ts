@@ -164,3 +164,31 @@ describe('tablette restée trop longtemps sans réseau (audit global F2)', () =>
     await disabled.unlock('482915'); expect(disabled.vault.unlocked).toBe(true); disabled.lock();
   });
 });
+
+describe('changement d’activité sur la tablette', () => {
+  const withSync = async () => {
+    const { repo, store } = await desk([visitor('v1', 'Koné Mariam')]);
+    const calls: string[] = [];
+    const sync = { sync: vi.fn(async () => { calls.push('sync'); }), request: vi.fn(async (method: string, url: string) => { calls.push(`${method} ${url}`); return { activites: [] }; }) };
+    const local = new LocalPosteRepository(repo.list.snapshot, (repo as unknown as { vault: PosteVault }).vault, store, { id: 'u1', name: 'Agent fictif' }, vi.fn(), 0, sync as never);
+    return { local, store, sync, calls };
+  };
+  it('envoie d’abord la file, change l’activité côté serveur, puis recharge la copie', async () => {
+    const { local, calls } = await withSync();
+    await local.switchActivity('e2');
+    expect(calls).toEqual(['sync', 'POST /poste/api/activite', 'sync']);
+  });
+  it('refuse de changer d’activité tant que des opérations ne sont pas envoyées', async () => {
+    const { local, store, sync } = await withSync();
+    vi.spyOn(store, 'count').mockResolvedValue(2);
+    await expect(local.switchActivity('e2')).rejects.toMatchObject({ code: 'operations_en_attente' });
+    expect(sync.request).not.toHaveBeenCalled();
+  });
+  it('demande le réseau pour changer d’activité', async () => {
+    const { local } = await withSync();
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await expect(local.switchActivity('e2')).rejects.toMatchObject({ code: 'reseau' });
+    await expect(local.activities()).rejects.toMatchObject({ code: 'reseau' });
+    vi.restoreAllMocks();
+  });
+});

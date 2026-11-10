@@ -163,6 +163,8 @@ Route::middleware(['auth'])->group(function (): void {
             Route::middleware(ResolvePoste::class)->group(function (): void {
                 Route::get('/poste/api/liste', [PosteSyncController::class, 'liste'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/liste/version', [PosteSyncController::class, 'version'])->middleware('can:visiteurs.rechercher');
+                Route::get('/poste/api/activites', [PosteSyncController::class, 'activites'])->middleware('can:visiteurs.rechercher');
+                Route::post('/poste/api/activite', [PosteSyncController::class, 'activite'])->middleware(['can:visiteurs.rechercher', 'throttle:sync']);
                 Route::post('/poste/api/sync', [PosteSyncController::class, 'sync'])->middleware(['can:visiteurs.rechercher', 'throttle:sync']);
                 Route::post('/poste/api/efface', [PosteSyncController::class, 'efface'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/contexte', [PosteApiController::class, 'contexte'])->middleware('can:visiteurs.rechercher');

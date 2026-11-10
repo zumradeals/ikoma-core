@@ -4,7 +4,7 @@ import AgentLayout from '../../layouts/AgentLayout.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { initial, reduce, stepNumber, validateBlockedReason, type Ev } from '../../poste/machine';
 import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../poste/repository';
-import { ApiError, type Avis, type DeskContext, type DeskSummary, type Fiche, type IdentityDocument, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
+import { ApiError, type ActivityChoice, type Avis, type DeskContext, type DeskSummary, type Fiche, type IdentityDocument, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
 import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.vue'; import PosteSelect from './PosteSelect.vue'; import StepSearch from './StepSearch.vue'; import StepFiche from './StepFiche.vue';
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
 import PosteFooter from './PosteFooter.vue'; import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
@@ -45,6 +45,27 @@ const syncLabel = computed(() => {
   return new Date(now.value).toDateString() === d.toDateString() ? `Aujourd’hui à ${time}` : `${shortDay(d)} à ${time}`;
 });
 const hasAlerts = computed(() => !online.value || !!props.sync?.needsLogin || !!props.sync?.stale || !!props.sync?.clockWarning || !!props.sync?.lastError);
+
+// Activité du jour : liste des activités autorisées (en ligne) ; le choix n'est possible qu'à l'étape de recherche, jamais pendant l'accueil d'une personne.
+const choices = ref<ActivityChoice[]>([]);
+async function refreshChoices() {
+  if (!repo.activities || !context.value || !online.value) return;
+  try { choices.value = await repo.activities(); } catch { /* hors ligne ou indisponible : la tablette garde l'activité en cours */ }
+}
+watch([context, online, () => props.sync?.lastSyncAt], () => { void refreshChoices(); });
+const canSwitch = computed(() => choices.value.length > 1 && online.value && ctx.value.step === 'recherche');
+function onSwitchActivity(event: Event) {
+  const id = (event.target as HTMLSelectElement).value;
+  const current = context.value?.event.id;
+  if (!id || id === current) return;
+  const name = choices.value.find(c => c.id === id)?.name ?? 'cette activité';
+  if (!window.confirm(`Passer à l’activité « ${name} » ? La liste de cette tablette sera remplacée.`)) { (event.target as HTMLSelectElement).value = current ?? ''; return; }
+  void run(async () => {
+    await repo.switchActivity!(id);
+    context.value = await repo.context(); fiche.value = null; ctx.value = initial(); homonyms.value = 1;
+    await refreshChoices(); await refreshSummary();
+  });
+}
 
 // Panneau du poste : recalculé quand l'agent revient à la recherche, quand la file ou la synchronisation changent.
 const summary = ref<DeskSummary | null>(null);
@@ -183,7 +204,8 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
         <div class="poste-titlebar">
           <div class="poste-title-block"><span class="poste-title-icon" aria-hidden="true"><AdminIcon name="users" :size="32" /></span><div><h1 class="poste-title" data-testid="titre-poste">Poste d’accueil <span>– Enregistrement d’un visiteur</span></h1><p>Accueil, identification et enregistrement de l’entrée.</p></div></div>
           <div class="poste-title-chips">
-            <p class="poste-chip-box"><AdminIcon name="calendar" :size="22" /> Événement : <strong>{{ context.event.name }}</strong></p>
+            <p v-if="choices.length > 1" class="poste-chip-box" data-testid="selecteur-activite"><AdminIcon name="calendar" :size="22" /> <label for="activite-du-jour">Événement :</label> <select id="activite-du-jour" class="poste-activity-select" :value="context.event.id" :disabled="!canSwitch" @change="onSwitchActivity"><option v-for="c in choices" :key="c.id" :value="c.id">{{ c.name }}</option></select></p>
+            <p v-else class="poste-chip-box"><AdminIcon name="calendar" :size="22" /> Événement : <strong>{{ context.event.name }}</strong></p>
             <p class="poste-chip-box"><AdminIcon name="layers" :size="22" /> Opérations en attente : <strong data-testid="en-attente">{{ sync ? sync.pending : pending }}</strong></p>
           </div>
         </div>

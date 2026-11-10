@@ -82,6 +82,10 @@ Inertia et Vue ne suffisent pas à eux seuls : une navigation Inertia demande un
 
 Deux tablettes hors ligne pourraient attribuer le même badge. Parade : **chaque poste d'accueil reçoit son propre lot de badges réservé**. Si un conflit survient malgré tout, il est signalé au superviseur comme alerte à traiter, jamais écrasé silencieusement.
 
+### 4.3 Tablette permanente et activité du jour (décision du dirigeant)
+
+Une tablette est un équipement permanent du site : elle se crée sans événement et reçoit de l'administrateur la liste des activités qu'elle peut utiliser. L'agent choisit l'activité du jour sur la tablette, parmi ces seules activités ; la tablette ne garde qu'une copie à la fois (celle de l'activité du jour) et changer d'activité demande le réseau, après envoi de toute la file. Détails et écarts : `docs/ailct/V1-POSTE-MULTI-POSTES-EVENEMENTS.md`.
+
 ## 5. Modules applicatifs
 
 > **Nomenclature fondatrice ratifiée le 31/10/2026 :**

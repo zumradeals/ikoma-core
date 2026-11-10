@@ -36,7 +36,7 @@ final class ListSnapshot
 
         // Cartes permanentes, habilitations et politiques de zone : toute révocation ou habilitation modifiée change la version et est donc reprise à la prochaine synchronisation.
         // Le point de contrôle du poste (et donc ses capacités) fait partie de la copie : le modifier change la version.
-        return sha1((string) $row->v.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-').'|'.md5(json_encode([PostCapabilities::capabilities($poste), PostCapabilities::requiresDirection($poste)], JSON_THROW_ON_ERROR)));
+        return sha1((string) $row->v.'|'.$e.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-').'|'.md5(json_encode([PostCapabilities::capabilities($poste), PostCapabilities::requiresDirection($poste)], JSON_THROW_ON_ERROR)));
     }
 
     private function groupMode(): string

@@ -1,4 +1,4 @@
-import { ApiError, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput, type PassageDirection, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult } from '../types';
+import { ApiError, type ActivityChoice, type DeskSummary, type Avis, type Checkpoint, type ControlResult, type DeskContext, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type PointRef, type Poste, type SearchResult, type UnlistedInput, type PassageDirection, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult } from '../types';
 import type { GroupPosteRepository } from '../repository';
 import { posteGate, OP_POLICY } from './capabilities';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
@@ -74,6 +74,24 @@ export class LocalPosteRepository implements GroupPosteRepository {
   }
   /** Portrait de la personne, en ligne seulement : hors ligne ou sans portrait, l'accueil affiche l'initiale. */
   async portrait(visitorId: string): Promise<Blob | null> { return this.sync && this.online ? this.sync.image('/poste/api/visiteurs/' + encodeURIComponent(visitorId) + '/portrait') : null; }
+  /** Activités autorisées pour cette tablette, lues sur le serveur : hors ligne, la liste reste celle de l'activité en cours. */
+  async activities(): Promise<ActivityChoice[]> {
+    if (!this.sync || !this.online) throw new ApiError('reseau', 'Changer d’activité demande le réseau.');
+    return (await this.sync.request<{ activites: ActivityChoice[] }>('GET', '/poste/api/activites', undefined, undefined, 4000)).activites;
+  }
+
+  /**
+   * Change l'activité du jour. Toute la file est d'abord envoyée : l'ancienne activité n'est jamais changée sous des opérations en attente ;
+   * ensuite la synchronisation recharge la copie de la nouvelle activité (la version de la liste dépend de l'activité).
+   */
+  async switchActivity(eventId: string): Promise<void> {
+    if (!this.sync || !this.online) throw new ApiError('reseau', 'Changer d’activité demande le réseau : reconnectez la tablette.');
+    await this.sync.sync();
+    if ((await this.store.count('pending')) > 0) throw new ApiError('operations_en_attente', 'Des opérations ne sont pas encore envoyées : attendez la fin de l’envoi avant de changer d’activité.');
+    await this.sync.request('POST', '/poste/api/activite', { event_id: eventId }, undefined, 6000);
+    await this.sync.sync();
+  }
+
   async listPostes(): Promise<Poste[]> {
     const s = this.list.snapshot;
     return [{ id: s.poste.id, name: s.poste.name, station: s.poste.station, event_id: s.poste.event_id, event_name: s.event.name }];

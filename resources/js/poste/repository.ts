@@ -1,6 +1,6 @@
 import type { ArrivalResult, BoardResult, GroupSummary, GroupView } from './local/group';
 import type { PermanentResult } from './local/permanent';
-import { ApiError, type PassageDirection, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
+import { ApiError, type ActivityChoice, type PassageDirection, type ExpectedVisit, type IncidentsView, type VehicleMove, type VehicleResult, type Avis, type Checkpoint, type ControlResult, type DeskContext, type DeskSummary, type ExitResult, type GiveBackResult, type Fiche, type IdentityDocument, type Poste, type PointRef, type SearchResult, type UnlistedInput } from './types';
 
 /**
  * Tous les accès aux données du poste passent par cette interface (plan, section 4.1). Le lot L5 n'a qu'une implémentation (appels JSON) ;
@@ -17,6 +17,10 @@ export interface PosteRepository {
   search(query: string, categoryId?: string | null): Promise<SearchResult[]>;
   /** Portrait de la personne (en ligne seulement) ; absent ou hors ligne : null. */
   portrait?(visitorId: string): Promise<Blob | null>;
+  /** Activités que cette tablette peut choisir (en ligne seulement). */
+  activities?(): Promise<ActivityChoice[]>;
+  /** Change l'activité du jour : envoie d'abord la file, puis recharge la copie de la nouvelle activité (en ligne seulement). */
+  switchActivity?(eventId: string): Promise<void>;
   /** Recherche d'une personne permanente, en lecture seule ; absent quand le poste travaille directement sur le serveur. */
   searchPermanent?(query: string): Promise<PermanentResult[]>;
   /** Véhicules (S09), EN LIGNE UNIQUEMENT : recherche par plaque, entrée et sortie. Absent quand le poste n'a pas ces opérations. */

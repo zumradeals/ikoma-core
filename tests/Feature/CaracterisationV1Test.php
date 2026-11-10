@@ -25,6 +25,8 @@ const CV_ROUTES = [
     ['POST', 'poste/api/enroler', ['can:visiteurs.rechercher'], []],
     ['GET', 'poste/api/liste', ['can:visiteurs.rechercher'], []],
     ['GET', 'poste/api/liste/version', ['can:visiteurs.rechercher'], []],
+    ['GET', 'poste/api/activites', ['can:visiteurs.rechercher'], []],
+    ['POST', 'poste/api/activite', ['can:visiteurs.rechercher'], ['throttle:sync']],
     ['POST', 'poste/api/sync', ['can:visiteurs.rechercher'], ['throttle:sync']],
     ['POST', 'poste/api/efface', ['can:visiteurs.rechercher'], []],
     ['GET', 'poste/api/contexte', ['can:visiteurs.rechercher'], []],

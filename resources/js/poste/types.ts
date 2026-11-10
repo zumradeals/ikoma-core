@@ -1,6 +1,8 @@
 export type Category = { id: string; name: string; color: string; priority_circuit: boolean; visitor_count?: number };
 export type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string };
 export type DeskContext = { poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string; starts_at?: string; ends_at?: string; site?: string | null }; visitor_count?: number; present_count?: number; absent_count?: number; hosts: { id: string; name: string; service: string | null }[]; categories: Category[] };
+/** Activité que la tablette peut choisir (autorisée par l'administrateur, encore ouverte). */
+export type ActivityChoice = { id: string; name: string; starts_at: string; ends_at: string; current: boolean };
 /** Situation d'accès d'une personne dans la liste de l'accueil : « Autorisé » seulement dans la période, sans refus, avant l'entrée. */
 export type Access = 'autorise' | 'hors_periode' | 'refuse' | 'present' | 'sorti';
 export type SearchResult = { id: string; full_name: string; organisation: string | null; host: string | null; homonyms: number; category: Category; job_title?: string | null; access?: Access; has_portrait?: boolean };

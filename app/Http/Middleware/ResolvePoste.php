@@ -28,7 +28,9 @@ class ResolvePoste
         if ($device->revoked_at !== null && ! $isWipeReceipt) {
             return response()->json(['code' => 'appareil_revoque', 'message' => 'Cette tablette a été révoquée : ses données locales vont être effacées.', 'action' => null], 401);
         }
-        if (! $isWipeReceipt) {
+        // Choisir une autre activité reste possible quand l'activité en cours est clôturée (c'est justement la sortie de cette situation).
+        $isActivityChoice = $request->is('poste/api/activites') || ($request->is('poste/api/activite') && $request->isMethod('POST'));
+        if (! $isWipeReceipt && ! $isActivityChoice) {
             EventAvailability::requireOpen($device->event_id);
         }
         $request->attributes->set('poste', $device);
