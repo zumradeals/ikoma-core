@@ -5,6 +5,7 @@ import StepFiche from '../../resources/js/components/poste/StepFiche.vue';
 import StepDecision from '../../resources/js/components/poste/StepDecision.vue';
 import StepDone from '../../resources/js/components/poste/StepDone.vue';
 import StepSearch from '../../resources/js/components/poste/StepSearch.vue';
+import PosteFooter from '../../resources/js/components/poste/PosteFooter.vue';
 import StepIdentity from '../../resources/js/components/poste/StepIdentity.vue';
 import UnlistedForm from '../../resources/js/components/poste/UnlistedForm.vue';
 import PosteApp from '../../resources/js/components/poste/PosteApp.vue';
@@ -194,5 +195,49 @@ describe('application du poste', () => {
     await wrapper.get('input.field').setValue('B-015'); await wrapper.get('form[aria-label="Saisir le code du badge"]').trigger('submit'); await flushPromises();
     expect(refused).toHaveBeenCalledTimes(2); expect(wrapper.text()).toContain('Étape 6 sur 7');
     expect(refused.mock.calls[0][0]).not.toBe(refused.mock.calls[1][0]); // un autre code est une autre opération
+  });
+});
+
+describe('écran de recherche conforme à la maquette', () => {
+  const people = [result({ id: 'a', full_name: 'Koné Mariam' }), result({ id: 'b', full_name: 'Yao Brou', category: vip }), result({ id: 'c', full_name: 'Traoré Awa' })];
+  const mountSearch = async () => {
+    const wrapper = mount(StepSearch, { props: { repository: fakeRepo({ search: async () => people, visitor: async () => fiche({ id: 'a' }) }), eventName: 'Événement fictif' } });
+    await flushPromises(); return wrapper;
+  };
+  it('filtre les résultats affichés par catégorie, avec le nombre de personnes de chaque onglet', async () => {
+    const wrapper = await mountSearch();
+    const tabs = wrapper.get('[data-testid="onglets-categories"]');
+    expect(tabs.text()).toContain('Tous (3)'); expect(tabs.text()).toContain('Visiteur (2)'); expect(tabs.text()).toContain('VIP (1)');
+    await tabs.findAll('button').find(b => b.text().startsWith('VIP'))!.trigger('click');
+    expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] li')).toHaveLength(1);
+    await tabs.findAll('button')[0].trigger('click');
+    expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] li')).toHaveLength(3);
+  });
+  it('affiche l’aperçu d’une ligne touchée sans quitter l’étape, et « Continuer » sélectionne cette personne', async () => {
+    const wrapper = await mountSearch();
+    expect(wrapper.get('[data-testid="apercu-vide"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="continuer-enregistrement"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('[data-testid="ligne-a"]').trigger('click'); await flushPromises();
+    expect(wrapper.emitted('select')).toBeUndefined();
+    expect(wrapper.get('[data-testid="apercu-nom"]').text()).toBe('Koné Mariam');
+    expect(wrapper.get('[data-testid="apercu-statut"]').text()).toBe('Dans la période');
+    expect(wrapper.get('[data-testid="apercu-personne"]').text()).toContain('Événement fictif');
+    await wrapper.get('[data-testid="continuer-enregistrement"]').trigger('click');
+    expect(wrapper.emitted('select')![0][0]).toMatchObject({ id: 'a' });
+  });
+  it('le bouton « Sélectionner » d’une ligne enregistre directement, sans passer par l’aperçu', async () => {
+    const wrapper = await mountSearch();
+    await wrapper.get('[data-testid="ligne-c"] button').trigger('click');
+    expect(wrapper.emitted('select')![0][0]).toMatchObject({ id: 'c' });
+  });
+  it('la barre basse dit l’état réel : dernière synchronisation, poste, verrouillage', async () => {
+    const sync = { online: true, syncing: false, pending: 0, conflicts: 0, lastSyncAt: '2027-01-10T10:42:00Z', lastError: null, needsLogin: false, revoked: false, stale: false, clockWarning: false };
+    const wrapper = mount(PosteFooter, { props: { poste: 'Poste fictif A', agent: 'Agent fictif', online: true, sync } });
+    expect(wrapper.text()).toContain('Enrôlé'); expect(wrapper.text()).toContain('Poste fictif A'); expect(wrapper.text()).toContain('Poste déverrouillé');
+    expect(wrapper.get('[data-testid="bloc-synchronisation"]').text()).toContain('À jour');
+    await wrapper.get('[data-testid="verrouiller"]').trigger('click'); expect(wrapper.emitted('lock')).toHaveLength(1);
+    await wrapper.get('[data-testid="synchroniser"]').trigger('click'); expect(wrapper.emitted('sync')).toHaveLength(1);
+    const never = mount(PosteFooter, { props: { poste: null, agent: 'A', online: false, sync: { ...sync, lastSyncAt: null } } });
+    expect(never.get('[data-testid="derniere-sync"]').text()).toBe('jamais'); expect(never.text()).not.toContain('À jour');
   });
 });
