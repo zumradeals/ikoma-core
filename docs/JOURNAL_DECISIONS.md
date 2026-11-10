@@ -848,3 +848,6 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Garde-fous en base : déclencheur « zone du site seulement » (`ikoma_require_site_zone`), déclencheur de non-modification/non-suppression (`ikoma_site_entitlement_guard`), contrainte de période, motif de retrait obligatoire côté service.
 - Remise à zéro de démonstration : les deux tables ajoutées au TRUNCATE de `ikoma_reset_demo_business` (sans CASCADE, comme le contrat l'exige).
 - Reporté au lot 4 : politique de zone du site (autorisation hors ligne, classification) et jugement à l'entrée.
+## deploy.sh : plus de 502 après une reconstruction
+- Constat : après un redéploiement, le conteneur nginx de la pile gardait l'ancienne adresse interne de PHP (502) et le test HTTPS final, lancé trop tôt, faisait échouer le script.
+- Décision : `deploy.sh` redémarre le service nginx de la pile après le démarrage, puis réessaie le test HTTPS pendant 30 secondes au plus. Le test reste strict (pas de `curl -k`) et la configuration TLS existante n'est toujours pas touchée.
