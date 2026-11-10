@@ -31,6 +31,14 @@ SQL);
         DB::statement('DROP TRIGGER IF EXISTS devices_activity_sync ON devices');
         DB::statement('CREATE TRIGGER devices_activity_sync AFTER INSERT ON devices FOR EACH ROW EXECUTE FUNCTION public.ikoma_device_activity_sync()');
 
+        // Remise à zéro globale : la vérification différée « activité en cours autorisée » est exécutée avant TRUNCATE (qui refuse des contrôles en attente).
+        $business = (string) DB::selectOne("SELECT pg_get_functiondef('public.ikoma_reset_demo_business(uuid,boolean)'::regprocedure) AS d")->d;
+        $business = str_replace('-- SANS CASCADE :', "SET CONSTRAINTS public.devices_current_activity_authorized IMMEDIATE;\n    -- SANS CASCADE :", $business, $count);
+        if ($count !== 1) {
+            throw new RuntimeException('Fonction de remise à zéro (globale) inattendue : revue du contrat requise.');
+        }
+        DB::unprepared($business);
+
         $event = (string) DB::selectOne("SELECT pg_get_functiondef('public.ikoma_reset_demo_event(uuid)'::regprocedure) AS d")->d;
         $event = str_replace('DELETE FROM public.devices WHERE event_id = p_event;', "DELETE FROM public.devices WHERE event_id = p_event;\n    DELETE FROM public.device_activities WHERE event_id = p_event;", $event, $count);
         if ($count !== 1) {
