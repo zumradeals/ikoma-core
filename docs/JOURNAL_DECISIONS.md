@@ -848,3 +848,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Garde-fous en base : déclencheur « zone du site seulement » (`ikoma_require_site_zone`), déclencheur de non-modification/non-suppression (`ikoma_site_entitlement_guard`), contrainte de période, motif de retrait obligatoire côté service.
 - Remise à zéro de démonstration : les deux tables ajoutées au TRUNCATE de `ikoma_reset_demo_business` (sans CASCADE, comme le contrat l'exige).
 - Reporté au lot 4 : politique de zone du site (autorisation hors ligne, classification) et jugement à l'entrée.
+
+## Tablette de site, lot 3 : décisions du dirigeant
+- Présence du site = personnel permanent seulement ; visiteurs comptés par activité.
+- Conservation des mouvements du site : durée des mouvements d'activité, réglage dans l'écran Administration ; pas de suppression automatique sans réglage.
+- Présence par contexte jusqu'au lot 6 (fusion par identité à la reprise).

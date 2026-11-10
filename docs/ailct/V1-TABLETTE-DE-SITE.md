@@ -69,3 +69,8 @@ Pas de contrôle à l'entrée (lot 4), pas d'alertes du site (`alerts.event_id` 
 
 ### Critères de validation
 Tests Pest : mouvement du site sans événement accepté, mouvement mixte refusé en base, présence recalculée après entrée/sortie/correction, correction unique, lecture réservée à `presences.consulter`, tableaux d'activité inchangés (mêmes chiffres qu'avant), remise à zéro de démonstration. CI complète verte.
+
+### Décisions du dirigeant sur le lot 3 (recommandations approuvées)
+1. « Présents sur le site » compte **uniquement le personnel permanent** ; les visiteurs restent comptés par activité.
+2. Conservation des mouvements du site : **même durée que les mouvements d'activité**, réglée dans l'écran Administration (jamais dans le code) ; sans réglage, aucune suppression automatique.
+3. Avant le lot 6, un titulaire entré via une activité (ancien mode) et un mouvement du site ont **chacun leur présence** ; la fusion par identité se fait à la reprise du lot 6.
