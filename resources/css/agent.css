@@ -285,3 +285,5 @@
  .poste-row-check { grid-area:chk; } .poste-row-name { grid-area:name; } .poste-row-org { grid-area:org; } .poste-row-cat { grid-area:cat; } .poste-row-status { grid-area:sta; } .poste-select { grid-area:act; align-self:center; }
 }
 @media (min-width:1650px) { .poste-search { grid-template-columns:minmax(0,1fr) 26rem !important; } }
+.poste-activity-select { min-height:40px; max-width:18rem; padding:4px 8px; border:1px solid #cbdcee; border-radius:8px; background:white; font-weight:700; color:var(--inst-primary); }
+.poste-activity-select:disabled { opacity:.7; }

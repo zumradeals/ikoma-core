@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Audit;
 use App\Services\EventAvailability;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -82,6 +83,43 @@ final class Devices
             }
             DB::table('devices')->where('id', $device->id)->update(['event_id' => $eventId, 'updated_at' => now()]);
             $this->audit->append('poste.activite_en_cours', $actor->id, ['device_id' => $device->id, 'event_id' => $eventId]);
+        });
+    }
+
+    /**
+     * Activités que cette tablette peut choisir : celles que l'administrateur a autorisées et qui sont encore ouvertes.
+     *
+     * @return list<array{id:string,name:string,starts_at:string,ends_at:string,current:bool}>
+     */
+    public function choices(Device $device): array
+    {
+        return DB::table('device_activities as a')->join('events as e', 'e.id', '=', 'a.event_id')
+            ->where('a.device_id', $device->id)->where('e.is_permanent', false)->whereNull('e.anonymized_at')
+            ->where(fn ($q) => $q->whereNull('e.status')->orWhereNotIn('e.status', ['clos', 'archive']))
+            ->orderBy('e.starts_at')->orderBy('e.name')->get(['e.id', 'e.name', 'e.starts_at', 'e.ends_at'])
+            ->map(fn ($e) => ['id' => $e->id, 'name' => $e->name, 'starts_at' => Carbon::parse($e->starts_at)->toIso8601String(), 'ends_at' => Carbon::parse($e->ends_at)->toIso8601String(), 'current' => $e->id === $device->event_id])->all();
+    }
+
+    /**
+     * L'agent change l'activité du jour de sa tablette, parmi les activités autorisées et ouvertes. Le client envoie d'abord toute sa file ; les opérations
+     * saisies entre-temps pour l'ancienne activité sont refusées par le serveur (visiteur inconnu) : jamais appliquées à la mauvaise activité.
+     */
+    public function switchActivity(Device $device, string $eventId, User $agent): void
+    {
+        DB::transaction(function () use ($device, $eventId, $agent): void {
+            $device = Device::query()->lockForUpdate()->findOrFail($device->id);
+            if ($device->revoked_at !== null || $device->token_hash === null) {
+                throw new DeskRefused('appareil_non_enrole', 'Cette tablette n’est pas enrôlée.', 409);
+            }
+            if (! DB::table('device_activities')->where('device_id', $device->id)->where('event_id', $eventId)->exists()) {
+                throw new DeskRefused('activite_non_autorisee', 'Cette activité n’est pas autorisée pour cette tablette : demandez à l’administrateur.', 403);
+            }
+            EventAvailability::requireOpen($eventId);
+            if ($device->event_id === $eventId) {
+                return;
+            }
+            DB::table('devices')->where('id', $device->id)->update(['event_id' => $eventId, 'updated_at' => now()]);
+            $this->audit->append('poste.activite_changee', $agent->id, ['device_id' => $device->id, 'de' => $device->event_id, 'vers' => $eventId]);
         });
     }
 

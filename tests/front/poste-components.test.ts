@@ -271,3 +271,33 @@ describe('portrait de la personne à l’accueil', () => {
     withPhoto.unmount(); expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:portrait-fictif');
   });
 });
+
+describe('activité du jour choisie par l’agent', () => {
+  beforeEach(() => { window.localStorage.clear(); });
+  const choices = [{ id: 'e1', name: 'Activité fictive A', starts_at: '2026-11-02T08:00:00Z', ends_at: '2099-11-14T18:00:00Z', current: true }, { id: 'e2', name: 'Activité fictive B', starts_at: '2026-11-02T08:00:00Z', ends_at: '2099-11-14T18:00:00Z', current: false }];
+  const mountDesk = async (over: Partial<PosteRepository> = {}) => {
+    let event = { id: 'e1', name: 'Activité fictive A' };
+    const switchActivity = vi.fn(async (id: string) => { event = choices.find(c => c.id === id)!; });
+    const repo = fakeRepo({ context: async () => ({ poste: { id: 'p1', name: 'Tablette A', station: 'Poste fictif A', event_id: event.id }, event, hosts: [], categories: [] }), activities: async () => choices, switchActivity, ...over });
+    const wrapper = mount(PosteApp, { props: { agent: 'Agent fictif', repository: repo } });
+    await flushPromises(); await wrapper.get('ul button').trigger('click'); await flushPromises();
+    return { wrapper, switchActivity };
+  };
+  it('propose les activités autorisées et change d’activité après confirmation, en repartant de la recherche', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { wrapper, switchActivity } = await mountDesk();
+    const select = wrapper.get('[data-testid="selecteur-activite"] select');
+    expect((select.element as HTMLSelectElement).value).toBe('e1'); expect(select.findAll('option')).toHaveLength(2);
+    await select.setValue('e2'); await flushPromises();
+    expect(switchActivity).toHaveBeenCalledWith('e2');
+    expect(wrapper.text()).toContain('Étape 1 sur 7');
+  });
+  it('ne change rien si l’agent refuse la confirmation, et n’affiche pas de sélecteur avec une seule activité', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { wrapper, switchActivity } = await mountDesk();
+    await wrapper.get('[data-testid="selecteur-activite"] select').setValue('e2'); await flushPromises();
+    expect(switchActivity).not.toHaveBeenCalled();
+    const single = await mountDesk({ activities: async () => [choices[0]] });
+    expect(single.wrapper.find('[data-testid="selecteur-activite"]').exists()).toBe(false);
+  });
+});

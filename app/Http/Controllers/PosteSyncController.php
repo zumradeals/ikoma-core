@@ -33,6 +33,21 @@ final class PosteSyncController
         return response()->json(['version' => $snapshot->version($this->poste($r)), 'server_time' => now()->utc()->format('Y-m-d\TH:i:s.u\Z')]);
     }
 
+    /** Activités que cette tablette peut choisir (autorisées par l'administrateur, encore ouvertes). */
+    public function activites(Request $r, Devices $devices): JsonResponse
+    {
+        return response()->json(['activites' => $devices->choices($this->poste($r))]);
+    }
+
+    /** Change l'activité du jour de la tablette (l'agent choisit parmi les activités autorisées). */
+    public function activite(Request $r, Devices $devices): JsonResponse
+    {
+        $data = $r->validate(['event_id' => 'required|uuid']);
+        $devices->switchActivity($this->poste($r), $data['event_id'], $r->user());
+
+        return response()->json(['activites' => $devices->choices($this->poste($r)->refresh())]);
+    }
+
     public function sync(Request $r, SyncProcessor $processor): JsonResponse
     {
         $data = $r->validate(['sent_at' => 'nullable|date', 'operations' => 'required|array|min:1|max:'.SyncProcessor::MAX_OPERATIONS, 'operations.*' => 'array']);
