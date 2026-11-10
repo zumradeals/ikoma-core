@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
 import { displayDate } from '../../labels';
 type Poste = { id: string; name: string; station: string | null; point_code?: string | null; event_id: string | null; event_name: string; activities: string[]; wipe_acknowledged_at?: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
@@ -9,6 +9,8 @@ const props = defineProps<{
   newCode: { device_id: string; code: string } | null; conflicts: { id: string; kind: string; reason: string; operation_type: string | null; created_at: string; device_name: string }[];
 }>();
 const create = useForm({ event_ids: [] as string[], name: '', station: '', point_code: '' });
+const page = usePage<{ errors?: Record<string, string> }>();
+const refusal = (p: Poste) => page.props.errors?.['poste_' + p.id] ?? null;
 const chosen = reactive<Record<string, string[]>>({}); const current = reactive<Record<string, string>>({});
 const selection = (p: Poste) => (chosen[p.id] ??= [...p.activities]);
 const toggle = (p: Poste, id: string, on: boolean) => { const list = selection(p); const at = list.indexOf(id); if (on && at < 0) list.push(id); if (!on && at >= 0) list.splice(at, 1); };
@@ -45,7 +47,8 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <p v-if="poste.state === 'revoque'" class="my-3">{{ poste.wipe_acknowledged_at ? 'Effacement déclaré par la tablette.' : poste.enrolled_at ? 'Effacement en attente : reconnectez la tablette.' : 'Poste retiré sans enrôlement antérieur.' }}</p><p class="my-3"><span class="inline-flex items-center gap-2 rounded-full border-2 border-ikoma-blue px-4 py-2 font-semibold"><span aria-hidden="true">{{ states[poste.state][0] }}</span>{{ states[poste.state][1] }}</span><span v-if="poste.code_pending" class="ml-3">Un code d’enrôlement est en attente.</span></p>
 <p>Dernière synchronisation : {{ poste.last_synced_at ? displayDate(poste.last_synced_at) : 'jamais' }}</p>
 <p data-testid="compteurs">Opérations reçues : <strong>{{ poste.received }}</strong> · appliquées : <strong>{{ poste.applied }}</strong> · en conflit : <strong>{{ poste.conflicts }}</strong></p>
-<fieldset class="my-4 space-y-2" :data-testid="'activites-' + poste.id"><legend class="font-semibold">Activités autorisées</legend><label v-for="event in events" :key="event.id" class="flex items-center gap-3"><input type="checkbox" class="size-5" :checked="selection(poste).includes(event.id)" :disabled="poste.event_id === event.id" @change="toggle(poste, event.id, ($event.target as HTMLInputElement).checked)"> {{ event.name }}<span v-if="poste.event_id === event.id" class="text-sm text-slate-600">(activité en cours)</span></label><button type="button" class="action" @click="saveActivities(poste)">Enregistrer les activités</button>
+<p v-if="refusal(poste)" role="alert" class="my-3 rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" :data-testid="'refus-' + poste.id">⚠ {{ refusal(poste) }}</p>
+<fieldset class="my-4 space-y-2" :data-testid="'activites-' + poste.id"><legend class="font-semibold">Activités autorisées</legend><p v-if="!events.length" class="rounded-lg border border-dashed p-3 text-slate-700" data-testid="aucune-activite">Aucune activité n’existe pour l’instant : créez d’abord une activité (menu Activités), puis revenez cocher celles que cette tablette peut utiliser.</p><label v-for="event in events" :key="event.id" class="flex items-center gap-3"><input type="checkbox" class="size-5" :checked="selection(poste).includes(event.id)" :disabled="poste.event_id === event.id" @change="toggle(poste, event.id, ($event.target as HTMLInputElement).checked)"> {{ event.name }}<span v-if="poste.event_id === event.id" class="text-sm text-slate-600">(activité en cours)</span></label><button type="button" class="action" @click="saveActivities(poste)">Enregistrer les activités</button>
 <div v-if="poste.state !== 'enrole'" class="flex flex-wrap items-end gap-3"><label class="block">Activité en cours<select v-model="current[poste.id]" class="field"><option value="">Choisir…</option><option v-for="event in events.filter(e => poste.activities.includes(e.id))" :key="event.id" :value="event.id">{{ event.name }}</option></select></label><button type="button" class="action" :disabled="!current[poste.id]" @click="setCurrent(poste)">Définir comme activité en cours</button></div></fieldset>
 <div class="mt-4 flex flex-wrap gap-4"><button type="button" class="action" @click="router.post(`/administration/postes/${poste.id}/code`)">{{ poste.state === 'enrole' ? 'Réenrôler : nouveau code' : 'Générer un code d’enrôlement' }}</button><button v-if="poste.state !== 'revoque'" type="button" class="min-h-14 rounded-xl border-2 border-red-700 px-6 py-3 font-semibold text-red-800" @click="revoke(poste)">{{ poste.state === 'enrole' ? 'Révoquer ce poste' : 'Retirer ce poste' }}</button></div>
 </BaseCard>

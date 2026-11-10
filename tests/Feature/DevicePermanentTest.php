@@ -90,3 +90,12 @@ it('garde les réservations de badges d’une activité intactes quand la tablet
     $other = DB::table('badges')->where('event_id', $this->a)->where('id', '!=', $badge->id)->first();
     expect(fn () => DB::transaction(fn () => DB::table('badges')->where('id', $other->id)->update(['reserved_device_id' => (string) Str::uuid()])))->toThrow(QueryException::class);
 });
+
+it('affiche le refus d’un code d’enrôlement dans la page (pas en JSON brut) quand aucune activité n’est autorisée', function () {
+    $device = $this->devices->create(null, 'Tablette fictive sans activité', null, $this->admin, 'poste_1');
+    $this->post('/administration/postes/'.$device->id.'/code')->assertRedirect()->assertSessionHasErrors(['poste_'.$device->id]);
+    expect(session('errors')->first('poste_'.$device->id))->toContain('Aucune activité');
+    $this->devices->authorize($device, [$this->a], $this->admin);
+    $this->post('/administration/postes/'.$device->id.'/code')->assertRedirect()->assertSessionHasNoErrors();
+    expect(session('enrol_code.device_id'))->toBe($device->id);
+});
