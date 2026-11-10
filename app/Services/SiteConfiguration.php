@@ -40,10 +40,47 @@ final class SiteConfiguration
             'checkpoints' => $checkpoints,
             'catalogue' => PostCapabilities::CATALOGUE,
             'unassigned' => $tablets->whereNull('checkpoint_id')->where('state', '!=', 'revoque')->values()->all(),
+            'site_zones' => DB::table('zones')->whereNull('event_id')->orderBy('name')->get(['id', 'name'])->map(fn ($z) => ['id' => $z->id, 'name' => $z->name])->all(),
             'zones' => DB::table('zones as z')->join('events as e', 'e.id', '=', 'z.event_id')->orderBy('e.name')->orderBy('z.name')->get(['z.id', 'z.name', 'z.event_id', 'e.name as event_name']),
             'history' => DB::table('device_assignments as a')->join('devices as d', 'd.id', '=', 'a.device_id')->leftJoin('checkpoints as p', 'p.id', '=', 'a.checkpoint_id')->leftJoin('users as u', 'u.id', '=', 'a.assigned_by')
                 ->orderByDesc('a.assigned_at')->orderByDesc('a.id')->limit(25)->get(['a.id', 'd.name as device', 'p.name as checkpoint', 'a.assigned_at', 'a.ended_at', 'a.reason', 'u.name as by']),
         ];
+    }
+
+    /** Crée une zone du site (permanente, sans événement). */
+    public function createSiteZone(string $name, User $actor): string
+    {
+        $this->authorize($actor);
+        $name = (string) $this->text($name, 120, 'name', true);
+
+        return DB::transaction(function () use ($name, $actor): string {
+            DB::statement('SELECT pg_advisory_xact_lock(731904)');
+            $siteId = (string) DB::table('sites')->orderBy('created_at')->orderBy('id')->value('id');
+            if (DB::table('zones')->where('site_id', $siteId)->whereNull('event_id')->whereRaw('lower(name) = lower(?)', [$name])->exists()) {
+                throw ValidationException::withMessages(['name' => 'Une zone du site porte déjà ce nom.']);
+            }
+            $id = (string) Str::uuid();
+            DB::table('zones')->insert(['id' => $id, 'event_id' => null, 'site_id' => $siteId, 'name' => $name, 'created_at' => now(), 'updated_at' => now()]);
+            $this->audit->append('site.zone_creee', $actor->id, ['zone_id' => $id]);
+
+            return $id;
+        });
+    }
+
+    public function renameSiteZone(string $zoneId, string $name, User $actor): void
+    {
+        $this->authorize($actor);
+        $name = (string) $this->text($name, 120, 'name', true);
+        DB::transaction(function () use ($zoneId, $name, $actor): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731904)');
+            $zone = DB::table('zones')->where('id', $zoneId)->whereNull('event_id')->lockForUpdate()->first(['id', 'site_id']);
+            abort_if($zone === null, 404);
+            if (DB::table('zones')->where('site_id', $zone->site_id)->whereNull('event_id')->where('id', '<>', $zoneId)->whereRaw('lower(name) = lower(?)', [$name])->exists()) {
+                throw ValidationException::withMessages(['name' => 'Une zone du site porte déjà ce nom.']);
+            }
+            DB::table('zones')->where('id', $zoneId)->update(['name' => $name, 'updated_at' => now()]);
+            $this->audit->append('site.zone_renommee', $actor->id, ['zone_id' => $zoneId]);
+        });
     }
 
     public function renameSite(string $name, User $actor): void

@@ -16,9 +16,12 @@ type Checkpoint = { id: string; code: string; name: string; function_label: stri
 type SiteZone = { id: string; name: string; event_id: string; event_name: string };
 const props = defineProps<{
   site: { id: string; name: string } | null; checkpoints: Checkpoint[]; catalogue: Record<string, string>; unassigned: Tablet[];
-  zones: SiteZone[];
+  zones: SiteZone[]; site_zones?: { id: string; name: string }[];
   history: { id: string; device: string; checkpoint: string | null; assigned_at: string; ended_at: string | null; reason: string | null; by: string | null }[];
 }>();
+const siteZoneName = ref(''); const renaming = reactive<Record<string, string>>({});
+const addSiteZone = () => { const name = siteZoneName.value.trim(); if (name) router.post('/administration/site/zones', { name }, { preserveScroll: true, onSuccess: () => { siteZoneName.value = ''; } }); };
+const renameSiteZone = (id: string) => { const name = (renaming[id] ?? '').trim(); if (name) router.put(`/administration/site/zones/${id}`, { name }, { preserveScroll: true, onSuccess: () => { delete renaming[id]; } }); };
 const page = usePage<{ errors?: Record<string, string> }>();
 const errors = computed(() => Object.values(page.props.errors ?? {}));
 const stateLabel = { non_enrole: 'Non enrôlée', enrole: 'Enrôlée', revoque: 'Révoquée' } as const;
@@ -209,7 +212,18 @@ function toggleCreate(capability: string, on: boolean) {
       <!-- Zones -->
       <section v-else-if="tab === 'zones'" id="panneau-zones" role="tabpanel" aria-labelledby="tab-zones" class="admin-card space-y-3" data-testid="panneau-zones">
         <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-heading font-bold">Zones ({{ zones.length }})</h2><Link href="/administration/zones" class="btn-soft" data-testid="gerer-zones">Gérer les zones</Link></div>
-        <p class="text-slate-700">Les zones sont définies dans les activités. Un poste ne juge une zone que s’il lui est associé.</p>
+        <section class="space-y-2 rounded-xl border border-slate-200 p-3" aria-labelledby="zones-site-titre" data-testid="zones-du-site">
+          <h3 id="zones-site-titre" class="font-bold">Zones du site (permanentes, sans événement)</h3>
+          <p class="text-sm text-slate-700">Les zones du site existent indépendamment de toute activité : elles serviront aux habilitations du personnel permanent et au contrôle sur site.</p>
+          <ul v-if="site_zones?.length" class="divide-y">
+            <li v-for="z in site_zones" :key="z.id" class="flex flex-wrap items-center gap-2 py-2" :data-testid="'zone-site-' + z.id"><strong class="min-w-0 flex-1">{{ z.name }}</strong>
+              <input v-model="renaming[z.id]" class="field !min-h-10 max-w-56" maxlength="120" :placeholder="'Renommer'" :aria-label="'Nouveau nom de ' + z.name"><button type="button" class="btn-soft" @click="renameSiteZone(z.id)">Renommer</button></li>
+          </ul>
+          <p v-else data-testid="aucune-zone-site">Aucune zone du site pour l’instant.</p>
+          <form class="flex flex-wrap items-end gap-2" aria-label="Créer une zone du site" @submit.prevent="addSiteZone"><label class="block">Nom de la zone<input v-model="siteZoneName" class="field" maxlength="120" required data-testid="nom-zone-site"></label><button type="submit" class="admin-primary" data-testid="creer-zone-site">Créer la zone du site</button></form>
+        </section>
+        <h3 class="font-bold">Zones des activités</h3>
+        <p class="text-slate-700">Les zones des activités sont définies dans chaque activité. Un poste ne juge une zone que s’il lui est associé.</p>
         <p v-if="!zones.length" data-testid="aucune-zone">Aucune zone n’est définie.</p>
         <ul v-else class="divide-y">
           <li v-for="z in zones" :key="z.id" class="space-y-1 py-2" :data-testid="'zone-liste-' + z.id">
