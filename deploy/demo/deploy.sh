@@ -63,6 +63,8 @@ if ss -ltnH "sport = :$PORT" 2>/dev/null | grep -q . && ! $COMPOSE ps --status r
 fi
 echo "Port local de l'application : 127.0.0.1:$PORT"
 $COMPOSE up -d --build --wait
+# Le conteneur web peut garder l'ancienne adresse interne de PHP après une reconstruction (erreur 502) : on le redémarre pour qu'il la retrouve.
+$COMPOSE restart nginx >/dev/null 2>&1 || true
 
 say "6/7 Aucun réensemencement fictif automatique"
 echo "Comptes, événements et visiteurs existants conservés. Aucun compte ou visiteur fictif créé."
@@ -88,8 +90,12 @@ case "$WEB" in
       echo "Vhost existant préservé : $CONF ; aucun Certbot lancé."
       # Vérifie le certificat réellement servi en local (SNI + nom de domaine), sans ignorer TLS.
       # Ne cherche jamais à réparer un problème Nginx en écrasant le vhost sur un VPS mutualisé.
-      if ! curl --noproxy '*' --fail --silent --show-error --max-time 15 \
-        --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/sante" >/dev/null; then
+      TLS_OK=0
+      for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if curl --noproxy '*' --fail --silent --max-time 15 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/sante" >/dev/null; then TLS_OK=1; break; fi
+        sleep 3
+      done
+      if [ "$TLS_OK" != 1 ]; then
         fail "HTTPS existant invalide sur $DOMAIN : vérifiez les vhosts Nginx et le certificat présenté (SNI). Le déploiement n'a pas touché à la configuration TLS."
       fi
     else
