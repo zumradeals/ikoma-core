@@ -57,7 +57,7 @@ describe('registre des personnes', () => {
   it('garde un chemin vers l’import de liste et les fiches d’invités, retirés du menu', () => {
     const wrapper = mount(Personnes, { props: base });
     expect(wrapper.get('[data-testid=importer-liste]').attributes('href')).toBe('/administration/imports');
-    expect(wrapper.get('[data-testid=fiches-invites]').attributes('href')).toBe('/administration/invites');
+    expect(wrapper.find('[data-testid=fiches-invites]').exists()).toBe(false); // les fiches d’invités et le personnel permanent ont leurs onglets
   });
 
   it('cherche et filtre par le serveur, sans valeur vide, et pagine', async () => {

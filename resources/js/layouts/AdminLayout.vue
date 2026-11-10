@@ -29,6 +29,8 @@ const menus: Menu[] = [
   ] },
   { key: 'personnes', label: 'Personnes et habilitations', icon: 'users', items: [
     { key: 'personnes', label: 'Personnes', icon: 'users', href: '/administration/personnes', permission: 'listes.importer', match: ['imports'] },
+    { key: 'invites', label: 'Fiches des invités', icon: 'users', href: '/administration/invites', permission: 'listes.importer' },
+    { key: 'titulaires', label: 'Personnel permanent', icon: 'qr', href: '/administration/titulaires', permission: 'listes.importer' },
     { key: 'habilitations', label: 'Habilitations par zone', icon: 'shield', href: '/administration/habilitations', permission: 'listes.importer' },
     { key: 'categories-institutionnelles', label: 'Catégories institutionnelles', icon: 'tag', href: '/administration/categories-institutionnelles', permission: 'categories.gerer' },
   ] },
@@ -37,7 +39,7 @@ const menus: Menu[] = [
     { key: 'categories', label: 'Catégories', icon: 'tag', href: '/administration/categories', permission: 'categories.gerer' },
   ] },
   { key: 'badges-cartes', label: 'Badges et cartes', icon: 'qr', items: [
-    { key: 'badges-cartes', label: 'Badges et cartes', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer', match: ['badges', 'titulaires', 'modeles', 'modeles-cartes', 'atelier', 'atelier-parcours'] },
+    { key: 'badges-cartes', label: 'Badges et cartes', icon: 'qr', href: '/administration/badges', permission: 'badges.gerer', match: ['badges', 'modeles', 'modeles-cartes', 'atelier'] },
   ] },
   { key: 'operations', label: 'Opérations', icon: 'monitor', items: [
     { key: 'supervision', label: 'Supervision', icon: 'monitor', href: '/administration/operations', permission: 'pilotage.consulter' },
