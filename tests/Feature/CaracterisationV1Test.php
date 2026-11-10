@@ -51,6 +51,8 @@ const CV_ROUTES = [
     ['GET', 'administration/postes', ['can:postes.gerer'], []],
     ['POST', 'administration/postes', ['can:postes.gerer'], []],
     ['PUT', 'administration/postes/reglages', ['can:postes.gerer'], []],
+    ['PUT', 'administration/postes/{device}/activite', ['can:postes.gerer'], []],
+    ['PUT', 'administration/postes/{device}/activites', ['can:postes.gerer'], []],
     ['POST', 'administration/postes/{device}/code', ['can:postes.gerer'], []],
     ['POST', 'administration/postes/{device}/revoquer', ['can:postes.gerer'], []],
     ['GET', 'administration/demonstration', ['can:comptes.gerer'], []],

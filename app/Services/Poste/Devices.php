@@ -6,6 +6,7 @@ use App\Models\Device;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\EventAvailability;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -21,7 +22,7 @@ final class Devices
 
     public function __construct(private readonly Audit $audit) {}
 
-    public function create(string $eventId, string $name, ?string $station, User $actor, string $pointCode): Device
+    public function create(?string $eventId, string $name, ?string $station, User $actor, string $pointCode): Device
     {
         if (! array_key_exists($pointCode, PostCapabilities::points())) {
             throw new DeskRefused('point_inconnu', 'Point de contrôle inconnu.', 422);
@@ -35,6 +36,75 @@ final class Devices
         });
     }
 
+    /**
+     * Activités que l'administrateur autorise pour cette tablette. L'activité en cours ne peut pas être retirée ; une activité qui porte encore
+     * des badges réservés à cette tablette non plus (la base le refuse). Aucune activité n'est visible par défaut.
+     *
+     * @param  list<string>  $eventIds
+     */
+    public function authorize(Device $device, array $eventIds, User $actor): void
+    {
+        $eventIds = array_values(array_unique($eventIds));
+        DB::transaction(function () use ($device, $eventIds, $actor): void {
+            $device = Device::query()->lockForUpdate()->findOrFail($device->id);
+            if ($device->event_id !== null && ! in_array($device->event_id, $eventIds, true)) {
+                throw new DeskRefused('activite_en_cours', 'L’activité en cours de cette tablette ne peut pas être retirée : choisissez d’abord une autre activité en cours.', 422);
+            }
+            $known = DB::table('events')->whereIn('id', $eventIds)->where('is_permanent', false)->pluck('id')->all();
+            if (count($known) !== count($eventIds)) {
+                throw new DeskRefused('activite_inconnue', 'Activité inconnue.', 422);
+            }
+            $current = DB::table('device_activities')->where('device_id', $device->id)->pluck('event_id')->all();
+            foreach (array_diff($eventIds, $current) as $eventId) {
+                DB::table('device_activities')->insert(['id' => (string) Str::uuid(), 'device_id' => $device->id, 'event_id' => $eventId, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            foreach (array_diff($current, $eventIds) as $eventId) {
+                try {
+                    DB::transaction(fn () => DB::table('device_activities')->where('device_id', $device->id)->where('event_id', $eventId)->delete());
+                } catch (QueryException) {
+                    throw new DeskRefused('activite_utilisee', 'Cette activité garde des badges réservés à cette tablette : libérez-les avant de la retirer.', 422);
+                }
+            }
+            $this->audit->append('poste.activites_modifiees', $actor->id, ['device_id' => $device->id, 'event_ids' => $eventIds]);
+        });
+    }
+
+    /** Choisit l'activité en cours parmi les activités autorisées ; refusé tant que la tablette est enrôlée (la copie hors ligne serait changée sous ses pieds). */
+    public function setCurrent(Device $device, string $eventId, User $actor): void
+    {
+        DB::transaction(function () use ($device, $eventId, $actor): void {
+            $device = Device::query()->lockForUpdate()->findOrFail($device->id);
+            if ($device->token_hash !== null && $device->revoked_at === null) {
+                throw new DeskRefused('tablette_enrolee', 'Cette tablette est enrôlée : révoquez-la puis réenrôlez-la pour changer son activité en cours.', 409);
+            }
+            if (! DB::table('device_activities')->where('device_id', $device->id)->where('event_id', $eventId)->exists()) {
+                throw new DeskRefused('activite_non_autorisee', 'Cette activité n’est pas autorisée pour cette tablette.', 422);
+            }
+            DB::table('devices')->where('id', $device->id)->update(['event_id' => $eventId, 'updated_at' => now()]);
+            $this->audit->append('poste.activite_en_cours', $actor->id, ['device_id' => $device->id, 'event_id' => $eventId]);
+        });
+    }
+
+    /**
+     * Une tablette sans activité en cours en reçoit une quand l'administrateur n'en a autorisé qu'une seule ; sinon l'enrôlement attend un choix explicite.
+     */
+    private function ensureCurrentActivity(Device $device): Device
+    {
+        if ($device->event_id !== null) {
+            return $device;
+        }
+        $authorized = DB::table('device_activities')->where('device_id', $device->id)->pluck('event_id')->all();
+        if ($authorized === []) {
+            throw new DeskRefused('aucune_activite', 'Aucune activité n’est autorisée pour cette tablette : autorisez-en au moins une dans l’administration.', 422);
+        }
+        if (count($authorized) > 1) {
+            throw new DeskRefused('activite_a_choisir', 'Choisissez l’activité en cours de cette tablette dans l’administration avant de l’enrôler.', 422);
+        }
+        DB::table('devices')->where('id', $device->id)->update(['event_id' => $authorized[0], 'updated_at' => now()]);
+
+        return $device->refresh();
+    }
+
     /** Génère un code à afficher une seule fois ; seul son hachage est conservé. */
     public function issueCode(Device $device, User $actor): string
     {
@@ -46,6 +116,7 @@ final class Devices
             $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
         }
         DB::transaction(function () use ($device, $code, $actor): void {
+            $device = $this->ensureCurrentActivity($device);
             EventAvailability::requireOpen($device->event_id);
             DB::table('devices')->where('id', $device->id)->update(['enrollment_hash' => self::hash($code), 'enrollment_expires_at' => now()->addMinutes(self::CODE_VALID_MINUTES), 'updated_at' => now()]);
             $this->audit->append('poste.code_emis', $actor->id, ['device_id' => $device->id]);
@@ -74,6 +145,7 @@ final class Devices
                 $this->audit->append('poste.enrolement_refuse', $agent->id, ['raison' => 'code_invalide']);
                 throw new DeskRefused('code_invalide', 'Code d’enrôlement invalide ou expiré : demandez-en un nouveau à l’administrateur.', 422);
             }
+            $device = $this->ensureCurrentActivity($device);
             EventAvailability::requireOpen($device->event_id);
             if ($device->point_code === null) {
                 throw new DeskRefused('poste_non_identifie', 'Ce poste n’a pas de point de contrôle identifié : demandez à l’administrateur de le préciser.', 422);
