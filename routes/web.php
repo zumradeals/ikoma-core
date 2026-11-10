@@ -193,6 +193,8 @@ Route::middleware(['auth'])->group(function (): void {
 
         Route::get('/administration/site', [SiteAccesController::class, 'index'])->middleware('can:postes.gerer');
         Route::put('/administration/site', [SiteAccesController::class, 'rename'])->middleware('can:postes.gerer');
+        Route::post('/administration/site/zones', [SiteAccesController::class, 'createZone'])->middleware('can:postes.gerer');
+        Route::put('/administration/site/zones/{zone}', [SiteAccesController::class, 'renameZone'])->whereUuid('zone')->middleware('can:postes.gerer');
         Route::post('/administration/site/postes', [SiteAccesController::class, 'createCheckpoint'])->middleware('can:postes.gerer');
         Route::put('/administration/site/postes/{checkpoint}', [SiteAccesController::class, 'updateCheckpoint'])->whereUuid('checkpoint')->middleware('can:postes.gerer');
         Route::post('/administration/site/postes/{checkpoint}/activation', [SiteAccesController::class, 'activation'])->whereUuid('checkpoint')->middleware('can:postes.gerer');

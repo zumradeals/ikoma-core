@@ -32,6 +32,22 @@ final class SiteAccesController
         return back()->with('status', 'Nom du site enregistré.');
     }
 
+    public function createZone(Request $request, SiteConfiguration $site): RedirectResponse
+    {
+        Gate::authorize('postes.gerer');
+        $site->createSiteZone((string) $request->validate(['name' => 'required|string|max:120'])['name'], $request->user());
+
+        return back()->with('status', 'Zone du site créée.');
+    }
+
+    public function renameZone(Request $request, string $zone, SiteConfiguration $site): RedirectResponse
+    {
+        Gate::authorize('postes.gerer');
+        $site->renameSiteZone($zone, (string) $request->validate(['name' => 'required|string|max:120'])['name'], $request->user());
+
+        return back()->with('status', 'Zone du site renommée.');
+    }
+
     public function createCheckpoint(Request $request, SiteConfiguration $site): RedirectResponse
     {
         Gate::authorize('postes.gerer');

@@ -109,6 +109,8 @@ const CN_ADDED = [
     ['GET', 'administration/site', ['can:postes.gerer'], []],
     ['PUT', 'administration/site', ['can:postes.gerer'], []],
     ['POST', 'administration/site/postes', ['can:postes.gerer'], []],
+    ['POST', 'administration/site/zones', ['can:postes.gerer'], []],
+    ['PUT', 'administration/site/zones/{zone}', ['can:postes.gerer'], []],
     ['PUT', 'administration/site/postes/{checkpoint}', ['can:postes.gerer'], []],
     ['POST', 'administration/site/postes/{checkpoint}/activation', ['can:postes.gerer'], []],
     ['POST', 'administration/site/tablettes/{device}/affectation', ['can:postes.gerer'], []],
