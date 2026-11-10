@@ -217,10 +217,10 @@ function toggleCreate(capability: string, on: boolean) {
           <p class="text-sm text-slate-700">Les zones du site existent indépendamment de toute activité : elles serviront aux habilitations du personnel permanent et au contrôle sur site.</p>
           <ul v-if="site_zones?.length" class="divide-y">
             <li v-for="z in site_zones" :key="z.id" class="flex flex-wrap items-center gap-2 py-2" :data-testid="'zone-site-' + z.id"><strong class="min-w-0 flex-1">{{ z.name }}</strong>
-              <input v-model="renaming[z.id]" class="field !min-h-10 max-w-56" maxlength="120" :placeholder="'Renommer'" :aria-label="'Nouveau nom de ' + z.name"><button type="button" class="btn-soft" @click="renameSiteZone(z.id)">Renommer</button></li>
+              <input v-model="renaming[z.id]" class="field !min-h-10 max-w-56" maxlength="120" :placeholder="'Renommer'" :aria-label="'Nouvel intitulé de ' + z.name"><button type="button" class="btn-soft" @click="renameSiteZone(z.id)">Renommer</button></li>
           </ul>
           <p v-else data-testid="aucune-zone-site">Aucune zone du site pour l’instant.</p>
-          <form class="flex flex-wrap items-end gap-2" aria-label="Créer une zone du site" @submit.prevent="addSiteZone"><label class="block">Nom de la zone<input v-model="siteZoneName" class="field" maxlength="120" required data-testid="nom-zone-site"></label><button type="submit" class="admin-primary" data-testid="creer-zone-site">Créer la zone du site</button></form>
+          <form class="flex flex-wrap items-end gap-2" aria-label="Nouvelle zone permanente du site" @submit.prevent="addSiteZone"><label class="block">Intitulé de la zone permanente<input v-model="siteZoneName" class="field" maxlength="120" required data-testid="nom-zone-site"></label><button type="submit" class="admin-primary" data-testid="creer-zone-site">Ajouter au site</button></form>
         </section>
         <h3 class="font-bold">Zones des activités</h3>
         <p class="text-slate-700">Les zones des activités sont définies dans chaque activité. Un poste ne juge une zone que s’il lui est associé.</p>
