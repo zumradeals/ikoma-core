@@ -40,8 +40,6 @@ const CN_ROUTES = [
     ['POST', 'administration/atelier/apercu', ['can:badges.gerer'], ['throttle:atelier']],
     ['POST', 'administration/atelier/personnes', ['can:badges.gerer', 'can:listes.importer'], []],
     ['POST', 'administration/atelier/preparer', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
-    ['POST', 'administration/atelier/modeles/reinitialiser', ['can:badges.gerer'], ['throttle:atelier']],
-    ['POST', 'administration/atelier/modeles/reprendre', ['can:badges.gerer'], ['throttle:atelier']],
     ['POST', 'administration/atelier/tirages', ['can:badges.gerer'], ['throttle:atelier']],
     ['GET', 'administration/atelier/tirages', ['can:badges.gerer'], []],
     ['GET', 'administration/atelier/tirages/{run}/document', ['can:badges.gerer'], []],
