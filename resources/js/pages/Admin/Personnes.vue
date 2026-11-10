@@ -198,7 +198,6 @@ function closeAll() { creating.value = false; if (props.selected) closePanel(); 
           <div>
             <h1 class="text-display font-bold" data-testid="titre-personnes">Personnes et habilitations</h1>
             <p class="max-w-2xl text-slate-700">Registre des personnes, de leur statut institutionnel, de leurs participations et de leurs habilitations d’accès. Une personne a une identité unique ; deux personnes ne sont jamais fusionnées sur le seul nom.</p>
-            <p class="mt-1 flex flex-wrap gap-x-4 text-sm"><Link href="/administration/invites" class="font-semibold underline" data-testid="fiches-invites">Fiches d’invités</Link><Link href="/administration/titulaires" class="font-semibold underline" data-testid="personnel-permanent-cartes">Personnel permanent et cartes</Link><Link href="/administration/habilitations" class="font-semibold underline" data-testid="habilitations-par-zone">Habilitations par zone</Link></p>
           </div>
         </div>
         <div class="flex flex-wrap gap-2">

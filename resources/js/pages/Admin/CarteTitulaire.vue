@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
-import BadgesCartesShell from '../../components/admin/BadgesCartesShell.vue';
 import '../../../../public/badges/holder-cards.css';
 
 type Print = { id: string; kind: 'emission' | 'reimpression'; reason: string | null; created_at: string; by: string | null };
@@ -49,7 +48,6 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
 
 <template>
   <AdminLayout active="titulaires">
-    <BadgesCartesShell active="cartes" />
     <div class="space-y-6" data-testid="page-carte-titulaire">
       <header class="space-y-3">
         <Link href="/administration/titulaires" class="font-semibold underline" data-testid="retour-titulaires">← Personnel permanent et cartes</Link>

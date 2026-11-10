@@ -40,9 +40,11 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await expect(page.getByTestId('onglet-lots')).toHaveAttribute('aria-current', 'page');
     await noHorizontalScroll(page, `lots ${label}`);
     await page.screenshot({ path: `test-results/consolidation-lots-${label}.png`, fullPage: true });
-    // Personnel permanent : page toujours accessible (Personnes), sans onglet propre.
-    await page.goto('/administration/titulaires');
+    // Personnel permanent : onglet du menu « Personnes et habilitations ».
+    await page.goto('/administration/personnes');
+    await page.getByTestId('sous-menu-titulaires').click();
     await expect(page.getByTestId('page-titulaires')).toBeVisible();
+    await expect(page.getByTestId('sous-menu-titulaires')).toHaveAttribute('aria-current', 'page');
     await noHorizontalScroll(page, `titulaires ${label}`);
     await page.screenshot({ path: `test-results/consolidation-cartes-${label}.png`, fullPage: true });
 
@@ -64,12 +66,13 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await expect(page.getByTestId('rappel-modele')).toBeVisible();
     await noHorizontalScroll(page, `impression ${label}`);
 
-    // Invités : « Ajouter un invité », réservé aux invités temporaires, avec renvoi vers le registre.
+    // Invités : page « Fiches des invités » (onglet du menu Personnes), réservée aux invités temporaires, avec renvoi vers le registre.
     await page.goto('/administration/imports');
     await expect(page.getByTestId('ajouter-invite')).toHaveText('Ajouter un invité');
     await expect(page.getByText('Ajouter une personne')).toHaveCount(0);
     await page.getByTestId('ajouter-invite').click();
-    await expect(page.getByRole('heading', { name: 'Ajouter un invité' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Fiches des invités' })).toBeVisible();
+    await expect(page.getByTestId('sous-menu-invites')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('lien-registre-titulaires')).toBeVisible();
     await noHorizontalScroll(page, `invité ${label}`);
     await page.screenshot({ path: `test-results/a065-ajouter-invite-${label}.png`, fullPage: true });

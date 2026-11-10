@@ -23,8 +23,8 @@ function search() { router.get('/administration/invites', { event_id: form.event
 function withdraw() { if (v && window.confirm('Retirer cette fiche de la liste ? Son historique sera conservé.')) router.delete('/administration/invites/' + v.id, { onError: errors => { withdrawError.value = Object.values(errors).join(' '); } }); }
 </script>
 <template>
-  <AdminLayout active="imports" :event="events.find(e => e.id === form.event_id) ?? null">
-    <div class="mb-6 flex flex-wrap items-start justify-between gap-3"><div><h1>{{ visitor ? 'Fiche de l’invité' : 'Ajouter un invité' }}</h1><p class="mt-2">Une fiche unique pour la liste, l’accueil et les badges, sans fichier Excel. <strong>Réservé aux invités temporaires d’un événement</strong> : un titulaire permanent s’enregistre dans <Link href="/administration/titulaires" class="font-semibold underline" data-testid="lien-registre-titulaires">le registre des titulaires permanents</Link>, jamais ici.</p></div><Link href="/administration/imports" class="btn-soft">Importer une liste</Link></div>
+  <AdminLayout active="invites" :event="events.find(e => e.id === form.event_id) ?? null">
+    <div class="mb-6 flex flex-wrap items-start justify-between gap-3"><div><h1>{{ visitor ? 'Fiche de l’invité' : 'Fiches des invités' }}</h1><p class="mt-2">Une fiche unique pour la liste, l’accueil et les badges, sans fichier Excel. <strong>Réservé aux invités temporaires d’un événement</strong> : un titulaire permanent s’enregistre dans <Link href="/administration/titulaires" class="font-semibold underline" data-testid="lien-registre-titulaires">le registre des titulaires permanents</Link>, jamais ici.</p></div><Link href="/administration/imports" class="btn-soft">Importer une liste</Link></div>
     <p v-if="feedback" role="status" class="mb-5 rounded-xl border bg-green-50 p-4">{{ feedback }}</p>
     <section class="mb-6 space-y-4 rounded-xl border bg-white p-5" data-testid="liste-invites-visible">
       <h2 class="text-heading font-bold">Liste des invités</h2>

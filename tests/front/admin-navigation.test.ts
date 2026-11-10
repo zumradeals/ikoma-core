@@ -41,7 +41,7 @@ describe('navigation d’administration', () => {
 
   it('garde toutes les pages existantes accessibles, en onglets du menu qui les regroupe', () => {
     const expected: Record<string, string[]> = {
-      'personnes': ['personnes', 'habilitations', 'categories-institutionnelles'],
+      'personnes': ['personnes', 'invites', 'titulaires', 'habilitations', 'categories-institutionnelles'],
       'evenements': ['evenements', 'categories'],
       'postes': ['postes', 'groupes'],
       'comptes': ['identite', 'modules', 'comptes', 'donnees', 'journal', 'securite'],
@@ -69,9 +69,10 @@ describe('navigation d’administration', () => {
     for (const active of ['zones', 'acces-zones']) expect(menu(active, ALL).wrapper.get('[data-testid="menu-site"]').attributes('aria-current'), active).toBe('page');
     expect(menu('habilitations', ALL).wrapper.get('[data-testid="menu-personnes"]').attributes('aria-current')).toBe('page');
     expect(menu('postes', ALL).wrapper.get('[data-testid="menu-operations"]').attributes('aria-current')).toBe('page');
-    for (const active of ['badges', 'titulaires', 'modeles', 'modeles-cartes', 'atelier', 'atelier-parcours']) {
+    for (const active of ['badges', 'modeles', 'modeles-cartes', 'atelier']) {
       expect(menu(active, ALL).wrapper.get('[data-testid="menu-badges-cartes"]').attributes('aria-current'), active).toBe('page');
     }
+    for (const active of ['invites', 'titulaires']) expect(menu(active, ALL).wrapper.get('[data-testid="menu-personnes"]').attributes('aria-current'), active).toBe('page');
     const imports = menu('imports', ALL);
     expect(imports.wrapper.get('[data-testid="menu-personnes"]').attributes('aria-current')).toBe('page');
     expect(imports.wrapper.get('[data-testid="sous-menu-personnes"]').attributes('aria-current')).toBe('page');
@@ -90,7 +91,7 @@ describe('navigation d’administration', () => {
   it('ne montre aucun lien vers une fonction interdite à l’utilisateur', () => {
     const limited = menu('titulaires', ['listes.importer']);
     expect(limited.ids).toEqual(['personnes', 'administration']);
-    expect(tabs(menu('personnes', ['listes.importer']).wrapper)).toEqual(['personnes', 'habilitations']);
+    expect(tabs(menu('personnes', ['listes.importer']).wrapper)).toEqual(['personnes', 'invites', 'titulaires', 'habilitations']);
     expect(menu('tableau', []).ids).toEqual(['administration']);
     expect(menu('securite', []).hrefs).toEqual(['/securite']);
     expect(menu('tableau', ['postes.gerer']).ids).toEqual(['site', 'operations', 'administration']);
