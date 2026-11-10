@@ -33,6 +33,10 @@ Migration (affectations), enrôlement et synchronisation par affectation, file l
 4. **Sélecteur de la tablette** (en-tête de la maquette) : poste et activité, limités aux affectations de la tablette ; sélection automatique s'il n'y en a qu'une ; chaque opération de la file porte `activity_id`. Tests Playwright de coupure réseau avec bascule d'activité.
 5. **Retrait de l'ancien lien** : suppression de la dépendance `devices.event_id` une fois toutes les lectures migrées ; mise à jour de `docs/PLAN_CONCEPTION.md` §4.
 
-## Questions restantes pour le dirigeant
-- Qui choisit l'activité du jour : **l'agent sur la tablette** (recommandé, conforme au sélecteur de la maquette), l'administrateur, ou automatiquement quand une seule activité est ouverte ?
-- Une tablette peut-elle être limitée à certaines activités (liste autorisée) ou voit-elle toutes les activités ouvertes du site ?
+## Décisions du dirigeant (questions tranchées)
+- **L'agent choisit l'activité du jour sur la tablette** (sélecteur de l'en-tête de la maquette), parmi les seules activités autorisées pour cette tablette.
+- **Une tablette ne voit que les activités que l'administrateur lui autorise** (liste par tablette, table `device_activities`) ; aucune activité n'est visible par défaut.
+- Le plan en cinq étapes ci-dessus est approuvé.
+
+## Avancement
+- Étape 1 (additive, sans changement de comportement) : table `device_activities`, reprise des tablettes existantes, déclencheur de synchronisation tant que `devices.event_id` existe. Les clés composites des badges réservés et des attributions seront reportées sur cette table à l'étape 2, en même temps que `devices.event_id` devient facultatif.
