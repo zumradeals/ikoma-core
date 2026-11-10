@@ -16,9 +16,14 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await loginAdmin(page);
   await expect(page.getByTestId('admin-layout')).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Mon espace', exact: true })).toHaveCount(0);
-  await expect(page.getByTestId('titre-etat')).toContainText('Votre événement');
-  await expect(page.getByRole('progressbar')).toBeVisible();
-  for (const key of ['zones', 'liste', 'badges', 'tablettes', 'groupes', 'comptes']) await expect(page.getByTestId(`statut-${key}`)).toHaveText(/(✓ Fait|● En cours|○ À faire)/);
+  await expect(page.getByTestId('titre-general')).toContainText('Tableau de bord');
+  await expect(page.getByTestId('indicateurs-globaux')).toBeVisible();
+  await expect(page.getByTestId('graphique-acces')).toBeVisible();
+  await expect(page.getByTestId('derniers-mouvements')).toBeVisible();
+  await expect(page.getByTestId('acces-rapides')).toBeVisible();
+  // L'ancienne préparation pas à pas n'est plus sous la vue d'ensemble.
+  await expect(page.getByTestId('titre-etat')).toHaveCount(0);
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
   expect(await noHorizontalScroll(page)).toBe(true);
   await page.screenshot({ path: 'test-results/administration/tableau-bureau.png', fullPage: true });
   await openPage(page, 'administration', 'comptes');

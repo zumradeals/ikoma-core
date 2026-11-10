@@ -47,6 +47,7 @@ final class AdminOverview
             'donnees' => ['sauvegarde' => $backup['etat'], 'actualise' => $now->format('Y-m-d\TH:i:s\Z')],
             'indicateurs' => [
                 'personnes' => ['enregistrees' => (int) $personKpis['personnes']],
+                'titulaires' => ['actifs' => (int) DB::table('permanent_holders')->where('status', 'actif')->count()],
                 'habilitations' => ['actives' => (int) $personKpis['habilitations_actives'], 'a_echeance' => (int) $personKpis['a_echeance'], 'jours' => (int) $personKpis['jours_echeance']],
                 'activites' => ['en_cours' => (int) $activityKpis['en_cours'], 'a_venir' => (int) $activityKpis['a_venir'], 'participants_actifs' => (int) $activityKpis['participants_actifs']],
                 'supports' => ['cartes_remises' => $cards['remises'], 'badges_associes' => $temporary['associes']],
@@ -58,6 +59,8 @@ final class AdminOverview
                 'jours' => (int) $personKpis['jours_echeance'], 'retirees_ou_expirees' => (int) $personKpis['retirees_ou_expirees'], 'verifications' => $verifications],
             'badges' => ['cartes' => $cards, 'temporaires' => $temporary, 'impression' => $printing],
             'operations' => ['mouvements' => $site['mouvements'], 'presents' => $site['presents'], 'postes' => $site['postes'], 'visites_annoncees' => $visits,
+                'par_heure' => $site['par_heure'], 'vehicules_presents' => (int) DB::table('vehicles')->where('status', 'present')->count(),
+                'derniere_synchro' => DB::table('devices')->whereNotNull('token_hash')->whereNull('revoked_at')->max('last_synced_at'),
                 'derniers' => $this->lastMovements($viewer->can('presences.consulter'))],
             'priorites' => $this->priorities($viewer, $escalated, (int) $site['litiges'], (int) $personKpis['a_echeance'], (int) $personKpis['jours_echeance'], $temporary, $cards, $printing, $silent, $verifications, $backup),
         ];
@@ -154,9 +157,9 @@ final class AdminOverview
     }
 
     /**
-     * Derniers mouvements CONFIRMÉS (entrées, sorties, contrôles non corrigés), tous contextes. Le nom n'est communiqué qu'à qui consulte les présences.
+     * Derniers mouvements CONFIRMÉS (entrées, sorties, contrôles non corrigés) et derniers refus, tous contextes. Le nom n'est communiqué qu'à qui consulte les présences.
      *
-     * @return list<array{at: string, type: string, checkpoint: ?string, context: string, name: ?string}>
+     * @return list<array{at: string, type: string, checkpoint: ?string, context: string, name: ?string, resultat: string}>
      */
     private function lastMovements(bool $withNames): array
     {
@@ -165,10 +168,16 @@ final class AdminOverview
             ->orderByDesc('e.occurred_at')->orderByDesc('e.id')->limit(self::MAX_MOVEMENTS)->get(['e.occurred_at', 'e.type', 'e.checkpoint', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
         $out = [];
         foreach ($rows as $r) {
-            $out[] = ['at' => (string) $r->occurred_at, 'type' => (string) $r->type, 'checkpoint' => $r->checkpoint, 'context' => $r->is_permanent ? 'Contexte permanent' : (string) $r->context, 'name' => $withNames ? $r->full_name : null];
+            $out[] = ['at' => (string) $r->occurred_at, 'type' => (string) $r->type, 'checkpoint' => $r->checkpoint, 'context' => $r->is_permanent ? 'Contexte permanent' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'autorise'];
         }
+        $refusals = DB::table('refusals as r')->join('visitors as v', 'v.id', '=', 'r.visitor_id')->join('events as ev', 'ev.id', '=', 'v.event_id')
+            ->orderByDesc('r.refused_at')->limit(self::MAX_MOVEMENTS)->get(['r.refused_at', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
+        foreach ($refusals as $r) {
+            $out[] = ['at' => (string) $r->refused_at, 'type' => 'refus', 'checkpoint' => null, 'context' => $r->is_permanent ? 'Contexte permanent' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'refuse'];
+        }
+        usort($out, fn (array $a, array $b): int => strcmp($b['at'], $a['at']));
 
-        return $out;
+        return array_slice($out, 0, self::MAX_MOVEMENTS);
     }
 
     /**
