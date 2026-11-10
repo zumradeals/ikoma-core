@@ -276,3 +276,11 @@ it('prépare et imprime 200 destinations nominatives sans activation ni modifica
         ->and(Badge::where('badge_batch_id', $batch->id)->where('status', 'Disponible')->count())->toBe(200)
         ->and(Badge::where('badge_batch_id', $batch->id)->orderBy('code')->pluck('qr_token')->all())->toBe($tokens);
 });
+
+it('enregistre le motif de la visite et le transmet à la copie de la tablette avec la fonction', function () {
+    $this->post('/administration/invites', [...manualInput('Personne fictive motif'), 'visit_purpose' => 'Visite de site fictive'])->assertRedirect();
+    $person = Visitor::where('full_name', 'Personne fictive motif')->firstOrFail();
+    expect($person->visit_purpose)->toBe('Visite de site fictive');
+    $entry = collect(app(ListSnapshot::class)->build(Device::findOrFail(DemoSeeder::id('device')))['visitors'])->firstWhere('id', $person->id);
+    expect($entry['visit_purpose'])->toBe('Visite de site fictive')->and($entry['job_title'])->toBe('Stagiaire fictif');
+});

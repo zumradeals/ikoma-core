@@ -35,6 +35,7 @@ const CV_ROUTES = [
     ['GET', 'poste/api/presents', ['can:badges.controler'], []],
     ['GET', 'poste/api/recherche', ['can:visiteurs.rechercher'], ['throttle:recherche']],
     ['GET', 'poste/api/visiteurs/{visitor}', ['can:visiteurs.verifier'], []],
+    ['GET', 'poste/api/visiteurs/{visitor}/portrait', ['can:visiteurs.rechercher'], ['throttle:portrait']],
     ['POST', 'poste/api/identite', ['can:visiteurs.verifier'], []],
     ['POST', 'poste/api/avis-hote', ['can:visiteurs.valider'], []],
     ['POST', 'poste/api/valider', ['can:visiteurs.valider'], []],

@@ -1,4 +1,4 @@
-import { ApiError, documentLabels, type Avis, type Fiche, type SearchResult } from '../types';
+import { ApiError, documentLabels, type Access, type Avis, type Fiche, type SearchResult } from '../types';
 import type { LocalList, SnapVisitor } from './list';
 import { applyGroupOp, type GroupDelta } from './group';
 import { searchIndex } from './search';
@@ -15,25 +15,33 @@ export function outsidePeriod(visitor: SnapVisitor, now: number): boolean {
   return now < Date.parse(visitor.valid_from) || now > Date.parse(visitor.valid_until);
 }
 
+/** Situation d'accès affichée dans la liste de l'accueil : même règle que le serveur (VisitorSearch::access). */
+export function accessOf(v: SnapVisitor, now: number): Access {
+  if (v.status === 'refuse' || v.host_validation === 'refuse') return 'refuse';
+  if (v.status === 'present' || v.status === 'sorti') return v.status;
+  return outsidePeriod(v, now) ? 'hors_periode' : 'autorise';
+}
+
 export function ficheOf(list: LocalList, id: string, now: number): Fiche {
   const v = list.visitors.get(id);
   if (!v) throw new ApiError('visiteur_inconnu', 'Visiteur introuvable pour ce poste.', null, 404);
   const category = list.categories.get(v.category_id);
   if (!category) throw new ApiError('visiteur_inconnu', 'Visiteur introuvable pour ce poste.', null, 404);
   return {
-    id: v.id, full_name: v.full_name, organisation: v.organisation, host: v.host_id ? list.hostNames.get(v.host_id) ?? null : null, category, zones: list.zonesFor(v),
+    id: v.id, full_name: v.full_name, organisation: v.organisation, job_title: v.job_title ?? null, visit_purpose: v.visit_purpose ?? null, host: v.host_id ? list.hostNames.get(v.host_id) ?? null : null, category, zones: list.zonesFor(v),
     accueil_limite: v.source === 'non listé', source: v.source, status: v.status, host_validation: v.host_validation, valid_from: v.valid_from, valid_until: v.valid_until,
     identity_document: list.snapshot.settings.identity_document === true, hors_periode: outsidePeriod(v, now), identity_done: v.identity_done, photo_done: v.photo_done, validated: v.validated, badge_code: v.badge_code, access_note: v.access_note ?? null, a_rebadger: v.a_rebadger ?? false,
   };
 }
 
-export function searchOf(list: LocalList, query: string): SearchResult[] {
+export function searchOf(list: LocalList, query: string, now: number = Date.now(), categoryId: string | null = null): SearchResult[] {
+  const inCategory = <T extends { id: string }>(rows: T[]): T[] => (categoryId ? rows.filter(e => list.visitors.get(e.id)?.category_id === categoryId) : rows);
   const entries = query.trim() === ''
-    ? [...list.indexed()].sort((a, b) => a.full_name.localeCompare(b.full_name, 'fr') || a.id.localeCompare(b.id)).slice(0, 10)
-    : searchIndex(list.indexed(), query);
+    ? inCategory([...list.indexed()]).sort((a, b) => a.full_name.localeCompare(b.full_name, 'fr') || a.id.localeCompare(b.id)).slice(0, 10)
+    : searchIndex(inCategory(list.indexed()), query);
   return entries.map(e => {
     const v = list.visitors.get(e.id)!;
-    return { id: e.id, full_name: e.full_name, organisation: e.organisation, host: e.host, homonyms: e.homonyms, category: list.categories.get(v.category_id)! };
+    return { id: e.id, full_name: e.full_name, organisation: e.organisation, host: e.host, homonyms: e.homonyms, category: list.categories.get(v.category_id)!, job_title: v.job_title ?? null, access: accessOf(v, now) };
   });
 }
 

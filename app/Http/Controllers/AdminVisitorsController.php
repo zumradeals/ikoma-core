@@ -44,7 +44,7 @@ final class AdminVisitorsController
             'events' => DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name', 'starts_at', 'ends_at']), 'eventId' => $event,
             'hosts' => DB::table('hosts')->orderBy('name')->get(['id', 'event_id', 'name']), 'categories' => DB::table('categories')->orderBy('name')->get(['id', 'event_id', 'name']),
             'groups' => DB::table('groups')->orderBy('name')->get(['id', 'event_id', 'name']),
-            'visitor' => $visitor ? [...$visitor->only(['id', 'event_id', 'full_name', 'organisation', 'position', 'category_id', 'host_id', 'group_id', 'valid_from', 'valid_until', 'profile_photo_print_allowed', 'withdrawn_at']), 'has_photo' => (bool) $visitor->profile_photo_file, 'revision' => (string) $visitor->updated_at] : null,
+            'visitor' => $visitor ? [...$visitor->only(['id', 'event_id', 'full_name', 'organisation', 'position', 'visit_purpose', 'category_id', 'host_id', 'group_id', 'valid_from', 'valid_until', 'profile_photo_print_allowed', 'withdrawn_at']), 'has_photo' => (bool) $visitor->profile_photo_file, 'revision' => (string) $visitor->updated_at] : null,
             'withdrawn' => $request->boolean('withdrawn'), 'withdrawnVisitors' => $event && $request->boolean('withdrawn') ? DB::table('visitors')->where('event_id', $event)->whereNotNull('withdrawn_at')->whereNull('holder_id')->orderByRaw('full_name COLLATE "C" ASC')->orderBy('id')->limit(200)->get(['id', 'full_name', 'organisation']) : [],
             'list' => $list, 'searchQuery' => $input['q'] ?? '',
             'editable' => $editable, 'feedback' => $request->session()->get('visitor_feedback'),
@@ -56,7 +56,7 @@ final class AdminVisitorsController
     {
         Gate::authorize('listes.importer');
         $data = $request->validate([
-            'event_id' => 'required|uuid|exists:events,id', 'person_id' => 'nullable|uuid|exists:persons,id', 'full_name' => 'required|string|max:160', 'organisation' => 'nullable|string|max:160', 'position' => 'nullable|string|max:160',
+            'event_id' => 'required|uuid|exists:events,id', 'person_id' => 'nullable|uuid|exists:persons,id', 'full_name' => 'required|string|max:160', 'organisation' => 'nullable|string|max:160', 'position' => 'nullable|string|max:160', 'visit_purpose' => 'nullable|string|max:200',
             'category_id' => ['required', 'uuid', Rule::exists('categories', 'id')->where('event_id', $request->input('event_id'))],
             'host_id' => ['nullable', 'uuid', Rule::exists('hosts', 'id')->where('event_id', $request->input('event_id'))],
             'group_id' => ['nullable', 'uuid', Rule::exists('groups', 'id')->where('event_id', $request->input('event_id'))],

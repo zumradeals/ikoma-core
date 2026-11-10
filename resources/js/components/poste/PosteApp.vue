@@ -7,7 +7,7 @@ import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../p
 import { ApiError, type Avis, type DeskContext, type DeskSummary, type Fiche, type IdentityDocument, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
 import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.vue'; import PosteSelect from './PosteSelect.vue'; import StepSearch from './StepSearch.vue'; import StepFiche from './StepFiche.vue';
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
-import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
+import PosteFooter from './PosteFooter.vue'; import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
 
 import type { SyncState } from '../../poste/local/sync';
 const props = defineProps<{ agent: string; repository?: PosteRepository; sync?: SyncState | null; autoSelect?: boolean }>();
@@ -26,6 +26,25 @@ const posteName = computed(() => { const p = postes.value.find(x => x.id === pos
 const elapsed = computed(() => (ctx.value.startedAt === null ? 0 : Math.max(0, Math.round((now.value - ctx.value.startedAt) / 1000))));
 const clockLabel = computed(() => `${Math.floor(elapsed.value / 60)}:${String(elapsed.value % 60).padStart(2, '0')}`);
 const blockedReason = computed(() => validateBlockedReason(ctx.value));
+
+// Données du bandeau d'événement et de l'en-tête : tout vient du contexte du poste et de l'état réel de la synchronisation.
+const shortDay = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+const eventPeriod = computed(() => {
+  const e = context.value?.event; if (!e?.starts_at || !e.ends_at) return null;
+  const a = new Date(e.starts_at); const b = new Date(e.ends_at);
+  if (a.toDateString() === b.toDateString()) return `${shortDay(a)} ${a.getFullYear()}`;
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() ? `${String(a.getDate()).padStart(2, '0')} – ${shortDay(b)} ${b.getFullYear()}` : `${shortDay(a)} – ${shortDay(b)} ${b.getFullYear()}`;
+});
+const eventState = computed(() => {
+  const e = context.value?.event; if (!e?.starts_at || !e.ends_at) return null;
+  return now.value < Date.parse(e.starts_at) ? { label: 'À venir', tone: 'poste-chip-warn' } : now.value > Date.parse(e.ends_at) ? { label: 'Terminé', tone: 'poste-chip-warn' } : { label: 'En cours', tone: 'poste-chip-ok' };
+});
+const syncLabel = computed(() => {
+  const at = props.sync?.lastSyncAt; if (!at) return null;
+  const d = new Date(at); const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(now.value).toDateString() === d.toDateString() ? `Aujourd’hui à ${time}` : `${shortDay(d)} à ${time}`;
+});
+const hasAlerts = computed(() => !online.value || !!props.sync?.needsLogin || !!props.sync?.stale || !!props.sync?.clockWarning || !!props.sync?.lastError);
 
 // Panneau du poste : recalculé quand l'agent revient à la recherche, quand la file ou la synchronisation changent.
 const summary = ref<DeskSummary | null>(null);
@@ -144,9 +163,16 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
 </script>
 
 <template>
-  <AgentLayout active="poste" :agent="agent" :online="online">
-    <template #header-context><span v-if="posteName">Poste : {{ posteName }}</span></template>
-    <template #status><StatusBar :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" :offline-minutes="offlineMinutes" :call-after="summary?.offlineCallMinutes" @sync="emit('sync')" @lock="emit('lock')" /></template>
+  <AgentLayout active="poste" :agent="agent" :online="online" :sync-label="context ? syncLabel : null" :notifications="sync?.conflicts ?? 0" :site-name="context?.event.site ?? null">
+    <template v-if="context" #sidebar-extra>
+      <div class="agent-sidebar-device" role="group" aria-label="Appareil et connexion" data-testid="menu-appareil"><p class="agent-nav-caption">Appareil &amp; connexion</p>
+        <a class="agent-nav-link" href="#poste-barre-basse"><AdminIcon name="tablet" :size="24" />Appareil et poste</a>
+        <button type="button" class="agent-nav-link w-full text-left" :disabled="!sync || sync.syncing" data-testid="nav-synchroniser" @click="emit('sync')"><AdminIcon name="refresh" :size="24" />Synchronisation<span v-if="sync && sync.lastSyncAt && !sync.stale && !sync.lastError" class="agent-nav-ok" aria-label="À jour">✓</span></button>
+        <button type="button" class="agent-nav-link w-full text-left" data-testid="nav-verrouiller" @click="emit('lock')"><AdminIcon name="lock" :size="24" />Verrouillage</button>
+      </div>
+    </template>
+    <template #header-context><span v-if="posteName" class="agent-poste-chip" data-testid="poste-en-cours"><AdminIcon name="map" :size="24" /><span><small>Poste en cours</small><strong>{{ posteName }}</strong></span></span></template>
+    <template #status><StatusBar v-if="hasAlerts" :poste="posteName" :agent="agent" :online="online" :pending="sync ? sync.pending : pending" :sync="sync" :offline-minutes="offlineMinutes" :call-after="summary?.offlineCallMinutes" :compact="!!context" @sync="emit('sync')" @lock="emit('lock')" /></template>
     <div class="agent-workspace agent-desk-workspace">
       <div v-if="error" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 text-lg text-red-900" data-testid="erreur">
         <p class="font-bold"><span aria-hidden="true">⚠</span> {{ error.message }}</p>
@@ -154,15 +180,28 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
       </div>
       <PosteSelect v-if="!context" :postes="postes" @select="choosePoste" />
       <template v-else>
+        <div class="poste-titlebar">
+          <div class="poste-title-block"><span class="poste-title-icon" aria-hidden="true"><AdminIcon name="users" :size="32" /></span><div><h1 class="poste-title" data-testid="titre-poste">Poste d’accueil <span>– Enregistrement d’un visiteur</span></h1><p>Accueil, identification et enregistrement de l’entrée.</p></div></div>
+          <div class="poste-title-chips">
+            <p class="poste-chip-box"><AdminIcon name="calendar" :size="22" /> Événement : <strong>{{ context.event.name }}</strong></p>
+            <p class="poste-chip-box"><AdminIcon name="layers" :size="22" /> Opérations en attente : <strong data-testid="en-attente">{{ sync ? sync.pending : pending }}</strong></p>
+          </div>
+        </div>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <StepTracker :current="stepNumber[ctx.step]" class="min-w-64 flex-1" />
           <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><AdminIcon name="clock" /> {{ clockLabel }}</p>
         </div>
-        <p v-if="ctx.step === 'recherche'" class="rounded-xl border border-slate-300 bg-white p-3 text-base" data-testid="poste-evenement-liste"><strong>Événement : {{ context.event.name }}</strong><span class="block">{{ context.visitor_count ?? '—' }} personne(s) dans la liste de cet événement sur ce poste.</span><span v-if="sync?.lastSyncAt" class="block text-sm">Copie actualisée lors de la dernière synchronisation.</span></p>
-        <div v-if="ctx.step === 'recherche'" class="grid gap-6" :class="summary ? 'lg:grid-cols-[minmax(0,1fr)_21rem]' : ''">
-          <StepSearch :repository="repo" :refresh-key="sync?.lastSyncAt ?? null" @select="onSelect" @open="id => selectVisitor(id, 1)" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
+        <p v-if="ctx.step === 'recherche'" class="poste-eventbar" data-testid="poste-evenement-liste">
+          <strong><AdminIcon name="users" :size="22" /> Événement : {{ context.event.name }}</strong>
+          <span v-if="eventPeriod" data-testid="evt-periode"><AdminIcon name="calendar" :size="20" /> {{ eventPeriod }}</span>
+          <span v-if="context.event.site" data-testid="evt-site"><AdminIcon name="map" :size="20" /> {{ context.event.site }}</span>
+          <span class="poste-counts"><span><AdminIcon name="users" :size="20" /> Participants : <b data-testid="evt-participants">{{ context.visitor_count ?? '—' }}</b></span><span class="poste-sep" aria-hidden="true">/</span><span>Présents : <b data-testid="evt-presents">{{ context.present_count ?? '—' }}</b></span><span class="poste-sep" aria-hidden="true">/</span><span>Absents : <b data-testid="evt-absents">{{ context.absent_count ?? '—' }}</b></span></span>
+          <span v-if="eventState" class="poste-chip ml-auto" :class="eventState.tone" data-testid="evt-etat">{{ eventState.label }}</span>
+        </p>
+        <template v-if="ctx.step === 'recherche'">
+          <StepSearch :repository="repo" :refresh-key="sync?.lastSyncAt ?? null" :event-name="context.event.name" :categories="context.categories" :total="context.visitor_count ?? null" :period="eventPeriod" @select="onSelect" @open="id => selectVisitor(id, 1)" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
           <DeskPanel v-if="summary" :summary="summary" :online="online" :syncing="sync?.syncing" @sync="emit('sync')" @select="id => selectVisitor(id, 1)" />
-        </div>
+        </template>
         <UnlistedForm v-else-if="ctx.step === 'non_liste'" :context="context" :busy="busy" @submit="onCreateUnlisted" @back="onBack" />
         <StepFiche v-else-if="ctx.step === 'fiche' && fiche" :key="fiche.id" :fiche="fiche" :homonyms="homonyms" @confirm="onConfirm" @back="onBack" />
         <StepWaitHost v-else-if="ctx.step === 'attente_hote' && fiche" :fiche="fiche" :refused="ctx.hostRefused" :busy="busy" @refresh="onHostRefresh" @next="onNext" />
@@ -172,6 +211,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
         <StepHandover v-else-if="ctx.step === 'remise' && fiche" :fiche="fiche" :badge-code="ctx.badgeCode ?? ''" :busy="busy" @enter="onEnter" />
         <StepDone v-else-if="ctx.step === 'entree' && fiche" :name="fiche.full_name" :badge-code="ctx.badgeCode ?? ''" :zones="entryZones" :duration-ms="ctx.durationMs ?? 0" @next="onNext" />
         <StepRefused v-else-if="ctx.step === 'refus' && fiche" :name="fiche.full_name" @next="onNext" />
+        <PosteFooter :poste="posteName" :device="context.poste.name" :agent="agent" :online="online" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
       </template>
     </div>
   </AgentLayout>

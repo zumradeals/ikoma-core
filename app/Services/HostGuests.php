@@ -116,6 +116,7 @@ final class HostGuests
             if ($administration) {
                 $values['host_id'] = $host?->id;
                 $values['position'] = $clean->clean($data['position'] ?? '') ?: null;
+                $values['visit_purpose'] = mb_substr($clean->clean($data['visit_purpose'] ?? ''), 0, 200) ?: null;
             }
             $fields = [];
             foreach ($values as $key => $value) {

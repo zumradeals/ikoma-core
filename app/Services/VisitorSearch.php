@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -30,7 +31,7 @@ final class VisitorSearch
      *
      * @return list<array<string, mixed>>
      */
-    public function preview(string $eventId): array
+    public function preview(string $eventId, ?string $categoryId = null): array
     {
         if (! Str::isUuid($eventId)) {
             throw new InvalidArgumentException('Événement invalide.');
@@ -41,9 +42,10 @@ final class VisitorSearch
             ->leftJoin('hosts as h', 'h.id', '=', 'v.host_id')
             ->where('v.event_id', $eventId)
             ->whereNull('v.withdrawn_at')->whereNull('v.holder_id')->whereNull('v.closed_at')
+            ->when($categoryId !== null && Str::isUuid($categoryId), fn ($q) => $q->where('v.category_id', $categoryId))
             ->orderByRaw('v.full_name COLLATE "C" ASC')->orderBy('v.id')
             ->limit(10)
-            ->get(['v.id', 'v.full_name', 'v.organisation', 'h.name as host_name',
+            ->get(['v.id', 'v.full_name', 'v.organisation', 'v.position', 'v.status', 'v.valid_from', 'v.valid_until', 'v.host_validation', 'v.profile_photo_file', 'h.name as host_name',
                 'c.id as category_id', 'c.name as category_name', 'c.color', 'c.priority_circuit']);
 
         return $rows->map(function ($row) use ($eventId): array {
@@ -55,7 +57,8 @@ final class VisitorSearch
             return ['id' => $row->id, 'full_name' => $row->full_name, 'organisation' => $row->organisation,
                 'host' => $row->host_name, 'homonyms' => $homonyms,
                 'category' => ['id' => $row->category_id, 'name' => $row->category_name,
-                    'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit]];
+                    'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit],
+                'job_title' => $row->position, 'access' => self::access($row), 'has_portrait' => $row->profile_photo_file !== null];
         })->all();
     }
 
@@ -64,7 +67,7 @@ final class VisitorSearch
      *
      * @return list<array{id:string,full_name:string,organisation:?string,host:?string,homonyms:int,category:array{id:string,name:string,color:string,priority_circuit:bool}}>
      */
-    public function searchDetailed(string $eventId, string $query): array
+    public function searchDetailed(string $eventId, string $query, ?string $categoryId = null): array
     {
         if (! Str::isUuid($eventId)) {
             throw new InvalidArgumentException('Événement invalide.');
@@ -80,6 +83,7 @@ final class VisitorSearch
             return [];
         }
         $name = 'public.ikoma_normalize(v.full_name)';
+        $category = $categoryId !== null && Str::isUuid($categoryId) ? $categoryId : null;
         $where = [];
         $score = [];
         $bindings = [];
@@ -97,18 +101,36 @@ final class VisitorSearch
             $score[] = "(CASE WHEN $name LIKE ? THEN 1.0 WHEN $name LIKE ? THEN 0.9 WHEN $name LIKE ? THEN 0.7 ELSE word_similarity(?, $name) END)";
             array_push($scoreBindings, $token.'%', '% '.$token.'%', '%'.$token.'%', $token);
         }
-        $sql = 'SELECT v.id, v.full_name, v.organisation, h.name AS host_name, c.id AS category_id, c.name AS category_name, c.color, c.priority_circuit, '
+        $sql = 'SELECT v.id, v.full_name, v.organisation, v.position, v.status, v.valid_from, v.valid_until, v.host_validation, v.profile_photo_file, h.name AS host_name, c.id AS category_id, c.name AS category_name, c.color, c.priority_circuit, '
             ."(SELECT count(*) FROM visitors o WHERE o.event_id = v.event_id AND o.withdrawn_at IS NULL AND o.holder_id IS NULL AND public.ikoma_normalize(o.full_name) = $name) AS homonyms "
             .'FROM visitors v JOIN categories c ON c.id = v.category_id LEFT JOIN hosts h ON h.id = v.host_id '
-            .'WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND v.holder_id IS NULL AND v.closed_at IS NULL AND '.implode(' AND ', $where)
+            .'WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND v.holder_id IS NULL AND v.closed_at IS NULL '.($category ? 'AND v.category_id = ? ' : '').'AND '.implode(' AND ', $where)
             .' ORDER BY round((('.implode(' + ', $score).') / ?)::numeric, 1) DESC, c.priority_circuit DESC, ('.implode(' + ', $score).') DESC, v.full_name COLLATE "C" ASC, v.id LIMIT 10';
         // Le seuil ne vaut que pour cette transaction ; paramètres toujours liés.
-        $rows = DB::transaction(function () use ($sql, $eventId, $bindings, $scoreBindings, $tokens) {
+        $rows = DB::transaction(function () use ($sql, $eventId, $category, $bindings, $scoreBindings, $tokens) {
             DB::statement("SELECT set_config('pg_trgm.word_similarity_threshold', ?, true)", [self::FUZZY_THRESHOLD]);
 
-            return DB::select($sql, [$eventId, ...$bindings, ...$scoreBindings, (float) count($tokens), ...$scoreBindings]);
+            return DB::select($sql, [$eventId, ...($category ? [$category] : []), ...$bindings, ...$scoreBindings, (float) count($tokens), ...$scoreBindings]);
         });
 
-        return array_map(fn ($row) => ['id' => $row->id, 'full_name' => $row->full_name, 'organisation' => $row->organisation, 'host' => $row->host_name, 'homonyms' => (int) $row->homonyms, 'category' => ['id' => $row->category_id, 'name' => $row->category_name, 'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit]], $rows);
+        return array_map(fn ($row) => ['id' => $row->id, 'full_name' => $row->full_name, 'organisation' => $row->organisation, 'host' => $row->host_name, 'homonyms' => (int) $row->homonyms, 'category' => ['id' => $row->category_id, 'name' => $row->category_name, 'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit], 'job_title' => $row->position, 'access' => self::access($row), 'has_portrait' => $row->profile_photo_file !== null], $rows);
+    }
+
+    /**
+     * Situation d'accès d'une personne, telle que l'accueil l'affiche dans la liste : refus de l'hôte ou de l'accueil, déjà entrée, sortie, hors période, sinon autorisée.
+     * Même règle que la tablette (resources/js/poste/local/apply.ts : accessOf) : une seule définition fonctionnelle, deux implémentations.
+     */
+    private static function access(object $row): string
+    {
+        $status = $row->status ?? 'attendu';
+        if ($status === 'refuse' || $row->host_validation === 'refuse') {
+            return 'refuse';
+        }
+        if ($status === 'present' || $status === 'sorti') {
+            return $status;
+        }
+        $now = now();
+
+        return $now->lt(Carbon::parse($row->valid_from)) || $now->gt(Carbon::parse($row->valid_until)) ? 'hors_periode' : 'autorise';
     }
 }
