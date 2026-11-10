@@ -173,6 +173,7 @@ Route::middleware(['auth'])->group(function (): void {
                 Route::get('/poste/api/presents', [PosteApiController::class, 'presents'])->middleware('can:badges.controler');
                 Route::get('/poste/api/recherche', [PosteApiController::class, 'recherche'])->middleware(['can:visiteurs.rechercher', 'throttle:recherche']);
                 Route::get('/poste/api/visiteurs/{visitor}', [PosteApiController::class, 'fiche'])->middleware('can:visiteurs.verifier');
+                Route::get('/poste/api/visiteurs/{visitor}/portrait', [PosteApiController::class, 'portrait'])->middleware(['can:visiteurs.rechercher', 'throttle:portrait']);
                 Route::post('/poste/api/identite', [PosteApiController::class, 'identite'])->middleware('can:visiteurs.verifier');
                 Route::post('/poste/api/avis-hote', [PosteApiController::class, 'avisHote'])->middleware('can:visiteurs.valider');
                 Route::post('/poste/api/valider', [PosteApiController::class, 'valider'])->middleware('can:visiteurs.valider');

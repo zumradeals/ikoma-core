@@ -122,7 +122,7 @@ it('cherche sur n’importe quel mot du nom, avec accents et fautes, VIP d’abo
     $search = fn (string $q) => collect($this->getJson('/poste/api/recherche?q='.urlencode($q), deskHeaders())->assertOk()->json('results'));
     $preview = collect($this->getJson('/poste/api/recherche', deskHeaders())->assertOk()->json('results'));
     expect($preview)->toHaveCount(10)
-        ->and($preview->first())->toHaveKeys(['id', 'full_name', 'organisation', 'host', 'homonyms', 'category', 'job_title', 'access'])
+        ->and($preview->first())->toHaveKeys(['id', 'full_name', 'organisation', 'host', 'homonyms', 'category', 'job_title', 'access', 'has_portrait'])
         ->and($this->getJson('/poste/api/contexte', deskHeaders())->json('visitor_count'))->toBe(
             DB::table('visitors')->where('event_id', $event)->whereNull('withdrawn_at')->count()
         );
@@ -135,7 +135,7 @@ it('cherche sur n’importe quel mot du nom, avec accents et fautes, VIP d’abo
     expect($search('ko')->first()['full_name'])->toBe('Koné Mariam');
     $yao = $search('Yao Brou');
     expect($yao->count())->toBe(3)->and($yao->first()['category']['priority_circuit'])->toBeTrue()->and($yao->first()['homonyms'])->toBe(3)->and($yao->pluck('organisation')->unique()->count())->toBeGreaterThan(1);
-    expect(array_keys($yao->first()))->toBe(['id', 'full_name', 'organisation', 'host', 'homonyms', 'category', 'job_title', 'access']);
+    expect(array_keys($yao->first()))->toBe(['id', 'full_name', 'organisation', 'host', 'homonyms', 'category', 'job_title', 'access', 'has_portrait']);
     expect($search('Visiteur fictif'))->toHaveCount(10);
     expect($search('x'))->toHaveCount(0)->and($search("' OR 1=1 --"))->toHaveCount(0)->and($search('zzzzzz'))->toHaveCount(0);
     // un autre événement n'est jamais visible
@@ -409,4 +409,19 @@ it('fournit à l’accueil la fonction, le motif, le site, les présents et abse
     DB::table('visitors')->where('id', $id)->update(['status' => 'refuse']);
     $line = collect($this->getJson('/poste/api/recherche?q='.urlencode((string) DB::table('visitors')->where('id', $id)->value('full_name')), deskHeaders())->assertOk()->json('results'))->firstWhere('id', $id);
     expect($line['access'])->toBe('refuse')->and($line['job_title'])->toBe('Directrice fictive');
+});
+
+it('sert le portrait d’une personne de l’événement du poste, tracé, sans jamais le servir pour une autre personne ni sans portrait', function () {
+    Storage::fake('local');
+    $id = deskVisitor(1);
+    $path = 'profile-portraits/'.Str::uuid().'.enc';
+    Storage::disk('local')->put($path, Crypt::encryptString(deskJpeg()));
+    $this->getJson('/poste/api/visiteurs/'.$id.'/portrait', deskHeaders())->assertNotFound();
+    DB::table('visitors')->where('id', $id)->update(['profile_photo_file' => $path]);
+    $response = $this->get('/poste/api/visiteurs/'.$id.'/portrait', deskHeaders())->assertOk();
+    expect($response->headers->get('Content-Type'))->toBe('image/jpeg')->and($response->headers->get('Cache-Control'))->toContain('no-store')->and($response->getContent())->toBe(deskJpeg());
+    expect(DB::table('audit_logs')->where('action', 'portrait.consulte_accueil')->count())->toBeGreaterThan(0);
+    $line = collect($this->getJson('/poste/api/recherche?q='.urlencode((string) DB::table('visitors')->where('id', $id)->value('full_name')), deskHeaders())->json('results'))->firstWhere('id', $id);
+    expect($line['has_portrait'])->toBeTrue();
+    $this->getJson('/poste/api/visiteurs/'.Str::uuid().'/portrait', deskHeaders())->assertNotFound();
 });

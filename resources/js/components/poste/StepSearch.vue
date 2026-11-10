@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import CategorySwatch from '../CategorySwatch.vue';
 import PermanentSearch from './PermanentSearch.vue';
 import AccueilOperations from './AccueilOperations.vue';
+import PortraitThumb from './PortraitThumb.vue';
 import type { PosteRepository } from '../../poste/repository';
 import { ApiError, type Access, type Category, type Fiche, type SearchResult } from '../../poste/types';
 const props = defineProps<{ repository: PosteRepository; refreshKey?: string | null; eventName?: string; categories?: Category[]; total?: number | null; period?: string | null }>();
@@ -83,7 +84,7 @@ onBeforeUnmount(() => { window.clearTimeout(timer); ++sequence; });
       <ul class="agent-search-results poste-rows" aria-label="Résultats de la recherche">
         <li v-for="result in results" :key="result.id" class="poste-row" :class="{ 'is-chosen': chosen?.id === result.id, 'is-vip': result.category.priority_circuit }" :data-testid="'ligne-' + result.id" @click="choose(result)">
           <span class="poste-row-check" aria-hidden="true"><span :class="{ 'is-on': chosen?.id === result.id }">{{ chosen?.id === result.id ? '✓' : '' }}</span></span>
-          <span class="poste-row-name"><span class="agent-search-initial" aria-hidden="true">{{ result.full_name.charAt(0) }}</span><span class="min-w-0"><strong class="block">{{ result.full_name }}</strong><span v-if="result.category.priority_circuit" class="block text-sm font-bold text-amber-900"><span aria-hidden="true">★</span> Personnalité VIP : circuit prioritaire, sans file d’attente</span><span v-if="result.homonyms > 1" class="block text-sm font-semibold text-red-800"><span aria-hidden="true">⚠</span> Homonyme : {{ result.homonyms }} personnes portent ce nom</span></span></span>
+          <span class="poste-row-name"><PortraitThumb :repository="repository" :visitor-id="result.id" :name="result.full_name" :has-portrait="result.has_portrait" class="poste-thumb" /><span class="min-w-0"><strong class="block">{{ result.full_name }}</strong><span v-if="result.category.priority_circuit" class="block text-sm font-bold text-amber-900"><span aria-hidden="true">★</span> Personnalité VIP : circuit prioritaire, sans file d’attente</span><span v-if="result.homonyms > 1" class="block text-sm font-semibold text-red-800"><span aria-hidden="true">⚠</span> Homonyme : {{ result.homonyms }} personnes portent ce nom</span></span></span>
           <span class="poste-row-org min-w-0"><span class="block truncate">{{ result.organisation || 'Organisation non indiquée' }}</span><span class="block truncate text-sm text-slate-600">{{ result.job_title || '—' }} · reçu par {{ result.host || 'non indiqué' }}</span></span>
           <span class="poste-row-cat"><CategorySwatch :name="result.category.name" :color="result.category.color" :priority="result.category.priority_circuit" /></span>
           <span class="poste-row-status" :data-testid="'statut-' + result.id"><span class="inline-block size-2.5 rounded-full" :class="accessOf(result).dot" aria-hidden="true" /> {{ accessOf(result).label }}</span>
@@ -105,7 +106,7 @@ onBeforeUnmount(() => { window.clearTimeout(timer); ++sequence; });
         <p v-if="!chosen" class="rounded-lg border border-dashed p-4 text-slate-600" data-testid="apercu-vide">Touchez une ligne pour voir un aperçu de la personne avant de l’enregistrer.</p>
         <template v-else>
           <div class="flex items-start gap-3">
-            <span class="agent-search-initial poste-portrait" aria-hidden="true">{{ chosen.full_name.charAt(0) }}</span>
+            <PortraitThumb :repository="repository" :visitor-id="chosen.id" :name="chosen.full_name" :has-portrait="chosen.has_portrait" class="poste-portrait" />
             <div class="min-w-0 flex-1"><p class="text-xl font-bold" data-testid="apercu-nom">{{ chosen.full_name }}</p><p class="truncate text-slate-700">{{ chosen.organisation || 'Organisation non indiquée' }}</p>
               <p class="mt-2"><CategorySwatch :name="chosen.category.name" :color="chosen.category.color" :priority="chosen.category.priority_circuit" /></p></div>
             <span class="poste-chip" :class="accessOf(chosen).chip" data-testid="apercu-statut"><span aria-hidden="true">{{ chosen.access === 'autorise' || !chosen.access ? '✓' : '•' }}</span> {{ accessOf(chosen).label }}</span>

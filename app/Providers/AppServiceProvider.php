@@ -31,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         RateLimiter::for('sync', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id.'|'.$r->attributes->get('poste')?->id));
+        // Portraits de la liste de l'accueil : jusqu'à dix par affichage, hors du quota de recherche pour ne jamais le consommer.
+        RateLimiter::for('portrait', fn (Request $r) => Limit::perMinute(600)->by($r->user()?->id));
         RateLimiter::for('recherche', fn (Request $r) => Limit::perMinute(240)->by($r->user()?->id));
         // Limiteurs nommés et indépendants : « throttle:N,M » partage un seul compteur par adresse entre toutes les routes qui l'utilisent.
         RateLimiter::for('sante', fn (Request $r) => Limit::perMinute(60)->by($r->ip()));

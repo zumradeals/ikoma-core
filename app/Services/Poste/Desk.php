@@ -12,6 +12,7 @@ use App\Services\BadgeService;
 use App\Services\EventAvailability;
 use App\Services\HostNotifications;
 use App\Services\PrivatePhoto;
+use App\Services\ProfilePortrait;
 use App\Services\QrSvg;
 use App\Services\VisitorSearch;
 use Illuminate\Support\Carbon;
@@ -59,6 +60,12 @@ final class Desk
     public function search(Device $poste, string $query, ?string $categoryId = null): array
     {
         return trim($query) === '' ? $this->search->preview($poste->event_id, $categoryId) : $this->search->searchDetailed($poste->event_id, $query, $categoryId);
+    }
+
+    /** Portrait de la personne pour l'accueil (en ligne seulement) ; null s'il n'y en a pas. La personne doit appartenir à l'événement du poste. */
+    public function portrait(Device $poste, string $visitorId): ?string
+    {
+        return app(ProfilePortrait::class)->readForDesk($this->visitor($poste, $visitorId), $poste->id);
     }
 
     /** @return array<string, mixed> */

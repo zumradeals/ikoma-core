@@ -15,6 +15,8 @@ export interface PosteRepository {
   listPostes(): Promise<Poste[]>;
   context(): Promise<DeskContext>;
   search(query: string, categoryId?: string | null): Promise<SearchResult[]>;
+  /** Portrait de la personne (en ligne seulement) ; absent ou hors ligne : null. */
+  portrait?(visitorId: string): Promise<Blob | null>;
   /** Recherche d'une personne permanente, en lecture seule ; absent quand le poste travaille directement sur le serveur. */
   searchPermanent?(query: string): Promise<PermanentResult[]>;
   /** Véhicules (S09), EN LIGNE UNIQUEMENT : recherche par plaque, entrée et sortie. Absent quand le poste n'a pas ces opérations. */
@@ -103,6 +105,13 @@ export class HttpPosteRepository implements PosteRepository {
     return data as T;
   }
 
+  async portrait(visitorId: string): Promise<Blob | null> {
+    const poste = this.posteId();
+    try {
+      const response = await fetch('/poste/api/visiteurs/' + encodeURIComponent(visitorId) + '/portrait', { headers: { Accept: 'image/jpeg', 'X-Requested-With': 'XMLHttpRequest', ...(poste ? { 'X-Poste-Id': poste } : {}) }, credentials: 'same-origin', redirect: 'manual' });
+      return response.ok && (response.headers.get('Content-Type') ?? '').startsWith('image/') ? await response.blob() : null;
+    } catch { return null; }
+  }
   refreshHost(visitorId:string):Promise<Fiche>{return this.visitor(visitorId);}
   async requestHostAdvice(visitorId:string):Promise<void>{await this.call('POST','/poste/api/avis-hote',{visitor_id:visitorId});}
   async listPostes(): Promise<Poste[]> { return (await this.call<{ postes: Poste[] }>('GET', '/poste/api/postes')).postes; }

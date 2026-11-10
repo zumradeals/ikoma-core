@@ -62,6 +62,15 @@ export class SyncManager {
   /** Appel authentifié par le jeton d'appareil (aussi utilisé par le contrôle en ligne). */
   request<T>(method: 'GET' | 'POST', url: string, body?: object, operationId?: string, timeoutMs?: number): Promise<T> { return this.call<T>(method, url, body, operationId, timeoutMs); }
 
+  /** Image protégée (portrait) lue en ligne avec le jeton d'appareil : jamais copiée dans la file ni dans la copie chiffrée ; null s'il n'y en a pas ou si le réseau manque. */
+  async image(url: string, timeoutMs = 4000): Promise<Blob | null> {
+    const token = await this.vault.getSecret<string>('deviceToken');
+    try {
+      const response = await (this.hooks.fetcher ?? fetch)(url, { method: 'GET', headers: { Accept: 'image/jpeg', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN'), 'X-Device-Token': token ?? '' }, credentials: 'same-origin', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+      return response.ok && (response.headers.get('Content-Type') ?? '').startsWith('image/') ? await response.blob() : null;
+    } catch { return null; }
+  }
+
   private async call<T>(method: 'GET' | 'POST', url: string, body?: object, operationId?: string, timeoutMs?: number): Promise<T> {
     const token = await this.vault.getSecret<string>('deviceToken');
     const headers: Record<string, string> = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN'), 'X-Device-Token': token ?? '' };

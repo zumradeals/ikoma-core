@@ -45,7 +45,7 @@ final class VisitorSearch
             ->when($categoryId !== null && Str::isUuid($categoryId), fn ($q) => $q->where('v.category_id', $categoryId))
             ->orderByRaw('v.full_name COLLATE "C" ASC')->orderBy('v.id')
             ->limit(10)
-            ->get(['v.id', 'v.full_name', 'v.organisation', 'v.position', 'v.status', 'v.valid_from', 'v.valid_until', 'v.host_validation', 'h.name as host_name',
+            ->get(['v.id', 'v.full_name', 'v.organisation', 'v.position', 'v.status', 'v.valid_from', 'v.valid_until', 'v.host_validation', 'v.profile_photo_file', 'h.name as host_name',
                 'c.id as category_id', 'c.name as category_name', 'c.color', 'c.priority_circuit']);
 
         return $rows->map(function ($row) use ($eventId): array {
@@ -58,7 +58,7 @@ final class VisitorSearch
                 'host' => $row->host_name, 'homonyms' => $homonyms,
                 'category' => ['id' => $row->category_id, 'name' => $row->category_name,
                     'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit],
-                'job_title' => $row->position, 'access' => self::access($row)];
+                'job_title' => $row->position, 'access' => self::access($row), 'has_portrait' => $row->profile_photo_file !== null];
         })->all();
     }
 
@@ -101,7 +101,7 @@ final class VisitorSearch
             $score[] = "(CASE WHEN $name LIKE ? THEN 1.0 WHEN $name LIKE ? THEN 0.9 WHEN $name LIKE ? THEN 0.7 ELSE word_similarity(?, $name) END)";
             array_push($scoreBindings, $token.'%', '% '.$token.'%', '%'.$token.'%', $token);
         }
-        $sql = 'SELECT v.id, v.full_name, v.organisation, v.position, v.status, v.valid_from, v.valid_until, v.host_validation, h.name AS host_name, c.id AS category_id, c.name AS category_name, c.color, c.priority_circuit, '
+        $sql = 'SELECT v.id, v.full_name, v.organisation, v.position, v.status, v.valid_from, v.valid_until, v.host_validation, v.profile_photo_file, h.name AS host_name, c.id AS category_id, c.name AS category_name, c.color, c.priority_circuit, '
             ."(SELECT count(*) FROM visitors o WHERE o.event_id = v.event_id AND o.withdrawn_at IS NULL AND o.holder_id IS NULL AND public.ikoma_normalize(o.full_name) = $name) AS homonyms "
             .'FROM visitors v JOIN categories c ON c.id = v.category_id LEFT JOIN hosts h ON h.id = v.host_id '
             .'WHERE v.event_id = ? AND v.withdrawn_at IS NULL AND v.holder_id IS NULL AND v.closed_at IS NULL '.($category ? 'AND v.category_id = ? ' : '').'AND '.implode(' AND ', $where)
@@ -113,7 +113,7 @@ final class VisitorSearch
             return DB::select($sql, [$eventId, ...($category ? [$category] : []), ...$bindings, ...$scoreBindings, (float) count($tokens), ...$scoreBindings]);
         });
 
-        return array_map(fn ($row) => ['id' => $row->id, 'full_name' => $row->full_name, 'organisation' => $row->organisation, 'host' => $row->host_name, 'homonyms' => (int) $row->homonyms, 'category' => ['id' => $row->category_id, 'name' => $row->category_name, 'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit], 'job_title' => $row->position, 'access' => self::access($row)], $rows);
+        return array_map(fn ($row) => ['id' => $row->id, 'full_name' => $row->full_name, 'organisation' => $row->organisation, 'host' => $row->host_name, 'homonyms' => (int) $row->homonyms, 'category' => ['id' => $row->category_id, 'name' => $row->category_name, 'color' => $row->color, 'priority_circuit' => (bool) $row->priority_circuit], 'job_title' => $row->position, 'access' => self::access($row), 'has_portrait' => $row->profile_photo_file !== null], $rows);
     }
 
     /**

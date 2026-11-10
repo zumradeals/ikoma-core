@@ -72,6 +72,8 @@ export class LocalPosteRepository implements GroupPosteRepository {
     if(!this.sync || !this.online)throw new ApiError('reseau','Reconnectez-vous pour demander l’avis de l’hôte.');
     await this.sync.sync();await this.sync.request('POST','/poste/api/avis-hote',{visitor_id:visitorId},undefined,3000);
   }
+  /** Portrait de la personne, en ligne seulement : hors ligne ou sans portrait, l'accueil affiche l'initiale. */
+  async portrait(visitorId: string): Promise<Blob | null> { return this.sync && this.online ? this.sync.image('/poste/api/visiteurs/' + encodeURIComponent(visitorId) + '/portrait') : null; }
   async listPostes(): Promise<Poste[]> {
     const s = this.list.snapshot;
     return [{ id: s.poste.id, name: s.poste.name, station: s.poste.station, event_id: s.poste.event_id, event_name: s.event.name }];

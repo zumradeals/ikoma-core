@@ -12,6 +12,7 @@ use App\Services\Presence;
 use App\Services\Vehicles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -40,6 +41,14 @@ final class PosteApiController
     public function fiche(Request $r, string $visitor): JsonResponse
     {
         return response()->json($this->desk->fiche($this->poste($r), $visitor));
+    }
+
+    public function portrait(Request $r, string $visitor): Response
+    {
+        $bytes = $this->desk->portrait($this->poste($r), $visitor);
+        abort_if($bytes === null, 404);
+
+        return response($bytes)->header('Content-Type', 'image/jpeg')->header('Cache-Control', 'no-store, private')->header('Content-Disposition', 'inline');
     }
 
     public function identite(Request $r): JsonResponse

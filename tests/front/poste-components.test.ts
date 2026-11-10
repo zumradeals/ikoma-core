@@ -5,6 +5,7 @@ import StepFiche from '../../resources/js/components/poste/StepFiche.vue';
 import StepDecision from '../../resources/js/components/poste/StepDecision.vue';
 import StepDone from '../../resources/js/components/poste/StepDone.vue';
 import StepSearch from '../../resources/js/components/poste/StepSearch.vue';
+import PortraitThumb from '../../resources/js/components/poste/PortraitThumb.vue';
 import PosteFooter from '../../resources/js/components/poste/PosteFooter.vue';
 import StepIdentity from '../../resources/js/components/poste/StepIdentity.vue';
 import UnlistedForm from '../../resources/js/components/poste/UnlistedForm.vue';
@@ -252,5 +253,21 @@ describe('écran de recherche conforme à la maquette', () => {
     expect(wrapper.get('[data-testid="evt-site"]').text()).toContain('Site fictif'); expect(wrapper.get('[data-testid="evt-etat"]').text()).toBe('En cours');
     expect(wrapper.get('[data-testid="en-attente"]').text()).toBe('3'); expect(wrapper.get('[data-testid="cloche"]').text()).toContain('2');
     expect(wrapper.get('[data-testid="entete-synchro"]').text()).toContain('Aujourd’hui à'); expect(wrapper.get('[data-testid="poste-en-cours"]').text()).toContain('Poste fictif A');
+  });
+});
+
+describe('portrait de la personne à l’accueil', () => {
+  beforeEach(() => { URL.createObjectURL = vi.fn(() => 'blob:portrait-fictif'); URL.revokeObjectURL = vi.fn(); });
+  it('affiche le portrait lu en ligne, sinon l’initiale (sans portrait, hors ligne ou en échec)', async () => {
+    const portrait = vi.fn(async () => new Blob(['x'], { type: 'image/jpeg' }));
+    const withPhoto = mount(PortraitThumb, { props: { repository: fakeRepo({ portrait }), visitorId: 'v1', name: 'Koné Mariam', hasPortrait: true } }); await flushPromises();
+    expect(withPhoto.get('[data-testid="portrait"]').attributes('src')).toBe('blob:portrait-fictif'); expect(portrait).toHaveBeenCalledWith('v1');
+    const none = mount(PortraitThumb, { props: { repository: fakeRepo({ portrait }), visitorId: 'v2', name: 'Yao Brou', hasPortrait: false } }); await flushPromises();
+    expect(none.find('[data-testid="portrait"]').exists()).toBe(false); expect(none.text()).toBe('Y'); expect(portrait).toHaveBeenCalledTimes(1);
+    const offline = mount(PortraitThumb, { props: { repository: fakeRepo({ portrait: async () => null }), visitorId: 'v3', name: 'Traoré Awa', hasPortrait: true } }); await flushPromises();
+    expect(offline.find('[data-testid="portrait"]').exists()).toBe(false); expect(offline.text()).toBe('T');
+    const failing = mount(PortraitThumb, { props: { repository: fakeRepo({ portrait: async () => { throw new Error('réseau'); } }), visitorId: 'v4', name: 'Diaby Moussa', hasPortrait: true } }); await flushPromises();
+    expect(failing.text()).toBe('D');
+    withPhoto.unmount(); expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:portrait-fictif');
   });
 });

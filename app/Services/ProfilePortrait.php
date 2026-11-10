@@ -89,6 +89,26 @@ final class ProfilePortrait
         return $bytes;
     }
 
+    /**
+     * Lecture par un poste d'accueil, pour reconnaître la personne qui se présente (jamais pour l'impression) : l'autorité est le poste enrôlé,
+     * l'appelant a déjà vérifié que la personne appartient à l'événement du poste. Chaque consultation est tracée.
+     */
+    public function readForDesk(Visitor $visitor, string $deviceId): ?string
+    {
+        if (! $visitor->profile_photo_file) {
+            return null;
+        }
+        $this->checkPath($visitor->profile_photo_file);
+        $encrypted = Storage::disk('local')->get($visitor->profile_photo_file);
+        if ($encrypted === null) {
+            return null;
+        }
+        $bytes = Crypt::decryptString($encrypted);
+        app(Audit::class)->append('portrait.consulte_accueil', auth()->id(), ['visitor_id' => $visitor->id, 'device_id' => $deviceId]);
+
+        return $bytes;
+    }
+
     public function deleteFile(string $path): void
     {
         $this->checkPath($path);
