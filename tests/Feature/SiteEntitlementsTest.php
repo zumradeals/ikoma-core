@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
@@ -17,6 +18,7 @@ beforeEach(function () {
     $this->admin = User::create(['name' => 'Admin fictif habilitations du site', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24), 'two_factor_confirmed_at' => now()]);
     $this->admin->assignRole('administrateur');
     $this->actingAs($this->admin);
+    app(InstitutionalCategories::class)->initialize($this->admin);
     $this->post('/administration/site/zones', ['name' => 'Hall fictif du site']);
     $this->zone = (string) DB::table('zones')->where('name', 'Hall fictif du site')->value('id');
     $this->holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive Site '.Str::random(6), 'institutional_category' => 'AILCT-01'], $this->admin);
