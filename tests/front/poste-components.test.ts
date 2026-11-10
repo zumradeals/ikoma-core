@@ -104,12 +104,12 @@ describe('composants du poste', () => {
     const search = vi.fn(async () => [result({ homonyms: 2 }), result({ id: 'v2', full_name: 'Yao Brou', category: vip })]);
     const wrapper = mount(StepSearch, { props: { repository: fakeRepo({ search }) } });
     await flushPromises();
-    expect(search).toHaveBeenCalledWith('');
+    expect(search).toHaveBeenCalledWith('', null);
     expect(wrapper.get('[data-testid="apercu-liste"]').text()).toContain('Dix premières personnes');
     await wrapper.get('input').setValue('k'); await vi.advanceTimersByTimeAsync(400);
-    expect(search).not.toHaveBeenCalledWith('k');
+    expect(search).not.toHaveBeenCalledWith('k', null);
     await wrapper.get('input').setValue('ko'); await vi.advanceTimersByTimeAsync(400); await flushPromises();
-    expect(search).toHaveBeenCalledWith('ko'); expect(wrapper.emitted('started')).toBeTruthy();
+    expect(search).toHaveBeenCalledWith('ko', null); expect(wrapper.emitted('started')).toBeTruthy();
     expect(wrapper.text()).toContain('Homonyme : 2'); expect(wrapper.text()).toContain('Personnalité VIP'); expect(wrapper.text()).toContain('Prioritaire');
     await wrapper.findAll('ul[aria-label="Résultats de la recherche"] button')[0].trigger('click'); expect(wrapper.emitted('select')![0][0]).toMatchObject({ id: 'v1' });
     await wrapper.findAll('button').find(b => b.text().includes('Visiteur non listé'))!.trigger('click'); expect(wrapper.emitted('unlisted')).toHaveLength(1);
@@ -130,7 +130,7 @@ describe('composants du poste', () => {
     await wrapper.get('input').setValue('');
     await flushPromises();
     expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] button')).toHaveLength(10);
-    expect(search).toHaveBeenCalledWith('');
+    expect(search).toHaveBeenCalledWith('', null);
   });
   it('prépare la fiche rapide d’un non listé avec la catégorie « Visiteur » par défaut', async () => {
     const context = await fakeRepo().context();
@@ -199,45 +199,58 @@ describe('application du poste', () => {
 });
 
 describe('écran de recherche conforme à la maquette', () => {
-  const people = [result({ id: 'a', full_name: 'Koné Mariam' }), result({ id: 'b', full_name: 'Yao Brou', category: vip }), result({ id: 'c', full_name: 'Traoré Awa' })];
-  const mountSearch = async () => {
-    const wrapper = mount(StepSearch, { props: { repository: fakeRepo({ search: async () => people, visitor: async () => fiche({ id: 'a' }) }), eventName: 'Événement fictif' } });
-    await flushPromises(); return wrapper;
+  beforeEach(() => { window.localStorage.clear(); });
+  const people = [result({ id: 'a', full_name: 'Koné Mariam', job_title: 'Directrice fictive', access: 'autorise' }), result({ id: 'b', full_name: 'Yao Brou', category: vip, access: 'hors_periode' }), result({ id: 'c', full_name: 'Traoré Awa', access: 'present' })];
+  const categories = [{ ...category, visitor_count: 38 }, { ...vip, visitor_count: 1 }, { id: 'c3', name: 'Expert', color: '#2E7D32', priority_circuit: false, visitor_count: 0 }];
+  const mountSearch = async (search = vi.fn(async () => people)) => {
+    const wrapper = mount(StepSearch, { props: { repository: fakeRepo({ search, visitor: async () => fiche({ id: 'a', visit_purpose: 'Visite de site fictive' }) }), eventName: 'Événement fictif', categories, total: 40, period: '02 – 14 nov. 2026' } });
+    await flushPromises(); return { wrapper, search };
   };
-  it('filtre les résultats affichés par catégorie, avec le nombre de personnes de chaque onglet', async () => {
-    const wrapper = await mountSearch();
+  it('affiche les onglets de toutes les catégories avec le nombre de la liste et filtre par la recherche elle-même', async () => {
+    const { wrapper, search } = await mountSearch();
     const tabs = wrapper.get('[data-testid="onglets-categories"]');
-    expect(tabs.text()).toContain('Tous (3)'); expect(tabs.text()).toContain('Visiteur (2)'); expect(tabs.text()).toContain('VIP (1)');
-    await tabs.findAll('button').find(b => b.text().startsWith('VIP'))!.trigger('click');
-    expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] li')).toHaveLength(1);
-    await tabs.findAll('button')[0].trigger('click');
-    expect(wrapper.findAll('ul[aria-label="Résultats de la recherche"] li')).toHaveLength(3);
+    expect(tabs.text()).toContain('Tous (40)'); expect(tabs.text()).toContain('Visiteur (38)'); expect(tabs.text()).toContain('VIP (1)'); expect(tabs.text()).toContain('Expert (0)');
+    await wrapper.get('[data-testid="onglet-categorie-c0"]').trigger('click'); await flushPromises();
+    expect(search).toHaveBeenLastCalledWith('', 'c0');
+    await wrapper.get('[data-testid="onglet-tous"]').trigger('click'); await flushPromises();
+    expect(search).toHaveBeenLastCalledWith('', null);
   });
-  it('affiche l’aperçu d’une ligne touchée sans quitter l’étape, et « Continuer » sélectionne cette personne', async () => {
-    const wrapper = await mountSearch();
-    expect(wrapper.get('[data-testid="apercu-vide"]').exists()).toBe(true);
+  it('affiche le statut, la fonction et l’aperçu complet (type, fonction, motif, période, événement) d’une ligne touchée', async () => {
+    const { wrapper } = await mountSearch();
+    expect(wrapper.get('[data-testid="statut-a"]').text()).toBe('Autorisé'); expect(wrapper.get('[data-testid="statut-b"]').text()).toBe('Hors période'); expect(wrapper.get('[data-testid="statut-c"]').text()).toBe('Déjà entré');
+    expect(wrapper.find('[data-testid="apercu-vide"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="continuer-enregistrement"]').attributes('disabled')).toBeDefined();
     await wrapper.get('[data-testid="ligne-a"]').trigger('click'); await flushPromises();
     expect(wrapper.emitted('select')).toBeUndefined();
-    expect(wrapper.get('[data-testid="apercu-nom"]').text()).toBe('Koné Mariam');
-    expect(wrapper.get('[data-testid="apercu-statut"]').text()).toBe('Dans la période');
+    expect(wrapper.get('[data-testid="apercu-nom"]').text()).toBe('Koné Mariam'); expect(wrapper.get('[data-testid="apercu-statut"]').text()).toContain('Autorisé');
+    expect(wrapper.get('[data-testid="apercu-fonction"]').text()).toBe('Directrice fictive'); expect(wrapper.get('[data-testid="apercu-motif"]').text()).toBe('Visite de site fictive');
     expect(wrapper.get('[data-testid="apercu-personne"]').text()).toContain('Événement fictif');
     await wrapper.get('[data-testid="continuer-enregistrement"]').trigger('click');
     expect(wrapper.emitted('select')![0][0]).toMatchObject({ id: 'a' });
   });
   it('le bouton « Sélectionner » d’une ligne enregistre directement, sans passer par l’aperçu', async () => {
-    const wrapper = await mountSearch();
+    const { wrapper } = await mountSearch();
     await wrapper.get('[data-testid="ligne-c"] button').trigger('click');
     expect(wrapper.emitted('select')![0][0]).toMatchObject({ id: 'c' });
   });
-  it('la barre basse dit l’état réel : dernière synchronisation, poste, verrouillage', async () => {
+  it('la barre basse dit l’état réel : appareil, poste, dernière synchronisation, verrouillage', async () => {
     const sync = { online: true, syncing: false, pending: 0, conflicts: 0, lastSyncAt: '2027-01-10T10:42:00Z', lastError: null, needsLogin: false, revoked: false, stale: false, clockWarning: false };
-    const wrapper = mount(PosteFooter, { props: { poste: 'Poste fictif A', agent: 'Agent fictif', online: true, sync } });
-    expect(wrapper.text()).toContain('Enrôlé'); expect(wrapper.text()).toContain('Poste fictif A'); expect(wrapper.text()).toContain('Poste déverrouillé');
+    const wrapper = mount(PosteFooter, { props: { poste: 'Poste fictif A', device: 'Tablette fictive A', agent: 'Agent fictif', online: true, sync } });
+    expect(wrapper.text()).toContain('Enrôlé'); expect(wrapper.text()).toContain('Poste fictif A'); expect(wrapper.text()).toContain('Appareil : Tablette fictive A'); expect(wrapper.text()).toContain('Poste déverrouillé');
     expect(wrapper.get('[data-testid="bloc-synchronisation"]').text()).toContain('À jour');
     await wrapper.get('[data-testid="verrouiller"]').trigger('click'); expect(wrapper.emitted('lock')).toHaveLength(1);
     await wrapper.get('[data-testid="synchroniser"]').trigger('click'); expect(wrapper.emitted('sync')).toHaveLength(1);
     const never = mount(PosteFooter, { props: { poste: null, agent: 'A', online: false, sync: { ...sync, lastSyncAt: null } } });
     expect(never.get('[data-testid="derniere-sync"]').text()).toBe('jamais'); expect(never.text()).not.toContain('À jour');
+  });
+  it('le bandeau d’événement et l’en-tête reprennent les données réelles du poste', async () => {
+    const context = { poste: { id: 'p1', name: 'Tablette fictive A', station: 'Poste fictif A', event_id: 'e1' }, event: { id: 'e1', name: 'Événement fictif', starts_at: '2020-11-02T08:00:00Z', ends_at: '2099-11-14T18:00:00Z', site: 'Site fictif' }, visitor_count: 40, present_count: 38, absent_count: 2, hosts: [], categories };
+    const repo = fakeRepo({ context: async () => context, search: async () => people });
+    const wrapper = mount(PosteApp, { props: { agent: 'Agent fictif', repository: repo, sync: { online: true, syncing: false, pending: 3, conflicts: 2, lastSyncAt: new Date().toISOString(), lastError: null, needsLogin: false, revoked: false, stale: false, clockWarning: false } } });
+    await flushPromises(); await wrapper.get('ul button').trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid="evt-participants"]').text()).toBe('40'); expect(wrapper.get('[data-testid="evt-presents"]').text()).toBe('38'); expect(wrapper.get('[data-testid="evt-absents"]').text()).toBe('2');
+    expect(wrapper.get('[data-testid="evt-site"]').text()).toContain('Site fictif'); expect(wrapper.get('[data-testid="evt-etat"]').text()).toBe('En cours');
+    expect(wrapper.get('[data-testid="en-attente"]').text()).toBe('3'); expect(wrapper.get('[data-testid="cloche"]').text()).toContain('2');
+    expect(wrapper.get('[data-testid="entete-synchro"]').text()).toContain('Aujourd’hui à'); expect(wrapper.get('[data-testid="poste-en-cours"]').text()).toContain('Poste fictif A');
   });
 });

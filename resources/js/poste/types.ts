@@ -1,11 +1,14 @@
-export type Category = { id: string; name: string; color: string; priority_circuit: boolean };
+export type Category = { id: string; name: string; color: string; priority_circuit: boolean; visitor_count?: number };
 export type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string };
-export type DeskContext = { poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string }; visitor_count?: number; hosts: { id: string; name: string; service: string | null }[]; categories: Category[] };
-export type SearchResult = { id: string; full_name: string; organisation: string | null; host: string | null; homonyms: number; category: Category };
+export type DeskContext = { poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string; starts_at?: string; ends_at?: string; site?: string | null }; visitor_count?: number; present_count?: number; absent_count?: number; hosts: { id: string; name: string; service: string | null }[]; categories: Category[] };
+/** Situation d'accès d'une personne dans la liste de l'accueil : « Autorisé » seulement dans la période, sans refus, avant l'entrée. */
+export type Access = 'autorise' | 'hors_periode' | 'refuse' | 'present' | 'sorti';
+export type SearchResult = { id: string; full_name: string; organisation: string | null; host: string | null; homonyms: number; category: Category; job_title?: string | null; access?: Access };
 export type IdentityDocument = { type: string; number?: string; photo: Blob };
 export const documentLabels: Record<string, string> = { cni: 'Carte nationale d’identité', passeport: 'Passeport', permis: 'Permis de conduire', carte_militaire: 'Carte militaire', carte_professionnelle: 'Carte professionnelle', autre: 'Autre pièce' };
 
 export type Fiche = {
+  job_title?: string | null; visit_purpose?: string | null;
   identity_document?: boolean;
   id: string; full_name: string; organisation: string | null; host: string | null; category: Category; zones: string[]; accueil_limite: boolean; source: string; status: string;
   host_advice?: {state:string|null};

@@ -7,7 +7,7 @@ import type { SyncState } from '../../poste/local/sync';
  * Barre basse du poste d'accueil : appareil et poste, synchronisation, sécurité. Tout vient de l'état réel de la tablette (coffre déverrouillé, dernière synchronisation) ; rien n'est supposé.
  * « Enrôlé » : cette barre n'existe que lorsque la tablette est enrôlée et déverrouillée.
  */
-const props = defineProps<{ poste: string | null; agent: string; online: boolean; sync?: SyncState | null }>();
+const props = defineProps<{ poste: string | null; device?: string | null; agent: string; online: boolean; sync?: SyncState | null }>();
 const emit = defineEmits<{ sync: []; lock: [] }>();
 const last = computed(() => (props.sync?.lastSyncAt ? new Date(props.sync.lastSyncAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais'));
 const synced = computed(() => !!props.sync && !!props.sync.lastSyncAt && !props.sync.stale && !props.sync.lastError);
@@ -15,8 +15,8 @@ const synced = computed(() => !!props.sync && !!props.sync.lastSyncAt && !props.
 <template>
   <section id="poste-barre-basse" class="poste-footer" aria-label="Appareil, synchronisation et sécurité" data-testid="poste-barre-basse">
     <div class="poste-footer-block" data-testid="bloc-appareil">
-      <AdminIcon name="users" :size="28" />
-      <div><p class="poste-footer-title">Appareil et poste <span class="poste-chip poste-chip-ok">Enrôlé</span></p><p>Poste : {{ poste ?? 'non choisi' }}</p><p>Agent : {{ agent }}</p></div>
+      <AdminIcon name="tablet" :size="30" />
+      <div><p class="poste-footer-title">Appareil et poste <span class="poste-chip poste-chip-ok">Enrôlé</span></p><p>Poste : {{ poste ?? 'non choisi' }}</p><p v-if="device">Appareil : {{ device }}</p><p>Agent : {{ agent }}</p></div>
     </div>
     <div class="poste-footer-block" data-testid="bloc-synchronisation">
       <AdminIcon name="refresh" :size="28" />

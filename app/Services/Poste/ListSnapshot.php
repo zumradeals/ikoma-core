@@ -52,7 +52,7 @@ final class ListSnapshot
         $e = $poste->event_id;
         $f06Active = app(FoundingModules::class)->f06Active();
         $setting = fn (string $key, int $default): int => (int) (DB::table('settings')->where('key', $key)->value('value') ?? $default);
-        $visitors = DB::select("SELECT v.id, v.full_name, v.organisation, v.host_id, v.category_id, v.valid_from, v.valid_until, v.source, v.status, v.host_validation, v.access_note, v.group_id, v.updated_at AS rev,
+        $visitors = DB::select("SELECT v.id, v.full_name, v.organisation, v.position, v.visit_purpose, v.host_id, v.category_id, v.valid_from, v.valid_until, v.source, v.status, v.host_validation, v.access_note, v.group_id, v.updated_at AS rev,
             (v.status IS DISTINCT FROM 'sorti' AND v.status IS DISTINCT FROM 'refuse' AND EXISTS (SELECT 1 FROM badge_assignments x WHERE x.visitor_id = v.id AND x.cancelled_at IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM badge_assignments x WHERE x.visitor_id = v.id AND x.returned_at IS NULL AND x.cancelled_at IS NULL)) AS a_rebadger,
             EXISTS (SELECT 1 FROM identity_checks i WHERE i.visitor_id = v.id) AS identity_done,
             EXISTS (SELECT 1 FROM photos p WHERE p.visitor_id = v.id) AS photo_done,
@@ -65,7 +65,7 @@ final class ListSnapshot
             'version' => $this->version($poste),
             'server_time' => now()->utc()->format('Y-m-d\TH:i:s.u\Z'),
             'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $e, 'point_code' => $poste->point_code, 'capabilities' => PostCapabilities::capabilities($poste), 'direction_required' => PostCapabilities::requiresDirection($poste)],
-            'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at']),
+            'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at', 'site']),
             'settings' => ['inactivity_minutes' => $setting('poste_inactivite_minutes', 5), 'clock_skew_seconds' => $setting('poste_ecart_horloge_secondes', 300), 'pin_max_failures' => $setting('poste_echecs_pin_max', 15), 'controle_stagiaires' => $this->groupMode(), 'f06_active' => $f06Active,
                 'identity_document' => Desk::documentRequired(), 'offline_call_minutes' => $setting('poste_delai_appel_minutes', 15), 'offline_max_hours' => $setting('poste_hors_reseau_max_heures', 12), 'offline_trust_hours' => PostCapabilities::offlineTrustHours(), 'low_badges_percent' => $setting('poste_badges_bas_pourcent', 10), 'low_badges_min' => $setting('poste_badges_bas_minimum', 5)],
             'categories' => DB::table('categories')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
@@ -76,7 +76,7 @@ final class ListSnapshot
             'point_zones' => DB::table('checkpoint_zones as c')->join('devices as d', 'd.checkpoint_id', '=', 'c.checkpoint_id')->where('c.event_id', $e)->where('d.event_id', $e)->orderBy('d.id')->orderBy('c.zone_id')->get(['d.id as device_id', 'c.zone_id']),
             'entitlements' => DB::table('participation_entitlements')->where('event_id', $e)->whereNull('revoked_at')->whereNull('suspended_at')->where('valid_until', '>=', now())->get(['visitor_id', 'zone_id', 'valid_from', 'valid_until']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
-            'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
+            'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'job_title' => $v->position, 'visit_purpose' => $v->visit_purpose, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
             'permanent' => app(PermanentAccess::class)->snapshot($e),
             'postes' => DB::table('devices')->where('event_id', $e)->whereNull('revoked_at')->orderBy('name')->get(['id', 'name', 'station'])->map(fn ($d) => ['id' => $d->id, 'name' => $d->station ?? $d->name])->all(),
             // Les jetons QR ne quittent jamais le serveur en clair : la tablette compare le hachage du jeton scanné. Tous les badges de l'événement

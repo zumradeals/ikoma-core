@@ -44,17 +44,21 @@ final class Desk
     {
         return [
             'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $poste->event_id],
-            'event' => DB::table('events')->where('id', $poste->event_id)->first(['id', 'name', 'starts_at', 'ends_at']),
+            'event' => DB::table('events')->where('id', $poste->event_id)->first(['id', 'name', 'starts_at', 'ends_at', 'site']),
             'visitor_count' => DB::table('visitors')->where('event_id', $poste->event_id)->whereNull('withdrawn_at')->count(),
+            // Présents : personnes entrées et pas encore sorties ; absents : personnes attendues pas encore arrivées (mêmes définitions que la copie de la tablette).
+            'present_count' => DB::table('visitors')->where('event_id', $poste->event_id)->whereNull('withdrawn_at')->where('status', 'present')->count(),
+            'absent_count' => DB::table('visitors')->where('event_id', $poste->event_id)->whereNull('withdrawn_at')->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'attendu'))->count(),
             'hosts' => DB::table('hosts')->where('event_id', $poste->event_id)->orderBy('name')->get(['id', 'name', 'service']),
-            'categories' => DB::table('categories')->where('event_id', $poste->event_id)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
+            'categories' => DB::table('categories')->where('event_id', $poste->event_id)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit'])
+                ->map(fn ($c) => [...(array) $c, 'visitor_count' => DB::table('visitors')->where('event_id', $poste->event_id)->where('category_id', $c->id)->whereNull('withdrawn_at')->count()]),
         ];
     }
 
     /** @return list<array<string, mixed>> */
-    public function search(Device $poste, string $query): array
+    public function search(Device $poste, string $query, ?string $categoryId = null): array
     {
-        return trim($query) === '' ? $this->search->preview($poste->event_id) : $this->search->searchDetailed($poste->event_id, $query);
+        return trim($query) === '' ? $this->search->preview($poste->event_id, $categoryId) : $this->search->searchDetailed($poste->event_id, $query, $categoryId);
     }
 
     /** @return array<string, mixed> */
@@ -69,7 +73,7 @@ final class Desk
         $badge = DB::table('badge_assignments as a')->join('badges as b', 'b.id', '=', 'a.badge_id')->where('a.visitor_id', $visitor->id)->whereNull('a.returned_at')->whereNull('a.cancelled_at')->value('b.code');
 
         return [
-            'id' => $visitor->id, 'full_name' => $visitor->full_name, 'organisation' => $visitor->organisation,
+            'id' => $visitor->id, 'full_name' => $visitor->full_name, 'organisation' => $visitor->organisation, 'job_title' => $visitor->position, 'visit_purpose' => $visitor->visit_purpose,
             'host' => DB::table('hosts')->where('id', $visitor->host_id)->value('name'),
             'category' => ['id' => $category->id, 'name' => $category->name, 'color' => $category->color, 'priority_circuit' => (bool) $category->priority_circuit],
             'zones' => $zones->all(), 'accueil_limite' => $unlisted, 'source' => $visitor->source, 'status' => $visitor->status ?? 'attendu', 'host_validation' => $visitor->host_validation,

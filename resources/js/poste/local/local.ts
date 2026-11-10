@@ -79,10 +79,11 @@ export class LocalPosteRepository implements GroupPosteRepository {
 
   async context(): Promise<DeskContext> {
     const s = this.list.snapshot;
-    return { poste: s.poste, event: { id: s.event.id, name: s.event.name }, visitor_count: this.list.visitors.size, hosts: s.hosts, categories: s.categories };
+    return { poste: s.poste, event: { id: s.event.id, name: s.event.name, starts_at: s.event.starts_at, ends_at: s.event.ends_at, site: s.event.site ?? null }, visitor_count: this.list.visitors.size,
+      present_count: [...this.list.visitors.values()].filter(v => v.status === 'present').length, absent_count: [...this.list.visitors.values()].filter(v => v.status === 'attendu').length, hosts: s.hosts, categories: s.categories.map(c => ({ ...c, visitor_count: [...this.list.visitors.values()].filter(v => v.category_id === c.id).length })) };
   }
 
-  async search(query: string): Promise<SearchResult[]> { return searchOf(this.list, query); }
+  async search(query: string, categoryId: string | null = null): Promise<SearchResult[]> { return searchOf(this.list, query, this.now(), categoryId); }
   /** Recherche d'une personne permanente (lecture seule, copie locale). */
   async searchPermanent(query: string): Promise<PermanentResult[]> { return searchPermanentDirectory(this.list.snapshot.permanent, this.list.snapshot.zones, query, Date.now()); }
   async visitor(id: string): Promise<Fiche> { return ficheOf(this.list, id, this.now()); }
