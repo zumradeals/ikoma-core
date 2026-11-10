@@ -856,3 +856,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## deploy.sh : plus de 502 après une reconstruction
 - Constat : après un redéploiement, le conteneur nginx de la pile gardait l'ancienne adresse interne de PHP (502) et le test HTTPS final, lancé trop tôt, faisait échouer le script.
 - Décision : `deploy.sh` redémarre le service nginx de la pile après le démarrage, puis réessaie le test HTTPS pendant 30 secondes au plus. Le test reste strict (pas de `curl -k`) et la configuration TLS existante n'est toujours pas touchée.
+
+## Tablette de site, lot 3 : mouvements du site dans le même journal
+- Décision : `access_events` reste l'unique journal ; le contexte « site » = `event_id` vide + `holder_id` renseigné (contraintes de base : pas de mélange activité/site, pas de participation ni de badge côté site).
+- Présence du site calculée à la lecture (service `SiteMovements`), jamais stockée ; personnel permanent seulement (décision du dirigeant). Aucun mouvement du site n'est supprimé automatiquement tant qu'aucun réglage de conservation n'existe.
+- `Presence::corriger` (activité) refuse un mouvement du site ; la correction du site passe par `SiteMovements::correct`.
+- Écart assumé : pas d'écran de correction ni d'écriture par la tablette au lot 3 (lot 4).

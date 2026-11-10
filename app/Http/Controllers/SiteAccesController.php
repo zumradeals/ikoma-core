@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Poste\PostCapabilities;
 use App\Services\SiteConfiguration;
+use App\Services\SiteMovements;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -17,11 +18,15 @@ use Inertia\Response;
  */
 final class SiteAccesController
 {
-    public function index(SiteConfiguration $site): Response
+    public function index(Request $request, SiteConfiguration $site, SiteMovements $movements): Response
     {
         Gate::authorize('postes.gerer');
+        // Présents sur le site : personnel permanent seulement (les visiteurs restent comptés par activité) ; réservé au droit « presences.consulter ».
+        $presence = $request->user()->can('presences.consulter')
+            ? array_map(fn ($p) => ['id' => $p->id, 'name' => $p->full_name, 'identifier' => $p->identifier, 'category' => $p->category, 'point' => $p->checkpoint, 'since' => $p->occurred_at], $movements->present())
+            : null;
 
-        return Inertia::render('Admin/SiteAcces', $site->overview());
+        return Inertia::render('Admin/SiteAcces', $site->overview() + ['site_presence' => $presence]);
     }
 
     public function rename(Request $request, SiteConfiguration $site): RedirectResponse
