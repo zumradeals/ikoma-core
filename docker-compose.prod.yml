@@ -16,7 +16,7 @@ x-durci: &durci
 services:
   db:
     <<: *durci
-    image: ghcr.io/zumradeals/ikoma-access-postgres-candidate@sha256:972db7acac7096fe75a5918b8d4692f2199bdb07599d055082b0b2a5b88c731d
+    image: ghcr.io/zumradeals/ikoma-access-postgres-candidate@sha256:d98609e21a7a130dd6d7e308f072a3d4592bc6c54f3b1a0bcef4c3507bff78ab
     command: [postgres, -c, log_error_verbosity=terse, -c, log_parameter_max_length_on_error=0, -c, log_connections=on, -c, ssl=off]
     secrets: [db_owner]
     # S0.7 fail-closed: a fresh installation or separately approved migration must set this explicitly.
