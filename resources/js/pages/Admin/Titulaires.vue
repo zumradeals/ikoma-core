@@ -140,7 +140,6 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
         </div>
       </section>
 
-      <p v-if="canCards" class="col-span-full text-sm" data-testid="navigation-cartes">Cartes permanentes : <Link href="/administration/modeles?section=cartes" class="font-semibold underline" data-testid="lien-modeles">personnalisation des cartes</Link> · <Link href="/administration/badges?type=carte_permanente" class="font-semibold underline" data-testid="lien-atelier-cartes-registre">imprimer des cartes</Link> · <Link href="/administration/habilitations" class="font-semibold underline" data-testid="lien-habilitations-registre">habilitations et zones</Link>. Les badges des visiteurs temporaires se gèrent dans <Link href="/administration/badges" class="font-semibold underline" data-testid="lien-badges-visiteurs">Badges visiteurs</Link>.</p>
 
       <form class="col-span-full grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]" role="search" @submit.prevent="runSearch">
         <label class="font-semibold">Rechercher (nom, fonction, organisation, numéro)<input v-model="search.q" class="field mt-1" data-testid="recherche-titulaires" placeholder="Nom ou numéro"></label>

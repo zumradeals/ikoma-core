@@ -10,10 +10,10 @@ test('un administrateur génère un lot, réserve une plage à un poste et ouvre
   const origin = new URL(baseURL || 'http://localhost:8080').origin;
   await page.setViewportSize({ width: 1024, height: 1400 });
   await loginWithSecondFactor(page, user.email, user.password, user.secret);
-  // L'entrée « Badges et cartes » ouvre l'espace de travail ; les lots et réservations restent sur leur page historique.
+  // L'entrée « Badges et cartes » ouvre l'espace de travail ; les lots et réservations (stock des visiteurs non annoncés) ont leur onglet.
   await openMenu(page, 'badges-cartes');
   await expect(page.getByTestId('espace-travail')).toBeVisible();
-  await page.getByTestId('lien-lots').click();
+  await page.getByTestId('onglet-lots').click();
   await expect(page.getByRole('heading', { name: 'Administration · Lots et réservations de badges' })).toBeVisible();
 
   // 1. Génération d'un lot de 20 badges « Visiteur » : 20 attendus + 10 % de marge = 22.

@@ -69,6 +69,5 @@ defineExpose({ load });
       <button type="button" class="site-btn site-btn-outline !min-h-10" :disabled="loading || registre.meta.current_page >= registre.meta.last_page" data-testid="registre-suivant" @click="load(registre.meta.current_page + 1)">Suivant</button>
     </nav>
     <p class="mt-auto pt-3 text-xs text-slate-600" data-testid="registre-stock">Le stock de lots sans titulaire est masqué : filtre « Disponible (stock) » ou recherche d’un numéro.</p>
-    <p class="pt-1 text-xs text-slate-600" data-testid="registre-liens"><slot name="footer" /></p>
   </section>
 </template>

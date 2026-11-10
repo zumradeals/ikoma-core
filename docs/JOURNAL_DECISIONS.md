@@ -807,3 +807,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **Conservé** : lots, réservations, mise à disposition, étiquettes et atelier par lots (le stock sert encore à l'accueil des visiteurs non annoncés) ; cycle de vie des cartes (remettre, révoquer, remplacer) ; suivi des tirages ; routes `titulaires/modeles/{code}` et PUT de réglage.
 - **Redirections maintenues** : `?mode=cartes` de l'Atelier → registre filtré sur les cartes ; filtres de lots sur `/badges` → `/badges/lots`.
 - Les tests qui appelaient les routes supprimées utilisent leurs équivalents (`atelier/*`, tirage tracé puis document, `impression`).
+
+## V1 — Badges et cartes : retrait de l'ancien modèle par activité et des liens redondants (décision du dirigeant)
+- **Modèles institutionnels** : la page ne montre plus que les modèles par catégorie. L'ancien modèle des badges de lots, par activité, est supprimé avec ses routes d'enregistrement (`atelier/modeles`, `reinitialiser`, `reprendre`) ; l'Atelier garde des réglages valables pour le seul tirage.
+- **Liens retirés** : ligne de liens de la page du personnel permanent, renvoi « Atelier des badges » de la fiche carte, lien de la page des lots vers les cartes permanentes, lien du registre vers le personnel permanent.
+- **Onglet « Lots et réservations »** : quatrième onglet de l'espace, après « Impression et historique », vers `/administration/badges/lots` (permission `badges.gerer`) : le stock de badges et leurs réservations restent utiles pour les visiteurs non annoncés. Les liens de pied du registre sont retirés ; la mise à disposition entre activités reste accessible depuis la page des lots. La page du personnel permanent reste accessible depuis Personnes.

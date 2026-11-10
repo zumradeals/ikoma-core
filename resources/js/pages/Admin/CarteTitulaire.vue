@@ -119,7 +119,6 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
 
           <section class="space-y-3 rounded-xl border bg-white p-5" aria-label="Impression">
             <h2 class="text-heading font-bold">{{ reprinting ? 'Réimprimer la carte' : 'Imprimer la carte' }}</h2>
-            <p class="text-sm">Pour imprimer plusieurs cartes à la fois, utilisez <Link href="/administration/badges?type=carte_permanente" class="font-semibold underline" data-testid="lien-atelier-cartes">l’Atelier des badges</Link>.</p>
             <p v-if="reprinting">Réimprimer conserve le même badge, le même QR et le même identifiant. Un motif est obligatoire et reste dans l’historique.</p>
             <p v-else>Le premier tirage est l’émission de la carte. Faites d’abord un essai sur la <a href="/administration/titulaires/alignement" target="_blank" rel="noopener" class="font-semibold underline" data-testid="lien-alignement">page d’alignement</a>.</p>
             <form method="post" :action="base + '/carte/imprimer'" target="_blank" class="space-y-3" data-testid="formulaire-impression">

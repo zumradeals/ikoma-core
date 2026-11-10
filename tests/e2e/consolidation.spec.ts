@@ -27,28 +27,31 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     // L'espace : quatre responsabilités, compteurs, rappel du poste d'accueil.
     await page.getByTestId('menu-badges-cartes').click();
     await expect(page).toHaveURL(/\/administration\/badges$/);
-    for (const key of ['registre', 'modeles', 'impression']) await expect(page.getByTestId(`onglet-${key}`)).toBeVisible();
+    for (const key of ['registre', 'modeles', 'impression', 'lots']) await expect(page.getByTestId(`onglet-${key}`)).toBeVisible();
     await expect(page.getByTestId('onglet-registre')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('compteurs-badges-cartes')).toBeVisible();
     await expect(page.getByTestId('rappel-accueil')).toContainText('acte distinct de la sortie physique');
     await noHorizontalScroll(page, `badges ${label}`);
     await page.screenshot({ path: `test-results/consolidation-badges-visiteurs-${label}.png`, fullPage: true });
 
-    // Cartes permanentes : renvoi explicite depuis les badges visiteurs, onglet actif, renvoi inverse.
-    await page.getByTestId('lien-cartes-permanentes').click();
+    // Lots et réservations : onglet dédié (stock pour les visiteurs non annoncés), actif sur sa page.
+    await page.getByTestId('onglet-lots').click();
+    await expect(page.getByRole('heading', { name: 'Administration · Lots et réservations de badges' })).toBeVisible();
+    await expect(page.getByTestId('onglet-lots')).toHaveAttribute('aria-current', 'page');
+    await noHorizontalScroll(page, `lots ${label}`);
+    await page.screenshot({ path: `test-results/consolidation-lots-${label}.png`, fullPage: true });
+    // Personnel permanent : page toujours accessible (Personnes), sans onglet propre.
+    await page.goto('/administration/titulaires');
     await expect(page.getByTestId('page-titulaires')).toBeVisible();
-    await expect(page.getByTestId('onglet-registre')).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByTestId('navigation-cartes')).toContainText('Badges visiteurs');
     await noHorizontalScroll(page, `titulaires ${label}`);
     await page.screenshot({ path: `test-results/consolidation-cartes-${label}.png`, fullPage: true });
 
-    // Modèles institutionnels : un modèle par catégorie ; l'ancien modèle par activité (lots) est rangé dans un bloc replié.
+    // Modèles institutionnels : un modèle par catégorie ; l'ancien modèle par activité (lots) n'existe plus.
     await page.getByTestId('onglet-modeles').click();
     await expect(page.getByTestId('page-modeles')).toBeVisible();
     await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
-    await expect(page.getByTestId('bloc-modele-badge')).toBeHidden();
-    await page.getByTestId('modele-type-badges').click();
-    await expect(page.getByTestId('bloc-modele-badge')).toBeVisible();
+    await expect(page.getByTestId('bloc-modele-badge')).toHaveCount(0);
+    await expect(page.getByTestId('modele-historique')).toHaveCount(0);
     await noHorizontalScroll(page, `modeles ${label}`);
     await page.screenshot({ path: `test-results/consolidation-modeles-${label}.png`, fullPage: true });
 
@@ -60,8 +63,6 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await page.getByTestId('ouvrir-atelier-lots').click();
     await expect(page.getByTestId('rappel-modele')).toBeVisible();
     await noHorizontalScroll(page, `impression ${label}`);
-    await page.getByTestId('lien-modeles-badges').click();
-    await expect(page.getByTestId('page-modeles')).toBeVisible();
 
     // Invités : « Ajouter un invité », réservé aux invités temporaires, avec renvoi vers le registre.
     await page.goto('/administration/imports');

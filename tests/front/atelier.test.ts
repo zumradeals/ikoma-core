@@ -114,11 +114,11 @@ describe('Atelier des badges (parcours visiteurs)', () => {
   });
 });
 
-describe('Atelier des badges : la gestion des modèles est dans l’espace Modèles', () => {
-  it('renvoie vers la page Modèles et ne propose plus d’enregistrer, réinitialiser ni reprendre un modèle', async () => {
+describe('Atelier des badges : aucun enregistrement de modèle par activité', () => {
+  it('précise que les réglages ne valent que pour le tirage et ne propose ni lien vers un espace de modèles ni enregistrement', async () => {
     const wrapper = render(); await flushPromises();
     expect(wrapper.get('[data-testid="rappel-modele"]').text()).toContain('ce tirage seulement');
-    expect(wrapper.get('[data-testid="lien-modeles-badges"]').text()).toContain('Gérer les modèles');
+    expect(wrapper.find('[data-testid="lien-modeles-badges"]').exists()).toBe(false);
     for (const id of ['enregistrer-modele', 'reinitialiser-modele', 'reprendre-modele', 'source-modele', 'gestion-modeles']) expect(wrapper.find(`[data-testid="${id}"]`).exists()).toBe(false);
   });
 
