@@ -87,7 +87,7 @@ const quick = computed(() => [
     </dl>
 
     <!-- Accès, mouvements, site -->
-    <div class="grid items-stretch gap-4 lg:grid-cols-[1.35fr_1.15fr_.9fr]">
+    <div class="grid items-stretch gap-4 min-[1320px]:grid-cols-[1.35fr_1.15fr_.9fr]">
       <section class="admin-card" aria-labelledby="acces-titre" data-testid="bloc-acces">
         <h2 id="acces-titre" class="text-lg font-extrabold">Activité des accès <span class="font-normal text-slate-600">(24 dernières heures)</span></h2>
         <svg viewBox="0 0 620 235" class="mt-2 w-full" role="img" aria-label="Entrées et sorties par heure sur les 24 dernières heures" data-testid="graphique-acces">
@@ -127,13 +127,13 @@ const quick = computed(() => [
     </div>
 
     <!-- Activités, visites, badges -->
-    <div class="grid items-stretch gap-4 lg:grid-cols-3">
+    <div class="grid items-stretch gap-4 md:grid-cols-2 min-[1320px]:grid-cols-3">
       <section class="admin-card" aria-labelledby="act-titre" data-testid="bloc-activites">
         <div class="flex items-center justify-between gap-2"><h2 id="act-titre" class="text-lg font-extrabold">Activités en cours</h2><Link v-if="can('evenements.gerer')" href="/administration/evenements" class="text-sm font-semibold text-blue-800 underline" data-testid="vers-registre-activites">Voir tout →</Link></div>
         <p v-if="!general.activites.length" class="mt-3 text-slate-600" data-testid="aucune-activite-ouverte">Aucune activité ouverte ou à venir.</p>
         <ul v-else class="mt-2 space-y-3" data-testid="liste-activites">
           <li v-for="a in general.activites.slice(0, 2)" :key="a.id" class="space-y-1" :data-testid="'activite-' + a.id">
-            <div class="flex items-center justify-between gap-2"><Link :href="'/administration/evenements?activite=' + a.id" class="truncate font-bold">{{ a.name }}</Link><span class="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-900">{{ phase[a.phase] ?? a.phase }}</span></div>
+            <div class="flex items-center justify-between gap-2"><Link :href="'/administration/evenements?activite=' + a.id" class="min-w-0 truncate font-bold">{{ a.name }}</Link><span class="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-900">{{ phase[a.phase] ?? a.phase }}</span></div>
             <p class="text-xs text-slate-600">{{ periode(a) }}<template v-if="a.site"> · {{ a.site }}</template></p>
             <p class="text-sm" :data-testid="'effectifs-' + a.id">Participants : {{ a.participants }} · Attendus : {{ a.attendus }} · Arrivés : {{ a.arrivees }} · Présents : {{ a.presents }}</p>
             <div class="flex items-center gap-2" :aria-label="'Arrivées confirmées : ' + progress(a) + ' %'"><div class="h-2.5 grow overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full bg-green-600" :style="{ width: progress(a) + '%' }" /></div><span class="text-sm font-bold">{{ progress(a) }} %</span></div>
@@ -164,7 +164,7 @@ const quick = computed(() => [
     </div>
 
     <!-- Accès rapides, alertes -->
-    <div class="grid items-stretch gap-4 lg:grid-cols-[1.1fr_1fr]">
+    <div class="grid items-stretch gap-4 min-[1320px]:grid-cols-[1.1fr_1fr]">
       <section class="admin-card" aria-labelledby="rapide-titre" data-testid="acces-rapides">
         <h2 id="rapide-titre" class="text-lg font-extrabold">Accès rapides</h2>
         <nav class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Accès rapides">
