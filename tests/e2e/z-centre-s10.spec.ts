@@ -47,16 +47,15 @@ test('le superviseur voit le centre de supervision et consulte un détail sans q
 
 test('le superviseur n’accède à aucune page d’agent ni d’administration', async ({ page }) => {
   await loginWithSecondFactor(page, fx.supervisor.email, fx.supervisor.password, fx.supervisor.secret);
-  for (const url of ['/poste', '/controle', '/administration/atelier/parcours', '/administration/postes']) {
+  for (const url of ['/poste', '/controle', '/administration/badges', '/administration/postes']) {
     const response = await page.goto(url);
     expect(response?.status(), url).toBe(403);
   }
 });
 
-test('l’administrateur retrouve l’espace Badges et cartes : ancien sommaire redirigé, trois responsabilités et espace de travail', async ({ page }) => {
+test('l’administrateur retrouve l’espace Badges et cartes : trois responsabilités et espace de travail', async ({ page }) => {
   await loginWithSecondFactor(page, fx.admin.email, fx.admin.password, fx.admin.secret);
-  await page.goto('/administration/atelier/parcours');
-  await expect(page).toHaveURL(/\/administration\/badges$/);
+  await page.goto('/administration/badges');
   await expect(page.getByTestId('onglet-registre')).toContainText('Registre et cartes');
   await expect(page.getByTestId('onglet-modeles')).toContainText('Modèles institutionnels');
   await expect(page.getByTestId('onglet-impression')).toContainText('Impression et historique');

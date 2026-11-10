@@ -154,14 +154,8 @@ it('traite les étiquettes A4 comme un format de l’Atelier : même suivi, mêm
     $this->postJson('/administration/atelier/tirages', ['format' => 'etiquettes', 'batch' => $this->batch->id, 'cols' => 9])->assertUnprocessable()->assertJsonValidationErrors('cols');
 });
 
-it('conserve les anciens liens : l’atelier et les étiquettes redirigent vers l’Atelier avec la sélection', function () {
-    $this->get('/administration/badges/modeles')->assertRedirect('/administration/atelier');
-    $this->get('/administration/badges/etiquettes?batch='.$this->batch->id.'&cols=2&rows=3&from=5&to=9')->assertRedirect('/administration/atelier?format=etiquettes&batch='.$this->batch->id.'&from=5&to=9&cols=2&rows=3');
-    $this->get('/administration/badges/etiquettes?batch='.$this->batch->id.'&cols=9')->assertSessionHasErrors('cols');
+it('ouvre l’Atelier avec la sélection demandée (lot, format, plage)', function () {
     $this->get('/administration/atelier?format=etiquettes&batch='.$this->batch->id.'&cols=2&rows=3')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/Atelier')->where('initial.format', 'etiquettes')->where('initial.batch', $this->batch->id)->where('initial.event', DemoSeeder::id('event'))->has('runs'));
-    // L'ancienne page d'impression directe reste utilisable et est désormais tracée.
-    $this->get('/administration/badges/modeles/imprimer?'.http_build_query([...$this->selection, 'from' => $this->n0, 'to' => $this->n0 + 2]))->assertOk();
-    expect(DB::table('badge_print_runs')->count())->toBe(1);
 });
 
 it('fournit une page d’essai d’alignement commune, sans QR, sans donnée personnelle et sans trace', function () {
@@ -222,7 +216,6 @@ it('applique les permissions côté serveur à toutes les routes de l’Atelier'
     $this->get('/administration/atelier/alignement?format=pvc&orientation=paysage')->assertForbidden();
     $this->postJson('/administration/atelier/personnes', [])->assertForbidden();
     $this->postJson('/administration/atelier/preparer', [])->assertForbidden();
-    $this->get('/administration/badges/etiquettes?batch='.$this->batch->id)->assertForbidden();
     expect(DB::table('badge_print_events')->where('print_run_id', $plan['run'])->count())->toBe(1);
 })->with(['agent_accueil', 'superviseur', 'hote', 'encadreur']);
 

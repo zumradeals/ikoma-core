@@ -51,10 +51,6 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await expect(page.getByTestId('bloc-modele-badge')).toBeVisible();
     await noHorizontalScroll(page, `modeles ${label}`);
     await page.screenshot({ path: `test-results/consolidation-modeles-${label}.png`, fullPage: true });
-    // Ancienne adresse des modèles de cartes : renvoi vers l'espace Modèles, section carte.
-    await page.goto('/administration/titulaires/modeles');
-    await expect(page).toHaveURL(/\/administration\/modeles\?section=cartes/);
-    await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
 
     // Impression et historique : le suivi des tirages d'abord ; l'atelier par lots (stock existant) s'ouvre à la demande, le modèle y est rappelé avec un lien vers Modèles.
     await page.getByTestId('onglet-impression').click();
@@ -66,10 +62,6 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await noHorizontalScroll(page, `impression ${label}`);
     await page.getByTestId('lien-modeles-badges').click();
     await expect(page.getByTestId('page-modeles')).toBeVisible();
-
-    // Ancien sommaire : adresse conservée, renvoi vers l'espace.
-    await page.goto('/administration/atelier/parcours');
-    await expect(page).toHaveURL(/\/administration\/badges$/);
 
     // Invités : « Ajouter un invité », réservé aux invités temporaires, avec renvoi vers le registre.
     await page.goto('/administration/imports');

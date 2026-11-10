@@ -36,7 +36,7 @@ const quick = computed(() => [
   { key: 'personne', label: 'Ajouter une personne', href: '/administration/personnes', icon: 'users', show: can('listes.importer') },
   { key: 'habilitations', label: 'Gérer les habilitations', href: '/administration/habilitations', icon: 'shield', show: can('listes.importer') },
   { key: 'activite', label: 'Créer une activité', href: '/administration/evenements', icon: 'calendar', show: can('evenements.gerer') },
-  { key: 'badges', label: 'Préparer des badges', href: '/administration/badges/preparer', icon: 'qr', show: can('badges.gerer') && can('listes.importer') },
+  { key: 'badges', label: 'Préparer des badges', href: '/administration/badges', icon: 'qr', show: can('badges.gerer') && can('listes.importer') },
   { key: 'operations', label: 'Voir les opérations', href: '/administration/operations', icon: 'monitor', show: can('pilotage.consulter') },
   { key: 'journal', label: 'Consulter le journal', href: '/administration/journal', icon: 'book', show: can('journal.consulter') },
 ].filter(q => q.show));

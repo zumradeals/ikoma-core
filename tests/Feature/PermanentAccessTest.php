@@ -538,32 +538,29 @@ it('enregistre, valide et fait évoluer un modèle de carte par catégorie', fun
     $this->put('/administration/titulaires/modeles/AILCT-03', ['color' => '#445566', 'mention' => 'X', 'show_validity' => true, 'qr_side' => 'verso'])->assertForbidden();
 });
 
-it('imprime plusieurs cartes depuis l’Atelier avec un tirage tracé et exige un motif à la réimpression', function () {
+it('imprime plusieurs cartes par la route d’impression unique avec un tirage tracé et exige un motif à la réimpression', function () {
     $this->actingAs($this->admin);
     $ids = [];
     foreach (['AILCT-01', 'AILCT-04'] as $category) {
         $ids[] = $holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive '.Str::random(6), 'institutional_category' => $category], $this->admin);
         app(HolderCards::class)->issue($holder, $this->admin, false);
     }
-    $this->getJson('/administration/atelier/cartes')->assertOk()->assertJsonCount(2, 'cards')->assertJsonPath('cards.0.activated', false);
-    $this->post('/administration/atelier/cartes', ['holders' => []])->assertSessionHasErrors('holders');
-    $response = $this->post('/administration/atelier/cartes', ['holders' => $ids])->assertOk();
-    expect(substr_count($response->getContent(), 'data-side="recto"'))->toBe(2);
+    $badges = DB::table('holder_cards')->whereIn('holder_id', $ids)->pluck('badge_id')->all();
+    $this->post('/administration/badges/impression', ['badges' => []])->assertSessionHasErrors('badges');
+    $this->post('/administration/badges/impression', ['badges' => $badges])->assertOk();
     $run = DB::table('badge_print_runs')->where('kind', 'permanent')->first();
     expect($run->badge_count)->toBe(2)->and($run->format)->toBe('cr80')->and($run->batch_id)->toBeNull()
         ->and(DB::table('badge_print_events')->where('print_run_id', $run->id)->where('event_type', 'generated')->count())->toBe(1);
     expect(DB::table('holder_card_prints')->whereIn('card_id', DB::table('holder_cards')->whereIn('holder_id', $ids)->pluck('id'))->count())->toBe(2);
     // Réimpression : le motif est obligatoire, et rien n'est écrit sans lui.
-    $this->post('/administration/atelier/cartes', ['holders' => $ids])->assertSessionHasErrors('reason');
+    $this->post('/administration/badges/impression', ['badges' => $badges])->assertSessionHasErrors('reason');
     expect(DB::table('badge_print_runs')->where('kind', 'permanent')->count())->toBe(1);
-    $this->post('/administration/atelier/cartes', ['holders' => $ids, 'reason' => 'Carte abîmée (fictif)'])->assertOk();
+    $this->post('/administration/badges/impression', ['badges' => $badges, 'reason' => 'Carte abîmée (fictif)'])->assertOk();
     expect(DB::table('badge_print_runs')->where('kind', 'permanent')->count())->toBe(2);
     // L'impression n'active rien.
     expect(DB::table('holder_cards')->whereIn('holder_id', $ids)->whereNotNull('activated_at')->count())->toBe(0);
     $this->actingAs($this->agent);
-    $this->post('/administration/atelier/cartes', ['holders' => $ids])->assertForbidden();
-    $this->actingAs($this->agent);
-    $this->getJson('/administration/atelier/cartes')->assertForbidden();
+    $this->post('/administration/badges/impression', ['badges' => $badges])->assertForbidden();
 });
 
 it('accorde l’accès à plusieurs personnes et zones d’un coup : un accès individuel par couple, doublons ignorés, jamais par catégorie', function () {

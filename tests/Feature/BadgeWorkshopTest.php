@@ -42,7 +42,7 @@ it('présente les événements et lots sans transmettre les jetons ou les titula
 it('imprime 200 badges sans changer les jetons, statuts, réservations ou associations', function () {
     $before = DB::table('badges')->orderBy('id')->get()->toJson();
     $assignments = DB::table('badge_assignments')->orderBy('id')->get()->toJson();
-    $response = $this->get('/administration/badges/modeles/imprimer?'.http_build_query($this->printOptions))->assertOk()->assertHeader('Cache-Control', 'no-store, private');
+    $response = atelierDocument($this, $this->printOptions)->assertOk()->assertHeader('Cache-Control', 'no-store, private');
     expect(substr_count($response->getContent(), '<article class="access-card '))->toBe(200)
         ->and(substr_count($response->getContent(), '<section class="sheet"'))->toBe(20);
     $first = Badge::where('badge_batch_id', $this->batch->id)->orderBy('code')->firstOrFail();
@@ -55,14 +55,14 @@ it('imprime 200 badges sans changer les jetons, statuts, réservations ou associ
 
 it('prévisualise le même badge que le tirage PVC avec les dimensions physiques dans les deux orientations', function (string $orientation, string $size) {
     $options = [...$this->printOptions, 'format' => 'pvc', 'from' => 401, 'to' => 401, 'orientation' => $orientation];
-    $preview = $this->postJson('/administration/badges/modeles/apercu', $options)->assertOk()->assertJsonPath('count', 1)->assertJsonPath('first', 'B-401');
-    $response = $this->get('/administration/badges/modeles/imprimer?'.http_build_query($options))->assertOk();
+    $preview = $this->postJson('/administration/atelier/apercu', $options)->assertOk()->assertJsonPath('count', 1)->assertJsonPath('first', 'B-401');
+    $response = atelierDocument($this, $options)->assertOk();
     $response->assertSee($preview->json('html'), false)->assertSee('size: '.$size, false);
     expect(substr_count($response->getContent(), '<article class="access-card '))->toBe(1);
 })->with([['paysage', '85.6mm 53.98mm'], ['portrait', '53.98mm 85.6mm']]);
 
 it('refuse les sélections incohérentes et les planches qui réduiraient les badges', function (array $changes, string $field) {
-    $this->postJson('/administration/badges/modeles/apercu', [...$this->printOptions, ...$changes])->assertUnprocessable()->assertJsonValidationErrors($field);
+    $this->postJson('/administration/atelier/apercu', [...$this->printOptions, ...$changes])->assertUnprocessable()->assertJsonValidationErrors($field);
 })->with([
     [['cols' => 3], 'cols'], [['orientation' => 'portrait', 'rows' => 5], 'cols'],
     [['from' => 402, 'to' => 401], 'to'], [['from' => 999999], 'from'],
@@ -72,19 +72,19 @@ it('refuse les sélections incohérentes et les planches qui réduiraient les ba
 
 it('refuse plus de 1000 badges plutôt que de tronquer silencieusement', function () {
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 1001, $this->admin);
-    $this->postJson('/administration/badges/modeles/apercu', [...$this->printOptions, 'batch' => $batch->id])->assertUnprocessable()->assertJsonValidationErrors('to');
+    $this->postJson('/administration/atelier/apercu', [...$this->printOptions, 'batch' => $batch->id])->assertUnprocessable()->assertJsonValidationErrors('to');
 });
 
 it('utilise les catégories réelles pour les trois modèles et distingue les stagiaires', function (int $category, string $design, string $mention) {
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category'.$category), 1, $this->admin);
-    $response = $this->postJson('/administration/badges/modeles/apercu', [...$this->printOptions, 'batch' => $batch->id, 'design' => $design])->assertOk()->assertJsonPath('count', 1);
+    $response = $this->postJson('/administration/atelier/apercu', [...$this->printOptions, 'batch' => $batch->id, 'design' => $design])->assertOk()->assertJsonPath('count', 1);
     expect($response->json('html'))->toContain($mention)->toContain('Badge à restituer à l’accueil');
 })->with([[0, 'vip', 'VIP'], [1, 'visiteur', 'VISITEUR'], [2, 'prestataire', 'PRESTATAIRE'], [3, 'prestataire', 'STAGIAIRE']]);
 
 it('sépare strictement les événements pour un même numéro de badge', function () {
     $event = Str::uuid()->toString();
     DB::table('events')->insert(['id' => $event, 'name' => 'Autre événement fictif', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
-    $this->postJson('/administration/badges/modeles/apercu', [...$this->printOptions, 'event' => $event])->assertUnprocessable()->assertJsonValidationErrors('batch');
+    $this->postJson('/administration/atelier/apercu', [...$this->printOptions, 'event' => $event])->assertUnprocessable()->assertJsonValidationErrors('batch');
 });
 
 it('conserve les règles de contrôle après tirage, association, annulation et restitution', function () {
@@ -94,46 +94,43 @@ it('conserve les règles de contrôle après tirage, association, annulation et 
     $service = app(BadgeService::class);
     $badge = $badges[0];
     $service->associer($badge, DemoSeeder::id('visitor1'), $agent);
-    $this->get('/administration/badges/modeles/imprimer?'.http_build_query([...$this->printOptions, 'design' => 'vip']))->assertOk();
+    atelierDocument($this, [...$this->printOptions, 'design' => 'vip'])->assertOk();
     expect($service->controler(QrSvg::payload($badge->qr_token))->valid)->toBeTrue();
     $service->annuler($badge, $supervisor, 'Recette fictive');
-    $this->postJson('/administration/badges/modeles/apercu', $this->printOptions)->assertOk()->assertJsonPath('inactive', 1);
+    $this->postJson('/administration/atelier/apercu', $this->printOptions)->assertOk()->assertJsonPath('inactive', 1);
     expect($service->controler(QrSvg::payload($badge->qr_token))->valid)->toBeFalse()->and($badge->fresh()->status)->toBe(BadgeStatus::Cancelled);
     $other = $badges[1];
     $service->associer($other, DemoSeeder::id('visitor4'), $agent);
     DB::table('settings')->where('key', 'badge_reutilisable')->update(['value' => 'non']);
     $service->restituer($other, $agent);
-    $this->get('/administration/badges/modeles/imprimer?'.http_build_query($this->printOptions))->assertOk();
+    atelierDocument($this, $this->printOptions)->assertOk();
     expect($service->controler(QrSvg::payload($other->qr_token))->valid)->toBeFalse()->and($other->fresh()->status)->toBe(BadgeStatus::Closed);
 });
 
 it('enregistre les options dans les réglages de cet événement et échappe les textes fournis', function () {
     $title = '<img src=x onerror=alert(1)>';
-    $this->put('/administration/badges/modeles', [...$this->printOptions, 'title' => $title])->assertRedirect();
+    $this->put('/administration/atelier/modeles', [...$this->printOptions, 'title' => $title])->assertRedirect();
     expect(DB::table('settings')->where('key', 'badge_atelier_'.DemoSeeder::id('event').'_title')->value('value'))->toBe($title);
-    $this->postJson('/administration/badges/modeles/apercu', [...$this->printOptions, 'title' => $title, 'full_name' => 'Secret fictif', 'photo' => 'https://exemple.test/p.jpg'])
+    $this->postJson('/administration/atelier/apercu', [...$this->printOptions, 'title' => $title, 'full_name' => 'Secret fictif', 'photo' => 'https://exemple.test/p.jpg'])
         ->assertOk()->assertDontSee('<img src=x', false)->assertDontSee('Secret fictif')->assertDontSee('https://exemple.test/p.jpg');
 });
 
 it('rend le verso générique sans QR ni données nominatives', function () {
-    $preview = $this->postJson('/administration/badges/modeles/apercu', [...$this->printOptions, 'side' => 'verso'])->assertOk();
+    $preview = $this->postJson('/administration/atelier/apercu', [...$this->printOptions, 'side' => 'verso'])->assertOk();
     expect($preview->json('html'))->toContain('Consignes de visite')->not->toContain('<svg')->not->toContain('Visiteur fictif');
 });
 
 it('applique les permissions à toutes les entrées de l’atelier', function (string $role) {
     $this->actingAs(workshopAccount($role));
-    $this->get('/administration/badges/modeles')->assertForbidden();
-    $this->postJson('/administration/badges/modeles/apercu', $this->printOptions)->assertForbidden();
-    $this->putJson('/administration/badges/modeles', $this->printOptions)->assertForbidden();
-    $this->get('/administration/badges/modeles/imprimer?'.http_build_query($this->printOptions))->assertForbidden();
+    $this->get('/administration/atelier')->assertForbidden();
+    $this->postJson('/administration/atelier/apercu', $this->printOptions)->assertForbidden();
+    $this->putJson('/administration/atelier/modeles', $this->printOptions)->assertForbidden();
+    $this->postJson('/administration/atelier/tirages', $this->printOptions)->assertForbidden();
 })->with(['agent_accueil', 'superviseur', 'hote']);
 
 it('exige la connexion sans OTP de l’administrateur', function () {
     auth()->logout();
     $this->get('/administration/atelier')->assertRedirect('/login');
-    $this->get('/administration/badges/modeles')->assertRedirect('/login');
     $this->admin->forceFill(['two_factor_confirmed_at' => null])->save();
     $this->actingAs($this->admin)->get('/administration/atelier')->assertOk();
-    // Ancien lien conservé : redirection vers l'Atelier, avec les paramètres.
-    $this->get('/administration/badges/modeles?person=abc')->assertRedirect('/administration/atelier?person=abc');
 });

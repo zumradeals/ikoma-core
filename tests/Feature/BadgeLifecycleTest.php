@@ -511,7 +511,6 @@ it('réserve la création de lots, réservations, réglages, étiquettes et dém
         $this->post('/administration/badges/lots', ['event_id' => $event, 'category_id' => DemoSeeder::id('category1'), 'expected' => 5])->assertForbidden();
         $this->post('/administration/badges/reservations', [])->assertForbidden();
         $this->put('/administration/badges/reglages', ['margin' => 5, 'reusable' => 'oui'])->assertForbidden();
-        $this->get('/administration/badges/etiquettes?batch='.DemoSeeder::id('batch'))->assertForbidden();
     }
     expect(DB::table('settings')->where('key', 'badge_marge_pourcent')->value('value'))->toBe('10');
     $this->actingAs($admin)->post('/administration/badges', [])->assertStatus(405);
@@ -584,8 +583,6 @@ it('imprime une plage avec une grille réglable, en indiquant catégorie, symbol
     $this->actingAs(badgeAccount('administrateur'));
     $html = labelsDocument($this, $lot->badge_batch_id, ['from' => $first + 2, 'to' => $first + 4, 'cols' => 2, 'rows' => 3])->getContent();
     expect(substr_count($html, '<article class="label"'))->toBe(3)->and($html)->toContain('repeat(2, 1fr)')->and($html)->toContain('repeat(3, 1fr)')->and($html)->toContain('Stagiaire')->and($html)->toContain('■')->and($html)->toContain('N° '.($first + 2))->and($html)->not->toContain('B-'.$first.'<');
-    $this->get('/administration/badges/etiquettes?batch='.$lot->badge_batch_id.'&cols=9')->assertSessionHasErrors('cols');
-    $this->get('/administration/badges/etiquettes?batch='.(string) Str::uuid())->assertSessionHasErrors('batch');
 });
 
 it('limite le nombre d’étiquettes par page et affiche un message clair', function () {

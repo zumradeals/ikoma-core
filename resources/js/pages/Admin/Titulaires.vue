@@ -131,7 +131,7 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
         <div class="space-y-2 rounded-xl border-2 p-4" :class="pipeline.a_imprimer > 0 ? 'border-[#0066B3]' : 'border-slate-200'" data-testid="etape-imprimer">
           <h2 class="flex items-center gap-2 text-lg font-bold"><span class="grid size-8 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">2</span>Imprimer</h2>
           <p><strong class="text-2xl" data-testid="nb-a-imprimer">{{ pipeline.a_imprimer }}</strong> carte(s) à imprimer.</p>
-          <Link href="/administration/atelier?mode=cartes" class="admin-primary inline-block" data-testid="aller-atelier">Ouvrir l’Atelier des badges</Link>
+          <Link href="/administration/badges?type=carte_permanente" class="admin-primary inline-block" data-testid="aller-atelier">Ouvrir le registre des cartes</Link>
         </div>
         <div class="space-y-2 rounded-xl border-2 p-4" :class="pipeline.a_remettre > 0 ? 'border-[#0066B3]' : 'border-slate-200'" data-testid="etape-remettre">
           <h2 class="flex items-center gap-2 text-lg font-bold"><span class="grid size-8 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">3</span>Remettre et activer</h2>
@@ -140,7 +140,7 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
         </div>
       </section>
 
-      <p v-if="canCards" class="col-span-full text-sm" data-testid="navigation-cartes">Cartes permanentes : <Link href="/administration/titulaires/modeles" class="font-semibold underline" data-testid="lien-modeles">personnalisation des cartes</Link> · <Link href="/administration/atelier?mode=cartes" class="font-semibold underline" data-testid="lien-atelier-cartes-registre">imprimer des cartes</Link> · <Link href="/administration/habilitations" class="font-semibold underline" data-testid="lien-habilitations-registre">habilitations et zones</Link>. Les badges des visiteurs temporaires se gèrent dans <Link href="/administration/badges" class="font-semibold underline" data-testid="lien-badges-visiteurs">Badges visiteurs</Link>.</p>
+      <p v-if="canCards" class="col-span-full text-sm" data-testid="navigation-cartes">Cartes permanentes : <Link href="/administration/modeles?section=cartes" class="font-semibold underline" data-testid="lien-modeles">personnalisation des cartes</Link> · <Link href="/administration/badges?type=carte_permanente" class="font-semibold underline" data-testid="lien-atelier-cartes-registre">imprimer des cartes</Link> · <Link href="/administration/habilitations" class="font-semibold underline" data-testid="lien-habilitations-registre">habilitations et zones</Link>. Les badges des visiteurs temporaires se gèrent dans <Link href="/administration/badges" class="font-semibold underline" data-testid="lien-badges-visiteurs">Badges visiteurs</Link>.</p>
 
       <form class="col-span-full grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]" role="search" @submit.prevent="runSearch">
         <label class="font-semibold">Rechercher (nom, fonction, organisation, numéro)<input v-model="search.q" class="field mt-1" data-testid="recherche-titulaires" placeholder="Nom ou numéro"></label>

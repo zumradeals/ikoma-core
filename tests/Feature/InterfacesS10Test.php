@@ -119,7 +119,7 @@ it('ne laisse au superviseur aucune action réservée à l’agent ou à l’adm
     }
     // administrateur : annonces, véhicules, réglages, atelier
     foreach ([['post', "/administration/participations/$id/annonce", ['expected_at' => '2027-01-10 14:00:00']], ['post', "/administration/participations/$id/vehicules", ['plate' => 'ZZ-1', 'kind' => 'voiture']],
-        ['delete', '/administration/vehicules/'.Str::uuid(), []], ['put', '/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12]], ['get', '/administration/atelier/parcours', []], ['get', '/administration/atelier', []]] as [$method, $url, $body]) {
+        ['delete', '/administration/vehicules/'.Str::uuid(), []], ['put', '/administration/postes/reglages', ['inactivity' => 10, 'skew' => 600, 'pin' => 12]], ['get', '/administration/atelier', []]] as [$method, $url, $body]) {
         $this->json($method, $url, $body)->assertForbidden();
     }
 });
@@ -179,13 +179,6 @@ it('expose à la tablette les capacités du poste pour adapter l’écran', func
 });
 
 // --- Parcours de l'atelier -------------------------------------------------------------------------------------------------------------
-
-it('redirige l’ancien sommaire des parcours vers l’espace Badges et cartes, pour l’administrateur seulement', function () {
-    $this->actingAs($this->admin)->get('/administration/atelier/parcours')->assertRedirect('/administration/badges');
-    foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
-        $this->actingAs(s10User($role))->get('/administration/atelier/parcours')->assertForbidden();
-    }
-});
 
 it('ne compte pas les badges des cartes permanentes parmi les badges visiteurs dans les compteurs de l’espace', function () {
     $before = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->count();
