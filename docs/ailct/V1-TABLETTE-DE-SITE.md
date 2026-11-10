@@ -105,3 +105,6 @@ Une tablette **avec** une activité en cours qui lit une carte permanente : quel
 
 ### Critères de validation
 Pest : refus par défaut sans habilitation du site ; habilitation valable/expirée/future ; zone sans politique ; carte perdue/volée/non activée ; visiteur refusé sans activité ; alerte du site créée ; mouvement du site écrit ; comportement avec activité inchangé ; remise à zéro de démonstration ; inventaire des routes. CI verte.
+
+### Décision du dirigeant sur le lot 4 (recommandation approuvée)
+Tablette avec activité qui lit une carte permanente : l'habilitation du **site** est regardée d'abord (zones du site gardées par le poste) ; si elle accorde l'accès, le mouvement est écrit dans le journal du **site** ; sinon l'habilitation **d'activité** existante s'applique comme aujourd'hui. Aucun accès n'est retiré.
