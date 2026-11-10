@@ -853,3 +853,6 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Présence du site = personnel permanent seulement ; visiteurs comptés par activité.
 - Conservation des mouvements du site : durée des mouvements d'activité, réglage dans l'écran Administration ; pas de suppression automatique sans réglage.
 - Présence par contexte jusqu'au lot 6 (fusion par identité à la reprise).
+## deploy.sh : plus de 502 après une reconstruction
+- Constat : après un redéploiement, le conteneur nginx de la pile gardait l'ancienne adresse interne de PHP (502) et le test HTTPS final, lancé trop tôt, faisait échouer le script.
+- Décision : `deploy.sh` redémarre le service nginx de la pile après le démarrage, puis réessaie le test HTTPS pendant 30 secondes au plus. Le test reste strict (pas de `curl -k`) et la configuration TLS existante n'est toujours pas touchée.
