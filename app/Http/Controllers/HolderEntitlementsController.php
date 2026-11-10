@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\HolderEntitlements;
 use App\Services\PermanentAccess;
+use App\Services\SiteEntitlements;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ use Inertia\Response;
  */
 final class HolderEntitlementsController
 {
-    public function index(Request $request, HolderEntitlements $entitlements, PermanentAccess $access): Response
+    public function index(Request $request, HolderEntitlements $entitlements, PermanentAccess $access, SiteEntitlements $site): Response
     {
         $this->authorizeView();
         $events = DB::table('events')->where('is_permanent', false)->orderByDesc('starts_at')->get(['id', 'name']);
@@ -29,6 +30,7 @@ final class HolderEntitlementsController
 
         return Inertia::render('Admin/Habilitations', [
             'events' => $events, 'eventId' => $eventId,
+            'site' => ['zones' => DB::table('zones')->whereNull('event_id')->orderBy('name')->get(['id', 'name']), 'entitlements' => $site->all()],
             'zones' => $eventId ? array_map(fn ($z) => ['id' => $z->id, 'name' => $z->name, 'classification' => $z->classification, 'permanent_allowed' => (bool) $z->permanent_allowed, 'offline_entry_allowed' => (bool) $z->offline_entry_allowed], $entitlements->zones($eventId)) : [],
             'entitlements' => $eventId ? $entitlements->forEvent($eventId) : [],
             'holders' => DB::table('permanent_holders as h')->leftJoin('institutional_categories as c', 'c.code', '=', 'h.institutional_category')->where('h.status', 'actif')->orderByRaw('public.ikoma_normalize(h.full_name)')->limit(500)
@@ -82,6 +84,24 @@ final class HolderEntitlementsController
         $entitlements->revoke($entitlement, $data['reason'], $request->user());
 
         return back()->with('status', 'Habilitation retirée : l’historique est conservé.');
+    }
+
+    /** Habilitations permanentes du SITE (par zone du site, sans événement). */
+    public function grantSite(Request $request, SiteEntitlements $site): RedirectResponse
+    {
+        $this->authorizeGrant();
+        $data = $request->validate(['holder_id' => ['required', 'uuid'], 'zone_id' => ['required', 'uuid'], 'valid_from' => ['required', 'date'], 'valid_until' => ['required', 'date']]);
+        $site->grant($data['holder_id'], $data['zone_id'], $data['valid_from'], $data['valid_until'], $request->user());
+
+        return back()->with('status', 'Habilitation du site accordée.');
+    }
+
+    public function revokeSite(Request $request, string $entitlement, SiteEntitlements $site): RedirectResponse
+    {
+        $this->authorizeGrant();
+        $site->revoke($entitlement, $request->validate(['reason' => ['required', 'string', 'max:200']])['reason'], $request->user());
+
+        return back()->with('status', 'Habilitation du site retirée : l’historique est conservé.');
     }
 
     public function policy(Request $request, string $zone, HolderEntitlements $entitlements): RedirectResponse

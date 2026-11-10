@@ -28,11 +28,13 @@ final class SiteConfiguration
                 'last_synced_at' => $d->last_synced_at, 'event_name' => $d->event_name ?? 'Aucune activité en cours']);
         $zones = DB::table('checkpoint_zones as c')->join('zones as z', 'z.id', '=', 'c.zone_id')->join('events as e', 'e.id', '=', 'z.event_id')->orderBy('z.name')
             ->get(['c.id', 'c.checkpoint_id', 'c.zone_id', 'c.event_id', 'z.name', 'e.name as event_name'])->groupBy('checkpoint_id');
+        $siteMappings = DB::table('checkpoint_site_zones as c')->join('zones as z', 'z.id', '=', 'c.zone_id')->orderBy('z.name')->get(['c.id', 'c.checkpoint_id', 'c.zone_id', 'z.name'])->groupBy('checkpoint_id');
         $checkpoints = DB::table('checkpoints')->orderBy('code')->get()->map(fn ($p) => [
             'id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'function_label' => $p->function_label, 'capabilities' => PostCapabilities::normalize(json_decode((string) $p->capabilities, true)),
             'direction_required' => (bool) $p->direction_required, 'active' => (bool) $p->active, 'version' => (int) $p->version,
             'tablets' => $tablets->where('checkpoint_id', $p->id)->where('state', '!=', 'revoque')->values()->all(),
             'zones' => ($zones[$p->id] ?? collect())->map(fn ($z) => ['mapping_id' => $z->id, 'zone_id' => $z->zone_id, 'event_id' => $z->event_id, 'name' => $z->name, 'event_name' => $z->event_name])->values()->all(),
+            'site_zones' => ($siteMappings[$p->id] ?? collect())->map(fn ($z) => ['mapping_id' => $z->id, 'zone_id' => $z->zone_id, 'name' => $z->name])->values()->all(),
         ])->all();
 
         return [
@@ -64,6 +66,37 @@ final class SiteConfiguration
             $this->audit->append('site.zone_creee', $actor->id, ['zone_id' => $id]);
 
             return $id;
+        });
+    }
+
+    /** Associe une zone du site à un poste de contrôle (le poste garde cette zone). */
+    public function mapSiteZone(string $checkpointId, string $zoneId, User $actor): void
+    {
+        $this->authorize($actor);
+        DB::transaction(function () use ($checkpointId, $zoneId, $actor): void {
+            if (! DB::table('checkpoints')->where('id', $checkpointId)->where('active', true)->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages(['checkpoint_id' => 'Poste inconnu ou désactivé.']);
+            }
+            if (! DB::table('zones')->where('id', $zoneId)->whereNull('event_id')->exists()) {
+                throw ValidationException::withMessages(['zone_id' => 'Zone du site inconnue.']);
+            }
+            if (DB::table('checkpoint_site_zones')->where('checkpoint_id', $checkpointId)->where('zone_id', $zoneId)->exists()) {
+                throw ValidationException::withMessages(['zone_id' => 'Cette zone est déjà gardée par ce poste.']);
+            }
+            $id = (string) Str::uuid();
+            DB::table('checkpoint_site_zones')->insert(['id' => $id, 'checkpoint_id' => $checkpointId, 'zone_id' => $zoneId, 'created_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]);
+            $this->audit->append('site.zone_associee_poste', $actor->id, ['correspondance_id' => $id, 'checkpoint_id' => $checkpointId, 'zone_id' => $zoneId]);
+        });
+    }
+
+    public function unmapSiteZone(string $mappingId, User $actor): void
+    {
+        $this->authorize($actor);
+        DB::transaction(function () use ($mappingId, $actor): void {
+            $row = DB::table('checkpoint_site_zones')->where('id', $mappingId)->lockForUpdate()->first();
+            abort_unless($row !== null, 404);
+            DB::table('checkpoint_site_zones')->where('id', $mappingId)->delete();
+            $this->audit->append('site.zone_dissociee_poste', $actor->id, ['correspondance_id' => $mappingId, 'checkpoint_id' => $row->checkpoint_id, 'zone_id' => $row->zone_id]);
         });
     }
 

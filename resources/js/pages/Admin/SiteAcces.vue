@@ -12,7 +12,7 @@ import { displayDate } from '../../labels';
  */
 type Tablet = { id: string; name: string; station: string | null; checkpoint_id: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; last_synced_at: string | null; event_name: string };
 type PostZone = { mapping_id: string; zone_id: string; event_id: string; name: string; event_name: string };
-type Checkpoint = { id: string; code: string; name: string; function_label: string | null; capabilities: string[]; direction_required: boolean; active: boolean; version: number; tablets: Tablet[]; zones: PostZone[] };
+type Checkpoint = { id: string; code: string; name: string; function_label: string | null; capabilities: string[]; direction_required: boolean; active: boolean; version: number; tablets: Tablet[]; zones: PostZone[]; site_zones?: { mapping_id: string; zone_id: string; name: string }[] };
 type SiteZone = { id: string; name: string; event_id: string; event_name: string };
 const props = defineProps<{
   site: { id: string; name: string } | null; checkpoints: Checkpoint[]; catalogue: Record<string, string>; unassigned: Tablet[];
@@ -95,6 +95,11 @@ function addZone(p: Checkpoint) {
   const zone = props.zones.find(z => z.id === zoneChoice[p.id]);
   if (zone) router.post('/administration/acces/correspondances', { event_id: zone.event_id, checkpoint_id: p.id, zone_id: zone.id }, { preserveScroll: true });
 }
+const siteZoneChoice = reactive<Record<string, string>>({});
+function addSiteZoneToPost(p: Checkpoint) {
+  if (siteZoneChoice[p.id]) router.post(`/administration/site/postes/${p.id}/zones-site`, { zone_id: siteZoneChoice[p.id] }, { preserveScroll: true, onSuccess: () => { siteZoneChoice[p.id] = ''; } });
+}
+function removeSiteZoneFromPost(mappingId: string) { router.delete(`/administration/site/zones-site/${mappingId}`, { preserveScroll: true }); }
 function removeZone(z: PostZone) { router.post(`/administration/acces/correspondances/${z.mapping_id}/retirer`, {}, { preserveScroll: true }); }
 const postsOfZone = (zoneId: string) => props.checkpoints.filter(p => p.zones.some(z => z.zone_id === zoneId));
 
@@ -342,6 +347,15 @@ function toggleCreate(capability: string, on: boolean) {
               <ul v-else class="space-y-1">
                 <li v-for="z in selected.zones" :key="z.mapping_id" class="flex items-center justify-between gap-3" :data-testid="'zone-' + z.mapping_id"><span><strong>{{ z.name }}</strong> · {{ z.event_name }}</span><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" :aria-label="'Retirer la zone ' + z.name" @click="removeZone(z)">Retirer</button></li>
               </ul>
+              <h3 class="pt-2 font-bold">Zones du site gardées ({{ selected.site_zones?.length ?? 0 }})</h3>
+              <p v-if="!selected.site_zones?.length" class="text-slate-700" data-testid="aucune-zone-site-poste">Ce poste ne garde aucune zone du site.</p>
+              <ul v-else class="space-y-1">
+                <li v-for="z in selected.site_zones" :key="z.mapping_id" class="flex items-center justify-between gap-3" :data-testid="'zone-site-poste-' + z.mapping_id"><strong>{{ z.name }}</strong><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" :aria-label="'Retirer la zone du site ' + z.name" @click="removeSiteZoneFromPost(z.mapping_id)">Retirer</button></li>
+              </ul>
+              <div v-if="site_zones?.length" class="flex flex-wrap items-center gap-2">
+                <select v-model="siteZoneChoice[selected.id]" class="field !mt-0 grow" :aria-label="'Zone du site à associer à ' + selected.name" :data-testid="'zone-site-choix-' + selected.code"><option value="">Choisir une zone du site…</option><option v-for="z in site_zones" :key="z.id" :value="z.id">{{ z.name }}</option></select>
+                <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!siteZoneChoice[selected.id]" :data-testid="'zone-site-ajouter-' + selected.code" @click="addSiteZoneToPost(selected)">Associer</button>
+              </div>
               <div v-if="zones.length" class="flex flex-wrap items-center gap-2">
                 <select v-model="zoneChoice[selected.id]" class="field !mt-0 grow" :aria-label="'Zone à associer à ' + selected.name" :data-testid="'zone-choix-' + selected.code"><option value="">Choisir une zone…</option><option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }} · {{ z.event_name }}</option></select>
                 <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!zoneChoice[selected.id]" :data-testid="'zone-ajouter-' + selected.code" @click="addZone(selected)">Associer</button>

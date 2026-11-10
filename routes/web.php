@@ -195,6 +195,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/site', [SiteAccesController::class, 'rename'])->middleware('can:postes.gerer');
         Route::post('/administration/site/zones', [SiteAccesController::class, 'createZone'])->middleware('can:postes.gerer');
         Route::put('/administration/site/zones/{zone}', [SiteAccesController::class, 'renameZone'])->whereUuid('zone')->middleware('can:postes.gerer');
+        Route::post('/administration/site/postes/{checkpoint}/zones-site', [SiteAccesController::class, 'mapSiteZone'])->whereUuid('checkpoint')->middleware('can:postes.gerer');
+        Route::delete('/administration/site/zones-site/{mapping}', [SiteAccesController::class, 'unmapSiteZone'])->whereUuid('mapping')->middleware('can:postes.gerer');
         Route::post('/administration/site/postes', [SiteAccesController::class, 'createCheckpoint'])->middleware('can:postes.gerer');
         Route::put('/administration/site/postes/{checkpoint}', [SiteAccesController::class, 'updateCheckpoint'])->whereUuid('checkpoint')->middleware('can:postes.gerer');
         Route::post('/administration/site/postes/{checkpoint}/activation', [SiteAccesController::class, 'activation'])->whereUuid('checkpoint')->middleware('can:postes.gerer');
@@ -233,6 +235,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/habilitations', [HolderEntitlementsController::class, 'grant'])->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
         Route::post('/administration/habilitations/groupe', [HolderEntitlementsController::class, 'grantMany'])->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
         Route::post('/administration/habilitations/{entitlement}/retirer', [HolderEntitlementsController::class, 'revoke'])->whereUuid('entitlement')->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
+        Route::post('/administration/habilitations/site', [HolderEntitlementsController::class, 'grantSite'])->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
+        Route::post('/administration/habilitations/site/{entitlement}/retirer', [HolderEntitlementsController::class, 'revokeSite'])->whereUuid('entitlement')->middleware(['can:listes.importer', 'can:zones.gerer', 'throttle:titulaires']);
         Route::put('/administration/habilitations/zones/{zone}', [HolderEntitlementsController::class, 'policy'])->whereUuid('zone')->middleware(['can:zones.gerer', 'throttle:titulaires']);
         Route::put('/administration/habilitations/confiance', [HolderEntitlementsController::class, 'trust'])->middleware(['can:postes.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/carte/revoquer', [HolderCardsController::class, 'revoke'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
