@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue';
 import BadgesCartesShell from '../../components/admin/BadgesCartesShell.vue';
 import BadgePreparerPanel from '../../components/admin/BadgePreparerPanel.vue';
@@ -17,8 +17,6 @@ const props = defineProps<{
   registre: Registre; filters: { q: string; type: string; etat: string }; states: Record<string, string>;
   canPrepare: boolean; events: { id: string; name: string; kind: string; starts_at: string; ends_at: string }[]; max: number; preset?: { event: string; ids: string[] } | null;
 }>();
-const page = usePage<{ auth?: { permissions: string[] } | null }>();
-const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
 
 // Petits écrans : un seul volet à la fois (les trois sont visibles côte à côte sur grand écran).
 const panel = ref<'registre' | 'preparer' | 'apercu'>(props.preset ? 'preparer' : 'registre');
@@ -79,7 +77,6 @@ const hide = (key: string) => (panel.value === key ? '' : 'hidden min-[1180px]:b
           <template #footer>
             <Link href="/administration/badges/lots" class="underline" data-testid="lien-lots">Lots et réservations (stock existant)</Link> ·
             <Link href="/administration/badges/registre" class="underline" data-testid="lien-mise-a-disposition">Mise à disposition entre activités</Link>
-            <template v-if="can('listes.importer')"> · <Link href="/administration/titulaires" class="underline" data-testid="lien-cartes-permanentes">Personnel permanent</Link></template>
           </template>
         </SupportRegistryPanel>
       </div>

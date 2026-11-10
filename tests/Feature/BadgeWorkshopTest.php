@@ -107,10 +107,8 @@ it('conserve les règles de contrôle après tirage, association, annulation et 
     expect($service->controler(QrSvg::payload($other->qr_token))->valid)->toBeFalse()->and($other->fresh()->status)->toBe(BadgeStatus::Closed);
 });
 
-it('enregistre les options dans les réglages de cet événement et échappe les textes fournis', function () {
+it('échappe les textes fournis et n’affiche ni nom, ni photo, ni donnée personnelle dans l’aperçu', function () {
     $title = '<img src=x onerror=alert(1)>';
-    $this->put('/administration/atelier/modeles', [...$this->printOptions, 'title' => $title])->assertRedirect();
-    expect(DB::table('settings')->where('key', 'badge_atelier_'.DemoSeeder::id('event').'_title')->value('value'))->toBe($title);
     $this->postJson('/administration/atelier/apercu', [...$this->printOptions, 'title' => $title, 'full_name' => 'Secret fictif', 'photo' => 'https://exemple.test/p.jpg'])
         ->assertOk()->assertDontSee('<img src=x', false)->assertDontSee('Secret fictif')->assertDontSee('https://exemple.test/p.jpg');
 });
@@ -124,7 +122,6 @@ it('applique les permissions à toutes les entrées de l’atelier', function (s
     $this->actingAs(workshopAccount($role));
     $this->get('/administration/atelier')->assertForbidden();
     $this->postJson('/administration/atelier/apercu', $this->printOptions)->assertForbidden();
-    $this->putJson('/administration/atelier/modeles', $this->printOptions)->assertForbidden();
     $this->postJson('/administration/atelier/tirages', $this->printOptions)->assertForbidden();
 })->with(['agent_accueil', 'superviseur', 'hote']);
 

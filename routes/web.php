@@ -132,9 +132,6 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/atelier/apercu', [BadgeWorkshopController::class, 'preview'])->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::post('/administration/atelier/personnes', [BadgeWorkshopController::class, 'people'])->middleware(['can:badges.gerer', 'can:listes.importer']);
         Route::post('/administration/atelier/preparer', [BadgeWorkshopController::class, 'prepare'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
-        Route::put('/administration/atelier/modeles', [BadgeWorkshopController::class, 'save'])->middleware('can:badges.gerer');
-        Route::post('/administration/atelier/modeles/reinitialiser', [BadgeWorkshopController::class, 'resetModel'])->middleware(['can:badges.gerer', 'throttle:atelier']);
-        Route::post('/administration/atelier/modeles/reprendre', [BadgeWorkshopController::class, 'copyModel'])->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::post('/administration/atelier/tirages', [AtelierController::class, 'plan'])->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::get('/administration/atelier/tirages', [AtelierController::class, 'runs'])->middleware('can:badges.gerer');
         Route::get('/administration/atelier/tirages/{run}/document', [AtelierController::class, 'document'])->whereUuid('run')->middleware('can:badges.gerer');

@@ -270,9 +270,13 @@ it('ouvre l’historique des tirages par défaut et l’atelier par lots seuleme
     $this->get('/administration/atelier?vue=autre')->assertStatus(302);
 });
 
-it('ouvre les modèles institutionnels par défaut ; l’ancien modèle par activité reste demandable', function () {
+it('ouvre les modèles institutionnels, sans l’ancien modèle des badges de lots par activité', function () {
     app(InstitutionalCategories::class)->initialize($this->admin);
     $this->actingAs($this->admin);
-    $this->get('/administration/modeles')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Modeles')->where('section', 'cartes')->has('cards.categories', 8));
-    $this->get('/administration/modeles?section=badges')->assertOk()->assertInertia(fn (Assert $p) => $p->where('section', 'badges')->has('preferences'));
+    $this->get('/administration/modeles')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Admin/Modeles')->has('cards.categories', 8)->missing('events')->missing('preferences')->missing('section'));
+    $this->get('/administration/modeles?section=cartes&categorie=AILCT-02')->assertOk()->assertInertia(fn (Assert $p) => $p->where('cards.selected', 'AILCT-02'));
+    // Les routes d'enregistrement de l'ancien modèle par activité sont supprimées.
+    $this->put('/administration/atelier/modeles', [])->assertNotFound();
+    $this->postJson('/administration/atelier/modeles/reinitialiser', [])->assertNotFound();
+    $this->postJson('/administration/atelier/modeles/reprendre', [])->assertNotFound();
 });

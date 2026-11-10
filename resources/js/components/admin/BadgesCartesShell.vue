@@ -4,7 +4,7 @@ import { Link, usePage } from '@inertiajs/vue3';
 import AdminIcon from './AdminIcon.vue';
 
 /**
- * Cadre de l'espace « Badges et cartes » : trois responsabilités (registre et cartes, modèles institutionnels, impression et historique) et quatre compteurs réels.
+ * Cadre de l'espace « Badges et cartes » : quatre onglets (registre et cartes, modèles institutionnels, impression et historique, personnel permanent) et quatre compteurs réels.
  * Ce n'est pas une page : chaque onglet est la page existante de sa responsabilité. « Préparer un badge » est l'action principale de l'espace de travail, pas un onglet.
  * Un onglet n'est affiché que si l'utilisateur détient la permission de sa page d'arrivée ; le serveur reste l'autorité.
  */
@@ -19,10 +19,11 @@ const tabs = [
   { key: 'registre', label: 'Registre et cartes', hint: 'Supports, préparer, consulter', href: '/administration/badges', permission: 'badges.gerer', icon: 'qr' },
   { key: 'modeles', label: 'Modèles institutionnels', hint: 'Aspect des badges et des cartes', href: '/administration/modeles', permission: 'badges.gerer', icon: 'pencil' },
   { key: 'impression', label: 'Impression et historique', hint: 'Suivi des tirages et réimpressions', href: '/administration/atelier', permission: 'badges.gerer', icon: 'print' },
+  { key: 'cartes', label: 'Personnel permanent', hint: 'Personnes permanentes et leurs cartes', href: '/administration/titulaires', permission: 'listes.importer', icon: 'users' },
 ] as const;
 const shown = computed(() => tabs.filter(tab => can(tab.permission)));
-// Les anciennes pages (lots, registre commun, fiche d'un badge, cartes) appartiennent à la responsabilité « Registre et cartes ».
-const current = computed(() => (['visiteurs', 'cartes', 'preparer'].includes(props.active) ? 'registre' : props.active));
+// Les anciennes pages (lots, registre commun, fiche d'un badge) appartiennent à la responsabilité « Registre et cartes » ; le personnel permanent a son propre onglet.
+const current = computed(() => (['visiteurs', 'preparer'].includes(props.active) ? 'registre' : props.active));
 const summary = computed(() => page.props.badgesCartes ?? null);
 const kpis = computed(() => {
   const t = summary.value?.totals;

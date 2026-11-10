@@ -59,11 +59,12 @@ test('l’administrateur retrouve l’espace Badges et cartes : trois responsabi
   await expect(page.getByTestId('onglet-registre')).toContainText('Registre et cartes');
   await expect(page.getByTestId('onglet-modeles')).toContainText('Modèles institutionnels');
   await expect(page.getByTestId('onglet-impression')).toContainText('Impression et historique');
+  await expect(page.getByTestId('onglet-cartes')).toContainText('Personnel permanent');
   await expect(page.getByTestId('compteurs-badges-cartes')).toContainText('Supports actifs');
   await expect(page.getByTestId('colonne-registre')).toBeVisible();
   await expect(page.getByTestId('colonne-apercu')).toBeVisible();
   await expect(page.getByTestId('rappel-accueil')).toContainText('acte distinct de la sortie physique');
-  await page.getByTestId('lien-cartes-permanentes').click();
+  await page.getByTestId('onglet-cartes').click();
   await expect(page).toHaveURL(/\/administration\/titulaires$/);
   await page.getByTestId('onglet-registre').click();
   await expect(page).toHaveURL(/\/administration\/badges$/);

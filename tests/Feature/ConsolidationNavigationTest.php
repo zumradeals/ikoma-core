@@ -40,7 +40,6 @@ const CN_ROUTES = [
     ['POST', 'administration/atelier/apercu', ['can:badges.gerer'], ['throttle:atelier']],
     ['POST', 'administration/atelier/personnes', ['can:badges.gerer', 'can:listes.importer'], []],
     ['POST', 'administration/atelier/preparer', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
-    ['PUT', 'administration/atelier/modeles', ['can:badges.gerer'], []],
     ['POST', 'administration/atelier/modeles/reinitialiser', ['can:badges.gerer'], ['throttle:atelier']],
     ['POST', 'administration/atelier/modeles/reprendre', ['can:badges.gerer'], ['throttle:atelier']],
     ['POST', 'administration/atelier/tirages', ['can:badges.gerer'], ['throttle:atelier']],
@@ -239,16 +238,14 @@ it('conserve les contrats des documents imprimés : demande et confirmation de t
     expect(DB::table('badge_print_runs')->count())->toBe(0);
 });
 
-it('sert la page Modèles avec le modèle de badge de chaque activité et le modèle de carte choisi, sans droit nouveau', function () {
+it('sert la page Modèles institutionnels avec le modèle de carte choisi, sans droit nouveau', function () {
     $admin = cnUser('administrateur');
     app(InstitutionalCategories::class)->initialize($admin);
     $this->actingAs($admin);
     $this->get('/administration/modeles')->assertOk()
-        ->assertInertia(fn ($page) => $page->component('Admin/Modeles')->where('section', 'cartes')->has('events')->has('preferences')->has('cards.categories', 8)->where('cards.canConfigure', true));
+        ->assertInertia(fn ($page) => $page->component('Admin/Modeles')->has('cards.categories', 8)->missing('events')->missing('preferences')->where('cards.canConfigure', true));
     $this->get('/administration/modeles?section=cartes&categorie=AILCT-02')->assertOk()
-        ->assertInertia(fn ($page) => $page->where('section', 'cartes')->where('cards.selected', 'AILCT-02'));
-    $event = DemoSeeder::id('event');
-    $this->get('/administration/modeles?event='.$event)->assertOk()->assertInertia(fn ($page) => $page->where('initialEvent', $event));
+        ->assertInertia(fn ($page) => $page->where('cards.selected', 'AILCT-02'));
 });
 
 it('fournit les compteurs du cadre seulement sur les pages de l’espace Badges et cartes', function () {

@@ -271,52 +271,6 @@ function s10SaveModel(string $event, array $values): void
     }
 }
 
-it('rétablit le modèle par défaut d’un événement sans toucher à celui des autres', function () {
-    $other = s10OtherEvent();
-    $vip = ['design' => 'vip', 'title' => 'TITRE FICTIF', 'primary' => '#0B3C6B', 'accent' => '#C9962B', 'orientation' => 'portrait'];
-    s10SaveModel($this->event, $vip);
-    s10SaveModel($other, $vip);
-    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reinitialiser', ['event' => $this->event])->assertOk()->assertJsonPath('model.design', 'visiteur')->assertJsonPath('model.title', 'IKOMA ACCESS');
-    expect(DB::table('settings')->where('key', 'like', 'badge_atelier\_'.$this->event.'\_%')->count())->toBe(0);
-    expect(DB::table('settings')->where('key', 'like', 'badge_atelier\_'.$other.'\_%')->count())->toBe(5);
-    expect(DB::table('audit_logs')->where('action', 'badge.modele_reinitialise')->count())->toBe(1);
-    // la page de l'atelier propose de nouveau les valeurs par défaut
-    $this->get('/administration/atelier')->assertOk()->assertInertia(fn ($page) => $page->where('preferences.'.$this->event.'.design', 'visiteur')->where('preferences.'.$other.'.design', 'vip')->etc());
-});
-
-it('reprend le modèle d’une autre activité sans modifier la source, et lui transmet les défauts si elle n’en a pas', function () {
-    $other = s10OtherEvent();
-    $vip = ['design' => 'vip', 'title' => 'TITRE REPRIS', 'primary' => '#0B3C6B', 'accent' => '#C9962B', 'orientation' => 'portrait'];
-    s10SaveModel($other, $vip);
-    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $other])->assertOk()->assertJsonPath('model.title', 'TITRE REPRIS');
-    foreach ($vip as $key => $value) {
-        expect(DB::table('settings')->where('key', 'badge_atelier_'.$this->event.'_'.$key)->value('value'))->toBe($value);
-        expect(DB::table('settings')->where('key', 'badge_atelier_'.$other.'_'.$key)->value('value'))->toBe($value);
-    }
-    $log = DB::table('audit_logs')->where('action', 'badge.modele_repris')->first();
-    expect(json_decode($log->details, true))->toMatchArray(['event_id' => $this->event, 'source_event_id' => $other]);
-    // une source sans modèle enregistré transmet les défauts de l'installation
-    $blank = s10OtherEvent();
-    $this->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $blank])->assertOk()->assertJsonPath('model.design', 'visiteur');
-    expect(DB::table('settings')->where('key', 'badge_atelier_'.$this->event.'_title')->value('value'))->toBe('IKOMA ACCESS');
-});
-
-it('refuse de reprendre un modèle de l’événement lui-même ou d’un contexte permanent, et réserve ces opérations à l’administrateur du badge', function () {
-    $other = s10OtherEvent();
-    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $this->event])->assertUnprocessable()->assertJsonValidationErrors('source');
-    $permanent = DB::table('events')->where('is_permanent', true)->value('id');
-    if ($permanent !== null) {
-        $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $permanent])->assertUnprocessable()->assertJsonValidationErrors('source');
-        $this->postJson('/administration/atelier/modeles/reinitialiser', ['event' => $permanent])->assertUnprocessable()->assertJsonValidationErrors('event');
-    }
-    foreach (['superviseur', 'agent_accueil', 'hote'] as $role) {
-        $this->actingAs(s10User($role));
-        $this->postJson('/administration/atelier/modeles/reinitialiser', ['event' => $this->event])->assertForbidden();
-        $this->postJson('/administration/atelier/modeles/reprendre', ['event' => $this->event, 'source' => $other])->assertForbidden();
-    }
-    $this->actingAs($this->admin)->postJson('/administration/atelier/modeles/reinitialiser', ['event' => 'pas-un-uuid'])->assertUnprocessable();
-});
-
 // --- Soute P5 : synchronisation hors ligne du sens Entrée / Sortie ---------------------------------------------------------------------
 
 /** Opération telle que la tablette de la soute l'enverrait après une coupure : contrôle jugé valide localement, sens choisi, âge de la copie déclaré. */

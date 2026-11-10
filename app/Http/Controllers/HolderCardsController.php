@@ -54,7 +54,7 @@ final class HolderCardsController
         // Carte préparée, pas encore remise : elle n'ouvre rien tant qu'elle n'est pas activée (bouton « Remettre et activer »).
         $cards->issue($holder, $request->user(), false);
 
-        return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte préparée. Imprimez-la dans l’Atelier des badges, puis remettez-la.');
+        return redirect('/administration/titulaires/'.$holder.'/carte')->with('status', 'Carte préparée. Imprimez-la depuis le registre Badges et cartes, puis remettez-la.');
     }
 
     /** « Tout préparer » : prépare les cartes de toutes les personnes (avec photo et catégorie) qui n'en ont pas encore. */

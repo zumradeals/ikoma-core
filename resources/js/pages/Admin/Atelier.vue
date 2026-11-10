@@ -177,7 +177,7 @@ onMounted(() => { if (!form.batch) chooseBatch(); else if (!form.from && !form.t
           <div class="grid grid-cols-2 gap-3"><label>Couleur principale<input v-model="form.primary" class="field" type="color"></label><label>Couleur d’accent<input v-model="form.accent" class="field" type="color"></label></div>
           <label>Orientation<select v-model="form.orientation" class="field"><option value="paysage">Paysage 85,60 × 53,98 mm</option><option value="portrait">Portrait 53,98 × 85,60 mm</option></select></label>
           <p class="text-base">Modèle générique de l’installation. Le logo IKOMA ACCESS fourni est utilisé ; aucun modèle institutionnel n’est présenté comme validé.</p>
-          <p class="rounded-xl border border-slate-300 p-3 text-base" data-testid="rappel-modele">Ces réglages valent pour <strong>ce tirage seulement</strong>. Pour enregistrer un modèle durablement, revenir au modèle par défaut ou reprendre celui d’une autre activité : espace « Modèles ». <Link :href="'/administration/modeles' + (form.event ? '?event=' + form.event : '')" class="font-semibold underline" data-testid="lien-modeles-badges">Gérer les modèles</Link></p>
+          <p class="rounded-xl border border-slate-300 p-3 text-base" data-testid="rappel-modele">Ces réglages valent pour <strong>ce tirage seulement</strong> : ils ne modifient aucun modèle enregistré.</p>
         </section>
 
         <section class="workshop-panel" aria-labelledby="etape-selection" data-testid="etape-selection">
