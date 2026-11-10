@@ -198,6 +198,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/administration/postes', [PostesController::class, 'index'])->middleware('can:postes.gerer');
         Route::post('/administration/postes', [PostesController::class, 'store'])->middleware('can:postes.gerer');
         Route::put('/administration/postes/reglages', [PostesController::class, 'settings'])->middleware('can:postes.gerer');
+        Route::put('/administration/postes/{device}/activites', [PostesController::class, 'activities'])->middleware('can:postes.gerer');
+        Route::put('/administration/postes/{device}/activite', [PostesController::class, 'current'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/code', [PostesController::class, 'code'])->middleware('can:postes.gerer');
         Route::post('/administration/postes/{device}/revoquer', [PostesController::class, 'revoke'])->middleware('can:postes.gerer');
 

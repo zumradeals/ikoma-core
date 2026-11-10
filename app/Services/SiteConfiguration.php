@@ -22,10 +22,10 @@ final class SiteConfiguration
     public function overview(): array
     {
         $site = DB::table('sites')->orderBy('created_at')->orderBy('id')->first(['id', 'name']);
-        $tablets = DB::table('devices as d')->join('events as e', 'e.id', '=', 'd.event_id')->orderBy('d.name')
+        $tablets = DB::table('devices as d')->leftJoin('events as e', 'e.id', '=', 'd.event_id')->orderBy('d.name')
             ->get(['d.id', 'd.name', 'd.station', 'd.checkpoint_id', 'd.token_hash', 'd.revoked_at', 'd.last_synced_at', 'e.name as event_name'])
             ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'station' => $d->station, 'checkpoint_id' => $d->checkpoint_id, 'state' => $d->revoked_at ? 'revoque' : ($d->token_hash ? 'enrole' : 'non_enrole'),
-                'last_synced_at' => $d->last_synced_at, 'event_name' => $d->event_name]);
+                'last_synced_at' => $d->last_synced_at, 'event_name' => $d->event_name ?? 'Aucune activité en cours']);
         $zones = DB::table('checkpoint_zones as c')->join('zones as z', 'z.id', '=', 'c.zone_id')->join('events as e', 'e.id', '=', 'z.event_id')->orderBy('z.name')
             ->get(['c.id', 'c.checkpoint_id', 'c.zone_id', 'c.event_id', 'z.name', 'e.name as event_name'])->groupBy('checkpoint_id');
         $checkpoints = DB::table('checkpoints')->orderBy('code')->get()->map(fn ($p) => [

@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import { reactive } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import FormButton from '../../components/FormButton.vue';
 import { displayDate } from '../../labels';
-type Poste = { id: string; name: string; station: string | null; point_code?: string | null; event_id: string; event_name: string; wipe_acknowledged_at?: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
+type Poste = { id: string; name: string; station: string | null; point_code?: string | null; event_id: string | null; event_name: string; activities: string[]; wipe_acknowledged_at?: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
 const props = defineProps<{
   events: { id: string; name: string }[]; postes: Poste[]; points: Record<string, string>; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; offlineApproved: boolean; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; lateMinutes: number; escalationMinutes: number; identityDocument: boolean };
   newCode: { device_id: string; code: string } | null; conflicts: { id: string; kind: string; reason: string; operation_type: string | null; created_at: string; device_name: string }[];
 }>();
-const create = useForm({ event_id: props.events[0]?.id || '', name: '', station: '', point_code: '' });
+const create = useForm({ event_ids: [] as string[], name: '', station: '', point_code: '' });
+const chosen = reactive<Record<string, string[]>>({}); const current = reactive<Record<string, string>>({});
+const selection = (p: Poste) => (chosen[p.id] ??= [...p.activities]);
+const toggle = (p: Poste, id: string, on: boolean) => { const list = selection(p); const at = list.indexOf(id); if (on && at < 0) list.push(id); if (!on && at >= 0) list.splice(at, 1); };
+const saveActivities = (p: Poste) => router.put(`/administration/postes/${p.id}/activites`, { event_ids: selection(p) }, { preserveScroll: true });
+const setCurrent = (p: Poste) => current[p.id] && router.put(`/administration/postes/${p.id}/activite`, { event_id: current[p.id] }, { preserveScroll: true });
 const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, offlineApproved: props.settings.offlineApproved, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, lateMinutes: props.settings.lateMinutes, escalationMinutes: props.settings.escalationMinutes, identityDocument: props.settings.identityDocument });
 const states = { non_enrole: ['○', 'Non enrôlé'], enrole: ['●', 'Enrôlé'], revoque: ['⛔', 'Révoqué'] } as const;
 const reasons: Record<string, string> = { deja_associe: 'Badge déjà associé', autre_poste: 'Badge réservé à un autre poste', deja_present: 'Visiteur déjà entré', agent_desactive: 'Agent désactivé', fiche_modifiee: 'Fiche modifiée entre-temps', horloge_suspecte: 'Horloge de la tablette décalée', hote_en_attente: 'Accord de l’hôte manquant', visiteur_refuse: 'Visiteur refusé', annule: 'Badge annulé' };
@@ -25,13 +31,13 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <div class="space-y-6">
 <BaseCard>
 <h2 class="mb-5 text-heading font-bold">Créer un poste</h2>
-<form class="space-y-5" aria-label="Créer un poste" @submit.prevent="create.post('/administration/postes', { onSuccess: () => create.reset('name', 'station', 'point_code') })">
-<label class="block">Événement<select v-model="create.event_id" class="field" required><option v-for="event in events" :key="event.id" :value="event.id">{{ event.name }}</option></select></label>
+<form class="space-y-5" aria-label="Créer un poste" @submit.prevent="create.post('/administration/postes', { onSuccess: () => create.reset('name', 'station', 'point_code', 'event_ids') })">
 <label class="block">Nom de la tablette<input v-model="create.name" class="field" maxlength="120" required></label>
 <label class="block">Nom du poste d’accueil<input v-model="create.station" class="field" maxlength="120"></label>
 <label class="block">Point de contrôle tenu par cette tablette<select v-model="create.point_code" class="field"><option value="">Non précisé (poste hérité : aucune restriction)</option><option v-for="(label, code) in points" :key="code" :value="code">{{ label }}</option></select></label>
+<fieldset class="space-y-2"><legend class="font-semibold">Activités autorisées pour cette tablette (facultatif)</legend><p class="text-sm text-slate-600">Une tablette est un équipement permanent du site : elle ne dépend d’aucune activité. L’agent ne verra que les activités cochées ici.</p><label v-for="event in events" :key="event.id" class="flex items-center gap-3"><input v-model="create.event_ids" type="checkbox" :value="event.id" class="size-5"> {{ event.name }}</label></fieldset>
 <p v-for="error in create.errors" :key="error" role="alert">{{ error }}</p>
-<FormButton :busy="create.processing">Créer le poste</FormButton>
+<FormButton :busy="create.processing">Créer la tablette</FormButton>
 </form>
 </BaseCard>
 <BaseCard v-for="poste in postes" :key="poste.id">
@@ -39,6 +45,8 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <p v-if="poste.state === 'revoque'" class="my-3">{{ poste.wipe_acknowledged_at ? 'Effacement déclaré par la tablette.' : poste.enrolled_at ? 'Effacement en attente : reconnectez la tablette.' : 'Poste retiré sans enrôlement antérieur.' }}</p><p class="my-3"><span class="inline-flex items-center gap-2 rounded-full border-2 border-ikoma-blue px-4 py-2 font-semibold"><span aria-hidden="true">{{ states[poste.state][0] }}</span>{{ states[poste.state][1] }}</span><span v-if="poste.code_pending" class="ml-3">Un code d’enrôlement est en attente.</span></p>
 <p>Dernière synchronisation : {{ poste.last_synced_at ? displayDate(poste.last_synced_at) : 'jamais' }}</p>
 <p data-testid="compteurs">Opérations reçues : <strong>{{ poste.received }}</strong> · appliquées : <strong>{{ poste.applied }}</strong> · en conflit : <strong>{{ poste.conflicts }}</strong></p>
+<fieldset class="my-4 space-y-2" :data-testid="'activites-' + poste.id"><legend class="font-semibold">Activités autorisées</legend><label v-for="event in events" :key="event.id" class="flex items-center gap-3"><input type="checkbox" class="size-5" :checked="selection(poste).includes(event.id)" :disabled="poste.event_id === event.id" @change="toggle(poste, event.id, ($event.target as HTMLInputElement).checked)"> {{ event.name }}<span v-if="poste.event_id === event.id" class="text-sm text-slate-600">(activité en cours)</span></label><button type="button" class="action" @click="saveActivities(poste)">Enregistrer les activités</button>
+<div v-if="poste.state !== 'enrole'" class="flex flex-wrap items-end gap-3"><label class="block">Activité en cours<select v-model="current[poste.id]" class="field"><option value="">Choisir…</option><option v-for="event in events.filter(e => poste.activities.includes(e.id))" :key="event.id" :value="event.id">{{ event.name }}</option></select></label><button type="button" class="action" :disabled="!current[poste.id]" @click="setCurrent(poste)">Définir comme activité en cours</button></div></fieldset>
 <div class="mt-4 flex flex-wrap gap-4"><button type="button" class="action" @click="router.post(`/administration/postes/${poste.id}/code`)">{{ poste.state === 'enrole' ? 'Réenrôler : nouveau code' : 'Générer un code d’enrôlement' }}</button><button v-if="poste.state !== 'revoque'" type="button" class="min-h-14 rounded-xl border-2 border-red-700 px-6 py-3 font-semibold text-red-800" @click="revoke(poste)">{{ poste.state === 'enrole' ? 'Révoquer ce poste' : 'Retirer ce poste' }}</button></div>
 </BaseCard>
 <p v-if="!postes.length">Aucun poste pour le moment.</p>

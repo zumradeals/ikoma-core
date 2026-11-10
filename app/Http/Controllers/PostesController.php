@@ -21,8 +21,9 @@ final class PostesController
     public function index(): Response
     {
         Gate::authorize('postes.gerer');
-        $postes = DB::table('devices as d')->join('events as e', 'e.id', '=', 'd.event_id')->orderBy('e.name')->orderBy('d.name')->get(['d.id', 'd.name', 'd.station', 'd.point_code', 'd.event_id', 'e.name as event_name', 'd.token_hash', 'd.revoked_at', 'd.enrolled_at', 'd.last_synced_at', 'd.enrollment_expires_at', 'd.wipe_acknowledged_at'])
-            ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'station' => $d->station, 'point_code' => $d->point_code, 'event_id' => $d->event_id, 'event_name' => $d->event_name, 'state' => $d->revoked_at ? 'revoque' : ($d->token_hash ? 'enrole' : 'non_enrole'), 'enrolled_at' => $d->enrolled_at, 'last_synced_at' => $d->last_synced_at, 'wipe_acknowledged_at' => $d->wipe_acknowledged_at, 'code_pending' => $d->enrollment_expires_at !== null && $d->enrollment_expires_at > now()->toDateTimeString()]);
+        $authorized = DB::table('device_activities')->get(['device_id', 'event_id'])->groupBy('device_id');
+        $postes = DB::table('devices as d')->leftJoin('events as e', 'e.id', '=', 'd.event_id')->orderBy('e.name')->orderBy('d.name')->get(['d.id', 'd.name', 'd.station', 'd.point_code', 'd.event_id', 'e.name as event_name', 'd.token_hash', 'd.revoked_at', 'd.enrolled_at', 'd.last_synced_at', 'd.enrollment_expires_at', 'd.wipe_acknowledged_at'])
+            ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'station' => $d->station, 'point_code' => $d->point_code, 'event_id' => $d->event_id, 'event_name' => $d->event_name ?? 'Aucune activité en cours', 'activities' => ($authorized[$d->id] ?? collect())->pluck('event_id')->values()->all(), 'state' => $d->revoked_at ? 'revoque' : ($d->token_hash ? 'enrole' : 'non_enrole'), 'enrolled_at' => $d->enrolled_at, 'last_synced_at' => $d->last_synced_at, 'wipe_acknowledged_at' => $d->wipe_acknowledged_at, 'code_pending' => $d->enrollment_expires_at !== null && $d->enrollment_expires_at > now()->toDateTimeString()]);
         $counts = DB::table('sync_operations')->selectRaw('device_id, count(*) AS received, count(*) FILTER (WHERE status_code = 200) AS applied, count(*) FILTER (WHERE status_code IS NOT NULL AND status_code <> 200) AS conflicts')->groupBy('device_id')->get()->keyBy('device_id');
         $postes = $postes->map(fn ($p) => [...$p, 'received' => (int) ($counts[$p['id']]->received ?? 0), 'applied' => (int) ($counts[$p['id']]->applied ?? 0), 'conflicts' => (int) ($counts[$p['id']]->conflicts ?? 0)]);
         $setting = fn (string $key) => (int) DB::table('settings')->where('key', $key)->value('value');
@@ -40,8 +41,31 @@ final class PostesController
     public function store(Request $r, Devices $devices): RedirectResponse
     {
         Gate::authorize('postes.gerer');
-        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120', 'point_code' => ['required', Rule::in(array_keys(PostCapabilities::points()))]]);
-        $devices->create($data['event_id'], $data['name'], $data['station'] ?? null, $r->user(), $data['point_code']);
+        $data = $r->validate(['event_id' => 'nullable|uuid|exists:events,id', 'event_ids' => 'nullable|array|max:50', 'event_ids.*' => 'uuid|distinct', 'name' => 'required|string|max:120', 'station' => 'nullable|string|max:120', 'point_code' => ['required', Rule::in(array_keys(PostCapabilities::points()))]]);
+        $device = $devices->create($data['event_id'] ?? null, $data['name'], $data['station'] ?? null, $r->user(), $data['point_code']);
+        if (! empty($data['event_ids'])) {
+            $devices->authorize($device, array_values(array_unique([...$data['event_ids'], ...($device->event_id ? [$device->event_id] : [])])), $r->user());
+        }
+
+        return back();
+    }
+
+    /** Activités autorisées pour la tablette (liste complète à enregistrer). */
+    public function activities(Request $r, Device $device, Devices $devices): RedirectResponse
+    {
+        Gate::authorize('postes.gerer');
+        $data = $r->validate(['event_ids' => 'present|array|max:50', 'event_ids.*' => 'uuid|distinct']);
+        $devices->authorize($device, $data['event_ids'], $r->user());
+
+        return back();
+    }
+
+    /** Activité en cours de la tablette, parmi les activités autorisées. */
+    public function current(Request $r, Device $device, Devices $devices): RedirectResponse
+    {
+        Gate::authorize('postes.gerer');
+        $data = $r->validate(['event_id' => 'required|uuid']);
+        $devices->setCurrent($device, $data['event_id'], $r->user());
 
         return back();
     }

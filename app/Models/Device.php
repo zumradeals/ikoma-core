@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string|null $point_code
+ * @property string|null $event_id
  */
 class Device extends Model
 {
