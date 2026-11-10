@@ -52,7 +52,7 @@ it('refuse une zone d’activité, un chevauchement, une période inversée et u
 
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $this->zone, 'valid_from' => now()->addDay()->toIso8601String(), 'valid_until' => now()->toIso8601String()])->assertSessionHasErrors('valid_until');
 
-    DB::table('permanent_holders')->where('id', $this->holder)->update(['status' => 'clos']);
+    app(PermanentHolders::class)->close($this->holder, 'Départ fictif', $this->admin);
     $other = (string) DB::table('zones')->whereNull('event_id')->value('id');
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $other] + ['valid_from' => now()->addYear()->toIso8601String(), 'valid_until' => now()->addYears(2)->toIso8601String()])->assertSessionHasErrors('holder_id');
 });
@@ -60,10 +60,10 @@ it('refuse une zone d’activité, un chevauchement, une période inversée et u
 it('protège en base : une habilitation du site ne se modifie pas, ne se supprime pas et ne vise qu’une zone du site', function () {
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $this->zone] + sePeriod());
     $id = (string) DB::table('holder_site_entitlements')->value('id');
-    expect(fn () => DB::table('holder_site_entitlements')->where('id', $id)->update(['valid_until' => now()->addYears(5)]))->toThrow(QueryException::class);
-    expect(fn () => DB::table('holder_site_entitlements')->where('id', $id)->delete())->toThrow(QueryException::class);
+    expect(fn () => DB::transaction(fn () => DB::table('holder_site_entitlements')->where('id', $id)->update(['valid_until' => now()->addYears(5)])))->toThrow(QueryException::class);
+    expect(fn () => DB::transaction(fn () => DB::table('holder_site_entitlements')->where('id', $id)->delete()))->toThrow(QueryException::class);
     $activityZone = (string) DB::table('zones')->whereNotNull('event_id')->value('id');
-    expect(fn () => DB::table('holder_site_entitlements')->insert(['id' => (string) Str::uuid(), 'holder_id' => $this->holder, 'zone_id' => $activityZone, 'valid_from' => now(), 'valid_until' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]))->toThrow(QueryException::class);
+    expect(fn () => DB::transaction(fn () => DB::table('holder_site_entitlements')->insert(['id' => (string) Str::uuid(), 'holder_id' => $this->holder, 'zone_id' => $activityZone, 'valid_from' => now(), 'valid_until' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()])))->toThrow(QueryException::class);
 });
 
 it('ne mélange pas les moteurs : une habilitation du site n’apparaît pas dans celles d’une activité', function () {
