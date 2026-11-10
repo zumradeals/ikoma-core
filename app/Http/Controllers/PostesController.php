@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Device;
 use App\Services\Audit;
+use App\Services\Poste\DeskRefused;
 use App\Services\Poste\Devices;
 use App\Services\Poste\PostCapabilities;
 use Illuminate\Http\RedirectResponse;
@@ -55,9 +56,8 @@ final class PostesController
     {
         Gate::authorize('postes.gerer');
         $data = $r->validate(['event_ids' => 'present|array|max:50', 'event_ids.*' => 'uuid|distinct']);
-        $devices->authorize($device, $data['event_ids'], $r->user());
 
-        return back();
+        return $this->attempt($device, fn () => $devices->authorize($device, $data['event_ids'], $r->user()));
     }
 
     /** Activité en cours de la tablette, parmi les activités autorisées. */
@@ -65,16 +65,27 @@ final class PostesController
     {
         Gate::authorize('postes.gerer');
         $data = $r->validate(['event_id' => 'required|uuid']);
-        $devices->setCurrent($device, $data['event_id'], $r->user());
 
-        return back();
+        return $this->attempt($device, fn () => $devices->setCurrent($device, $data['event_id'], $r->user()));
     }
 
     public function code(Request $r, Device $device, Devices $devices): RedirectResponse
     {
         Gate::authorize('postes.gerer');
 
-        return back()->with('enrol_code', ['device_id' => $device->id, 'code' => $devices->issueCode($device, $r->user())]);
+        return $this->attempt($device, fn () => session()->flash('enrol_code', ['device_id' => $device->id, 'code' => $devices->issueCode($device, $r->user())]));
+    }
+
+    /** Un refus métier s'affiche dans la page de la tablette concernée (jamais en JSON brut dans une fenêtre). */
+    private function attempt(Device $device, \Closure $action): RedirectResponse
+    {
+        try {
+            $action();
+        } catch (DeskRefused $e) {
+            return back()->withErrors(['poste_'.$device->id => $e->getMessage()]);
+        }
+
+        return back();
     }
 
     public function revoke(Request $r, Device $device, Devices $devices): RedirectResponse
