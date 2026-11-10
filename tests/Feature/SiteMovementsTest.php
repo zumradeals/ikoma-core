@@ -12,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 uses(DatabaseTransactions::class);
 
@@ -66,8 +67,8 @@ it('refuse en base un mouvement mêlant activité et site, ou sans personne iden
 });
 
 it('refuse un mouvement du site sans personne pour une entrée, mais accepte un contrôle sur carte inconnue', function () {
-    expect(fn () => $this->movements->record(null, 'entree', 'Point', $this->admin))->toThrow(\Illuminate\Validation\ValidationException::class);
-    expect(fn () => $this->movements->record($this->holder, 'badge', 'Point', $this->admin))->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $this->movements->record(null, 'entree', 'Point', $this->admin))->toThrow(ValidationException::class);
+    expect(fn () => $this->movements->record($this->holder, 'badge', 'Point', $this->admin))->toThrow(ValidationException::class);
     $this->movements->record(null, 'controle', 'Point', $this->admin);
     expect($this->movements->count())->toBe(0);
 });
