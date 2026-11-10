@@ -48,6 +48,8 @@ test('navigation consolidée : espace Badges et cartes, quatre responsabilités,
     await noHorizontalScroll(page, `titulaires ${label}`);
     await page.screenshot({ path: `test-results/consolidation-cartes-${label}.png`, fullPage: true });
 
+    // Retour à l'espace Badges et cartes (les pages du menu Personnes n'ont pas ses onglets).
+    await page.goto('/administration/badges');
     // Modèles institutionnels : un modèle par catégorie ; l'ancien modèle par activité (lots) n'existe plus.
     await page.getByTestId('onglet-modeles').click();
     await expect(page.getByTestId('page-modeles')).toBeVisible();
