@@ -35,7 +35,6 @@ const CN_ROUTES = [
     ['POST', 'administration/imports/apercu', ['can:listes.importer'], []],
     ['POST', 'administration/imports/confirmer', ['can:listes.importer'], []],
     ['POST', 'administration/imports/abandonner', ['can:listes.importer'], []],
-    ['GET', 'administration/atelier/parcours', ['can:badges.gerer'], []],
     ['GET', 'administration/atelier', ['can:badges.gerer'], []],
     ['POST', 'administration/atelier/apercu-fictif', ['can:badges.gerer'], ['throttle:atelier']],
     ['POST', 'administration/atelier/apercu', ['can:badges.gerer'], ['throttle:atelier']],
@@ -53,16 +52,9 @@ const CN_ROUTES = [
     ['GET', 'administration/badges', ['can:badges.gerer'], []],
     ['GET', 'administration/badges/supports', ['can:badges.gerer'], ['throttle:recherche']],
     ['GET', 'administration/badges/lots', ['can:badges.gerer'], []],
-    ['GET', 'administration/badges/modeles', ['can:badges.gerer'], []],
-    ['POST', 'administration/badges/modeles/apercu', ['can:badges.gerer'], []],
-    ['POST', 'administration/badges/modeles/personnes', ['can:badges.gerer', 'can:listes.importer'], []],
-    ['POST', 'administration/badges/modeles/preparer', ['can:badges.gerer', 'can:listes.importer'], []],
-    ['PUT', 'administration/badges/modeles', ['can:badges.gerer'], []],
-    ['GET', 'administration/badges/modeles/imprimer', ['can:badges.gerer'], []],
     ['POST', 'administration/badges/lots', ['can:badges.gerer'], []],
     ['POST', 'administration/badges/reservations', ['can:badges.gerer'], []],
     ['PUT', 'administration/badges/reglages', ['can:badges.gerer'], []],
-    ['GET', 'administration/badges/etiquettes', ['can:badges.gerer'], []],
     ['GET', 'administration/badges/registre', ['can:badges.gerer'], []],
     ['POST', 'administration/badges/mise-a-disposition', ['can:badges.gerer'], ['throttle:titulaires']],
     ['GET', 'administration/badges/{badge}', ['can:badges.gerer'], []],
@@ -82,9 +74,6 @@ const CN_ROUTES = [
     ['PUT', 'administration/habilitations/confiance', ['can:postes.gerer'], ['throttle:titulaires']],
     ['POST', 'administration/titulaires/{holder}/carte/revoquer', ['can:listes.importer', 'can:badges.gerer'], ['throttle:titulaires']],
     ['POST', 'administration/titulaires/{holder}/carte/remplacer', ['can:listes.importer', 'can:badges.gerer'], ['throttle:titulaires']],
-    ['GET', 'administration/atelier/cartes', ['can:listes.importer', 'can:badges.gerer'], []],
-    ['POST', 'administration/atelier/cartes', ['can:listes.importer', 'can:badges.gerer'], ['throttle:atelier']],
-    ['GET', 'administration/titulaires/modeles', ['can:badges.gerer'], []],
     ['POST', 'administration/titulaires/modeles/{code}/apercu', ['can:badges.gerer'], ['throttle:titulaires']],
     ['PUT', 'administration/titulaires/modeles/{code}', ['can:categories.gerer'], ['throttle:titulaires']],
     ['POST', 'administration/titulaires/modeles/{code}/valider', ['can:categories.gerer'], ['throttle:titulaires']],
@@ -127,13 +116,11 @@ const CN_ADDED = [
     ['POST', 'administration/site/postes/{checkpoint}/activation', ['can:postes.gerer'], []],
     ['POST', 'administration/site/tablettes/{device}/affectation', ['can:postes.gerer'], []],
     // Badges et cartes : contrat d'impression unique des supports émis (récapitulatif, aperçu, impression).
-    ['GET', 'administration/badges/preparer', ['can:badges.gerer', 'can:listes.importer'], []],
     ['GET', 'administration/badges/preparer/personnes', ['can:badges.gerer', 'can:listes.importer'], ['throttle:recherche']],
     ['POST', 'administration/badges/preparer/recapitulatif', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/preparer/generer', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression/recapitulatif', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression/donnees', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
-    ['POST', 'administration/badges/impression/apercu', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
     ['POST', 'administration/badges/impression', ['can:badges.gerer', 'can:listes.importer'], ['throttle:atelier']],
 ];
 
@@ -234,13 +221,11 @@ it('laisse l’administrateur atteindre chaque page de consultation de ces domai
     expect($reached)->toBeGreaterThan(20);
 });
 
-it('garde les anciens liens et leurs paramètres : Atelier, étiquettes, anciens modèles', function () {
+it('garde les liens utiles de l’Atelier et renvoie l’ancien mode « cartes » vers le registre', function () {
     $this->actingAs(cnUser('administrateur'));
-    $this->get('/administration/atelier?mode=cartes&format=a4&from=1&to=5&cols=2&rows=3')->assertOk()
+    $this->get('/administration/atelier?format=a4&from=1&to=5&cols=2&rows=3')->assertOk()
         ->assertInertia(fn ($page) => $page->component('Admin/Atelier')->where('initial.format', 'a4')->where('initial.from', fn ($v) => (int) $v === 1)->where('initial.to', fn ($v) => (int) $v === 5)->where('initial.cols', fn ($v) => (int) $v === 2)->where('initial.rows', fn ($v) => (int) $v === 3));
-    $this->get('/administration/badges/modeles?format=a4')->assertRedirect('/administration/atelier?format=a4');
-    $this->get('/administration/badges/modeles')->assertRedirect('/administration/atelier');
-    expect((string) $this->get('/administration/badges/etiquettes?batch='.DemoSeeder::id('batch'))->headers->get('Location'))->toContain('/administration/atelier?')->toContain('format=etiquettes');
+    $this->get('/administration/atelier?mode=cartes')->assertRedirect('/administration/badges?type=carte_permanente');
 });
 
 it('conserve les contrats des documents imprimés : demande et confirmation de tirage, retours', function () {
@@ -264,8 +249,6 @@ it('sert la page Modèles avec le modèle de badge de chaque activité et le mod
         ->assertInertia(fn ($page) => $page->where('section', 'cartes')->where('cards.selected', 'AILCT-02'));
     $event = DemoSeeder::id('event');
     $this->get('/administration/modeles?event='.$event)->assertOk()->assertInertia(fn ($page) => $page->where('initialEvent', $event));
-    // l'ancienne page « Personnalisation des cartes » renvoie vers l'espace Modèles en conservant la catégorie
-    $this->get('/administration/titulaires/modeles?categorie=AILCT-02')->assertRedirect('/administration/modeles?section=cartes&categorie=AILCT-02');
 });
 
 it('fournit les compteurs du cadre seulement sur les pages de l’espace Badges et cartes', function () {

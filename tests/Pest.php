@@ -52,3 +52,15 @@ pest()->use(DatabaseTransactions::class)->in('Feature/InterfacesS10Test.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/ConsolidationNavigationTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/CaracterisationV1Test.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/SiteAccesTest.php');
+
+/**
+ * Imprime un lot de badges par le circuit actuel : tirage tracé (plan) puis document du tirage.
+ *
+ * @param  array<string, mixed>  $options
+ */
+function atelierDocument(mixed $test, array $options): mixed
+{
+    $run = $test->postJson('/administration/atelier/tirages', $options)->assertOk()->json('run');
+
+    return $test->get('/administration/atelier/tirages/'.$run.'/document');
+}

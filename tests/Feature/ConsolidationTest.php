@@ -57,7 +57,7 @@ it('imprime à la fois un lot de badges visiteurs et la carte d’un titulaire s
     app(HolderCards::class)->issue($holder, $this->admin);
     $visitorsBefore = DB::table('badges')->where('event_id', DemoSeeder::id('event'))->orderBy('id')->get()->toJson();
     $options = ['event' => DemoSeeder::id('event'), 'batch' => $batch->id, 'design' => 'visiteur', 'title' => 'Site fictif', 'primary' => '#0066B3', 'accent' => '#F75C03', 'orientation' => 'paysage', 'format' => 'pvc', 'cols' => 1, 'rows' => 1, 'side' => 'recto'];
-    $visitors = $this->get('/administration/badges/modeles/imprimer?'.http_build_query($options))->assertOk();
+    $visitors = atelierDocument($this, $options)->assertOk();
     expect(substr_count($visitors->getContent(), '<article class="access-card '))->toBe(3);
     $card = $this->post('/administration/titulaires/'.$holder.'/carte/imprimer')->assertOk();
     expect(substr_count($card->getContent(), 'class="sheet"'))->toBe(2)->and($card->getContent())->toContain('data-template="AILCT-03"')->and($card->getContent())->not->toContain('access-card');
@@ -65,7 +65,7 @@ it('imprime à la fois un lot de badges visiteurs et la carte d’un titulaire s
 });
 
 it('ouvre les pages de chaque parcours uniquement avec les permissions existantes', function () {
-    $routes = ['/administration/badges' => 'badges.gerer', '/administration/atelier' => 'badges.gerer', '/administration/titulaires' => 'listes.importer', '/administration/titulaires/modeles' => 'badges.gerer', '/administration/modeles' => 'badges.gerer', '/administration/atelier/parcours' => 'badges.gerer', '/administration/habilitations' => 'listes.importer', '/administration/invites' => 'listes.importer', '/administration/imports' => 'listes.importer'];
+    $routes = ['/administration/badges' => 'badges.gerer', '/administration/atelier' => 'badges.gerer', '/administration/titulaires' => 'listes.importer', '/administration/modeles' => 'badges.gerer', '/administration/habilitations' => 'listes.importer', '/administration/invites' => 'listes.importer', '/administration/imports' => 'listes.importer'];
     foreach (['agent_accueil', 'superviseur', 'hote', 'encadreur'] as $role) {
         $user = User::create(['name' => 'Compte fictif', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24), 'two_factor_confirmed_at' => now()]);
         $user->assignRole($role);
@@ -74,10 +74,7 @@ it('ouvre les pages de chaque parcours uniquement avec les permissions existante
             $this->actingAs($user)->get($path)->assertForbidden();
         }
     }
-    // Les deux anciennes pages (sommaire des parcours, personnalisation des cartes) renvoient vers l'espace Badges et cartes ; toutes les autres s'ouvrent.
-    $redirections = ['/administration/titulaires/modeles', '/administration/atelier/parcours'];
     foreach (array_keys($routes) as $path) {
-        $response = $this->actingAs($this->admin)->get($path);
-        in_array($path, $redirections, true) ? $response->assertRedirect() : $response->assertOk();
+        $this->actingAs($this->admin)->get($path)->assertOk();
     }
 });

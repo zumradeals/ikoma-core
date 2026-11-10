@@ -3,10 +3,8 @@
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminVisitorsController;
-use App\Http\Controllers\AtelierCartesController;
 use App\Http\Controllers\AtelierController;
 use App\Http\Controllers\BadgeDetailsController;
-use App\Http\Controllers\BadgeLabelsController;
 use App\Http\Controllers\BadgeLotsController;
 use App\Http\Controllers\BadgePreparerController;
 use App\Http\Controllers\BadgeRegistryController;
@@ -128,8 +126,6 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/administration/categories', [CategoriesController::class, 'index'])->middleware('can:categories.gerer');
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
-        // Ancien sommaire « Parcours badges et cartes » : remplacé par le cadre à quatre onglets de l'espace Badges et cartes. L'adresse reste valable (permission d'abord).
-        Route::get('/administration/atelier/parcours', fn () => redirect('/administration/badges'))->middleware('can:badges.gerer');
         Route::get('/administration/modeles', [ModelesController::class, 'index'])->middleware('can:badges.gerer');
         Route::get('/administration/atelier', [AtelierController::class, 'index'])->middleware('can:badges.gerer');
         Route::post('/administration/atelier/apercu-fictif', [AtelierController::class, 'specimen'])->middleware(['can:badges.gerer', 'throttle:atelier']);
@@ -145,27 +141,18 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/atelier/tirages/{run}/demande', [AtelierController::class, 'requested'])->whereUuid('run')->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::post('/administration/atelier/tirages/{run}/confirmation', [AtelierController::class, 'confirmed'])->whereUuid('run')->middleware(['can:badges.gerer', 'throttle:atelier']);
         Route::get('/administration/atelier/alignement', [AtelierController::class, 'alignment'])->middleware('can:badges.gerer');
-        Route::get('/administration/badges/preparer', [BadgePreparerController::class, 'page'])->middleware(['can:badges.gerer', 'can:listes.importer']);
         Route::get('/administration/badges/preparer/personnes', [BadgePreparerController::class, 'people'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:recherche']);
         Route::post('/administration/badges/preparer/recapitulatif', [BadgePreparerController::class, 'summary'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/preparer/generer', [BadgePreparerController::class, 'generate'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression/recapitulatif', [SupportPrintController::class, 'plan'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression/donnees', [SupportPrintController::class, 'previewData'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
-        Route::post('/administration/badges/impression/apercu', [SupportPrintController::class, 'preview'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::post('/administration/badges/impression', [SupportPrintController::class, 'print'])->middleware(['can:badges.gerer', 'can:listes.importer', 'throttle:atelier']);
         Route::get('/administration/badges', BadgesController::class)->middleware('can:badges.gerer');
         Route::get('/administration/badges/supports', [BadgesController::class, 'supports'])->middleware(['can:badges.gerer', 'throttle:recherche']);
         Route::get('/administration/badges/lots', [BadgesController::class, 'lots'])->middleware('can:badges.gerer');
-        Route::get('/administration/badges/modeles', [BadgeWorkshopController::class, 'index'])->middleware('can:badges.gerer');
-        Route::post('/administration/badges/modeles/apercu', [BadgeWorkshopController::class, 'preview'])->middleware('can:badges.gerer');
-        Route::post('/administration/badges/modeles/personnes', [BadgeWorkshopController::class, 'people'])->middleware(['can:badges.gerer', 'can:listes.importer']);
-        Route::post('/administration/badges/modeles/preparer', [BadgeWorkshopController::class, 'prepare'])->middleware(['can:badges.gerer', 'can:listes.importer']);
-        Route::put('/administration/badges/modeles', [BadgeWorkshopController::class, 'save'])->middleware('can:badges.gerer');
-        Route::get('/administration/badges/modeles/imprimer', [BadgeWorkshopController::class, 'print'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/lots', [BadgeLotsController::class, 'store'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/reservations', [BadgeReservationsController::class, 'store'])->middleware('can:badges.gerer');
         Route::put('/administration/badges/reglages', [BadgeSettingsController::class, 'update'])->middleware('can:badges.gerer');
-        Route::get('/administration/badges/etiquettes', BadgeLabelsController::class)->middleware('can:badges.gerer');
         Route::get('/administration/badges/registre', [BadgeRegistryController::class, 'index'])->middleware('can:badges.gerer');
         Route::post('/administration/badges/mise-a-disposition', [BadgeRegistryController::class, 'store'])->middleware(['can:badges.gerer', 'throttle:titulaires']);
         Route::get('/administration/badges/{badge}', BadgeDetailsController::class)->whereUuid('badge')->middleware('can:badges.gerer');
@@ -246,10 +233,6 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/habilitations/confiance', [HolderEntitlementsController::class, 'trust'])->middleware(['can:postes.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/carte/revoquer', [HolderCardsController::class, 'revoke'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/carte/remplacer', [HolderCardsController::class, 'replace'])->whereUuid('holder')->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:titulaires']);
-        Route::get('/administration/atelier/cartes', [AtelierCartesController::class, 'index'])->middleware(['can:listes.importer', 'can:badges.gerer']);
-        Route::post('/administration/atelier/cartes', [AtelierCartesController::class, 'document'])->middleware(['can:listes.importer', 'can:badges.gerer', 'throttle:atelier']);
-        // Ancienne page « Personnalisation des cartes » : les modèles de cartes sont dans l'espace Modèles ; la catégorie choisie est conservée.
-        Route::get('/administration/titulaires/modeles', fn (Request $request) => redirect('/administration/modeles?'.http_build_query(['section' => 'cartes', ...$request->only('categorie')])))->middleware('can:badges.gerer');
         Route::post('/administration/titulaires/modeles/{code}/apercu', [HolderCardsController::class, 'modelPreview'])->where('code', 'AILCT-0[1-8]')->middleware(['can:badges.gerer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/modeles/{code}', [HolderCardsController::class, 'saveModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/modeles/{code}/valider', [HolderCardsController::class, 'validateModel'])->where('code', 'AILCT-0[1-8]')->middleware(['can:categories.gerer', 'throttle:titulaires']);

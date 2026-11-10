@@ -25,7 +25,7 @@ describe('parcours des cartes permanentes en trois étapes', () => {
     expect(wrapper.get('[data-testid=nb-a-imprimer]').text()).toBe('4');
     expect(wrapper.get('[data-testid=nb-a-remettre]').text()).toBe('1');
     expect(wrapper.get('[data-testid=nb-actives]').text()).toContain('7');
-    expect(wrapper.get('[data-testid=aller-atelier]').attributes('href')).toBe('/administration/atelier?mode=cartes');
+    expect(wrapper.get('[data-testid=aller-atelier]').attributes('href')).toBe('/administration/badges?type=carte_permanente');
     expect(wrapper.get('[data-testid=remettre-suivante]').attributes('href')).toBe('/administration/titulaires/h9/carte');
   });
 

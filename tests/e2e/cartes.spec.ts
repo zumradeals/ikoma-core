@@ -41,7 +41,7 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   await expect(page.getByTestId('categorie-AILCT-08')).toBeVisible();
 
   // Huit modèles (un par catégorie), exemples fictifs.
-  await page.goto('/administration/titulaires/modeles');
+  await page.goto('/administration/modeles?section=cartes');
   await expect(page.getByTestId('page-modeles-cartes')).toBeVisible();
   await expect(page.getByTestId('choix-categorie').locator('option')).toHaveCount(8);
   await page.getByTestId('choix-categorie').selectOption('AILCT-04');
@@ -148,17 +148,6 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   await expect(page.getByTestId('historique-tirages')).toContainText('Réimpression');
   expect(await decode(page, '[data-testid="apercu-verso"]')).toBe(previewPayload);
 
-  // Atelier, mode « Cartes permanentes » : choix de la personne, motif obligatoire (déjà imprimée), document tracé.
-  await page.goto('/administration/atelier?mode=cartes');
-  await expect(page.getByTestId('cartes-permanentes')).toBeVisible();
-  await page.getByTestId(`carte-${identifier}`).check();
-  await expect(page.getByTestId('motif-cartes')).toBeVisible();
-  await page.getByTestId('motif-cartes').fill('Essai depuis l’Atelier');
-  const [atelierDoc] = await Promise.all([context.waitForEvent('page'), page.getByTestId('imprimer-cartes').click()]);
-  await atelierDoc.waitForLoadState('domcontentloaded');
-  await expect(atelierDoc.locator('.sheet')).toHaveCount(2);
-  await atelierDoc.close();
-  await page.screenshot({ path: 'test-results/r5b-atelier-cartes-1440.png', fullPage: true });
   await page.goto('/administration/titulaires');
   await page.getByTestId('recherche-titulaires').fill(name);
   await page.getByTestId('lancer-recherche').click();
@@ -185,7 +174,7 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
   await expect(page.getByTestId('apercu-recto')).toBeVisible();
   await noHorizontalScroll(page, 'carte 1024');
   await page.screenshot({ path: 'test-results/a05-carte-apercu-1024.png', fullPage: true });
-  await page.goto('/administration/titulaires/modeles');
+  await page.goto('/administration/modeles?section=cartes');
   await noHorizontalScroll(page, 'modèles 1024');
   await page.screenshot({ path: 'test-results/a05-modeles-1024.png', fullPage: true });
 });

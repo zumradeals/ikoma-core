@@ -127,7 +127,7 @@ it('protège les historiques et les portraits contre les rôles non habilités',
         $this->actingAs($user);
         $this->get('/administration/invites/'.$person->id.'/portrait')->assertForbidden();
         $this->postJson('/administration/invites', manualInput())->assertForbidden();
-        $this->postJson('/administration/badges/modeles/personnes', ['event' => $person->event_id, 'batch' => DemoSeeder::id('batch')])->assertForbidden();
+        $this->postJson('/administration/atelier/personnes', ['event' => $person->event_id, 'batch' => DemoSeeder::id('batch')])->assertForbidden();
     }
 });
 
@@ -138,18 +138,18 @@ it('prépare sans activation et imprime avec ou sans portrait, jamais dans le mo
     $badge = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->firstOrFail();
     $token = $badge->qr_token;
     $number = (int) substr($badge->code, 2);
-    $this->postJson('/administration/badges/modeles/preparer', ['event' => $person->event_id, 'batch' => $batch->id, 'from' => $number, 'to' => $number, 'visitor_ids' => [$person->id], 'personal_allowed' => true])->assertOk();
+    $this->postJson('/administration/atelier/preparer', ['event' => $person->event_id, 'batch' => $batch->id, 'from' => $number, 'to' => $number, 'visitor_ids' => [$person->id], 'personal_allowed' => true])->assertOk();
     expect($badge->fresh()->status->value)->toBe('Disponible')->and(DB::table('badge_assignments')->where('badge_id', $badge->id)->exists())->toBeFalse();
     expect(app(BadgeService::class)->controler($token)->valid)->toBeFalse();
     $options = [...$this->printData, 'batch' => $batch->id, 'from' => $number, 'to' => $number];
-    $anonymous = $this->postJson('/administration/badges/modeles/apercu', $options)->assertOk()->json('html');
+    $anonymous = $this->postJson('/administration/atelier/apercu', $options)->assertOk()->json('html');
     expect($anonymous)->not->toContain($person->full_name)->not->toContain('data:image/jpeg');
     $personal = [...$options, 'mode' => 'nominatif', 'personal_allowed' => true];
-    $without = $this->postJson('/administration/badges/modeles/apercu', $personal)->assertOk()->json('html');
+    $without = $this->postJson('/administration/atelier/apercu', $personal)->assertOk()->json('html');
     expect($without)->toContain($person->full_name)->not->toContain('data:image/jpeg');
-    $with = $this->postJson('/administration/badges/modeles/apercu', [...$personal, 'show_photo' => true])->assertOk()->json('html');
+    $with = $this->postJson('/administration/atelier/apercu', [...$personal, 'show_photo' => true])->assertOk()->json('html');
     expect($with)->toContain('data:image/jpeg');
-    $this->get('/administration/badges/modeles/imprimer?'.http_build_query([...$personal, 'show_photo' => true]))->assertOk();
+    atelierDocument($this, [...$personal, 'show_photo' => true])->assertOk();
     expect($badge->fresh()->qr_token)->toBe($token)->and($badge->fresh()->status->value)->toBe('Disponible');
     $agent = User::create(['name' => 'Agent fictif', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24)]);
     $agent->assignRole('agent_accueil');
@@ -178,7 +178,7 @@ it('prépare un badge déjà réservé au poste sans toucher au QR, au statut ou
     $data = ['event' => $person->event_id, 'batch' => $batch->id, 'from' => $number, 'to' => $number,
         'visitor_ids' => [$person->id], 'personal_allowed' => true];
 
-    $this->postJson('/administration/badges/modeles/preparer', $data)
+    $this->postJson('/administration/atelier/preparer', $data)
         ->assertOk()->assertJsonPath('prepared.0.code', $badge->code)
         ->assertJsonPath('sync_required', true)->assertJsonPath('postes_a_synchroniser.0', $poste->station ?: $poste->name);
     $prepared = $badge->fresh();
@@ -191,10 +191,10 @@ it('prépare un badge déjà réservé au poste sans toucher au QR, au statut ou
     $snapshot = collect(app(ListSnapshot::class)->build($poste)['badges'])->firstWhere('code', $badge->code);
     expect($snapshot['mine'])->toBeTrue()->and($snapshot['printed_for_visitor_id'])->toBe($person->id);
 
-    $this->postJson('/administration/badges/modeles/preparer', $data)->assertOk()->assertJsonPath('sync_required', true);
+    $this->postJson('/administration/atelier/preparer', $data)->assertOk()->assertJsonPath('sync_required', true);
     $options = [...$this->printData, 'batch' => $batch->id, 'from' => $number, 'to' => $number,
         'mode' => 'nominatif', 'personal_allowed' => true];
-    $this->postJson('/administration/badges/modeles/apercu', $options)->assertOk()->assertSee('Personne nominative du poste');
+    $this->postJson('/administration/atelier/apercu', $options)->assertOk()->assertSee('Personne nominative du poste');
 });
 
 it('refuse un badge déjà utilisé, celui d’un groupe et celui d’un poste révoqué', function () {
@@ -214,15 +214,15 @@ it('refuse un badge déjà utilisé, celui d’un groupe et celui d’un poste r
         'actor_id' => $this->admin->id, 'assigned_at' => now(), 'returned_at' => now(),
         'created_at' => now(), 'updated_at' => now(),
     ]);
-    $this->postJson('/administration/badges/modeles/preparer', $data($badges[0]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
+    $this->postJson('/administration/atelier/preparer', $data($badges[0]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
     $groupId = DB::table('groups')->where('event_id', $person->event_id)->value('id');
     if ($groupId !== null) {
         DB::table('badges')->where('id', $badges[1]->id)->update(['reserved_group_id' => $groupId]);
-        $this->postJson('/administration/badges/modeles/preparer', $data($badges[1]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
+        $this->postJson('/administration/atelier/preparer', $data($badges[1]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
     }
     DB::table('badges')->where('id', $badges[2]->id)->update(['reserved_device_id' => $poste->id]);
     $poste->forceFill(['revoked_at' => now()])->save();
-    $this->postJson('/administration/badges/modeles/preparer', $data($badges[2]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
+    $this->postJson('/administration/atelier/preparer', $data($badges[2]))->assertUnprocessable()->assertJsonValidationErrors('visitor_ids');
     expect(Badge::where('badge_batch_id', $batch->id)->whereNotNull('printed_for_visitor_id')->count())->toBe(0);
 });
 
@@ -234,7 +234,7 @@ it('annule toute la préparation multi-badges si un badge est déjà affecté', 
     $batch = app(BadgeLots::class)->generate($a->event_id, $a->category_id, 2, $this->admin);
     $badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->get();
     DB::table('badges')->where('id', $badges[1]->id)->update(['reserved_group_id' => DB::table('groups')->where('event_id', $a->event_id)->value('id')]);
-    $this->postJson('/administration/badges/modeles/preparer', [
+    $this->postJson('/administration/atelier/preparer', [
         'event' => $a->event_id, 'batch' => $batch->id,
         'from' => (int) substr($badges[0]->code, 2), 'to' => (int) substr($badges[1]->code, 2),
         'visitor_ids' => [$a->id, $b->id], 'personal_allowed' => true,
@@ -269,9 +269,9 @@ it('prépare et imprime 200 destinations nominatives sans activation ni modifica
     $badges = Badge::where('badge_batch_id', $batch->id)->orderBy('code')->get();
     $from = (int) substr($badges->first()->code, 2);
     $to = (int) substr($badges->last()->code, 2);
-    $this->postJson('/administration/badges/modeles/preparer', ['event' => DemoSeeder::id('event'), 'batch' => $batch->id, 'from' => $from, 'to' => $to, 'visitor_ids' => $ids, 'personal_allowed' => true])->assertOk();
+    $this->postJson('/administration/atelier/preparer', ['event' => DemoSeeder::id('event'), 'batch' => $batch->id, 'from' => $from, 'to' => $to, 'visitor_ids' => $ids, 'personal_allowed' => true])->assertOk();
     $options = [...$this->printData, 'batch' => $batch->id, 'format' => 'a4', 'mode' => 'nominatif', 'personal_allowed' => true];
-    $response = $this->get('/administration/badges/modeles/imprimer?'.http_build_query($options))->assertOk();
+    $response = atelierDocument($this, $options)->assertOk();
     expect(substr_count($response->getContent(), '<article class="access-card '))->toBe(200)
         ->and(Badge::where('badge_batch_id', $batch->id)->where('status', 'Disponible')->count())->toBe(200)
         ->and(Badge::where('badge_batch_id', $batch->id)->orderBy('code')->pluck('qr_token')->all())->toBe($tokens);

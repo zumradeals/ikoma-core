@@ -200,21 +200,21 @@ it('sert récapitulatif, aperçu et impression par les routes, aux seuls comptes
     $this->actingAs($this->admin);
     $runs = DB::table('badge_print_runs')->count();
     $this->postJson('/administration/badges/impression/recapitulatif', ['badges' => [$t['badge']]])->assertOk()->assertJsonPath('supports.0.kind', 'emission')->assertJsonPath('supports.0.printable', true);
-    $this->post('/administration/badges/impression/apercu', ['badges' => [$t['badge']]])->assertOk()->assertSee($t['code'], false);
+    $this->postJson('/administration/badges/impression/donnees', ['badges' => [$t['badge']]])->assertOk()->assertJsonPath('supports.0.badge_code', $t['code']);
     expect(DB::table('badge_print_runs')->count())->toBe($runs);
     $this->post('/administration/badges/impression', ['badges' => [$t['badge']]])->assertOk()->assertSee($t['code'], false);
     expect(DB::table('badge_print_runs')->count())->toBe($runs + 1);
     $this->post('/administration/badges/impression', ['badges' => [$t['badge']]])->assertSessionHasErrors('reason');
     $this->actingAs($this->agent)->post('/administration/badges/impression', ['badges' => [$t['badge']]])->assertForbidden();
-    $this->post('/administration/badges/impression/apercu', ['badges' => [$t['badge']]])->assertForbidden();
+    $this->postJson('/administration/badges/impression/donnees', ['badges' => [$t['badge']]])->assertForbidden();
 });
 
-it('imprime les cartes par l’ancienne route de l’atelier à travers le même contrat', function () {
+it('imprime une carte par la route d’impression unique, avec son historique et son tirage permanent', function () {
     $card = spCard();
     $this->actingAs($this->admin);
     $items = DB::table('badge_print_items')->count();
     $permanentRuns = DB::table('badge_print_runs')->where('kind', 'permanent')->count();
-    $this->post('/administration/atelier/cartes', ['holders' => [$card['holder']]])->assertOk();
+    $this->post('/administration/badges/impression', ['badges' => [$card['badge']]])->assertOk();
     expect(DB::table('badge_print_items')->count())->toBe($items + 1)->and(DB::table('badge_print_items')->where('badge_id', $card['badge'])->value('kind'))->toBe('emission')
         ->and(DB::table('badge_print_runs')->where('kind', 'permanent')->count())->toBe($permanentRuns + 1);
 });

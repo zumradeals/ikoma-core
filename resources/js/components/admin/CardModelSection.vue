@@ -6,7 +6,7 @@ import type { CardModelProps } from './card-model';
 
 const props = defineProps<CardModelProps & { baseUrl?: string; extraQuery?: Record<string, string> }>();
 // Adresse qui affiche cette section (page historique ou page Modèles) ; la catégorie choisie est le paramètre « categorie ».
-const base = props.baseUrl ?? '/administration/titulaires/modeles';
+const base = props.baseUrl ?? '/administration/modeles';
 
 const choice = ref(props.selected ?? '');
 function pick() { router.get(base, { ...(props.extraQuery ?? {}), categorie: choice.value }, { preserveScroll: true }); }

@@ -39,12 +39,6 @@ test('Atelier des badges : exemple fictif, badge réel, PVC, A4, étiquettes, tr
   expect(link).toContain('/administration/atelier?format=etiquettes&batch=');
   const batch = new URL(link, 'http://localhost').searchParams.get('batch')!;
 
-  // L'ancien lien des étiquettes redirige vers l'Atelier ; l'ancienne page de l'atelier aussi.
-  await page.goto('/administration/badges/etiquettes?batch=' + batch + '&cols=3&rows=5');
-  await expect(page).toHaveURL(/\/administration\/atelier\?.*format=etiquettes/);
-  await page.goto('/administration/badges/modeles');
-  await expect(page).toHaveURL(/\/administration\/atelier$/);
-  await expect(page.getByTestId('page-atelier')).toBeVisible();
 
   // 1. Aperçu d'un modèle : exemple fictif, jamais de vrai QR ni de marquage du lot.
   await page.goto(link);
