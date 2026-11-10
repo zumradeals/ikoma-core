@@ -40,6 +40,14 @@ BEGIN
 END $$;
 SQL);
         DB::statement('CREATE TRIGGER devices_activity_sync AFTER INSERT OR UPDATE OF event_id ON devices FOR EACH ROW EXECUTE FUNCTION public.ikoma_device_activity_sync()');
+
+        // Remise à zéro de démonstration (globale, sans CASCADE) : l'affectation tablette-activité part avec les tablettes.
+        $business = (string) DB::selectOne("SELECT pg_get_functiondef('public.ikoma_reset_demo_business(uuid,boolean)'::regprocedure) AS d")->d;
+        $business = str_replace('public.devices,', 'public.device_activities, public.devices,', $business, $count);
+        if ($count !== 1) {
+            throw new RuntimeException('Fonction de remise à zéro (globale) inattendue : revue du contrat requise.');
+        }
+        DB::unprepared($business);
     }
 
     public function down(): void
