@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $withdrawn_at
  * @property string|null $closed_at
  * @property string $person_id
+ * @property string|null $visit_purpose
  */
 class Visitor extends Model
 {
