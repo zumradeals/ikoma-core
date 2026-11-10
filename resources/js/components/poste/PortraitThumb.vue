@@ -19,6 +19,6 @@ watch(() => [props.visitorId, props.hasPortrait] as const, async ([id, has]) => 
 onBeforeUnmount(() => { ++sequence; release(); });
 </script>
 <template>
-  <img v-if="url" :src="url" :alt="'Portrait de ' + name" class="poste-portrait-img" data-testid="portrait" width="72" height="72">
+  <img v-if="url" :src="url" :alt="'Portrait de ' + name" class="poste-portrait-img" data-testid="portrait" width="132" height="164">
   <span v-else class="agent-search-initial" aria-hidden="true">{{ name.charAt(0) }}</span>
 </template>

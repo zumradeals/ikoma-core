@@ -108,8 +108,7 @@ onBeforeUnmount(() => { window.clearTimeout(timer); ++sequence; });
           <div class="flex items-start gap-3">
             <PortraitThumb :repository="repository" :visitor-id="chosen.id" :name="chosen.full_name" :has-portrait="chosen.has_portrait" class="poste-portrait" />
             <div class="min-w-0 flex-1"><p class="text-xl font-bold" data-testid="apercu-nom">{{ chosen.full_name }}</p><p class="truncate text-slate-700">{{ chosen.organisation || 'Organisation non indiquée' }}</p>
-              <p class="mt-2"><CategorySwatch :name="chosen.category.name" :color="chosen.category.color" :priority="chosen.category.priority_circuit" /></p></div>
-            <span class="poste-chip" :class="accessOf(chosen).chip" data-testid="apercu-statut"><span aria-hidden="true">{{ chosen.access === 'autorise' || !chosen.access ? '✓' : '•' }}</span> {{ accessOf(chosen).label }}</span>
+              <p class="mt-2 flex flex-wrap items-center gap-2"><CategorySwatch :name="chosen.category.name" :color="chosen.category.color" :priority="chosen.category.priority_circuit" /><span class="poste-chip" :class="accessOf(chosen).chip" data-testid="apercu-statut"><span aria-hidden="true">{{ chosen.access === 'autorise' || !chosen.access ? '✓' : '•' }}</span> {{ accessOf(chosen).label }}</span></p></div>
           </div>
           <dl class="poste-facts">
             <div><dt><AdminIcon name="users" :size="20" /> Type</dt><dd>{{ chosen.category.name }}</dd></div>
