@@ -14,9 +14,20 @@ const props = defineProps<{
   categories: { code: string; label: string; color: string }[]; eventDates: { starts_at: string; ends_at: string } | null;
   decisions: Decision[]; devices: Device[]; trust: { configured: number; approved: boolean; effective: number; max: number };
   can: { grant: boolean; policies: boolean; trust: boolean };
+  site?: { zones: { id: string; name: string }[]; entitlements: Entitlement[] };
 }>();
 
 function chooseEvent(e: Event) { router.get('/administration/habilitations', { event: (e.target as HTMLSelectElement).value }); }
+
+// Habilitations du SITE : personnel permanent, par zone du site, sans événement.
+const siteForm = useForm({ holder_id: '', zone_id: '', valid_from: '', valid_until: '' });
+function submitSite() {
+  siteForm.transform(d => ({ ...d, valid_from: toUtcIso(d.valid_from), valid_until: toUtcIso(d.valid_until) }))
+    .post('/administration/habilitations/site', { preserveScroll: true, onSuccess: () => siteForm.reset('holder_id', 'zone_id', 'valid_from', 'valid_until') });
+}
+const siteRevoking = ref<string | null>(null);
+const siteRevoke = useForm({ reason: 'Retrait par l’administrateur' });
+function submitSiteRevoke(id: string) { siteRevoke.post('/administration/habilitations/site/' + id + '/retirer', { preserveScroll: true, onSuccess: () => { siteRevoking.value = null; } }); }
 
 // 1. Où peut-on entrer ? Ouvrir/fermer une zone aux personnes permanentes. La « classification » reste enregistrée mais n'est plus demandée : on garde la valeur existante, sinon « Standard ».
 function setZone(zone: Zone, open: boolean, offline = zone.offline_entry_allowed) {
@@ -90,6 +101,36 @@ function when(v: string | null) { return v ? new Date(v).toLocaleString('fr-FR')
           <select class="field mt-1" :value="eventId ?? ''" data-testid="choix-evenement" @change="chooseEvent"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
         </label>
       </header>
+
+      <section v-if="site" class="space-y-4 rounded-2xl border bg-white p-6" aria-labelledby="habilitations-site" data-testid="habilitations-site">
+        <h2 id="habilitations-site" class="text-heading font-bold">Personnel permanent : accès au site</h2>
+        <p class="max-w-4xl text-slate-700">L’accès au site se décide par zone du site, sans activité. Il s’ajoute aux accès liés aux activités, plus bas.</p>
+        <p v-if="!site.zones.length" data-testid="aucune-zone-site">Aucune zone du site : créez-en dans « Site et accès », onglet Zones.</p>
+        <form v-else-if="can.grant" class="flex flex-wrap items-end gap-3" aria-label="Accorder un accès au site" @submit.prevent="submitSite">
+          <label class="font-semibold">Personne<select v-model="siteForm.holder_id" class="field mt-1" required data-testid="site-personne"><option value="" disabled>Choisir…</option><option v-for="h in holders" :key="h.id" :value="h.id">{{ h.full_name }} ({{ h.identifier }})</option></select></label>
+          <label class="font-semibold">Zone du site<select v-model="siteForm.zone_id" class="field mt-1" required data-testid="site-zone"><option value="" disabled>Choisir…</option><option v-for="z in site.zones" :key="z.id" :value="z.id">{{ z.name }}</option></select></label>
+          <label class="font-semibold">Du<input v-model="siteForm.valid_from" type="datetime-local" class="field mt-1" required data-testid="site-debut"></label>
+          <label class="font-semibold">Au<input v-model="siteForm.valid_until" type="datetime-local" class="field mt-1" required data-testid="site-fin"></label>
+          <button type="submit" class="admin-primary" :disabled="siteForm.processing" data-testid="site-accorder">Accorder l’accès</button>
+        </form>
+        <p v-if="Object.values(siteForm.errors).length" class="font-semibold text-red-800" role="alert" data-testid="site-erreurs">{{ Object.values(siteForm.errors).join(' ') }}</p>
+        <p v-if="!site.entitlements.length" data-testid="aucune-habilitation-site">Aucun accès au site accordé.</p>
+        <ul class="space-y-2" data-testid="liste-habilitations-site">
+          <li v-for="e in site.entitlements" :key="e.id" class="flex flex-wrap items-center gap-3 rounded-xl border p-3" :data-testid="'hab-site-' + e.id">
+            <strong>{{ e.full_name }}</strong> <span class="font-mono text-sm">{{ e.identifier }}</span>
+            <span class="rounded-full bg-blue-100 px-3 py-1 font-semibold text-blue-950">{{ e.zone }}</span>
+            <span class="text-slate-700">{{ when(e.valid_from) }} → {{ when(e.valid_until) }}</span>
+            <span v-if="e.revoked_at" class="text-sm">retiré : {{ e.revocation_reason }}</span>
+            <template v-else-if="can.grant">
+              <button v-if="siteRevoking !== e.id" type="button" class="rounded-lg border-2 border-red-800 px-3 py-1 font-bold text-red-800" :data-testid="'retirer-site-' + e.id" @click="siteRevoking = e.id">Retirer</button>
+              <form v-else class="flex flex-wrap items-end gap-2" @submit.prevent="submitSiteRevoke(e.id)">
+                <label class="text-sm font-semibold">Motif du retrait<input v-model="siteRevoke.reason" class="field mt-1" required maxlength="200"></label>
+                <button type="submit" class="admin-primary">Confirmer</button><button type="button" class="btn-soft" @click="siteRevoking = null">Annuler</button>
+              </form>
+            </template>
+          </li>
+        </ul>
+      </section>
 
       <p v-if="!eventId" class="rounded-xl border bg-white p-5" data-testid="aucun-evenement">Aucun événement ordinaire : créez d’abord un événement et ses zones.</p>
       <template v-else>

@@ -40,6 +40,22 @@ final class SiteAccesController
         return back()->with('status', 'Zone du site créée.');
     }
 
+    public function mapSiteZone(Request $request, string $checkpoint, SiteConfiguration $site): RedirectResponse
+    {
+        Gate::authorize('postes.gerer');
+        $site->mapSiteZone($checkpoint, (string) $request->validate(['zone_id' => 'required|uuid'])['zone_id'], $request->user());
+
+        return back()->with('status', 'Zone du site associée au poste.');
+    }
+
+    public function unmapSiteZone(Request $request, string $mapping, SiteConfiguration $site): RedirectResponse
+    {
+        Gate::authorize('postes.gerer');
+        $site->unmapSiteZone($mapping, $request->user());
+
+        return back()->with('status', 'Zone du site retirée du poste.');
+    }
+
     public function renameZone(Request $request, string $zone, SiteConfiguration $site): RedirectResponse
     {
         Gate::authorize('postes.gerer');

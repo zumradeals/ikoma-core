@@ -842,3 +842,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 
 ## Sécurité — Image PostgreSQL republiée (failles krb5-libs, décision du dirigeant)
 - Le contrôle `production` (Trivy) bloquait toutes les PR : l'image PostgreSQL figée (alpine 3.24.3) embarquait `krb5-libs 1.22.2-r1`, avec plusieurs failles HIGH corrigées en 1.22.3-r0. Republication par le workflow S0.6 (accord du dirigeant) : nouveau digest `sha256:d98609e2…`, 0 HIGH/CRITICAL, attestation vérifiée ; digest remplacé dans les Compose, le workflow S0.7, son test et la documentation (détail dans `docs/security/S0.7-OCI-ADOPTION-GUARDED.md`).
+
+## Tablette de site, lot 2 : habilitations permanentes du site
+- Décision : tables **nouvelles** (`holder_site_entitlements`, `checkpoint_site_zones`) plutôt que d'assouplir `holder_entitlements` / `checkpoint_zones` (clés composites `(zone, événement)` et moteur de contrôle d'activité intacts). Les habilitations d'activité existantes ne sont pas reprises : elles restent des habilitations d'activité.
+- Garde-fous en base : déclencheur « zone du site seulement » (`ikoma_require_site_zone`), déclencheur de non-modification/non-suppression (`ikoma_site_entitlement_guard`), contrainte de période, motif de retrait obligatoire côté service.
+- Remise à zéro de démonstration : les deux tables ajoutées au TRUNCATE de `ikoma_reset_demo_business` (sans CASCADE, comme le contrat l'exige).
+- Reporté au lot 4 : politique de zone du site (autorisation hors ligne, classification) et jugement à l'entrée.
