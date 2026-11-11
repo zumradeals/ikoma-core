@@ -13,6 +13,10 @@ defineEmits<{ enter: [] }>();
       <p v-if="!fiche.zones.length" class="mt-2">Aucune zone enregistrée pour cette catégorie : appelez le superviseur.</p>
       <p class="mt-4">Remettez le badge, rappelez les zones autorisées et les consignes du site.<span v-if="fiche.accueil_limite"> Le visiteur doit être accompagné.</span></p>
     </div>
-    <button type="button" class="btn-ok" :disabled="busy" @click="$emit('enter')"><span aria-hidden="true">➜</span> Autoriser l’accès</button>
+    <div class="rounded-2xl border-2 border-slate-300 bg-white p-5" data-testid="consignes">
+      <h2 class="mb-2 text-heading font-bold">À faire avant d’autoriser l’accès</h2>
+      <ol class="list-decimal space-y-2 pl-7 text-xl font-semibold"><li>Remettez le badge au visiteur.</li><li>Rappelez les zones autorisées.</li><li>Rappelez les consignes du site : badge porté visible, restitué à la sortie.</li></ol>
+    </div>
+    <div class="poste-actionbar poste-actionbar-end"><button type="button" class="btn-ok" :disabled="busy" @click="$emit('enter')"><span aria-hidden="true">➜</span> Autoriser l’accès</button></div>
   </section>
 </template>
