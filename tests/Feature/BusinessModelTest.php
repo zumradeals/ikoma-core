@@ -130,9 +130,8 @@ it('refuse les écrans et écritures sans la permission correspondante', functio
         foreach (['zones', 'categories', 'badges'] as $screen) {
             $this->actingAs($user)->get('/administration/'.$screen)->assertForbidden();
         }
-        foreach (['zones', 'categories'] as $screen) {
-            $this->post('/administration/'.$screen, [])->assertForbidden();
-        }
+        $this->post('/administration/categories', [])->assertForbidden();
+        $this->post('/administration/site/zones', [])->assertForbidden();
     }
 });
 it('journalise la création et la modification des zones et catégories sans données superflues', function () {
