@@ -2,7 +2,7 @@
 import { Link } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '../../components/BaseCard.vue'; import CategoryForm from '../../components/CategoryForm.vue'; import CategorySwatch from '../../components/CategorySwatch.vue';
-defineProps<{ events: { id: string; name: string }[]; zones: { id: string; name: string; event_id: string }[]; categories: { id: string; name: string; color: string; priority_circuit: boolean; event_id: string; event_name: string; zone_ids: string[]; zone_names: string[] }[] }>();
+defineProps<{ events: { id: string; name: string }[]; zones: { id: string; name: string; event_id: string | null }[]; categories: { id: string; name: string; color: string; priority_circuit: boolean; event_id: string; event_name: string; zone_ids: string[]; zone_names: string[] }[] }>();
 const editing = ref<string | null>(null);
 </script>
 <template>

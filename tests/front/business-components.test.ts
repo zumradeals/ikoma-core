@@ -19,6 +19,11 @@ describe('administration L2', () => {
   await wrapper.find('input[value="za"]').setValue(true); await wrapper.get('select').setValue('b'); expect(wrapper.text()).toContain('Zone B'); expect(wrapper.text()).not.toContain('Zone A');
   await wrapper.get('select').setValue('a'); expect((wrapper.find('input[value="za"]').element as HTMLInputElement).checked).toBe(false);
  });
+ it('propose aussi les zones du site, quel que soit l’événement choisi, avec leur nature', async () => {
+  const wrapper = mount(CategoryForm, { props: { events: [{ id: 'a', name: 'Événement A' }, { id: 'b', name: 'Événement B' }], zones: [{ id: 'za', event_id: 'a', name: 'Zone A' }, { id: 'zs', event_id: null, name: 'Hall du site' }] } });
+  expect(wrapper.text()).toContain('Hall du site'); expect(wrapper.text()).toContain('zone du site'); expect(wrapper.text()).toContain('Zone A');
+  await wrapper.get('select').setValue('b'); expect(wrapper.text()).toContain('Hall du site'); expect(wrapper.text()).not.toContain('Zone A');
+ });
  it('interdit de déplacer une zone existante vers un autre événement', () => {
   const wrapper = mount(ZoneForm, { props: { events: [{ id: 'a', name: 'Événement A' }], zone: { id: 'z', name: 'Zone existante', event_id: 'a' } } }); expect(wrapper.get('select').attributes('disabled')).toBeDefined(); expect(wrapper.get('input').element.value).toBe('Zone existante');
  });
