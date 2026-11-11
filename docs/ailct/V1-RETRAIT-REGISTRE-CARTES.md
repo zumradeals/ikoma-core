@@ -21,3 +21,6 @@ Une carte permanente appartient au **site** : badge sans événement, sans lot, 
 
 ## Critères de fin
 Plus aucune référence à `createPermanentContext` ni `is_permanent` dans `app/` ; émission, remplacement, annulation, impression et contrôle d'une carte fonctionnent sans événement ; CI verte ; recette sur le serveur d'essai.
+
+## Avancement
+- Étape 1 (schéma additif) : migration `2026_12_11_000000_allow_site_badges.php` + `SiteBadgesSchemaTest` (badge du site accepté ; catégorie, personne imprimée ou réservation refusées ; jamais de passage site ↔ activité ; identifiants retirés du site non réattribuables). Garde `ikoma_retired_badge_guard` réécrit avec `IS NOT DISTINCT FROM`.
