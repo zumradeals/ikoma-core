@@ -19,8 +19,10 @@ final class LegacyCardRegistry
     /** @var array<string, true> */
     private array $suspended = [];
 
-    /** @var array<string, true> */
-    private array $visited = [];
+    /** Garde-fou : une reprise qui dépasse ce nombre d'étapes est interrompue (et annulée par l'appelant) plutôt que de tourner sans fin. */
+    private const MAX_STEPS = 20000;
+
+    private int $steps = 0;
 
     public function __construct(private readonly ConnectionInterface $db) {}
 
@@ -67,9 +69,17 @@ final class LegacyCardRegistry
      * Efface les lignes de $table qui répondent à $where, après avoir effacé celles qui les référencent (clés étrangères lues dans le catalogue).
      *
      * @param  list<mixed>  $bindings
+     * @param  list<string>  $path  tables déjà en cours de traitement sur ce chemin : coupe les cycles du schéma
      */
-    private function purge(string $table, string $where, array $bindings): int
+    private function purge(string $table, string $where, array $bindings, array $path = []): int
     {
+        if (in_array($table, $path, true)) {
+            return 0;
+        }
+        if (++$this->steps > self::MAX_STEPS) {
+            throw new \RuntimeException('Reprise de l\'ancien registre interrompue : le schéma est trop imbriqué pour une suppression automatique.');
+        }
+        $path[] = $table;
         $this->suspend($table);
         $deleted = 0;
         $children = $this->db->select(
@@ -82,14 +92,9 @@ final class LegacyCardRegistry
             $child = trim((string) preg_replace('/^public\./', '', (string) $fk->child), '"');
             $childCols = $this->pgArray($fk->child_cols);
             $parentCols = $this->pgArray($fk->parent_cols);
-            $key = $child.'|'.implode(',', $childCols).'|'.$table;
-            if (isset($this->visited[$key.'|'.$where.'|'.json_encode($bindings)])) {
-                continue;
-            }
-            $this->visited[$key.'|'.$where.'|'.json_encode($bindings)] = true;
             $left = '('.implode(', ', array_map(fn (string $c): string => $this->quote($c), $childCols)).')';
             $right = '(SELECT '.implode(', ', array_map(fn (string $c): string => $this->quote($c), $parentCols)).' FROM public.'.$this->quote($table).' WHERE '.$where.')';
-            $deleted += $this->purge($child, $left.' IN '.$right, $bindings);
+            $deleted += $this->purge($child, $left.' IN '.$right, $bindings, $path);
         }
         $deleted += $this->db->delete('DELETE FROM public.'.$this->quote($table).' WHERE '.$where, $bindings);
 
