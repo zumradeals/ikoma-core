@@ -114,3 +114,42 @@ it('fusionne les zones de même nom, garde la politique la plus restrictive et r
         $owner->rollBack();
     }
 });
+
+it('reprend les zones gardées par les postes dans Site et accès, sans doublon, et laisse les zones propres à une activité', function () {
+    $owner = repriseOwner();
+    $owner->beginTransaction();
+    try {
+        $at = ['created_at' => now(), 'updated_at' => now()];
+        $site = (string) $owner->table('sites')->orderBy('created_at')->value('id');
+        $event = (string) Str::uuid();
+        $owner->table('events')->insert(['id' => $event, 'name' => 'Activité fictive postes', 'starts_at' => now(), 'ends_at' => now()->addDay(), ...$at]);
+        [$siteZone, $already, $own] = [(string) Str::uuid(), (string) Str::uuid(), (string) Str::uuid()];
+        $owner->table('zones')->insert([
+            ['id' => $siteZone, 'event_id' => null, 'site_id' => $site, 'name' => 'Zone gardée reprise', 'est_accueil' => false, ...$at],
+            ['id' => $already, 'event_id' => null, 'site_id' => $site, 'name' => 'Zone déjà gardée reprise', 'est_accueil' => false, ...$at],
+            ['id' => $own, 'event_id' => $event, 'site_id' => $site, 'name' => 'Zone propre postes', 'est_accueil' => false, ...$at],
+        ]);
+        $checkpoint = (string) $owner->table('checkpoints')->orderBy('code')->value('id');
+        $owner->table('checkpoint_zones')->insert([
+            ['id' => (string) Str::uuid(), 'event_id' => $event, 'checkpoint_id' => $checkpoint, 'zone_id' => $siteZone, ...$at],
+            ['id' => (string) Str::uuid(), 'event_id' => $event, 'checkpoint_id' => $checkpoint, 'zone_id' => $already, ...$at],
+            ['id' => (string) Str::uuid(), 'event_id' => $event, 'checkpoint_id' => $checkpoint, 'zone_id' => $own, ...$at],
+        ]);
+        $owner->table('checkpoint_site_zones')->insert(['id' => (string) Str::uuid(), 'checkpoint_id' => $checkpoint, 'zone_id' => $already, ...$at]);
+
+        $previous = DB::getDefaultConnection();
+        DB::setDefaultConnection('owner');
+        try {
+            (require base_path('database/migrations/2026_12_15_000000_move_checkpoint_zones_to_site.php'))->up();
+        } finally {
+            DB::setDefaultConnection($previous);
+        }
+
+        expect($owner->table('checkpoint_site_zones')->where('checkpoint_id', $checkpoint)->where('zone_id', $siteZone)->count())->toBe(1);
+        expect($owner->table('checkpoint_site_zones')->where('checkpoint_id', $checkpoint)->where('zone_id', $already)->count())->toBe(1);
+        expect($owner->table('checkpoint_zones')->whereIn('zone_id', [$siteZone, $already])->exists())->toBeFalse();
+        expect($owner->table('checkpoint_zones')->where('zone_id', $own)->count())->toBe(1);
+    } finally {
+        $owner->rollBack();
+    }
+});

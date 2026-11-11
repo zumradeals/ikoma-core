@@ -100,9 +100,6 @@ function when(v: string | null) { return v ? new Date(v).toLocaleString('fr-FR')
       <header class="max-w-4xl space-y-3">
         <h1 class="text-display font-bold">Qui peut entrer où ?</h1>
         <p class="text-lg">Une personne permanente entre uniquement dans les zones où vous lui donnez accès. Sa carte et sa catégorie, seules, n’ouvrent rien.</p>
-        <label class="block max-w-xl font-semibold">Événement
-          <select class="field mt-1" :value="eventId ?? ''" data-testid="choix-evenement" @change="chooseEvent"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
-        </label>
       </header>
 
       <section v-if="site" class="space-y-4 rounded-2xl border bg-white p-6" aria-labelledby="habilitations-site" data-testid="habilitations-site">
@@ -142,7 +139,14 @@ function when(v: string | null) { return v ? new Date(v).toLocaleString('fr-FR')
         </ul>
       </section>
 
-      <p v-if="!eventId" class="rounded-xl border bg-white p-5" data-testid="aucun-evenement">Aucun événement ordinaire : créez d’abord un événement et ses zones.</p>
+      <section class="space-y-3 rounded-2xl border bg-white p-6" aria-labelledby="acces-activite" data-testid="acces-activite">
+        <h2 id="acces-activite" class="text-heading font-bold">Accès liés à une activité</h2>
+        <p class="max-w-4xl text-slate-700">Pour une activité précise, choisissez les zones du site qu’elle ouvre au personnel permanent et pour quelle période.</p>
+        <label class="block max-w-xl font-semibold">Activité
+          <select class="field mt-1" :value="eventId ?? ''" data-testid="choix-evenement" @change="chooseEvent"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
+        </label>
+      </section>
+      <p v-if="!eventId" class="rounded-xl border bg-white p-5" data-testid="aucun-evenement">Aucune activité ordinaire : créez d’abord une activité.</p>
       <template v-else>
         <section class="space-y-4 rounded-2xl border bg-white p-6" aria-labelledby="etape-zones" data-testid="etape-zones">
           <h2 id="etape-zones" class="flex items-center gap-3 text-heading font-bold"><span class="grid size-10 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">1</span>Où peut-on entrer ?</h2>
