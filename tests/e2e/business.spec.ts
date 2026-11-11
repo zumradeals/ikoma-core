@@ -9,11 +9,11 @@ test('un administrateur crée une zone puis une catégorie qui l’utilise', asy
  await page.setViewportSize({ width: 820, height: 1180 });
  await loginWithSecondFactor(page, user.email, user.password, user.secret);
  await openZones(page);
- const zone = `Zone fictive recette ${Date.now()}`; const zoneForm = page.getByRole('form', { name: 'Créer une zone' });
- await zoneForm.getByLabel('Nom de la zone').fill(zone); await zoneForm.getByRole('button', { name: 'Créer la zone', exact: true }).click();
- await expect(page.getByRole('heading', { name: zone, exact: true })).toBeVisible(); await page.screenshot({ path: 'test-results/l2-zones.png', fullPage: true });
+ const zone = `Zone fictive recette ${Date.now()}`;
+ await page.getByTestId('nom-zone-site').fill(zone); await page.getByTestId('creer-zone-site').click();
+ await expect(page.getByTestId('zones-du-site').getByText(zone, { exact: true })).toBeVisible(); await page.screenshot({ path: 'test-results/l2-zones.png', fullPage: true });
  await page.goto('/administration/categories'); const category = `Catégorie fictive recette ${Date.now()}`; const form = page.getByRole('form', { name: 'Créer une catégorie' });
- await form.getByLabel('Nom de la catégorie').fill(category); await form.getByLabel(zone, { exact: true }).check(); await form.getByRole('button', { name: 'Créer la catégorie', exact: true }).click();
+ await form.getByLabel('Nom de la catégorie').fill(category); await form.getByLabel(zone).check(); await form.getByRole('button', { name: 'Créer la catégorie', exact: true }).click();
  await expect(page.getByText(category, { exact: true })).toBeVisible(); await page.reload();
  const card = page.locator('section').filter({ has: page.getByText(category, { exact: true }) }); await expect(card).toContainText(zone);
  await page.screenshot({ path: 'test-results/l2-categories.png', fullPage: true });

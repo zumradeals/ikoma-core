@@ -52,7 +52,7 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
     expect(await noHorizontalScroll(page)).toBe(true);
   }
   await openZones(page);
-  await expect(page).toHaveURL(/\/administration\/zones$/);
+  await expect(page).toHaveURL(/\/administration\/site$/);
   await expect(page.getByTestId('menu-site')).toHaveAttribute('aria-current', 'page');
   // Pages sorties du menu mais toujours atteignables : liste d'invités depuis Personnes, politique de conservation depuis Données.
   await expandMenu(page);
