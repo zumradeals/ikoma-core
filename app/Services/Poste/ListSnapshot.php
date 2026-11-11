@@ -14,7 +14,6 @@ final class ListSnapshot
 {
     /**
      * Zones du site réutilisées par l'activité d'une tablette : choisies par une catégorie ou par une habilitation de participant.
-     *
      */
     private function usedSiteZones(string $eventId): Builder
     {
