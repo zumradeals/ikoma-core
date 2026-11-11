@@ -921,6 +921,11 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Décisions : toute zone devient une zone du site que les activités réutilisent ; l'écran « Accès et zones » est fusionné dans « Site et accès » ; les recettes ne sont pas urgentes. Plan en quatre étapes : docs/ailct/V1-ZONES-DU-SITE.md (fusion par nom exact, politique la plus restrictive, migration non réversible).
 - Étape Z1 : schéma souple et lecteurs doubles ; aucun comportement existant ne change tant qu'une catégorie ne choisit pas de zone du site. Un poste ne juge pour une activité que les zones du site qu'elle réutilise.
 
+## Site et accès : zones du site comptées et créées sans événement ; inventaire des écrans liés à un événement
+- Bug signalé par le dirigeant : sur Site et accès, une zone créée dans l'onglet Zones (zone du site) s'affichait mais les compteurs restaient à 0, et « Ajouter une zone » du résumé renvoyait vers un écran qui demande un événement. Cause : le résumé, le titre de l'onglet, l'indicateur et la fiche du site ne comptaient que les zones **d'activité**.
+- Correctif : « Zones du site (N) » compte les zones permanentes ; le résumé les liste avec les postes qui les gardent ; « Ajouter une zone » crée une zone du site sans événement ; les zones d'activité sont comptées à part avec un lien « Gérer les zones des activités ». Aucun changement serveur.
+- Inventaire demandé en priorité : docs/ailct/V1-INVENTAIRE-ECRANS-EVENEMENT.md (verdict par écran, constat, deux corrections suivantes, deux décisions à prendre).
+
 ## Poste d'accueil, étapes 2 à 7 : maquettes approuvées et mises en œuvre (décision du dirigeant)
 - Le dirigeant a validé les maquettes proposées pour les étapes Fiche, Identité et photo, Décision, Badge, Remise et Entrée (« ok, implémente les maquettes »). Même parcours et mêmes règles métier : seule la présentation change.
 - **Panneau visiteur** (`VisitorPanel`) visible à chaque étape de la fiche à l'entrée : nom, catégorie, organisation, personne reçue, validité, photo (celle qui vient d'être prise, valable hors ligne, sinon le portrait lu en ligne, sinon « Photo non prise ») et badge associé à partir de l'étape badge. Tout vient de la fiche locale.
