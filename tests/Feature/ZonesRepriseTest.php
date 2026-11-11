@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -104,7 +105,7 @@ it('fusionne les zones de même nom, garde la politique la plus restrictive et r
         try {
             $owner->table('category_zone')->insert(['id' => (string) Str::uuid(), 'event_id' => $a, 'category_id' => $categories[$a], 'zone_id' => $other, ...$at]);
             $this->fail('Une zone d’une autre activité aurait dû être refusée.');
-        } catch (Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             expect($e->getMessage())->toContain('sa propre activité');
         }
         $owner->statement('ROLLBACK TO SAVEPOINT essai');
