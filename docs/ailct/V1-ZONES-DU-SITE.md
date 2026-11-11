@@ -75,3 +75,9 @@ Constat : `zones.event_id`, `checkpoint_zones` et `zone_policies` ne servent plu
 - **Z5c — Schéma.** Migration non réversible : suppression de `zones.event_id` (colonne, unicités composites, index et déclencheurs `ikoma_zone_of_event_or_site`), des tables `checkpoint_zones` et `zone_policies`, de leur présence dans `ikoma_reset_demo_business` ; critère de fin : plus aucune requête `zones` filtrée par événement dans `app/`, CI verte, recette sur le serveur d'essai.
 Risque principal : changer les jeux d'essai touche la plupart des ~50 fichiers de test qui amorcent `DemoSeeder` ; chaque PR est donc testée par la CI complète avant la suivante.
 
+## Z4c — liens des écrans vers les habilitations des participants (écrite)
+Dans la fiche d'une activité, « Habilitations des participants » ouvre l'écran déjà réglé sur cette activité (`/administration/acces?event=…`) ; dans Site et accès, « Ajouter une règle » devient « Associer une zone à un poste » (retour au registre des postes, où se règle la garde des zones) et le lien vers l'écran des participants est renommé de la même façon. Aucune règle métier ne change.
+
+## Décision proposée sur Z5 (à valider par le dirigeant)
+Z5 n'apporte **aucun changement visible** : c'est un nettoyage interne (colonne et tables devenues inutiles). Il coûte cher et comporte un risque réel : changer les jeux d'essai (`DemoSeeder`) et la quarantaine de tests qui en dépendent, sans pouvoir exécuter PHP en local. **Recommandation : suspendre Z5 jusqu'à la recette sur le serveur d'essai**, et ne le reprendre (Z5a, Z5b, Z5c ci-dessus) que si la recette confirme que le modèle « toute zone est une zone du site » convient.
+

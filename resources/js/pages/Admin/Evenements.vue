@@ -391,7 +391,7 @@ const n = (v: number | string | undefined) => Number(v ?? 0);
             <p class="flex flex-wrap gap-x-4 text-sm font-semibold">
               <Link v-if="can?.site" href="/administration/site" class="underline">Site et accès</Link>
               <Link v-if="can?.badges" href="/administration/badges" class="underline" data-testid="vers-badges">Badges et cartes</Link>
-              <Link v-if="can?.zones" href="/administration/acces" class="underline" data-testid="vers-acces">Accès des participants</Link>
+              <Link v-if="can?.zones" :href="`/administration/acces?event=${selected.event.id}`" class="underline" data-testid="vers-acces">Habilitations des participants</Link>
             </p>
           </section>
 

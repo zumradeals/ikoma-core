@@ -144,7 +144,7 @@ describe('Activités : fiche', () => {
     expect(w.get('[data-testid=panneau-acces]').text()).toContain('habilitations permanentes appartiennent au profil permanent');
     expect(w.get('[data-testid=eff-habilitations]').text()).toBe('2');
     expect(w.get('[data-testid=vers-badges]').attributes('href')).toBe('/administration/badges');
-    expect(w.get('[data-testid=vers-acces]').attributes('href')).toBe('/administration/acces');
+    expect(w.get('[data-testid=vers-acces]').attributes('href')).toBe('/administration/acces?event=e1');
   });
 
   it('masque les sections interdites : sans droit de liste, ni onglet participants ni journal', async () => {
