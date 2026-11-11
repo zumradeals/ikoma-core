@@ -44,9 +44,13 @@ it('numérote les cartes du site de façon continue, sans réutiliser un code re
     }
     $number = fn (string $code): int => (int) substr($code, 2);
     expect($number($codes[1]))->toBe($number($codes[0]) + 1);
-    DB::table('badges')->whereNull('event_id')->where('code', $codes[1])->delete();
+    // Un badge du site sans carte peut être supprimé : son code est retiré et ne revient jamais ; le badge d'une carte, lui, ne se supprime pas (clé étrangère).
+    $spare = app(BadgeLots::class)->issueSiteCard('Essai à supprimer', $this->admin);
+    expect($number($spare['code']))->toBe($number($codes[1]) + 1);
+    DB::table('badges')->where('id', $spare['id'])->delete();
     $third = app(BadgeLots::class)->issueSiteCard('Essai', $this->admin);
-    expect($number($third['code']))->toBe($number($codes[1]) + 1); // le code retiré n'est pas réutilisé
+    expect($number($third['code']))->toBe($number($spare['code']) + 1);
+    expect(fn () => DB::transaction(fn () => DB::table('badges')->where('code', $codes[0])->whereNull('event_id')->delete()))->toThrow(QueryException::class);
     expect(fn () => DB::table('badges')->insert(['id' => (string) Str::uuid7(), 'event_id' => null, 'code' => $codes[0], 'qr_token' => bin2hex(random_bytes(32)), 'status' => 'Disponible', 'created_at' => now(), 'updated_at' => now()]))->toThrow(QueryException::class);
 });
 
