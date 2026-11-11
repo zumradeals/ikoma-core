@@ -21,16 +21,15 @@ it('crée une zone du site sans événement, rattachée au site, et la liste dan
     $this->post('/administration/site/zones', ['name' => 'Hall principal fictif'])->assertSessionHasNoErrors();
     $zone = DB::table('zones')->where('name', 'Hall principal fictif')->first();
     expect($zone->event_id)->toBeNull()->and($zone->site_id)->toBe(DB::table('sites')->orderBy('created_at')->value('id'));
-    $this->get('/administration/site')->assertOk()->assertInertia(fn ($page) => $page->has('site_zones', 1)->where('site_zones.0.name', 'Hall principal fictif'));
+    $this->get('/administration/site')->assertOk()->assertInertia(fn ($page) => $page->where('site_zones', fn ($zones) => collect($zones)->pluck('name')->contains('Hall principal fictif')));
     expect(DB::table('audit_logs')->where('action', 'site.zone_creee')->count())->toBe(1);
 });
 
-it('refuse deux zones du site de même nom (casse ignorée) mais accepte le même nom dans une activité', function () {
+it('refuse deux zones du site de même nom (casse ignorée)', function () {
+    $before = DB::table('zones')->whereNull('event_id')->count();
     $this->post('/administration/site/zones', ['name' => 'Cour fictive'])->assertSessionHasNoErrors();
     $this->post('/administration/site/zones', ['name' => 'COUR fictive'])->assertSessionHasErrors('name');
-    $zoneOfActivity = DB::table('zones')->whereNotNull('event_id')->value('name');
-    $this->post('/administration/site/zones', ['name' => $zoneOfActivity])->assertSessionHasNoErrors();
-    expect(DB::table('zones')->whereNull('event_id')->count())->toBe(2);
+    expect(DB::table('zones')->whereNull('event_id')->count())->toBe($before + 1);
 });
 
 it('renomme une zone du site, jamais une zone d’activité', function () {
@@ -38,7 +37,8 @@ it('renomme une zone du site, jamais une zone d’activité', function () {
     $id = (string) DB::table('zones')->where('name', 'Parking fictif')->value('id');
     $this->put('/administration/site/zones/'.$id, ['name' => 'Parking visiteurs fictif'])->assertSessionHasNoErrors();
     expect(DB::table('zones')->where('id', $id)->value('name'))->toBe('Parking visiteurs fictif');
-    $activityZone = (string) DB::table('zones')->whereNotNull('event_id')->value('id');
+    $activityZone = (string) Str::uuid(); // ancienne zone propre à une activité (ancien chemin, avant son retrait)
+    DB::table('zones')->insert(['id' => $activityZone, 'event_id' => DemoSeeder::id('event'), 'name' => 'Zone propre fictive', 'created_at' => now(), 'updated_at' => now()]);
     $this->put('/administration/site/zones/'.$activityZone, ['name' => 'Autre nom'])->assertNotFound();
 });
 

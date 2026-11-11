@@ -28,7 +28,9 @@ it('charge un jeu fictif complet et idempotent', function () {
     $e = DemoSeeder::id('event');
     foreach (['events' => 1, 'zones' => 6, 'categories' => 4, 'hosts' => 3, 'visitors' => 300, 'badge_batches' => 1, 'badges' => 400, 'groups' => 1, 'group_members' => 40, 'devices' => 1] as $table => $count) {
         $query = DB::table($table);
-        if ($table === 'events') {
+        if ($table === 'zones') {
+            $query->whereIn('id', array_map(fn ($i) => DemoSeeder::id('zone'.$i), range(0, 5))); // zones du site de la démonstration
+        } elseif ($table === 'events') {
             $query->where('id', $e);
         } elseif ($table === 'group_members') {
             $query->where('group_id', DemoSeeder::id('group'));

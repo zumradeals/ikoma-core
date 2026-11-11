@@ -6,6 +6,7 @@ use App\Models\Badge;
 use App\Models\Device;
 use App\Models\Group;
 use App\Models\User;
+use App\Services\ActivityZones;
 use App\Services\BadgeLots;
 use App\Services\BadgeService;
 use App\Services\Groups;
@@ -40,7 +41,7 @@ class DeskFixtures extends Command
         DB::table('events')->insert(['id' => $event, 'name' => "Recette fictive du poste d’accueil {$s}", 'starts_at' => $now->copy()->subHour(), 'ends_at' => $now->copy()->addDays(2), 'created_at' => $now, 'updated_at' => $now]);
         $zones = [];
         foreach (['Hall d’accueil' => true, 'Salle principale' => false, 'Espace VIP' => false] as $name => $reception) {
-            DB::table('zones')->insert(['id' => $zones[$name] = (string) Str::uuid(), 'event_id' => $event, 'name' => $name, 'est_accueil' => $reception, 'created_at' => $now, 'updated_at' => $now]);
+            $zones[$name] = ActivityZones::siteZone($name, $reception);
         }
         $categories = [];
         foreach ([['VIP', '#C9962B', true, ['Hall d’accueil', 'Salle principale', 'Espace VIP']], ['Visiteur', '#0F5AA6', false, ['Hall d’accueil', 'Salle principale']], ['Stagiaire', '#1E9E5A', false, ['Hall d’accueil', 'Salle principale']]] as [$name, $color, $priority, $allowed]) {

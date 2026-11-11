@@ -88,10 +88,12 @@ final class ActivityRegistry
             ->map(fn (object $g): array => ['id' => $g->id, 'name' => $g->name, 'bus_number' => $g->bus_number, 'supervisor' => $g->supervisor, 'members' => (int) $g->members])->all();
 
         // Habilitations de participation EFFECTIVES par zone (ni retirées, ni suspendues, dans leur période, participation ouverte) : lecture du moteur d'activité seulement.
-        $zones = DB::table('zones as z')->leftJoin('participation_entitlements as pe', function ($j) use ($now): void {
-            $j->on('pe.zone_id', '=', 'z.id')->whereNull('pe.revoked_at')->whereNull('pe.suspended_at')->where('pe.valid_from', '<=', $now)->where('pe.valid_until', '>', $now)
+        // Les zones d'une activité sont celles du site qu'elle réutilise (catégories ou habilitations de ses participants) ; seules les habilitations de cette activité comptent.
+        $zones = DB::table('zones as z')->leftJoin('participation_entitlements as pe', function ($j) use ($now, $eventId): void {
+            $j->on('pe.zone_id', '=', 'z.id')->where('pe.event_id', $eventId)->whereNull('pe.revoked_at')->whereNull('pe.suspended_at')->where('pe.valid_from', '<=', $now)->where('pe.valid_until', '>', $now)
                 ->whereIn('pe.visitor_id', DB::table('visitors')->whereNull('closed_at')->whereNull('withdrawn_at')->select('id'));
-        })->where('z.event_id', $eventId)->groupBy('z.id', 'z.name')->orderBy('z.name')->get(['z.id', 'z.name', DB::raw('count(pe.id) AS habilitations')])
+        })->where(fn ($q) => $q->where('z.event_id', $eventId)->orWhereIn('z.id', DB::table('category_zone')->where('event_id', $eventId)->select('zone_id'))
+            ->orWhereIn('z.id', DB::table('participation_entitlements')->where('event_id', $eventId)->select('zone_id')))->groupBy('z.id', 'z.name')->orderBy('z.name')->get(['z.id', 'z.name', DB::raw('count(pe.id) AS habilitations')])
             ->map(fn (object $z): array => ['id' => $z->id, 'name' => $z->name, 'habilitations' => (int) $z->habilitations])->all();
         $badges = DB::table('badge_assignments')->where('event_id', $eventId)->selectRaw('count(*) FILTER (WHERE returned_at IS NULL AND cancelled_at IS NULL) AS attribues, count(*) FILTER (WHERE returned_at IS NOT NULL) AS restitues')->first();
         $vehicles = (int) DB::table('vehicles as ve')->join('visitors as v', 'v.id', '=', 've.visitor_id')->where('v.event_id', $eventId)->whereIn('ve.status', ['annonce', 'present'])->count();

@@ -38,6 +38,27 @@ final class ActivityZones
         DB::table('zones')->insert(['id' => (string) Str::uuid(), 'event_id' => null, 'site_id' => $site, 'name' => 'Accueil', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
     }
 
+    /**
+     * Retrouve (ou crée) une zone du site par son nom exact : les jeux d'essai réutilisent les mêmes zones d'un lancement à l'autre.
+     * Une zone d'accueil ne perd jamais ce statut ici.
+     */
+    public static function siteZone(string $name, bool $reception = false): string
+    {
+        $site = (string) DB::table('sites')->orderBy('created_at')->orderBy('id')->value('id');
+        $row = DB::table('zones')->whereNull('event_id')->where('site_id', $site)->where('name', $name)->first(['id', 'est_accueil']);
+        if ($row !== null) {
+            if ($reception && ! $row->est_accueil) {
+                DB::table('zones')->where('id', $row->id)->update(['est_accueil' => true, 'updated_at' => now()]);
+            }
+
+            return (string) $row->id;
+        }
+        $id = (string) Str::uuid();
+        DB::table('zones')->insert(['id' => $id, 'event_id' => null, 'site_id' => $site, 'name' => $name, 'est_accueil' => $reception, 'created_at' => now(), 'updated_at' => now()]);
+
+        return $id;
+    }
+
     public static function allows(string $eventId, string $zoneId): bool
     {
         return self::query($eventId)->where('id', $zoneId)->exists();

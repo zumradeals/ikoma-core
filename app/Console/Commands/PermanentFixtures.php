@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Device;
 use App\Models\User;
+use App\Services\ActivityZones;
 use App\Services\CardLifecycle;
 use App\Services\HolderCards;
 use App\Services\HolderEntitlements;
@@ -46,8 +47,7 @@ class PermanentFixtures extends Command
         // Événement volontairement ANCIEN : les écrans qui choisissent par défaut l'événement le plus récent gardent celui des autres recettes.
         $event = (string) Str::uuid();
         DB::table('events')->insert(['id' => $event, 'name' => "Recette titulaires permanents {$s}", 'starts_at' => $now->copy()->subDays(30), 'ends_at' => $now->copy()->addDays(2), 'created_at' => $now, 'updated_at' => $now]);
-        $hall = (string) Str::uuid();
-        DB::table('zones')->insert(['id' => $hall, 'event_id' => $event, 'name' => "Hall titulaires {$s}", 'est_accueil' => true, 'created_at' => $now, 'updated_at' => $now]);
+        $hall = ActivityZones::siteZone("Hall titulaires {$s}", true);
         $holders = app(HolderEntitlements::class);
         $holders->savePolicy($event, $hall, 'NEUTRE-TEST', true, true, $admin);
         $device = (string) Str::uuid();

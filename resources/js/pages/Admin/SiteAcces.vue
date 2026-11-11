@@ -218,7 +218,7 @@ function toggleCreate(capability: string, on: boolean) {
 
           <!-- Règles d'accès -->
           <section class="site-card" aria-labelledby="regles-resume-titre" data-testid="resume-regles">
-            <header class="site-card-head"><h2 id="regles-resume-titre"><AdminIcon name="shield" :size="22" />Règles d’accès ({{ rules.length }})</h2><Link href="/administration/acces" class="site-btn site-btn-blue" data-testid="ajouter-regle"><AdminIcon name="plus" :size="16" />Ajouter une règle</Link></header>
+            <header class="site-card-head"><h2 id="regles-resume-titre"><AdminIcon name="shield" :size="22" />Règles d’accès ({{ rules.length }})</h2><button type="button" class="site-btn site-btn-blue" data-testid="ajouter-regle" @click="tab = 'postes'"><AdminIcon name="plus" :size="16" />Associer une zone à un poste</button></header>
             <p v-if="!rules.length" class="p-4" data-testid="aucune-regle-resume">Aucune règle poste–zone : sans correspondance, un poste ne refuse pas pour une zone.</p>
             <ul v-else class="divide-y">
               <li v-for="r in rules.slice(0, PREVIEW)" :key="r.mapping_id" class="flex items-center justify-between gap-3 px-4 py-2.5" :data-testid="'regle-resume-' + r.mapping_id">
@@ -276,7 +276,7 @@ function toggleCreate(capability: string, on: boolean) {
 
       <!-- Règles d'accès : uniquement les règles réellement configurées -->
       <section v-else-if="tab === 'regles'" id="panneau-regles" role="tabpanel" aria-labelledby="tab-regles" class="admin-card space-y-3" data-testid="panneau-regles">
-        <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-heading font-bold">Règles d’accès par poste</h2><Link href="/administration/acces" class="btn-soft" data-testid="gerer-acces">Accès des participants</Link></div>
+        <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-heading font-bold">Règles d’accès par poste</h2><Link href="/administration/acces" class="btn-soft" data-testid="gerer-acces">Habilitations des participants</Link></div>
         <p class="text-slate-700">Ce que chaque poste est autorisé à faire et les zones qu’il juge. Rien n’est autorisé par défaut : un poste sans opération refuse.</p>
         <p v-if="!checkpoints.length" data-testid="aucune-regle">Aucun poste n’est configuré.</p>
         <ul v-else class="divide-y">

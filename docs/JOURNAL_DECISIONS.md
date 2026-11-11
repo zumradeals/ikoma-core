@@ -951,3 +951,10 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Zones du site : étape Z4b, un poste, un seul endroit pour ses zones
 - Les zones gardées par un poste se règlent uniquement dans Site et accès ; les anciennes correspondances sur des zones devenues zones du site sont reprises (migration non réversible).
 - « Accès aux zones » devient « Habilitations des participants » ; dans « Habilitations par zone », le choix de l'activité n'apparaît plus qu'après la section du site.
+
+## Zones du site : étape Z4c et recommandation sur Z5
+- Liens des écrans alignés (fiche d'activité vers les habilitations des participants de cette activité ; Site et accès : « Associer une zone à un poste »).
+- Z5 (retrait de `zones.event_id`, `checkpoint_zones`, `zone_policies`) : plan écrit, exécution suspendue jusqu'à la recette (aucun gain visible, risque sur les jeux d'essai et ~50 fichiers de test).
+
+## Zones du site : Z5a, jeux d'essai en zones du site
+- Décision du dirigeant : les recettes peuvent attendre, Z5 est exécuté. Z5a : jeux d'essai et fixtures créent des zones du site (réutilisées par nom) ; Z5b (retrait du code de l'ancien chemin) et Z5c (suppression de la colonne et des tables) suivent.

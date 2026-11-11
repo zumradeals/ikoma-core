@@ -172,7 +172,7 @@ it('règle la politique d’une zone du site : ouverte, hors ligne seulement si 
     expect((bool) $policy->permanent_allowed)->toBeTrue()->and((bool) $policy->offline_entry_allowed)->toBeTrue();
     $this->put('/administration/habilitations/site/zones/'.$this->siteZone, ['permanent_allowed' => false, 'offline_entry_allowed' => true])->assertSessionHasErrors('offline');
     expect(fn () => app(SiteEntitlements::class)->savePolicy((string) $this->activityZone, true, false, $this->admin))->toThrow(ValidationException::class);
-    $this->get('/administration/habilitations')->assertOk()->assertInertia(fn ($p) => $p->where('site.zones.0.permanent_allowed', true)->where('site.zones.0.offline_entry_allowed', true));
+    $this->get('/administration/habilitations')->assertOk()->assertInertia(fn ($p) => $p->where('site.zones', fn ($zones) => collect($zones)->firstWhere('id', $this->siteZone)['permanent_allowed'] === true && collect($zones)->firstWhere('id', $this->siteZone)['offline_entry_allowed'] === true));
     expect(DB::table('audit_logs')->where('action', 'zone_site.politique_modifiee')->count())->toBe(1);
 });
 

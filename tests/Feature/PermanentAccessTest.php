@@ -389,7 +389,7 @@ it('affiche les cartes, habilitations, politiques, décisions et l’état de co
     pxGrant($holder, $this->event, $this->zone);
     pxControl($token)->assertJson(['valid' => true]);
     $this->actingAs($admin)->get('/administration/habilitations?event='.$this->event)->assertOk()->assertInertia(fn ($p) => $p->component('Admin/Habilitations')
-        ->where('eventId', $this->event)->has('zones', 1)->where('zones.0.permanent_allowed', true)->has('entitlements', 1)->where('entitlements.0.identifier', DB::table('permanent_holders')->where('id', $holder)->value('identifier'))
+        ->where('eventId', $this->event)->where('zones', fn ($zones) => collect($zones)->firstWhere('id', $this->zone)['permanent_allowed'] === true)->has('entitlements', 1)->where('entitlements.0.identifier', DB::table('permanent_holders')->where('id', $holder)->value('identifier'))
         ->has('decisions', 1)->where('decisions.0.type', 'entree')->where('trust.effective', 0)->where('devices.0.state', 'aucune_confiance'));
     app(PermanentAccess::class)->saveOfflineTrust(30, true, $admin);
     DB::table('devices')->where('id', $this->device)->update(['last_synced_at' => now()->subMinutes(10)]);

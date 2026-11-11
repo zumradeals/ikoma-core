@@ -38,8 +38,16 @@ final class DemoCleanup
                     throw new RuntimeException('Événement de démonstration modifié : suppression refusée.');
                 }
 
+                // Les zones de la démonstration sont des zones du site (identifiants fixes), plus des zones propres à l'activité.
+                $demoZones = array_map($id, array_map(static fn ($i) => 'zone'.$i, range(0, 5)));
+                $actualZones = DB::table('zones')->whereIn('id', $demoZones)->where(static fn ($q) => $q->whereNull('event_id')->orWhere('event_id', $eventId))->pluck('id')->all();
+                sort($actualZones);
+                $sortedZones = $demoZones;
+                sort($sortedZones);
+                if ($actualZones !== $sortedZones) {
+                    throw new RuntimeException('La composition du jeu de démonstration a été modifiée : nettoyage automatique refusé.');
+                }
                 $expected = [
-                    'zones' => array_map($id, array_map(static fn ($i) => 'zone'.$i, range(0, 5))),
                     'categories' => array_map($id, array_map(static fn ($i) => 'category'.$i, range(0, 3))),
                     'hosts' => array_map($id, array_map(static fn ($i) => 'host'.$i, range(0, 2))),
                     'devices' => [$id('device')],
@@ -146,6 +154,17 @@ final class DemoCleanup
                 DB::table('category_zone')->where('event_id', $eventId)->delete();
                 DB::table('categories')->where('event_id', $eventId)->delete();
                 DB::table('zones')->where('event_id', $eventId)->delete();
+                // Zones du site de la démonstration : retirées seulement si plus rien ne s'y rattache (jamais une zone utilisée ailleurs).
+                $unused = DB::table('zones')->whereIn('id', array_map($id, array_map(static fn ($i) => 'zone'.$i, range(0, 5))))
+                    ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('category_zone')->whereColumn('category_zone.zone_id', 'zones.id'))
+                    ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('checkpoint_zones')->whereColumn('checkpoint_zones.zone_id', 'zones.id'))
+                    ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('checkpoint_site_zones')->whereColumn('checkpoint_site_zones.zone_id', 'zones.id'))
+                    ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('participation_entitlements')->whereColumn('participation_entitlements.zone_id', 'zones.id'))
+                    ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('holder_entitlements')->whereColumn('holder_entitlements.zone_id', 'zones.id'))
+                    ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('holder_site_entitlements')->whereColumn('holder_site_entitlements.zone_id', 'zones.id'))
+                    ->pluck('id')->all();
+                DB::table('site_zone_policies')->whereIn('zone_id', $unused)->delete();
+                DB::table('zones')->whereIn('id', $unused)->delete();
                 DB::table('events')->where('id', $eventId)->delete();
             }
 
