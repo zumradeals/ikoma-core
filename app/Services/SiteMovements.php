@@ -22,6 +22,12 @@ final class SiteMovements
 
     public function __construct(private readonly Audit $audit) {}
 
+    /** Heure avec microsecondes : sans elles, une entrée et une sortie de la même seconde seraient à égalité et l'ordre dépendrait de l'identifiant. */
+    private static function stamp(Carbon $at): string
+    {
+        return $at->copy()->utc()->format('Y-m-d H:i:s.uP');
+    }
+
     /**
      * Enregistre un mouvement du site pour un titulaire (ou un contrôle sur une carte inconnue si `$holderId` est null).
      *
@@ -45,9 +51,9 @@ final class SiteMovements
                 $identifier = $holder->identifier;
             }
             $id = (string) Str::uuid();
-            $now = now();
+            $now = self::stamp(now());
             DB::table('access_events')->insert(['id' => $id, 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => $holderId, 'actor_id' => $actor?->id, 'type' => $type, 'checkpoint' => $point,
-                'occurred_at' => $at ?? $now, 'details' => $details === [] ? null : json_encode($details, JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
+                'occurred_at' => $at === null ? $now : self::stamp($at), 'details' => $details === [] ? null : json_encode($details, JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
             if ($type === 'entree') {
                 $this->audit->append('entree.site', $actor?->id, ['access_event_id' => $id, 'holder_id' => $holderId, 'identifiant' => $identifier, 'point' => $point]);
             }
@@ -108,7 +114,7 @@ final class SiteMovements
                     throw new DeskRefused('deja_corrige', 'Ce mouvement a déjà été corrigé.', 409);
                 }
                 $id = (string) Str::uuid();
-                $now = now();
+                $now = self::stamp(now());
                 DB::table('access_events')->insert(['id' => $id, 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => $movement->holder_id, 'actor_id' => $actor->id, 'type' => 'correction', 'checkpoint' => null,
                     'occurred_at' => $now, 'corrige_id' => $movement->id, 'details' => json_encode(['motif' => mb_substr($reason, 0, 500), 'corrige_type' => $movement->type], JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
                 $this->audit->append('presence_site.corrigee', $actor->id, ['access_event_id' => $movement->id, 'correction_id' => $id, 'holder_id' => $movement->holder_id, 'type_corrige' => $movement->type]);

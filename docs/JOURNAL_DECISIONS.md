@@ -868,3 +868,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Refactor sans changement de comportement dans `PermanentAccess` : refus de carte (`cardRefusal`) et évaluation des habilitations (`evaluate`) partagés entre `decide` (activité) et `decideSite`.
 - Sortie : si la personne est présente sur le site, la sortie est écrite dans le journal du site, sans condition d'habilitation ; sinon la sortie d'activité s'applique.
 - Écarts assumés : pas d'alerte du site (les refus restent des alertes d'activité tant que la tablette a une activité), rejeu hors ligne inchangé (lot 4b).
+
+## Mouvements du site : heures avec microsecondes
+- Constat (CI du lot 4a) : Laravel écrit les dates au format `Y-m-d H:i:s` (à la seconde). Une entrée et une sortie de la même seconde étaient à égalité et la présence dépendait de l'identifiant tiré au hasard (test intermittent).
+- Décision : `SiteMovements` enregistre `occurred_at`/`created_at` avec microsecondes (ordre déterministe).
+- Point de vigilance, non modifié ici : le journal d'activité (`Presence`, contrôle des visiteurs) a la même limite à la seconde ; à traiter dans un lot dédié si le terrain montre des passages à la même seconde.
