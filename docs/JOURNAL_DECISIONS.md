@@ -31,7 +31,6 @@
 - Journal : empreinte SHA-256 canonique incluant aussi l’identifiant de ligne, verrou transactionnel PostgreSQL pour sérialiser les ajouts, acteur conservé par UUID, aucun mot de passe ou secret TOTP journalisé. Le compte applicatif ne possède pas les tables et reçoit SELECT/INSERT seulement sur audit_logs. Le compte de migration distinct reste privilégié. Le chaînage détecte une altération isolée ; un administrateur de base capable de réécrire toute la chaîne reste hors de cette garantie, sans ancrage externe.
 - Correctif PWA : révision de / calculée automatiquement à partir des sources du build ; aucun contenu authentifié ni écran d’administration mis en cache. Un test reconstruit deux contenus et vérifie la mise à jour puis la réouverture hors ligne.
 
-
 ## L2 — modèle métier et administration de base, 27 octobre 2026
 
 - Départ de main après fusion de L0/L1. Source : `docs/reference/Mode_de_fonctionnement_verification_visiteurs.pdf`, sections 4, 7 et 8 ; schéma documenté dans `docs/schema.md`.
@@ -43,7 +42,6 @@
 - Zones et catégories : audit atomique avec identifiant/événement et liste des champs modifiés, sans copie des valeurs inutiles. Badges en lecture seule, QR jamais exposé.
 - Le test historique FoundationTest L1 est conservé à l’identique dans un schéma L1 isolé ; la suite L2 vérifie le schéma complet et les privilèges réels. Le temps de migrate-fresh-seed est mesuré en CI, avec sortie des mots de passe fictifs gardée privée.
 - Questions non arbitrées : permission d’administration des événements ; éventuelles exceptions de zones individuelles ; réutilisation/usage unique et Clos ; vocabulaire des statuts visiteurs/événements/imports ; contrôle des stagiaires. Aucun droit ni parcours supplémentaire créé.
-
 
 ## Décisions du dirigeant, 27 octobre 2026
 
@@ -330,20 +328,17 @@ Mission et deux maquettes validées par le dirigeant : un administrateur, un esp
 - Cadre et styles limités à l'administration. Menu orange avec texte marine contrasté ; cibles tactiles agrandies ; défilement horizontal limité à la table des comptes. Aucun ajout de dépendance, migration, mécanisme hors ligne ou nouvelle fonctionnalité.
 - Contrat, écarts intentionnels, recette et limites de déploiement : `docs/refonte-administration/README.md`. Le lot reste à revoir avant toute fusion.
 
-
 ## PR #26 — recette de la refonte administrative (29 octobre 2026)
 
 - Les deux scénarios navigateur qui échouaient avant le formulaire TOTP ont désormais une gestion limitée et explicite des refus temporaires de connexion : un seul nouvel essai après le délai du serveur. Les limites de connexion, le TOTP et les rôles de l'application restent inchangés. Les tests complets doivent être relancés.
 - L'observation ZAP 10112 de niveau informatif est acceptée uniquement pour `laravel-session` et `XSRF-TOKEN` sur la racine, avec la preuve exacte du nom du cookie ; les propriétés de sécurité des cookies restent surveillées et toutes les autres instances bloquent.
 - Trivy reste actif et bloquant dans la CI. Le risque résiduel du lot L12 avait été accepté provisoirement ; toute nouvelle faille ou évolution de correctif demande un réexamen avant le déploiement chez le client.
 
-
 ### PR #26 — diagnostic de la CI #143
 
 La CI #143 présente 36 parcours navigateurs réussis et un refus de connexion sur le compte fictif du scénario Zones/Catégories. La réponse HTTP 302 revient à `/login` sans atteindre le formulaire TOTP. La cause précise de cette redirection n'est pas encore établie : elle ne doit pas être qualifiée de régression métier sans preuve.
 
 La commande `test:screen-account`, strictement réservée à `APP_ENV=testing`, utilise désormais un mot de passe aléatoire long à encodage simple et vérifie côté serveur le hachage, l'authentification des identifiants et le rôle avant de transmettre les données à Playwright. Les diagnostics E2E peuvent afficher la route de redirection et la présence d'une erreur de formulaire, jamais les identifiants, le mot de passe ou le secret TOTP. Les contrôles de sécurité de l'application sont inchangés. Une nouvelle CI est obligatoire pour confirmer la correction.
-
 
 ### PR #26 — CI #144 : preuve de la redirection normale du login
 
@@ -357,11 +352,9 @@ GO du dirigeant après présentation des maquettes ordinateur, tablette et tél�
 
 GO écrit du dirigeant pour une branche et une PR dédiées depuis main après fusion de la PR #27. Cadre Agent commun et modernisation de Mon espace, accueil, groupes, contrôle et sécurité, sans modification des moteurs. Priorité du code métier sur la maquette : scan/association à l’étape 5, remise à l’étape 6, photographie de pièce selon `identite_piece_active`, aucun portrait/stock/zone inventé. Contrat et limites : `docs/refonte-agent/README.md`. Captures réelles demandées avant validation ; aucune fusion ou déploiement automatique.
 
-
 ## 29 octobre 2026 — Atelier de badges professionnels IKOMA ACCESS
 
 Mission écrite du dirigeant : trois modèles distincts, aperçu fidèle, PVC CR80 et planches A4, PR en brouillon uniquement. Le moteur BadgeLots / BadgeService / QrSvg et l’impression d’étiquettes historique sont préservés. Une vue Blade et une feuille CSS communes servent l’aperçu et l’impression ; aucun second encodeur QR. Les dimensions sont exprimées en millimètres et les grilles A4 impossibles sont refusées plutôt que réduites. Les options visuelles sont conservées dans settings, par événement et par clé (compatibles avec sa colonne value de 255 caractères). L’atelier ne lit aucune association ni fiche titulaire. Le logo IKOMA ACCESS fourni est le seul logo de cette livraison ; l’import d’identités client n’est pas ajouté. Le mode nominatif facultatif reste hors implémentation et non activable ; un contrat de confidentialité et de permissions distinct est nécessaire. Les actions d’enregistrement et de préparation d’impression sont auditées sans jeton ; aucune confirmation matérielle de tirage ne peut être déduite du navigateur. Guide et réserves : docs/ATELIER_BADGES.md. Aucune fusion ni déploiement autorisé.
-
 
 ## 29 octobre 2026 — Complément validé : fiches manuelles, portraits et badges nominatifs
 
@@ -374,7 +367,6 @@ La préparation nominative explicite inscrit une destination immuable printed_fo
 ## L33 — Contrats de cycle de vie (30 octobre 2026)
 
 Mission du dirigeant : actions administratives, archivage et centre de gestion. Voir LOT33_CONTRATS.md : réutiliser les états existants, préserver les permissions du superviseur, refuser une clôture tant que des tablettes pourraient encore détenir des opérations locales, conserver les traces et séparer web/maintenance privilégiée. Aucun nouveau composant externe.
-
 
 ## ACCESS-FOUNDATION-001 — Socle fondateur ratifié (31 octobre 2026)
 
@@ -444,7 +436,6 @@ déploiement ou donnée client n'est utilisé. R03–R05 restent un
 La PR R01–R02 reste non fusionnée ; gel des nouvelles mises en service
 commerciales avec données réelles maintenu.
 
-
 ## R05 — Correction ciblée de Symfony Mime (31 octobre 2026)
 
 Le dirigeant autorise ce lot séparé après validation R01–R02. Composer résout
@@ -454,7 +445,6 @@ verrou sont expliquées dans [le rapport R05](security/S0.2-R05-SYMFONY-MIME.md)
 Les tests portent sur les noms MIME invalides et la sérialisation valide, sans
 envoi de courriel. Les alertes système restent visibles et bloquantes ; aucune
 fusion de remédiation, livraison ou intervention serveur n'est autorisée.
-
 
 ## A03 — Identité institutionnelle configurable (2 novembre 2026)
 
@@ -471,7 +461,6 @@ Sans nom enregistré, l'identité IKOMA ACCESS standard est affichée, à l'iden
   Ces deux ressources publiques ne renvoient aucun cookie (même risque de course que la correction du précache).
 - Limites assumées : le manifeste PWA (nom d'installation) et les badges imprimés (lot A05) ne suivent pas encore l'identité ;
   la page d'accueil précachée peut afficher l'ancienne identité jusqu'à la mise à jour du service worker.
-
 
 ## A04 — Registre des titulaires permanents (2 novembre 2026)
 
@@ -548,7 +537,6 @@ Premier des six lots de la refonte des identités, badges et cartes (R1 à R6, v
 - **Motif (DC-3) :** obligatoire à chaque nouvelle génération d'un badge nominatif déjà tiré (confirmé ou non), facultatif mais journalisé pour un badge anonyme. Le motif libre reste dans le registre, jamais dans le journal d'audit.
 - Les cartes permanentes (R5b), les habilitations et le contrôle d'accès ne sont pas modifiés.
 
-
 ## Cartes — Lisibilité de l’aperçu et des textes (2 novembre 2026)
 
 Demande du dirigeant après examen de l’aperçu et d’un tirage PDF A4 : agrandir la lecture à l’écran et améliorer la mise en page, en conservant le CR80 portrait. Aucun contrat métier, aucune donnée ni migration modifiés.
@@ -560,7 +548,6 @@ Demande du dirigeant après examen de l’aperçu et d’un tirage PDF A4 : agra
 
 - Correctif de recette (CI 41506111524) : un seul échec navigateur, au contrôle de débordement du cadre `.hc` ; 49 parcours réussis, production et analyses de sécurité réussies. Le retrait horizontal du cadre est déplacé sur les blocs de texte (`largeur = largeur carte - 6 mm`) : les bandes pleine largeur n’étendent plus le contenu défilable dans le retrait droit du cadre flex. Les retraits visuels de 3 mm et les dimensions physiques sont conservés ; le contrôle de débordement reste actif. Les assertions de recette affichent désormais les mesures de chaque axe en cas d’échec.
 
-
 ## Accès permanents — les habilitations seules décident (2 novembre 2026)
 
 Constat de recette sur tablette : une carte active avec une habilitation en cours était refusée (« Engagement non commencé ») parce que la fiche portait un début d'engagement futur. Deux jeux de dates se contredisaient.
@@ -571,11 +558,9 @@ Constat de recette sur tablette : une carte active avec une habilitation en cour
 - **Conséquence à connaître :** une personne dont la fin d'engagement est passée garde son accès tant que ses habilitations courent et qu'elle n'est pas clôturée ; la fin d'une habilitation ou la clôture du titulaire reste le moyen de couper l'accès.
 - **Non fait :** proposer par défaut aux nouvelles habilitations les dates d'engagement de la personne.
 
-
 ## Poste d'accueil — bandeau de réinitialisation retiré de l'écran de travail (2 novembre 2026)
 
 Demande du dirigeant : le bandeau blanc « Réinitialiser ce navigateur et changer de poste » en haut de l'écran de travail n'est pas professionnel. Il est retiré de l'écran ouvert. La réinitialisation locale reste disponible depuis l'écran verrouillé (« Ancien poste ? Réinitialiser ce navigateur pour le réenrôler »), qui est le chemin documenté (RESET_POSTE_CAMERA.md). Aucune règle ni donnée modifiée.
-
 
 ## S03/S04 — Personnes, activités et participations (novembre 2026)
 
@@ -614,7 +599,6 @@ Lot de sécurité ciblé, issu de la qualification S01 (aucun remodelage du doma
 - **Revue architecturale de la PR (C3) — tablettes partagées :** la preuve d'auteur initial reste la combinaison coffre chiffré (PIN de l'agent) + session authentifiée + vérification serveur `agent_id` = session ; elle n'est pas cryptographique. En conséquence, au lieu d'inventer un mécanisme fragile, tout changement d'agent comportant des opérations en attente est INTERDIT : le coffre reste fermé et intact (`operations_en_attente_autre_agent`), l'envoi est impossible sous un autre compte (403 `auteur_incoherent`, rien de consommé), un nouvel enrôlement par-dessus est refusé (`operations_en_attente`), et un renvoi sous un autre auteur d'une opération déjà enregistrée est refusé (`operation_conflit`). Sans opération en attente, l'effacement existant pour changement de compte est conservé. Risque résiduel : la réinitialisation manuelle du navigateur reste possible (confirmation avec décompte) ; elle ne peut pas être déclarée au serveur coffre fermé.
 - **Décisions bloquantes :** voir le rapport S02 (typage obligatoire des postes avant mise en service, chemin superviseur de la clôture VIP, alertes consultables par l'administrateur).
 
-
 ## S02 — revue d'architecture, deuxième passe (novembre 2026)
 
 Décisions de l'architecte appliquées sans modifier les protections CI.
@@ -626,7 +610,6 @@ Décisions de l'architecte appliquées sans modifier les protections CI.
 - **Clôture VIP :** parcours du superviseur NON implémenté (lot ultérieur) ; cas bloqués identifiés et figés par un test (voir MATRICE_DROITS).
 - **Trivy (job production, images finales) :** voir le rapport de la PR ; aucune exception ajoutée, aucune protection modifiée.
 - **Points à valider :** (a) le délai hors ligne s'applique désormais aux décisions d'accès à chaque décision et son approbation est explicite ; (b) point de contrôle des tablettes de l'hôtel ; (c) les fixtures de recette approuvent un délai fictif pour que les parcours hors ligne de recette continuent de fonctionner (jamais en production).
-
 
 ## S02 — revue d'architecture, troisième passe (novembre 2026)
 
@@ -720,7 +703,6 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **Plusieurs tablettes par poste** ; l'affectation d'une tablette est historisée ; aucune contrainte « une seule tablette active par poste ».
 - PR 1 : socle additif (site, postes, affectations, relation poste–zone portée par le poste, configuration en données), écran « Site et accès », tests de caractérisation. Le moteur de contrôle, la présence, les activités, les badges et la navigation en sept entrées relèvent des PR 2 à 5.
 
-
 ## V1 — PR 1 : correction de l'interface « Site et accès » (après examen des captures de la PR #102)
 - **Sept menus à plat** : l'ancien menu à rubriques dépliantes est remplacé par les sept menus validés (Tableau de bord, Site et accès, Personnes et habilitations, Activités, Badges et cartes, Opérations, Administration). Aucune page n'est supprimée : les pages d'un même menu s'affichent en sous-menus (onglets sous le titre) ; chaque menu mène à sa première page permise à l'utilisateur et n'apparaît que s'il en garde une. Identifiants de test : `menu-<menu>` et `sous-menu-<page>`.
 - **Site et accès** : vue synthétique (indicateurs réels, registre des postes avec opérations, tablettes, zones et état) ; la configuration détaillée d'un poste ne s'ouvre qu'à la sélection. Sections Zones, Tablettes, Règles d'accès (uniquement les règles réellement configurées : opérations, sens obligatoire, zones jugées) et Paramètres (nom du site, historique). Aucun plan, aucune donnée ni règle ajoutée pour imiter la maquette ; la colonne « rôle sur le site » (Entrée / Sortie / Intérieur) n'existe pas dans le modèle de la PR 1 et n'est donc pas affichée.
@@ -783,6 +765,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Correctif de déploiement — permissions de rôle après mise à jour
 - **Constat** : les rôles ne sont synchronisés qu'à l'installation (`Installation` / `RoleSeeder`). Une instance déjà installée ne reçoit pas les permissions ajoutées ensuite à `config/roles.php` : l'administrateur n'avait pas `pilotage.consulter`, d'où un accès refusé à Opérations › Supervision (le menu retombait sur l'ancienne page « Postes et tablettes »).
 - **Décision** : migration additive `sync_missing_role_permissions` : ajoute aux rôles EXISTANTS les permissions manquantes de la configuration ; ne retire rien, ne crée aucun rôle. Elle s'exécute à chaque déploiement (`migrate`).
+
 ## V1 — Badges et cartes : convergence finale de l'interface
 - **Écran d'arrivée** : `/administration/badges` ouvre l'espace de travail à trois colonnes (registre commun · préparer un badge · aperçu). L'ancien atelier de lots et de réservations n'est plus la page d'arrivée : il reste consultable, inchangé, sur `/administration/badges/lots` (lien « Lots et réservations (stock existant) »). Les anciennes adresses de filtrage (`?status=`, `?batch=`, `?reserved=`) redirigent vers cette page ; `/administration/badges/preparer` (fiches d'activité) ouvre le même espace avec la présélection.
 - **Aucun moteur ajouté** : le registre est une lecture (`SupportRegistry`) qui dérive type, titulaire et état des tables existantes ; la préparation appelle `BadgeIssuance` (idempotence par opération) ; l'impression et la réimpression appellent `SupportPrinting` ; les modèles viennent de `CardModels`. Seul ajout serveur : `POST /administration/badges/impression/donnees`, aperçu en données du même composeur que l'impression (aucun tirage créé).
@@ -802,6 +785,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **Décision** : le tableau de bord est UNE vue en lecture seule, calquée sur la maquette : sept indicateurs, activité des accès (24 h, barres entrées/sorties), mouvements récents, état du site, activités en cours, visites et véhicules, badges et cartes, accès rapides, alertes et actions. L'ancienne préparation pas à pas n'est plus affichée (chaque fonction a son menu).
 - **Données ajoutées à `AdminOverview`** (lecture seule) : titulaires actifs, accès par heure (déjà calculés par `OperationsOverview`), véhicules présents, dernière synchronisation des appareils, refus récents parmi les mouvements.
 - **Écarts assumés** : « (jour) » devient « (24 h) » (fenêtre réelle de calcul) ; pas de photo sur les mouvements (initiales) ; sélecteurs de date et de périmètre affichés en lecture seule (périmètre fixe : tout le site) ; « En ligne » remplacé par « Synchronisés » (preuve = dernière synchronisation) ; ligne « Mode hors ligne » omise (aucune donnée serveur fiable).
+
 ## V1 — Badges et cartes : suppression des anciennes routes sans usage (installation de test, décision du dirigeant)
 - **Audit** : chaque route de `badges`, `atelier`, `titulaires` et `modeles` a été rapprochée de ses usages (écrans, redirections serveur, tests). Sont supprimées celles qu'aucun écran n'appelle : `atelier/parcours` (+ contrôleur et page orphelins), `badges/modeles` (GET, `apercu`, `personnes`, `preparer`, PUT, `imprimer` : doublons de `atelier/*`), `badges/etiquettes`, `badges/preparer` (page ; ses sous-routes JSON restent), `badges/impression/apercu` (remplacée par `impression/donnees`), `atelier/cartes` (impression des cartes : registre + `impression`), `titulaires/modeles` (GET, redirection) ; code mort retiré : `AtelierParcoursController`, `BadgeLabelsController`, `AtelierCartesController`, `HolderCardsController::models`, pages `AtelierParcours` et `PersonnalisationCartes`.
 - **Conservé** : lots, réservations, mise à disposition, étiquettes et atelier par lots (le stock sert encore à l'accueil des visiteurs non annoncés) ; cycle de vie des cartes (remettre, révoquer, remplacer) ; suivi des tirages ; routes `titulaires/modeles/{code}` et PUT de réglage.
@@ -853,6 +837,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Présence du site = personnel permanent seulement ; visiteurs comptés par activité.
 - Conservation des mouvements du site : durée des mouvements d'activité, réglage dans l'écran Administration ; pas de suppression automatique sans réglage.
 - Présence par contexte jusqu'au lot 6 (fusion par identité à la reprise).
+
 ## deploy.sh : plus de 502 après une reconstruction
 - Constat : après un redéploiement, le conteneur nginx de la pile gardait l'ancienne adresse interne de PHP (502) et le test HTTPS final, lancé trop tôt, faisait échouer le script.
 - Décision : `deploy.sh` redémarre le service nginx de la pile après le démarrage, puis réessaie le test HTTPS pendant 30 secondes au plus. Le test reste strict (pas de `curl -k`) et la configuration TLS existante n'est toujours pas touchée.
@@ -902,9 +887,11 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Dette : écrans de correction (décision technique)
 - Décision : un droit dédié `mouvements.corriger` plutôt que de réutiliser `litiges.decider` (nom trompeur) ; attribué au seul superviseur, comme les autres actes de décision sur le journal. L'administrateur configure et consulte, il ne réécrit pas la présence. À confirmer avec le dirigeant si l'administrateur doit aussi pouvoir corriger.
 - Une correction est toujours un nouvel événement avec motif, jamais une modification (journal en ajout seul).
+
 ## Dette : conservation des mouvements du site
 - Décision (dirigeant, lot 3) appliquée : pas de nouveau réglage ; la durée « événements » (`conservation_evenements_jours`) vaut aussi pour les mouvements du site, tant que la politique de conservation est approuvée. 0 = aucune suppression.
 - Contrainte de base respectée : la clé `corrige_id` interdit d'effacer un mouvement encore corrigé par une correction récente ; l'ordre de purge (corrections échues d'abord, puis mouvements non référencés) évite toute erreur.
+
 ## Tablette de site, lot 6 : masquer le conteneur des cartes (décision du dirigeant)
 - Choix du dirigeant (3 options présentées) : « d'abord masquer le conteneur ». Retrait complet du modèle reporté (projet à part, ~3 PR, risque sur l'émission et l'impression des cartes).
 - Fait : création automatique et idempotente du registre technique à la première carte ; suppression de l'étape visible et du blocage ; nouveau nom ; libellés « site (personnel permanent) » dans Opérations et Administration.
@@ -933,3 +920,12 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Zones du site réutilisées par les activités : décisions du dirigeant et étape Z1
 - Décisions : toute zone devient une zone du site que les activités réutilisent ; l'écran « Accès et zones » est fusionné dans « Site et accès » ; les recettes ne sont pas urgentes. Plan en quatre étapes : docs/ailct/V1-ZONES-DU-SITE.md (fusion par nom exact, politique la plus restrictive, migration non réversible).
 - Étape Z1 : schéma souple et lecteurs doubles ; aucun comportement existant ne change tant qu'une catégorie ne choisit pas de zone du site. Un poste ne juge pour une activité que les zones du site qu'elle réutilise.
+
+## Poste d'accueil, étapes 2 à 7 : maquettes approuvées et mises en œuvre (décision du dirigeant)
+- Le dirigeant a validé les maquettes proposées pour les étapes Fiche, Identité et photo, Décision, Badge, Remise et Entrée (« ok, implémente les maquettes »). Même parcours et mêmes règles métier : seule la présentation change.
+- **Panneau visiteur** (`VisitorPanel`) visible à chaque étape de la fiche à l'entrée : nom, catégorie, organisation, personne reçue, validité, photo (celle qui vient d'être prise, valable hors ligne, sinon le portrait lu en ligne, sinon « Photo non prise ») et badge associé à partir de l'étape badge. Tout vient de la fiche locale.
+- **Barre d'actions fixe** en bas de chaque étape (`poste-actionbar`) : le bouton principal reste atteignable sans défiler. À la décision : Retour à gauche, Refuser et Valider l'entrée à droite ; le refus garde son formulaire à motif obligatoire.
+- **Contenus** : fiche en champs lisibles avec zones en pastilles ; décision précédée de « Ce qui a été vérifié » (fiche, pièce, photo, période) ; badge avec le nombre de badges disponibles sur le poste ; remise avec les trois consignes ; entrée avec l'état d'envoi (« Enregistré sur la tablette… » tant que des opérations attendent ou hors ligne, sinon « envoyé au serveur »).
+- **Trois initiatives du proposant, approuvées avec les maquettes** : (1) les autres fiches du même nom (organisation, personne reçue) sont listées sous l'alerte d'homonyme ; la case du second critère reste obligatoire ; (2) « Badges disponibles » dans l'en-tête du poste ; (3) message d'état d'envoi à l'étape finale.
+- Non repris des maquettes : la barre de progression reste celle existante (numérotée, verte puis orange) ; la barre supérieure marine des maquettes fait double emploi avec l'en-tête actuel du poste (poste, activité, connexion, opérations en attente).
+- Aucune route, table ni permission nouvelle ; tests Vitest ajoutés (5 scénarios).

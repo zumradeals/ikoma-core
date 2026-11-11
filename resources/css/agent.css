@@ -287,3 +287,30 @@
 @media (min-width:1650px) { .poste-search { grid-template-columns:minmax(0,1fr) 26rem !important; } }
 .poste-activity-select { min-height:40px; max-width:18rem; padding:4px 8px; border:1px solid #cbdcee; border-radius:8px; background:white; font-weight:700; color:var(--inst-primary); }
 .poste-activity-select:disabled { opacity:.7; }
+
+/* Poste d'accueil, étapes 2 à 7 : panneau « visiteur » à gauche, barre d'actions fixe en bas (maquettes validées par le dirigeant). */
+.poste-flow { display:grid; grid-template-columns:minmax(0,280px) minmax(0,1fr); gap:24px; align-items:start; }
+.poste-flow-main { min-width:0; }
+.poste-visitor { position:sticky; top:12px; display:flex; flex-direction:column; gap:10px; padding:18px; border:2px solid #cbd5e1; border-radius:18px; background:white; }
+.poste-visitor-photo { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:180px; overflow:hidden; border-radius:12px; background:#dce6f1; color:#475569; font-size:15px; }
+.poste-visitor-photo img { display:block; width:100%; height:100%; object-fit:cover; }
+.poste-visitor-name { font-size:24px; font-weight:700; line-height:1.2; color:var(--inst-primary); }
+.poste-visitor-meta { font-size:16px; line-height:1.5; color:#334155; }
+.poste-visitor-badge { margin-top:6px; padding:10px 12px; border:2px solid #15803d; border-radius:12px; background:#f0fdf4; color:#14532d; }
+.poste-visitor-badge small { display:block; font-size:14px; font-weight:600; }
+.poste-visitor-badge strong { font-size:28px; letter-spacing:2px; }
+.poste-zone-chip { display:inline-block; padding:6px 14px; border:2px solid #0f5aa6; border-radius:12px; background:#e8f0fa; font-size:18px; font-weight:700; }
+.poste-check-dot { display:inline-grid; place-items:center; flex:none; width:32px; height:32px; border-radius:50%; color:white; font-weight:700; }
+.poste-check-ok { background:#15803d; }
+.poste-check-warn { background:#b45309; }
+.poste-actionbar { position:sticky; bottom:0; z-index:5; margin-top:8px; padding:14px 0; background:rgba(255,255,255,.96); border-top:2px solid #cbd5e1; }
+.poste-actionbar-end { display:flex; justify-content:flex-end; }
+.poste-actionbar-end > button { max-width:420px; }
+.poste-actionbar-decision { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.poste-actionbar-right { display:flex; gap:16px; flex:1 1 520px; justify-content:flex-end; }
+.poste-actionbar-right > div { flex:1 1 220px; max-width:320px; }
+@media (max-width:900px) {
+  .poste-flow { grid-template-columns:minmax(0,1fr); }
+  .poste-visitor { position:static; flex-direction:row; flex-wrap:wrap; align-items:center; }
+  .poste-visitor-photo { width:96px; height:96px; }
+}

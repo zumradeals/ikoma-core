@@ -4,6 +4,7 @@ import StatusBar from '../../resources/js/components/poste/StatusBar.vue';
 import StepFiche from '../../resources/js/components/poste/StepFiche.vue';
 import StepDecision from '../../resources/js/components/poste/StepDecision.vue';
 import StepDone from '../../resources/js/components/poste/StepDone.vue';
+import StepBadge from '../../resources/js/components/poste/StepBadge.vue';
 import StepSearch from '../../resources/js/components/poste/StepSearch.vue';
 import PortraitThumb from '../../resources/js/components/poste/PortraitThumb.vue';
 import PosteFooter from '../../resources/js/components/poste/PosteFooter.vue';
@@ -315,5 +316,76 @@ describe('activité du jour choisie par l’agent', () => {
     const { wrapper, switchActivity } = await mountDesk();
     await wrapper.get('[data-testid="passer-mode-site"]').trigger('click'); await flushPromises();
     expect(switchActivity).not.toHaveBeenCalled();
+  });
+});
+
+describe('étapes 2 à 7 conformes aux maquettes', () => {
+  beforeEach(() => { window.localStorage.clear(); });
+
+  it('garde le panneau visiteur sous les yeux à chaque étape, puis y ajoute la photo prise et le badge', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'setTimeout', 'Date'] });
+    const repo = fakeRepo();
+    const wrapper = mount(PosteApp, { props: { agent: 'Agent fictif', repository: repo } });
+    await flushPromises(); await wrapper.get('ul button').trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid=panneau-visiteur]').exists()).toBe(false); // pas de panneau à la recherche
+    await wrapper.get('input[type="search"]').setValue('kone'); await vi.advanceTimersByTimeAsync(400); await flushPromises();
+    await wrapper.get('ul[aria-label="Résultats de la recherche"] button').trigger('click'); await flushPromises();
+    const panel = () => wrapper.get('[data-testid=panneau-visiteur]');
+    expect(panel().text()).toContain('Koné Mariam'); expect(panel().text()).toContain('Organisation fictive 1'); expect(panel().text()).toContain('À voir : Hôte fictif 1');
+    expect(wrapper.get('[data-testid=panneau-sans-photo]').text()).toContain('Photo non prise');
+    await vi.advanceTimersByTimeAsync(10000);
+    await wrapper.findAll('button').find(b => b.text().includes('bien cette personne'))!.trigger('click'); await flushPromises();
+    expect(panel().text()).toContain('Koné Mariam'); // étape 3
+    await wrapper.get('input[type="checkbox"]').setValue(true); await wrapper.findAll('button').find(b => b.text().includes('Prendre la photo'))!.trigger('click'); await flushPromises();
+    await wrapper.findAll('button').find(b => b.text().includes('Enregistrer et passer'))!.trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid=panneau-sans-photo]').exists()).toBe(false); // la photo est désormais connue
+    expect(wrapper.get('[data-testid=verifications]').text()).toContain('Pièce d’identité contrôlée'); // étape 4
+    await wrapper.findAll('button').find(b => b.text().includes('Valider'))!.trigger('click'); await flushPromises();
+    await wrapper.get('input.field').setValue('b-014'); await wrapper.get('form[aria-label="Saisir le code du badge"]').trigger('submit'); await flushPromises();
+    expect(wrapper.get('[data-testid=panneau-badge]').text()).toContain('B-014'); // étape 6
+    expect(wrapper.get('[data-testid=consignes]').text()).toContain('Remettez le badge au visiteur');
+    await wrapper.findAll('button').find(b => b.text().includes('Autoriser l’accès'))!.trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid=panneau-visiteur]').text()).toContain('Koné Mariam'); // étape 7
+    await wrapper.findAll('button').find(b => b.text().includes('Visiteur suivant'))!.trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid=panneau-visiteur]').exists()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('liste les autres fiches du même nom avec leur organisation et la personne reçue, sans retirer le second critère obligatoire', async () => {
+    const other = result({ id: 'v2', organisation: 'Entreprise fictive de transport', host: 'Hôte fictif 2', homonyms: 2 });
+    const wrapper = mount(StepFiche, { props: { fiche: fiche(), homonyms: 2, others: [other] } });
+    expect(wrapper.get('[data-testid=autres-homonymes]').text()).toContain('Entreprise fictive de transport');
+    expect(wrapper.get('[data-testid=autres-homonymes]').text()).toContain('reçue par Hôte fictif 2');
+    const confirm = wrapper.findAll('button').find(b => b.text().includes('bien cette personne'))!;
+    expect(confirm.attributes('disabled')).toBeDefined();
+    await wrapper.get('input[type="checkbox"]').setValue(true);
+    expect(confirm.attributes('disabled')).toBeUndefined();
+  });
+
+  it('résume à la décision ce qui a été vérifié et signale ce qui manque', () => {
+    const ok = mount(StepDecision, { props: { fiche: fiche({ identity_done: true, photo_done: true }), name: 'Koné Mariam', horsPeriode: false, blockedReason: null, busy: false } });
+    expect(ok.findAll('[data-testid=verifications] li').map(li => li.attributes('data-ok'))).toEqual(['oui', 'oui', 'oui', 'oui']);
+    const missing = mount(StepDecision, { props: { fiche: fiche({ identity_done: false, photo_done: false, hors_periode: true }), name: 'Koné Mariam', horsPeriode: true, blockedReason: 'Identité et photo requises.', busy: false } });
+    expect(missing.findAll('[data-testid=verifications] li').map(li => li.attributes('data-ok'))).toEqual(['oui', 'non', 'non', 'non']);
+    expect(missing.text()).toContain('Hors de sa période de validité');
+  });
+
+  it('dit à la fin si l’entrée est déjà envoyée au serveur ou seulement gardée sur la tablette', () => {
+    const waiting = mount(StepDone, { props: { name: 'Koné Mariam', badgeCode: 'B-014', zones: ['Accueil'], durationMs: 30_000, pending: 2, online: true } });
+    expect(waiting.get('[data-testid=etat-envoi]').text()).toContain('Enregistré sur la tablette');
+    const offline = mount(StepDone, { props: { name: 'Koné Mariam', badgeCode: 'B-014', zones: [], durationMs: 30_000, pending: 0, online: false } });
+    expect(offline.get('[data-testid=etat-envoi]').text()).toContain('rien n’est perdu');
+    const sent = mount(StepDone, { props: { name: 'Koné Mariam', badgeCode: 'B-014', zones: [], durationMs: 30_000, pending: 0, online: true } });
+    expect(sent.get('[data-testid=etat-envoi]').text()).toContain('envoyé au serveur');
+  });
+
+  it('rappelle à l’étape du badge combien de badges restent disponibles sur le poste', async () => {
+    const wrapper = mount(StepBadge, { props: { name: 'Koné Mariam', busy: false, available: 38 } });
+    await flushPromises();
+    expect(wrapper.get('[data-testid=badges-restants]').text()).toBe('38 badges disponibles sur ce poste');
+    await wrapper.setProps({ available: 1 });
+    expect(wrapper.get('[data-testid=badges-restants]').text()).toBe('1 badge disponible sur ce poste');
+    await wrapper.setProps({ available: null });
+    expect(wrapper.find('[data-testid=badges-restants]').exists()).toBe(false);
   });
 });

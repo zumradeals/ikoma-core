@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { startScan, type ScanHandle } from '../../poste/media';
-defineProps<{ name: string; busy: boolean }>();
+defineProps<{ name: string; busy: boolean; available?: number | null }>();
 const emit = defineEmits<{ submit: [code: string] }>();
 const video = ref<HTMLVideoElement | null>(null); const code = ref(''); const scanError = ref(''); const scanning = ref(false);
 let handle: ScanHandle | null = null;
@@ -27,6 +27,7 @@ onBeforeUnmount(() => handle?.stop());
       <label class="block text-xl font-semibold">QR illisible ? Saisissez le code imprimé (exemple : B-014)<input v-model="code" class="field !min-h-16 !text-2xl uppercase" autocomplete="off" maxlength="100"></label>
       <button type="submit" class="btn-main" :disabled="!code.trim() || busy">Associer ce badge</button>
     </form>
+    <p v-if="available !== null && available !== undefined" class="mt-4 rounded-xl bg-white p-3 text-lg font-semibold" data-testid="badges-restants">{{ available }} badge{{ available > 1 ? 's' : '' }} disponible{{ available > 1 ? 's' : '' }} sur ce poste</p>
     </div>
 </div>
     <button v-if="scanError" type="button" class="btn-soft" @click="start">Réessayer la caméra</button>
