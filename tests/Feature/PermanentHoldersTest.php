@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use App\Services\DataLifecycle;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
 use App\Services\QrSvg;
@@ -352,4 +351,3 @@ it('protège aussi par déclencheurs, même contre le propriétaire de la base (
         $owner->rollBack();
     }
 });
-
