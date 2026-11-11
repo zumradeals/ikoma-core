@@ -38,9 +38,14 @@ return new class extends Migration
         // Remises à zéro de la démonstration : plus de table ni de zone liée à une activité.
         foreach (['public.ikoma_reset_demo_business(uuid,boolean)', 'public.ikoma_reset_demo_event(uuid)'] as $signature) {
             $definition = (string) DB::selectOne('SELECT pg_get_functiondef(?::regprocedure) AS d', [$signature])->d;
-            $updated = preg_replace(['/DELETE FROM public\.checkpoint_zones WHERE event_id = p_event;\s*/', '/DELETE FROM public\.zones WHERE event_id = p_event;\s*/', '/public\.checkpoint_zones,\s*/', '/public\.zone_policies,\s*/'], '', $definition);
-            if ($updated === null || preg_match('/checkpoint_zones|zone_policies|zones WHERE event_id/', $updated) === 1) {
-                throw new RuntimeException('Fonction de remise à zéro inattendue ('.$signature.') : revue du contrat requise.');
+            $updated = preg_replace([
+                '/\s*(?:DELETE FROM|TRUNCATE(?: TABLE)?)\s+public\.(?:checkpoint_zones|zone_policies)\b[^;]*;/',
+                '/\s*DELETE FROM public\.zones WHERE event_id = p_event;/',
+                '/public\.(?:checkpoint_zones|zone_policies)\s*,\s*/',
+                '/\s*,\s*public\.(?:checkpoint_zones|zone_policies)\b/',
+            ], '', $definition);
+            if ($updated === null || preg_match('/.{0,120}(?:checkpoint_zones|zone_policies|zones WHERE event_id).{0,120}/s', $updated, $left) === 1) {
+                throw new RuntimeException('Fonction de remise à zéro inattendue ('.$signature.') : revue du contrat requise. Reste : '.preg_replace('/\s+/', ' ', $left[0] ?? ''));
             }
             DB::unprepared($updated);
         }
