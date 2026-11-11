@@ -165,7 +165,7 @@ final class AdminOverview
     {
         $rows = DB::table('access_events as e')->join('visitors as v', 'v.id', '=', 'e.visitor_id')->join('events as ev', 'ev.id', '=', 'e.event_id')
             ->whereIn('e.type', ['entree', 'sortie', 'controle'])->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))
-            ->orderByDesc('e.occurred_at')->orderByDesc('e.id')->limit(self::MAX_MOVEMENTS)->get(['e.occurred_at', 'e.type', 'e.checkpoint', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->limit(self::MAX_MOVEMENTS)->get(['e.occurred_at', 'e.type', 'e.checkpoint', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
         $out = [];
         foreach ($rows as $r) {
             $out[] = ['at' => (string) $r->occurred_at, 'type' => (string) $r->type, 'checkpoint' => $r->checkpoint, 'context' => $r->is_permanent ? 'Contexte permanent' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'autorise'];
