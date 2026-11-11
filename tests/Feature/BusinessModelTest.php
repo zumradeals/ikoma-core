@@ -172,7 +172,7 @@ it('refuse des zones d’un autre événement et ne crée aucun journal en cas d
         DB::transaction(fn () => DB::table('category_zone')->insert(['id' => (string) Str::uuid(), 'event_id' => DemoSeeder::id('event'), 'category_id' => DemoSeeder::id('category0'), 'zone_id' => $zone]));
         $this->fail('Mélange événements accepté');
     } catch (QueryException $e) {
-        expect($e->getCode())->toBe('23503');
+        expect($e->getCode())->toBe('23514');
     }
 });
 it('affiche les badges en lecture seule sans jeton QR et filtre les réservations', function () {
