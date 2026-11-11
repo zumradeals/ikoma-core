@@ -85,6 +85,23 @@ final class SiteMovements
         return $last === 'entree';
     }
 
+    /**
+     * Derniers mouvements du site (entrées, sorties, contrôles, corrections), du plus récent au plus ancien, pour la supervision.
+     *
+     * @return list<object>
+     */
+    public function recent(int $limit = 30): array
+    {
+        return DB::select(
+            "SELECT e.id, e.type, e.checkpoint, e.occurred_at, h.identifier, h.full_name,
+                    EXISTS (SELECT 1 FROM access_events c WHERE c.corrige_id = e.id) AS corrected
+             FROM access_events e LEFT JOIN permanent_holders h ON h.id = e.holder_id
+             WHERE e.event_id IS NULL AND e.type IN ('entree', 'sortie', 'controle', 'correction')
+             ORDER BY e.occurred_at DESC, e.seq DESC LIMIT ?",
+            [$limit],
+        );
+    }
+
     public function count(): int
     {
         return count($this->present());

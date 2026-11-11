@@ -1,10 +1,10 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
-const { get } = vi.hoisted(() => ({ get: vi.fn() }));
+const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock('@inertiajs/vue3', () => ({
   usePage: () => ({ props: { auth: { name: 'Superviseur fictif', permissions: ['pilotage.consulter', 'presences.consulter', 'alertes.consulter'] }, pilotageContext: null } }),
-  router: { get, post: vi.fn() },
+  router: { get, post },
   Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
 }));
 
@@ -36,5 +36,33 @@ describe('centre de supervision', () => {
     expect(wrapper.get('[data-testid=habilitations]').text()).toContain('Consultation seule');
     expect(wrapper.get('[data-testid=habilitations]').text()).toContain('les zones de la catégorie de la personne restent autorisées');
     expect(wrapper.findAll('[data-testid=habilitations] button')).toHaveLength(0);
+  });
+
+  describe('correction d’un mouvement', () => {
+    const props = (over: object = {}) => ({ ...ctx, filters: { q: '', type: '', point: '', outcome: '', from: '', until: '' }, rows: [{ id: 'm1', occurred_at: '2027-01-10T10:00:00Z', type: 'entree', checkpoint: 'Accueil', visitor_id: 'v1', full_name: 'Koné Mariam', badge_code: null, verdict: null, zone_ok: null, corrected: false, corrige_id: null }, { id: 'm2', occurred_at: '2027-01-10T10:05:00Z', type: 'controle', checkpoint: 'Accueil', visitor_id: 'v1', full_name: 'Koné Mariam', badge_code: null, verdict: 'valide', zone_ok: null, corrected: false, corrige_id: null }],
+      total: 2, page: 1, perPage: 30, points: [], types: ['entree', 'sortie', 'controle', 'correction'], canCorrect: true,
+      siteMovements: [{ id: 's1', type: 'sortie', checkpoint: 'Entrée du site', occurred_at: '2027-01-10T11:00:00Z', identifier: 'ID-000001-8', full_name: 'Personne Fictive', corrected: false }, { id: 's2', type: 'entree', checkpoint: 'Entrée du site', occurred_at: '2027-01-10T09:00:00Z', identifier: 'ID-000001-8', full_name: 'Personne Fictive', corrected: true }], ...over });
+
+    it('propose « Corriger » seulement sur une entrée ou une sortie non corrigée, avec motif obligatoire, pour le droit de corriger', async () => {
+      post.mockClear();
+      const wrapper = mount(Mouvements, { props: props() });
+      expect(wrapper.find('[data-testid="corriger-m1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="corriger-m2"]').exists()).toBe(false); // un contrôle ne se corrige pas
+      expect(wrapper.find('[data-testid="corriger-s2"]').exists()).toBe(false); // déjà corrigé
+      expect(wrapper.get('[data-testid="mouvements-site"]').text()).toContain('Personne Fictive');
+      await wrapper.get('[data-testid="corriger-m1"]').trigger('click');
+      await wrapper.get('[data-testid="motif-correction"]').setValue('Saisie par erreur');
+      await wrapper.get('[data-testid="confirmer-correction"]').trigger('submit');
+      expect(post).toHaveBeenCalledWith('/pilotage/mouvements/m1/correction', { reason: 'Saisie par erreur' }, expect.anything());
+      await wrapper.get('[data-testid="corriger-s1"]').trigger('click');
+      await wrapper.findAll('[data-testid="motif-correction"]')[0].setValue('Sortie fictive');
+      await wrapper.get('[data-testid="confirmer-correction"]').trigger('submit');
+      expect(post).toHaveBeenLastCalledWith('/pilotage/mouvements/s1/correction', { reason: 'Sortie fictive' }, expect.anything());
+    });
+
+    it('ne propose aucune correction sans le droit', () => {
+      const wrapper = mount(Mouvements, { props: props({ canCorrect: false }) });
+      expect(wrapper.findAll('[data-testid^="corriger-"]')).toHaveLength(0);
+    });
   });
 });

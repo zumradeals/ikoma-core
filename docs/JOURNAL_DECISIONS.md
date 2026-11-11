@@ -898,3 +898,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Décision : aucune activité autorisée, ou plusieurs sans choix = enrôlement en mode site ; une seule activité autorisée = assignée comme avant. Les refus « aucune_activite » et « activite_a_choisir » de l'enrôlement disparaissent (la clôture de l'activité en cours reste refusée).
 - Conséquence : l'écran Postes n'impose plus de choix d'activité avant d'enrôler ; l'agent choisit sur la tablette.
 - Rappel : installation de test sans donnée réelle ; aucune reprise de données.
+
+## Dette : écrans de correction (décision technique)
+- Décision : un droit dédié `mouvements.corriger` plutôt que de réutiliser `litiges.decider` (nom trompeur) ; attribué au seul superviseur, comme les autres actes de décision sur le journal. L'administrateur configure et consulte, il ne réécrit pas la présence. À confirmer avec le dirigeant si l'administrateur doit aussi pouvoir corriger.
+- Une correction est toujours un nouvel événement avec motif, jamais une modification (journal en ajout seul).
