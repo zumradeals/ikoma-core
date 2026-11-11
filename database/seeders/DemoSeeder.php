@@ -29,7 +29,7 @@ final class DemoSeeder extends Seeder
             DB::table('events')->insert(['id' => $event, 'name' => 'Exercice fictif IKOMA — démonstration', 'starts_at' => '2027-01-10 08:00:00+00', 'ends_at' => '2027-01-10 20:00:00+00', 'site' => 'Site fictif de démonstration', 'status' => null, ...$dates]);
             $zones = ['Accueil', 'Salle principale', 'Espace VIP', 'Espace technique', 'Cour', 'Espace stagiaires'];
             foreach ($zones as $i => $name) {
-                DB::table('zones')->insert(['id' => self::id('zone'.$i), 'event_id' => $event, 'name' => $name, ...$dates]);
+                DB::table('zones')->insert(['id' => self::id('zone'.$i), 'event_id' => null, 'site_id' => DB::table('sites')->orderBy('created_at')->orderBy('id')->value('id'), 'name' => $name, ...$dates]);
             }
             $cats = [['VIP', '#C9962B', true, [0, 1, 2]], ['Visiteur', '#0F5AA6', false, [0, 1, 4]], ['Prestataire', '#F26B21', false, [0, 3, 4]], ['Stagiaire', '#1E9E5A', false, [0, 4, 5]]];
             foreach ($cats as $i => [$name,$color,$priority,$allowed]) {

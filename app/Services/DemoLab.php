@@ -77,10 +77,7 @@ final class DemoLab
 
             $zoneIds = [];
             foreach (['Accueil', 'Zone principale', 'Zone VIP', 'Zone technique'] as $index => $name) {
-                $id = (string) Str::uuid();
-                $zoneIds[] = $id;
-                DB::table('zones')->insert(['id' => $id, 'event_id' => $event, 'name' => $name,
-                    'est_accueil' => $index === 0, 'created_at' => $now, 'updated_at' => $now]);
+                $zoneIds[] = ActivityZones::siteZone($name, $index === 0);
             }
             $categoryIds = [];
             $categorySpecs = [

@@ -78,6 +78,9 @@ Risque principal : changer les jeux d'essai touche la plupart des ~50 fichiers d
 ## Z4c — liens des écrans vers les habilitations des participants (écrite)
 Dans la fiche d'une activité, « Habilitations des participants » ouvre l'écran déjà réglé sur cette activité (`/administration/acces?event=…`) ; dans Site et accès, « Ajouter une règle » devient « Associer une zone à un poste » (retour au registre des postes, où se règle la garde des zones) et le lien vers l'écran des participants est renommé de la même façon. Aucune règle métier ne change.
 
-## Décision proposée sur Z5 (à valider par le dirigeant)
+## Z5a — jeux d'essai en zones du site (écrite, décision du dirigeant : « fais Z5 »)
+`DemoSeeder`, `DeskFixtures`, `HostFixtures`, `PermanentFixtures` et `DemoLab` créent désormais des zones du site (retrouvées par nom exact, `ActivityZones::siteZone`, donc réutilisées d'un lancement à l'autre) ; aucune zone d'activité n'est plus créée par le code ou les jeux d'essai. Les tests qui avaient besoin d'une zone d'activité pour vérifier son refus par le site en créent une explicitement. Z5b (code) et Z5c (schéma) suivent, une PR chacune.
+
+## Décision proposée sur Z5 (remplacée par la décision du dirigeant ci-dessus : Z5 est exécuté)
 Z5 n'apporte **aucun changement visible** : c'est un nettoyage interne (colonne et tables devenues inutiles). Il coûte cher et comporte un risque réel : changer les jeux d'essai (`DemoSeeder`) et la quarantaine de tests qui en dépendent, sans pouvoir exécuter PHP en local. **Recommandation : suspendre Z5 jusqu'à la recette sur le serveur d'essai**, et ne le reprendre (Z5a, Z5b, Z5c ci-dessus) que si la recette confirme que le modèle « toute zone est une zone du site » convient.
 

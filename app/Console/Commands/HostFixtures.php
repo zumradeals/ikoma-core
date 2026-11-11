@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Badge;
 use App\Models\Device;
 use App\Models\User;
+use App\Services\ActivityZones;
 use App\Services\BadgeLots;
 use App\Services\Poste\Devices;
 use Database\Seeders\RoleSeeder;
@@ -30,9 +31,7 @@ final class HostFixtures extends Command
         DB::table('events')->insert(['id' => $event, 'name' => 'Recette hôte fictive '.$suffix, 'starts_at' => $at->copy()->subHours(2), 'ends_at' => $at->copy()->addDays(2), 'created_at' => $at, 'updated_at' => $at]);
         $zones = [];
         foreach (['Hall accueil fictif' => true, 'Salle fictive' => false] as $name => $reception) {
-            $id = (string) Str::uuid();
-            DB::table('zones')->insert(['id' => $id, 'event_id' => $event, 'name' => $name, 'est_accueil' => $reception, 'created_at' => $at, 'updated_at' => $at]);
-            $zones[] = $id;
+            $zones[] = ActivityZones::siteZone($name, $reception);
         }
         $category = (string) Str::uuid();
         DB::table('categories')->insert(['id' => $category, 'event_id' => $event, 'name' => 'Visiteur', 'color' => '#0F5AA6', 'priority_circuit' => false, 'created_at' => $at, 'updated_at' => $at]);
