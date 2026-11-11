@@ -17,7 +17,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Illuminate\Validation\ValidationException;
 
 uses(DatabaseTransactions::class);
 
@@ -60,8 +59,8 @@ beforeEach(function () {
     $this->event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $this->event, 'name' => 'Événement fictif contrôle du site', 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(10), 'created_at' => now(), 'updated_at' => now()]);
     $this->activityZone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $this->activityZone, 'event_id' => $this->event, 'name' => 'Zone d’activité fictive', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('zone_policies')->insert(['zone_id' => $this->activityZone, 'event_id' => $this->event, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $this->activityZone, 'event_id' => null, 'name' => 'Zone réutilisée fictive', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('site_zone_policies')->insert(['zone_id' => $this->activityZone, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
     $this->device = (string) Str::uuid();
     DB::table('devices')->insert(['id' => $this->device, 'event_id' => $this->event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', SC_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     $this->siteZone = app(SiteConfiguration::class)->createSiteZone('Hall fictif du site', $this->admin);
@@ -171,7 +170,6 @@ it('règle la politique d’une zone du site : ouverte, hors ligne seulement si 
     $policy = DB::table('site_zone_policies')->where('zone_id', $this->siteZone)->first();
     expect((bool) $policy->permanent_allowed)->toBeTrue()->and((bool) $policy->offline_entry_allowed)->toBeTrue();
     $this->put('/administration/habilitations/site/zones/'.$this->siteZone, ['permanent_allowed' => false, 'offline_entry_allowed' => true])->assertSessionHasErrors('offline');
-    expect(fn () => app(SiteEntitlements::class)->savePolicy((string) $this->activityZone, true, false, $this->admin))->toThrow(ValidationException::class);
     $this->get('/administration/habilitations')->assertOk()->assertInertia(fn ($p) => $p->where('site.zones', fn ($zones) => collect($zones)->firstWhere('id', $this->siteZone)['permanent_allowed'] === true && collect($zones)->firstWhere('id', $this->siteZone)['offline_entry_allowed'] === true));
     expect(DB::table('audit_logs')->where('action', 'zone_site.politique_modifiee')->count())->toBe(1);
 });

@@ -57,8 +57,6 @@ const CN_ROUTES = [
     ['GET', 'administration/badges/{badge}', ['can:badges.gerer'], []],
     ['GET', 'administration/habilitations', ['can:listes.importer'], []],
     ['GET', 'administration/acces', ['can:zones.gerer'], []],
-    ['POST', 'administration/acces/correspondances', ['can:zones.gerer', 'can:postes.gerer'], ['throttle:titulaires']],
-    ['POST', 'administration/acces/correspondances/{mapping}/retirer', ['can:zones.gerer', 'can:postes.gerer'], ['throttle:titulaires']],
     ['POST', 'administration/acces/habilitations', ['can:zones.gerer', 'can:listes.importer'], ['throttle:titulaires']],
     ['POST', 'administration/acces/habilitations/{entitlement}/suspendre', ['can:zones.gerer', 'can:listes.importer'], ['throttle:titulaires']],
     ['POST', 'administration/acces/habilitations/{entitlement}/reprendre', ['can:zones.gerer', 'can:listes.importer'], ['throttle:titulaires']],

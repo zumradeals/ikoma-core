@@ -259,7 +259,7 @@ final class PersonRegistry
         // Synthèse des accès : uniquement ce que les habilitations effectives ouvrent réellement.
         $effective = array_values(array_filter([...$permanentRights, ...$activityRights], fn (array $r): bool => $r['state'] === 'active'));
         $zoneIds = array_values(array_unique(array_column($effective, 'zone_id')));
-        $posts = $zoneIds === [] ? [] : DB::table('checkpoint_zones as cz')->join('checkpoints as c', 'c.id', '=', 'cz.checkpoint_id')->whereIn('cz.zone_id', $zoneIds)->where('c.active', true)
+        $posts = $zoneIds === [] ? [] : DB::table('checkpoint_site_zones as cz')->join('checkpoints as c', 'c.id', '=', 'cz.checkpoint_id')->whereIn('cz.zone_id', $zoneIds)->where('c.active', true)
             ->distinct()->orderBy('c.code')->get(['c.id', 'c.code', 'c.name'])->map(fn ($c): array => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name])->all();
         $zones = array_values(array_unique(array_map(fn (array $r): string => $r['zone'].' · '.$r['event'], $effective)));
         sort($zones);

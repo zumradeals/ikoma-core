@@ -157,7 +157,6 @@ final class DemoCleanup
                 // Zones du site de la démonstration : retirées seulement si plus rien ne s'y rattache (jamais une zone utilisée ailleurs).
                 $unused = DB::table('zones')->whereIn('id', array_map($id, array_map(static fn ($i) => 'zone'.$i, range(0, 5))))
                     ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('category_zone')->whereColumn('category_zone.zone_id', 'zones.id'))
-                    ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('checkpoint_zones')->whereColumn('checkpoint_zones.zone_id', 'zones.id'))
                     ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('checkpoint_site_zones')->whereColumn('checkpoint_site_zones.zone_id', 'zones.id'))
                     ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('participation_entitlements')->whereColumn('participation_entitlements.zone_id', 'zones.id'))
                     ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('holder_entitlements')->whereColumn('holder_entitlements.zone_id', 'zones.id'))

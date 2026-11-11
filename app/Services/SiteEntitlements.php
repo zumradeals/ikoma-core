@@ -33,18 +33,18 @@ final class SiteEntitlements
     }
 
     /** Politique d'une zone du site : ouverte ou non aux titulaires permanents, entrée hors ligne acceptée ou non (jamais sans l'ouverture). */
-    public function savePolicy(string $zoneId, bool $permanentAllowed, bool $offlineAllowed, User $actor): void
+    public function savePolicy(string $zoneId, bool $permanentAllowed, bool $offlineAllowed, User $actor, ?string $classification = null): void
     {
         if ($offlineAllowed && ! $permanentAllowed) {
             throw ValidationException::withMessages(['offline' => 'Une zone fermée aux titulaires permanents ne peut pas les accepter hors ligne.']);
         }
-        DB::transaction(function () use ($zoneId, $permanentAllowed, $offlineAllowed, $actor): void {
+        DB::transaction(function () use ($zoneId, $permanentAllowed, $offlineAllowed, $actor, $classification): void {
             if (! DB::table('zones')->where('id', $zoneId)->whereNull('event_id')->exists()) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone du site inconnue.']);
             }
-            $classification = (string) (DB::table('site_zone_policies')->where('zone_id', $zoneId)->value('classification') ?? 'Standard');
+            $classification ??= (string) (DB::table('site_zone_policies')->where('zone_id', $zoneId)->value('classification') ?? 'Standard');
             DB::table('site_zone_policies')->upsert([['zone_id' => $zoneId, 'classification' => $classification, 'permanent_allowed' => $permanentAllowed, 'offline_entry_allowed' => $offlineAllowed,
-                'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]], ['zone_id'], ['permanent_allowed', 'offline_entry_allowed', 'updated_by', 'updated_at']);
+                'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]], ['zone_id'], ['classification', 'permanent_allowed', 'offline_entry_allowed', 'updated_by', 'updated_at']);
             $this->audit->append('zone_site.politique_modifiee', $actor->id, ['zone_id' => $zoneId, 'permanents' => $permanentAllowed, 'hors_ligne' => $offlineAllowed]);
         });
     }

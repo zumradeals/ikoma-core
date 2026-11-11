@@ -266,7 +266,7 @@ it('enregistre l’entrée avec le chrono, passe le visiteur à présent et rapp
 
 it('bloque un visiteur non listé tant que l’hôte n’a pas accepté, puis le laisse passer', function () {
     $zone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone, 'event_id' => DemoSeeder::id('event'), 'name' => 'Hall d’accueil', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone, 'event_id' => null, 'name' => 'Hall d’accueil', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
     $created = $this->postJson('/poste/api/non-listes', ['name' => 'Personne fictive Imprévue', 'organisation' => 'Société fictive', 'host_id' => DemoSeeder::id('host0'), 'category_id' => DemoSeeder::id('category1')], deskHeaders())->assertOk()->json('visitor_id');
     $row = DB::table('visitors')->where('id', $created)->first();
     expect($row)->toMatchObject(['source' => 'non listé', 'status' => 'attendu', 'host_validation' => 'en_attente', 'organisation' => 'Société fictive']);

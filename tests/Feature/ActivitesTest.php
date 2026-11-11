@@ -3,6 +3,7 @@
 use App\Models\Badge;
 use App\Models\User;
 use App\Services\ActivityRegistry;
+use App\Services\ActivityZones;
 use App\Services\BadgeLots;
 use App\Services\BadgeService;
 use App\Services\HolderEntitlements;
@@ -43,7 +44,6 @@ function actEvent(string $kind = 'stage', ?string $status = null, string $name =
     $at = ['created_at' => now(), 'updated_at' => now()];
     DB::table('events')->insert(['id' => $id, 'name' => $name !== '' ? $name : 'Activité fictive '.Str::random(5), 'starts_at' => '2027-01-01 08:00:00+00', 'ends_at' => '2027-03-01 18:00:00+00', 'kind' => $kind, 'status' => $status, ...$at]);
     DB::table('categories')->insert(['id' => $category, 'event_id' => $id, 'name' => 'Stagiaire', 'color' => '#1E9E5A', 'priority_circuit' => false, ...$at]);
-    DB::table('zones')->insert(['id' => (string) Str::uuid(), 'event_id' => $id, 'name' => 'Salle fictive', ...$at]);
 
     return ['id' => $id, 'category' => $category];
 }
@@ -260,7 +260,7 @@ it('clôture l’activité par la route existante sans retirer d’habilitation 
     $person = actPerson('Zzclotureactivite');
     app(Participations::class)->enrol($this->admin, $person, ['event_id' => $event['id'], 'category_id' => $event['category']]);
     $holder = app(PermanentHolders::class)->create(['position' => 'Formateur fictif', 'institutional_category' => 'AILCT-01'], $this->admin, false, $person);
-    $zone = (string) DB::table('zones')->where('event_id', $event['id'])->value('id');
+    $zone = ActivityZones::siteZone('Salle fictive');
     $permanent = app(HolderEntitlements::class)->grant($holder, $event['id'], $zone, now()->subDay()->toIso8601String(), now()->addDays(20)->toIso8601String(), $this->admin);
     $this->actingAs($this->admin)->post("/administration/evenements/{$event['id']}/cloturer", ['confirmation' => true]);
     expect(DB::table('holder_entitlements')->where('id', $permanent)->value('revoked_at'))->toBeNull()

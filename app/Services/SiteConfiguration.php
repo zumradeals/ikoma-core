@@ -26,14 +26,11 @@ final class SiteConfiguration
             ->get(['d.id', 'd.name', 'd.station', 'd.checkpoint_id', 'd.token_hash', 'd.revoked_at', 'd.last_synced_at', 'e.name as event_name'])
             ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'station' => $d->station, 'checkpoint_id' => $d->checkpoint_id, 'state' => $d->revoked_at ? 'revoque' : ($d->token_hash ? 'enrole' : 'non_enrole'),
                 'last_synced_at' => $d->last_synced_at, 'event_name' => $d->event_name ?? 'Aucune activité en cours']);
-        $zones = DB::table('checkpoint_zones as c')->join('zones as z', 'z.id', '=', 'c.zone_id')->join('events as e', 'e.id', '=', 'z.event_id')->orderBy('z.name')
-            ->get(['c.id', 'c.checkpoint_id', 'c.zone_id', 'c.event_id', 'z.name', 'e.name as event_name'])->groupBy('checkpoint_id');
         $siteMappings = DB::table('checkpoint_site_zones as c')->join('zones as z', 'z.id', '=', 'c.zone_id')->orderBy('z.name')->get(['c.id', 'c.checkpoint_id', 'c.zone_id', 'z.name'])->groupBy('checkpoint_id');
         $checkpoints = DB::table('checkpoints')->orderBy('code')->get()->map(fn ($p) => [
             'id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'function_label' => $p->function_label, 'capabilities' => PostCapabilities::normalize(json_decode((string) $p->capabilities, true)),
             'direction_required' => (bool) $p->direction_required, 'active' => (bool) $p->active, 'version' => (int) $p->version,
             'tablets' => $tablets->where('checkpoint_id', $p->id)->where('state', '!=', 'revoque')->values()->all(),
-            'zones' => ($zones[$p->id] ?? collect())->map(fn ($z) => ['mapping_id' => $z->id, 'zone_id' => $z->zone_id, 'event_id' => $z->event_id, 'name' => $z->name, 'event_name' => $z->event_name])->values()->all(),
             'site_zones' => ($siteMappings[$p->id] ?? collect())->map(fn ($z) => ['mapping_id' => $z->id, 'zone_id' => $z->zone_id, 'name' => $z->name])->values()->all(),
         ])->all();
 
@@ -43,7 +40,6 @@ final class SiteConfiguration
             'catalogue' => PostCapabilities::CATALOGUE,
             'unassigned' => $tablets->whereNull('checkpoint_id')->where('state', '!=', 'revoque')->values()->all(),
             'site_zones' => DB::table('zones')->whereNull('event_id')->orderBy('name')->get(['id', 'name', 'est_accueil'])->map(fn ($z) => ['id' => $z->id, 'name' => $z->name, 'est_accueil' => (bool) $z->est_accueil])->all(),
-            'zones' => DB::table('zones as z')->join('events as e', 'e.id', '=', 'z.event_id')->orderBy('e.name')->orderBy('z.name')->get(['z.id', 'z.name', 'z.event_id', 'e.name as event_name']),
             'history' => DB::table('device_assignments as a')->join('devices as d', 'd.id', '=', 'a.device_id')->leftJoin('checkpoints as p', 'p.id', '=', 'a.checkpoint_id')->leftJoin('users as u', 'u.id', '=', 'a.assigned_by')
                 ->orderByDesc('a.assigned_at')->orderByDesc('a.id')->limit(25)->get(['a.id', 'd.name as device', 'p.name as checkpoint', 'a.assigned_at', 'a.ended_at', 'a.reason', 'u.name as by']),
         ];
