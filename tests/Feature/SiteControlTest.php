@@ -184,7 +184,7 @@ function scReplay(string $type, string $token, string $knownAt): TestResponse
         $payload += ['local_valid' => true, 'known_at' => $knownAt];
     }
 
-    return test()->postJson('/poste/api/sync', ['operations' => [['id' => (string) Str::uuid(), 'seq' => 1, 'type' => $type, 'agent_id' => test()->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => $payload]]],
+    return test()->postJson('/poste/api/sync', ['operations' => [['id' => (string) Str::uuid(), 'seq' => (int) DB::table('devices')->where('id', test()->device)->value('sync_seq') + 1, 'type' => $type, 'agent_id' => test()->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => $payload]]],
         ['X-Device-Token' => SC_TOKEN, 'Accept' => 'application/json'])->assertOk();
 }
 
