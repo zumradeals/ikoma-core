@@ -19,9 +19,9 @@ async function permanent(over: Partial<PermanentSnapshot> = {}): Promise<Permane
     ...over,
   };
 }
-async function list(snap: PermanentSnapshot): Promise<LocalList> {
+async function list(snap: PermanentSnapshot, withEvent = true): Promise<LocalList> {
   const s: Snapshot = {
-    version: 'v', server_time: iso(0), poste: { id: 'p1', name: 'Tablette', station: 'Entrée', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: { id: 'e1', name: 'Événement fictif', starts_at: iso(-86_400_000), ends_at: iso(86_400_000) },
+    version: 'v', server_time: iso(0), poste: { id: 'p1', name: 'Tablette', station: 'Entrée', event_id: withEvent ? 'e1' : null, point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] }, event: withEvent ? { id: 'e1', name: 'Événement fictif', starts_at: iso(-86_400_000), ends_at: iso(86_400_000) } : null,
     settings: { offline_trust_hours: 12, inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 }, categories: [], zones: ZONES, category_zone: [], hosts: [], postes: [{ id: 'p1', name: 'Entrée' }], visitors: [], badges: [], permanent: snap,
   };
   return new LocalList(s);
@@ -183,5 +183,18 @@ describe('titulaires permanents hors ligne : habilitation du site', () => {
     const l3 = await list(siteOnly);
     expect(controlLocal(l3, await resolveBadge(l3, TOKEN), zone('z1'), T0, iso(-10 * MIN))).toMatchObject({ valid: false });
     expect(hash).toHaveLength(64);
+  });
+});
+
+describe('tablette sans activité (mode site)', () => {
+  it('contrôle une carte au titre du site sans événement et laisse toujours sortir', async () => {
+    const snap = await permanent({ site: { zones: [{ id: 's1', name: 'Hall du site' }], policies: [{ zone_id: 's1', permanent_allowed: true, offline_entry_allowed: true }], entitlements: [{ holder_id: 'h1', zone_id: 's1', valid_from: iso(-60 * MIN), valid_until: iso(240 * MIN) }] } });
+    snap.holders[0].entitlements = [];
+    const l = await list(snap, false);
+    expect(l.snapshot.event).toBeNull();
+    const printed = await resolveBadge(l, TOKEN);
+    expect(controlLocal(l, printed, gate, T0, iso(-10 * MIN))).toMatchObject({ valid: true, zones: ['Hall du site'] });
+    expect(controlLocal(l, printed, gate, T0, iso(-90 * MIN))).toMatchObject({ valid: false, reason: 'confiance_expiree' });
+    expect(exitLocal(l, printed, gate, iso(-600 * MIN))).toMatchObject({ ok: true });
   });
 });

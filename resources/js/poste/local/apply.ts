@@ -142,8 +142,8 @@ export function applyOp(list: LocalList, op: LocalOp, now: number): ApplyResult 
       if (list.visitors.has(id)) throw new ApiError('fiche_existante', 'Cette fiche existe déjà.', null, 409);
       const category = list.categories.get(String(p.category_id)); const host = String(p.host_id ?? '');
       if (!category || !list.hostNames.has(host) || String(p.name ?? '').trim() === '') throw refuse('operation_invalide', 'Opération incomplète.');
-      const from = Math.min(now, Date.parse(list.snapshot.event.starts_at));
-      list.visitors.set(id, { id, full_name: String(p.name).trim().slice(0, 160), organisation: p.organisation ? String(p.organisation).trim().slice(0, 160) : null, host_id: host, category_id: category.id, valid_from: new Date(from).toISOString(), valid_until: list.snapshot.event.ends_at, source: 'non listé', status: 'attendu', host_validation: 'en_attente', rev: null, identity_done: false, photo_done: false, validated: false, badge_code: null });
+      const from = Math.min(now, list.snapshot.event ? Date.parse(list.snapshot.event.starts_at) : now);
+      list.visitors.set(id, { id, full_name: String(p.name).trim().slice(0, 160), organisation: p.organisation ? String(p.organisation).trim().slice(0, 160) : null, host_id: host, category_id: category.id, valid_from: new Date(from).toISOString(), valid_until: list.snapshot.event?.ends_at ?? new Date(now + 86_400_000).toISOString(), source: 'non listé', status: 'attendu', host_validation: 'en_attente', rev: null, identity_done: false, photo_done: false, validated: false, badge_code: null });
       list.touch();
       return { visitor_id: id };
     }

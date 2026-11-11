@@ -94,12 +94,13 @@ export class LocalPosteRepository implements GroupPosteRepository {
 
   async listPostes(): Promise<Poste[]> {
     const s = this.list.snapshot;
-    return [{ id: s.poste.id, name: s.poste.name, station: s.poste.station, event_id: s.poste.event_id, event_name: s.event.name }];
+    return [{ id: s.poste.id, name: s.poste.name, station: s.poste.station, event_id: s.poste.event_id, event_name: s.event?.name ?? 'Site' }];
   }
 
   async context(): Promise<DeskContext> {
     const s = this.list.snapshot;
-    return { poste: s.poste, event: { id: s.event.id, name: s.event.name, starts_at: s.event.starts_at, ends_at: s.event.ends_at, site: s.event.site ?? null }, visitor_count: this.list.visitors.size,
+    if (!s.event) throw new ApiError('aucune_activite_en_cours', 'Cette tablette n’a pas d’activité en cours : choisissez une activité pour accueillir des visiteurs.', null, 409);
+    return { poste: { ...s.poste, event_id: s.event.id }, event: { id: s.event.id, name: s.event.name, starts_at: s.event.starts_at, ends_at: s.event.ends_at, site: s.event.site ?? null }, visitor_count: this.list.visitors.size,
       present_count: [...this.list.visitors.values()].filter(v => v.status === 'present').length, absent_count: [...this.list.visitors.values()].filter(v => v.status === 'attendu').length, hosts: s.hosts, categories: s.categories.map(c => ({ ...c, visitor_count: [...this.list.visitors.values()].filter(v => v.category_id === c.id).length })) };
   }
 
