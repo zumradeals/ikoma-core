@@ -42,12 +42,16 @@ it('crée une tablette sans activité, avec ses activités autorisées, depuis l
     $this->get('/administration/postes')->assertOk();
 });
 
-it('n’enrôle une tablette sans activité que si une seule activité est autorisée, sinon demande un choix explicite', function () {
+it('enrôle une tablette en mode site (sans activité) quand aucune ou plusieurs activités sont autorisées, et assigne l’unique activité autorisée', function () {
     $none = $this->devices->create(null, 'Tablette fictive 0', null, $this->admin, 'poste_1');
-    expect(fn () => $this->devices->issueCode($none, $this->admin))->toThrow(DeskRefused::class, 'Aucune activité');
+    $enrolled = $this->devices->enrol($this->devices->issueCode($none, $this->admin), $this->admin);
+    expect($enrolled['poste']['event_id'])->toBeNull()->and($enrolled['poste']['event_name'])->toBeNull()->and($none->refresh()->event_id)->toBeNull()->and($none->token_hash)->not->toBeNull();
+
     $many = $this->devices->create(null, 'Tablette fictive 2', null, $this->admin, 'poste_1');
     $this->devices->authorize($many, [$this->a, $this->b], $this->admin);
-    expect(fn () => $this->devices->issueCode($many, $this->admin))->toThrow(DeskRefused::class, 'Choisissez l’activité');
+    $enrolledMany = $this->devices->enrol($this->devices->issueCode($many, $this->admin), $this->admin);
+    expect($enrolledMany['poste']['event_id'])->toBeNull()->and($many->refresh()->event_id)->toBeNull();
+
     $one = $this->devices->create(null, 'Tablette fictive 1', null, $this->admin, 'poste_1');
     $this->devices->authorize($one, [$this->b], $this->admin);
     $code = $this->devices->issueCode($one, $this->admin);
@@ -91,11 +95,15 @@ it('garde les réservations de badges d’une activité intactes quand la tablet
     expect(fn () => DB::transaction(fn () => DB::table('badges')->where('id', $other->id)->update(['reserved_device_id' => (string) Str::uuid()])))->toThrow(QueryException::class);
 });
 
-it('affiche le refus d’un code d’enrôlement dans la page (pas en JSON brut) quand aucune activité n’est autorisée', function () {
-    $device = $this->devices->create(null, 'Tablette fictive sans activité', null, $this->admin, 'poste_1');
-    $this->post('/administration/postes/'.$device->id.'/code')->assertRedirect()->assertSessionHasErrors(['poste_'.$device->id]);
-    expect(session('errors')->first('poste_'.$device->id))->toContain('Aucune activité');
+it('affiche le refus d’un code d’enrôlement dans la page (pas en JSON brut) quand l’activité en cours est clôturée', function () {
+    $device = $this->devices->create(null, 'Tablette fictive activité clôturée', null, $this->admin, 'poste_1');
     $this->devices->authorize($device, [$this->a], $this->admin);
+    $this->devices->setCurrent($device, $this->a, $this->admin);
+    $status = DB::table('events')->where('id', $this->a)->value('status');
+    DB::table('events')->where('id', $this->a)->update(['status' => 'clos']);
+    $this->post('/administration/postes/'.$device->id.'/code')->assertRedirect()->assertSessionHasErrors(['poste_'.$device->id]);
+    expect(session('errors')->first('poste_'.$device->id))->toContain('clôturé');
+    DB::table('events')->where('id', $this->a)->update(['status' => $status]);
     $this->post('/administration/postes/'.$device->id.'/code')->assertRedirect()->assertSessionHasNoErrors();
     expect(session('enrol_code.device_id'))->toBe($device->id);
 });

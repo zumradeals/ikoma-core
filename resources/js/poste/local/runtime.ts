@@ -10,7 +10,7 @@ import { PosteVault } from './vault';
 
 export const WIPE_AFTER_EVENT_MS = 24 * 3_600_000;
 export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel' | 'poste_supprime' | 'compte_change';
-type Enrolled = { device_token: string; device_secret: string; poste: { id: string; name: string; station: string | null; event_id: string; event_name: string } };
+type Enrolled = { device_token: string; device_secret: string; poste: { id: string; name: string; station: string | null; event_id: string | null; event_name: string | null } };
 
 /** Assemble le coffre, le magasin chiffré, la synchronisation et le dépôt local d'une tablette. Un seul exemplaire par page. */
 export const syncRequiredMessage = (hours: number): string => `Cette tablette n’a pas communiqué avec le serveur depuis plus de ${hours} heure${hours > 1 ? 's' : ''} : connectez-la au réseau pour reprendre. Rien n’est perdu.`;

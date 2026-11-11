@@ -124,7 +124,8 @@ final class Devices
     }
 
     /**
-     * Une tablette sans activité en cours en reçoit une quand l'administrateur n'en a autorisé qu'une seule ; sinon l'enrôlement attend un choix explicite.
+     * Une tablette sans activité en cours en reçoit une quand l'administrateur n'en a autorisé qu'une seule. Sinon (aucune activité autorisée, ou plusieurs sans
+     * choix), elle s'enrôle SANS activité : mode site (contrôle du personnel permanent) ; l'agent choisit l'activité du jour sur la tablette, parmi celles autorisées.
      */
     private function ensureCurrentActivity(Device $device): Device
     {
@@ -132,11 +133,8 @@ final class Devices
             return $device;
         }
         $authorized = DB::table('device_activities')->where('device_id', $device->id)->pluck('event_id')->all();
-        if ($authorized === []) {
-            throw new DeskRefused('aucune_activite', 'Aucune activité n’est autorisée pour cette tablette : autorisez-en au moins une dans l’administration.', 422);
-        }
-        if (count($authorized) > 1) {
-            throw new DeskRefused('activite_a_choisir', 'Choisissez l’activité en cours de cette tablette dans l’administration avant de l’enrôler.', 422);
+        if (count($authorized) !== 1) {
+            return $device;
         }
         DB::table('devices')->where('id', $device->id)->update(['event_id' => $authorized[0], 'updated_at' => now()]);
 
@@ -155,7 +153,9 @@ final class Devices
         }
         DB::transaction(function () use ($device, $code, $actor): void {
             $device = $this->ensureCurrentActivity($device);
-            EventAvailability::requireOpen($device->event_id);
+            if ($device->event_id !== null) {
+                EventAvailability::requireOpen($device->event_id);
+            }
             DB::table('devices')->where('id', $device->id)->update(['enrollment_hash' => self::hash($code), 'enrollment_expires_at' => now()->addMinutes(self::CODE_VALID_MINUTES), 'updated_at' => now()]);
             $this->audit->append('poste.code_emis', $actor->id, ['device_id' => $device->id]);
         });
@@ -184,7 +184,9 @@ final class Devices
                 throw new DeskRefused('code_invalide', 'Code d’enrôlement invalide ou expiré : demandez-en un nouveau à l’administrateur.', 422);
             }
             $device = $this->ensureCurrentActivity($device);
-            EventAvailability::requireOpen($device->event_id);
+            if ($device->event_id !== null) {
+                EventAvailability::requireOpen($device->event_id);
+            }
             if ($device->point_code === null) {
                 throw new DeskRefused('poste_non_identifie', 'Ce poste n’a pas de point de contrôle identifié : demandez à l’administrateur de le préciser.', 422);
             }
@@ -194,7 +196,7 @@ final class Devices
             RateLimiter::clear($key);
             $this->audit->append('poste.enrole', $agent->id, ['device_id' => $device->id, 'event_id' => $device->event_id]);
 
-            return ['device_token' => $token, 'device_secret' => $secret, 'poste' => ['id' => $device->id, 'name' => $device->name, 'station' => $device->station, 'event_id' => $device->event_id, 'event_name' => (string) DB::table('events')->where('id', $device->event_id)->value('name')]];
+            return ['device_token' => $token, 'device_secret' => $secret, 'poste' => ['id' => $device->id, 'name' => $device->name, 'station' => $device->station, 'event_id' => $device->event_id, 'event_name' => $device->event_id === null ? null : (string) DB::table('events')->where('id', $device->event_id)->value('name')]];
         });
     }
 
