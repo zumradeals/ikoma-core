@@ -67,7 +67,6 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
           <h2 class="text-heading font-bold">Préparation</h2>
           <ul class="list-disc space-y-1 pl-6" data-testid="preparation">
             <li :data-ok="category !== null">Catégorie institutionnelle : <strong>{{ category ? category.code + ' · ' + category.label : 'à choisir dans la fiche du titulaire' }}</strong></li>
-            <li :data-ok="permanentContext">Registre des cartes : <strong>{{ permanentContext ? 'prêt' : 'à créer depuis la page Personnel permanent et cartes' }}</strong></li>
             <li :data-ok="holder.has_photo">Photo : <strong>{{ holder.has_photo ? (holder.photo_print_allowed ? 'présente, imprimée sur la carte' : 'présente, non imprimée') : 'obligatoire pour préparer la carte' }}</strong></li>
           </ul>
           <form class="space-y-3 border-t pt-3" @submit.prevent="sendPortrait">
@@ -84,7 +83,7 @@ function when(value: string) { return new Date(value).toLocaleString('fr-FR'); }
           <h2 class="text-heading font-bold">Préparer la carte</h2>
           <p>La carte est préparée mais ne sert pas encore : elle sera utilisable après « Remettre et activer ». L’identifiant <strong>{{ holder.identifier }}</strong> ne change pas.</p>
           <p v-if="$page.props.errors?.holder" class="font-semibold text-red-800" role="alert" data-testid="erreur-carte">{{ $page.props.errors.holder }}</p>
-          <button type="button" class="admin-primary" data-testid="preparer-carte" :disabled="category === null || !permanentContext || !holder.has_photo" @click="prepare">Préparer la carte</button>
+          <button type="button" class="admin-primary" data-testid="preparer-carte" :disabled="category === null || !holder.has_photo" @click="prepare">Préparer la carte</button>
         </section>
 
         <section v-else-if="card === null && cards.length > 0" class="space-y-3 rounded-xl border-2 border-red-700 bg-white p-5" aria-label="Aucune carte active" data-testid="aucune-carte-active">

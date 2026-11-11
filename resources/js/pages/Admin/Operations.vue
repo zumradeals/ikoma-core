@@ -41,7 +41,7 @@ const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('fr
 const typeLabel: Record<string, string> = { entree: 'Entrée', sortie: 'Sortie', controle: 'Contrôle', validation: 'Validation', correction: 'Correction' };
 // « En ligne » n'est jamais affirmé : un appareil est « synchronisé récemment » (preuve : dernière synchronisation dans le délai existant) ou « sans nouvelles ».
 const posteLabel: Record<string, string> = { actif: 'Synchronisé récemment', silencieux: 'Sans nouvelles', revoque: 'Révoqué' };
-const scope = computed(() => (props.event ? (props.event.is_permanent ? 'contexte permanent (titulaires)' : `activité « ${props.event.name} »`) : 'aucune activité'));
+const scope = computed(() => (props.event ? (props.event.is_permanent ? 'site (personnel permanent)' : `activité « ${props.event.name} »`) : 'aucune activité'));
 const posteClass: Record<string, string> = { actif: 'bg-green-100 text-green-900', silencieux: 'bg-amber-100 text-amber-900', revoque: 'bg-slate-200 text-slate-700' };
 </script>
 
@@ -61,13 +61,13 @@ const posteClass: Record<string, string> = { actif: 'bg-green-100 text-green-900
 
       <section aria-labelledby="site-entier" data-testid="perimetre-site">
       <h2 id="site-entier" class="text-lg font-bold">Le site entier</h2>
-      <p class="admin-muted mb-3 text-sm" data-testid="perimetre-site-texte">Toutes activités et contexte permanent confondus. Ces indicateurs ne changent jamais avec l’activité consultée plus bas.</p>
+      <p class="admin-muted mb-3 text-sm" data-testid="perimetre-site-texte">Toutes activités et site confondus. Ces indicateurs ne changent jamais avec l’activité consultée plus bas.</p>
       <dl class="grid grid-cols-2 gap-3 xl:grid-cols-5" data-testid="indicateurs-operations">
         <div class="site-kpi min-w-0 bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="arrow" :size="36" /></span><div class="min-w-0 break-words"><dd class="text-3xl font-extrabold" data-testid="kpi-entrees">{{ general.mouvements.entrees }}</dd><dt class="font-semibold">Entrées (24 h)</dt></div></div>
         <div class="site-kpi min-w-0 bg-rose-50"><span class="site-kpi-icon text-rose-700"><AdminIcon name="shield" :size="36" /></span><div class="min-w-0 break-words"><dd class="text-3xl font-extrabold" data-testid="kpi-refus">{{ general.mouvements.refus }}</dd><dt class="font-semibold">Accès refusés (24 h)</dt></div></div>
         <div class="site-kpi min-w-0 bg-amber-50"><span class="site-kpi-icon text-amber-700"><AdminIcon name="alert" :size="36" /></span><div class="min-w-0 break-words"><dd class="text-3xl font-extrabold" data-testid="kpi-incidents">{{ incidents }}</dd><dt class="font-semibold">Incidents en cours</dt></div></div>
         <div class="site-kpi min-w-0 bg-sky-50"><span class="site-kpi-icon text-sky-700"><AdminIcon name="monitor" :size="36" /></span><div class="min-w-0 break-words"><dd class="text-3xl font-extrabold" data-testid="kpi-postes">{{ general.postes.actifs }}<small class="text-lg"> / {{ general.postes.total }}</small></dd><dt class="font-semibold">Postes actifs <span class="font-normal text-slate-600">(état administratif)</span></dt><small class="text-slate-600" data-testid="kpi-appareils">{{ general.postes.appareils_synchronises }} appareil{{ general.postes.appareils_synchronises > 1 ? 's' : '' }} synchronisé{{ general.postes.appareils_synchronises > 1 ? 's' : '' }} récemment · {{ general.postes.appareils_silencieux }} silencieux</small></div></div>
-        <div class="site-kpi min-w-0 bg-indigo-50"><span class="site-kpi-icon text-indigo-700"><AdminIcon name="users" :size="36" /></span><div class="min-w-0 break-words"><dd class="text-3xl font-extrabold" data-testid="kpi-presents">{{ general.presents.total }}</dd><dt class="font-semibold">Personnes présentes sur le site</dt><small class="text-slate-600" data-testid="kpi-presents-detail">Identités distinctes · dernier passage : {{ general.presents.permanents }} en contexte permanent, {{ general.presents.activites }} en activité</small></div></div>
+        <div class="site-kpi min-w-0 bg-indigo-50"><span class="site-kpi-icon text-indigo-700"><AdminIcon name="users" :size="36" /></span><div class="min-w-0 break-words"><dd class="text-3xl font-extrabold" data-testid="kpi-presents">{{ general.presents.total }}</dd><dt class="font-semibold">Personnes présentes sur le site</dt><small class="text-slate-600" data-testid="kpi-presents-detail">Identités distinctes · dernier passage : {{ general.presents.permanents }} sur le site (personnel permanent), {{ general.presents.activites }} en activité</small></div></div>
       </dl>
       </section>
 
@@ -77,7 +77,7 @@ const posteClass: Record<string, string> = { actif: 'bg-green-100 text-green-900
 
       <h2 class="text-lg font-bold" data-testid="titre-detail">Détail par activité</h2>
       <label class="block max-w-md text-sm font-semibold">Activité consultée (périmètre des panneaux ci-dessous, sauf mention « site entier »)
-        <select class="field" :value="event?.id ?? ''" data-testid="choix-activite" @change="choose"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.is_permanent ? 'Contexte permanent (titulaires)' : e.name }}</option></select>
+        <select class="field" :value="event?.id ?? ''" data-testid="choix-activite" @change="choose"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.is_permanent ? 'Site (personnel permanent)' : e.name }}</option></select>
       </label>
 
       <!-- Supervision -->
@@ -137,10 +137,10 @@ const posteClass: Record<string, string> = { actif: 'bg-green-100 text-green-900
         <h2 class="text-lg font-bold">Présences</h2>
         <div class="space-y-1">
           <p class="text-xs font-semibold text-slate-700">Site entier</p>
-          <p data-testid="presences-site">{{ general.presents.total }} personne{{ general.presents.total > 1 ? 's' : '' }} présente{{ general.presents.total > 1 ? 's' : '' }} sur le site (identités distinctes ; dernier passage : {{ general.presents.permanents }} en contexte permanent, {{ general.presents.activites }} en activité). Une présence se déduit des entrées et sorties confirmées et non corrigées, jamais de la simple possession d'un badge.</p>
+          <p data-testid="presences-site">{{ general.presents.total }} personne{{ general.presents.total > 1 ? 's' : '' }} présente{{ general.presents.total > 1 ? 's' : '' }} sur le site (identités distinctes ; dernier passage : {{ general.presents.permanents }} sur le site (personnel permanent), {{ general.presents.activites }} en activité). Une présence se déduit des entrées et sorties confirmées et non corrigées, jamais de la simple possession d'un badge.</p>
           <p v-if="general.presents.multi_contextes > 0" class="text-sm text-amber-900" data-testid="presences-multi">{{ general.presents.multi_contextes }} présence{{ general.presents.multi_contextes > 1 ? 's' : '' }} enregistrée{{ general.presents.multi_contextes > 1 ? 's' : '' }} dans plusieurs contextes pour une même personne : comptée{{ general.presents.multi_contextes > 1 ? 's' : '' }} une seule fois au total.</p>
           <p class="text-xs font-semibold text-slate-700">Présents par contexte (indicateurs distincts, non additionnés)</p>
-          <ul class="text-sm" data-testid="presences-contextes"><li v-for="c in general.presents.contextes" :key="c.event_id">{{ c.is_permanent ? 'Contexte permanent' : c.name }} : <strong>{{ c.presents }}</strong></li></ul>
+          <ul class="text-sm" data-testid="presences-contextes"><li v-for="c in general.presents.contextes" :key="c.event_id">{{ c.is_permanent ? 'Site (personnel permanent)' : c.name }} : <strong>{{ c.presents }}</strong></li></ul>
         </div>
         <div v-if="centre" class="space-y-1"><p class="text-xs font-semibold text-blue-900">Périmètre : {{ scope }}</p><p data-testid="presences-activite">Dans ce contexte : <strong>{{ centre.presents.count }}</strong> présent{{ centre.presents.count > 1 ? 's' : '' }}.</p></div>
         <div class="flex flex-wrap gap-3"><Link v-if="can.presences" :href="href('/pilotage/presents')" class="site-btn site-btn-outline">Liste des présents</Link><Link v-if="can.presences" :href="href('/pilotage/evacuation')" class="site-btn site-btn-outline" data-testid="vers-evacuation">Liste d’évacuation</Link></div>

@@ -70,3 +70,23 @@ it('permet de quitter une activité devenue close', function () {
     $this->postJson('/poste/api/activite', ['event_id' => $this->b], $this->headers)->assertOk();
     $this->getJson('/poste/api/liste/version', $this->headers)->assertOk();
 });
+
+it('permet de revenir au mode site (aucune activité), même quand l’activité en cours est close, puis de rechoisir une activité', function () {
+    $this->postJson('/poste/api/activite', ['event_id' => null], $this->headers)->assertOk();
+    expect(DB::table('devices')->where('id', $this->device)->value('event_id'))->toBeNull();
+    expect(DB::table('audit_logs')->where('action', 'poste.mode_site')->count())->toBe(1);
+    expect($this->getJson('/poste/api/liste', $this->headers)->assertOk()->json('event'))->toBeNull();
+    $this->getJson('/poste/api/contexte', $this->headers)->assertStatus(409)->assertJsonPath('code', 'aucune_activite_en_cours');
+
+    $this->postJson('/poste/api/activite', ['event_id' => $this->b], $this->headers)->assertOk();
+    expect(DB::table('devices')->where('id', $this->device)->value('event_id'))->toBe($this->b);
+    DB::table('events')->where('id', $this->b)->update(['status' => 'clos']);
+    $this->postJson('/poste/api/activite', ['event_id' => null], $this->headers)->assertOk();
+    expect(DB::table('devices')->where('id', $this->device)->value('event_id'))->toBeNull();
+});
+
+it('exige un champ event_id (null explicite pour le mode site) et refuse un identifiant invalide', function () {
+    $this->postJson('/poste/api/activite', [], $this->headers)->assertStatus(422);
+    $this->postJson('/poste/api/activite', ['event_id' => 'pas-un-uuid'], $this->headers)->assertStatus(422);
+    expect(DB::table('devices')->where('id', $this->device)->value('event_id'))->toBe($this->a);
+});

@@ -902,3 +902,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Dette : écrans de correction (décision technique)
 - Décision : un droit dédié `mouvements.corriger` plutôt que de réutiliser `litiges.decider` (nom trompeur) ; attribué au seul superviseur, comme les autres actes de décision sur le journal. L'administrateur configure et consulte, il ne réécrit pas la présence. À confirmer avec le dirigeant si l'administrateur doit aussi pouvoir corriger.
 - Une correction est toujours un nouvel événement avec motif, jamais une modification (journal en ajout seul).
+## Tablette de site, lot 6 : masquer le conteneur des cartes (décision du dirigeant)
+- Choix du dirigeant (3 options présentées) : « d'abord masquer le conteneur ». Retrait complet du modèle reporté (projet à part, ~3 PR, risque sur l'émission et l'impression des cartes).
+- Fait : création automatique et idempotente du registre technique à la première carte ; suppression de l'étape visible et du blocage ; nouveau nom ; libellés « site (personnel permanent) » dans Opérations et Administration.
+- Non fait : aucune table ni contrainte n'est modifiée ; `events.is_permanent` reste la clé du registre technique. Installation de test sans donnée réelle : aucune reprise de données.

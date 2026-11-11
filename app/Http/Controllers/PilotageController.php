@@ -152,7 +152,7 @@ final class PilotageController
         $badge = DB::table('badge_assignments as a')->join('badges as b', 'b.id', '=', 'a.badge_id')->where('a.visitor_id', $visitor)->whereNull('a.returned_at')->whereNull('a.cancelled_at')->first(['b.id', 'b.code', 'b.status']);
         $cancelled = DB::table('badge_assignments as a')->join('badges as b', 'b.id', '=', 'a.badge_id')->where('a.visitor_id', $visitor)->whereNotNull('a.cancelled_at')->orderByDesc('a.cancelled_at')->first(['b.code', 'a.cancelled_at', 'a.cancellation_reason']);
         $refusal = DB::table('refusals')->where('visitor_id', $visitor)->orderByDesc('refused_at')->first(['id', 'reason', 'refused_at', 'decision', 'supervisor_decision']);
-        $present = DB::table('access_events as e')->where('e.visitor_id', $visitor)->whereIn('e.type', ['entree', 'sortie'])->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))->orderByDesc('e.occurred_at')->orderByDesc('e.created_at')->value('e.type') === 'entree';
+        $present = DB::table('access_events as e')->where('e.visitor_id', $visitor)->whereIn('e.type', ['entree', 'sortie'])->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->value('e.type') === 'entree';
 
         return Inertia::render('Pilotage/Visiteur', [
             ...$this->shared((object) ['id' => $row->event_id, 'name' => (string) DB::table('events')->where('id', $row->event_id)->value('name')]),

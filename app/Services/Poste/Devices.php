@@ -101,25 +101,32 @@ final class Devices
     }
 
     /**
-     * L'agent change l'activité du jour de sa tablette, parmi les activités autorisées et ouvertes. Le client envoie d'abord toute sa file ; les opérations
+     * L'agent change l'activité du jour de sa tablette, parmi les activités autorisées et ouvertes, ou revient au mode site (`null`). Le client envoie d'abord toute sa file ; les opérations
      * saisies entre-temps pour l'ancienne activité sont refusées par le serveur (visiteur inconnu) : jamais appliquées à la mauvaise activité.
      */
-    public function switchActivity(Device $device, string $eventId, User $agent): void
+    public function switchActivity(Device $device, ?string $eventId, User $agent): void
     {
         DB::transaction(function () use ($device, $eventId, $agent): void {
             $device = Device::query()->lockForUpdate()->findOrFail($device->id);
             if ($device->revoked_at !== null || $device->token_hash === null) {
                 throw new DeskRefused('appareil_non_enrole', 'Cette tablette n’est pas enrôlée.', 409);
             }
-            if (! DB::table('device_activities')->where('device_id', $device->id)->where('event_id', $eventId)->exists()) {
-                throw new DeskRefused('activite_non_autorisee', 'Cette activité n’est pas autorisée pour cette tablette : demandez à l’administrateur.', 403);
+            // « Aucune activité » (null) : retour au mode site, toujours permis (la tablette contrôle alors le personnel permanent).
+            if ($eventId !== null) {
+                if (! DB::table('device_activities')->where('device_id', $device->id)->where('event_id', $eventId)->exists()) {
+                    throw new DeskRefused('activite_non_autorisee', 'Cette activité n’est pas autorisée pour cette tablette : demandez à l’administrateur.', 403);
+                }
+                EventAvailability::requireOpen($eventId);
             }
-            EventAvailability::requireOpen($eventId);
             if ($device->event_id === $eventId) {
                 return;
             }
-            DB::table('devices')->where('id', $device->id)->update(['event_id' => $eventId, 'updated_at' => now()]);
-            $this->audit->append('poste.activite_changee', $agent->id, ['device_id' => $device->id, 'de' => $device->event_id, 'vers' => $eventId]);
+            try {
+                DB::transaction(fn () => DB::table('devices')->where('id', $device->id)->update(['event_id' => $eventId, 'updated_at' => now()]));
+            } catch (QueryException) {
+                throw new DeskRefused('badges_reserves', 'Des badges de l’activité en cours sont réservés à cette tablette : libérez-les avant de la quitter.', 409);
+            }
+            $this->audit->append($eventId === null ? 'poste.mode_site' : 'poste.activite_changee', $agent->id, ['device_id' => $device->id, 'de' => $device->event_id, 'vers' => $eventId]);
         });
     }
 

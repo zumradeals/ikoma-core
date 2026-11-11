@@ -300,4 +300,20 @@ describe('activité du jour choisie par l’agent', () => {
     const single = await mountDesk({ activities: async () => [choices[0]] });
     expect(single.wrapper.find('[data-testid="selecteur-activite"]').exists()).toBe(false);
   });
+  it('permet de passer en mode site après confirmation (aucune activité), puis recharge la tablette', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload });
+    const { wrapper, switchActivity } = await mountDesk();
+    await wrapper.get('[data-testid="passer-mode-site"]').trigger('click'); await flushPromises();
+    expect(switchActivity).toHaveBeenCalledWith(null);
+    expect(reload).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+  it('ne passe pas en mode site si l’agent refuse la confirmation', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { wrapper, switchActivity } = await mountDesk();
+    await wrapper.get('[data-testid="passer-mode-site"]').trigger('click'); await flushPromises();
+    expect(switchActivity).not.toHaveBeenCalled();
+  });
 });

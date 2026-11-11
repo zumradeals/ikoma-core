@@ -67,6 +67,13 @@ function onSwitchActivity(event: Event) {
   });
 }
 
+// Retour au mode site : plus d'activité en cours, la tablette contrôle le personnel permanent. Même précautions que le changement d'activité (en ligne, étape de recherche).
+const canLeaveForSite = computed(() => !!repo.switchActivity && online.value && ctx.value.step === 'recherche');
+function onLeaveForSite() {
+  if (!window.confirm('Quitter l’activité et passer en mode site ? L’accueil des visiteurs ne sera plus disponible tant qu’une activité n’est pas choisie.')) return;
+  void run(async () => { await repo.switchActivity!(null); window.location.reload(); });
+}
+
 // Panneau du poste : recalculé quand l'agent revient à la recherche, quand la file ou la synchronisation changent.
 const summary = ref<DeskSummary | null>(null);
 let summarySeq = 0;
@@ -206,6 +213,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
           <div class="poste-title-chips">
             <p v-if="choices.length > 1" class="poste-chip-box" data-testid="selecteur-activite"><AdminIcon name="calendar" :size="22" /> <label for="activite-du-jour">Événement :</label> <select id="activite-du-jour" class="poste-activity-select" :value="context.event.id" :disabled="!canSwitch" @change="onSwitchActivity"><option v-for="c in choices" :key="c.id" :value="c.id">{{ c.name }}</option></select></p>
             <p v-else class="poste-chip-box"><AdminIcon name="calendar" :size="22" /> Événement : <strong>{{ context.event.name }}</strong></p>
+            <p v-if="repo.switchActivity" class="poste-chip-box"><button type="button" class="btn-soft" :disabled="!canLeaveForSite" data-testid="passer-mode-site" @click="onLeaveForSite">Passer en mode site</button></p>
             <p class="poste-chip-box"><AdminIcon name="layers" :size="22" /> Opérations en attente : <strong data-testid="en-attente">{{ sync ? sync.pending : pending }}</strong></p>
           </div>
         </div>
