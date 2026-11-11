@@ -8,7 +8,6 @@ const props = defineProps<{
   events: { id: string; name: string }[]; eventId: string | null; q: string; zones: { id: string; name: string }[]; points: { id: string; name: string }[];
   mappings: { id: string; checkpoint_id: string; point: string; zone_id: string; zone: string }[]; entitlements: Entitlement[]; participants: { id: string; full_name: string; organisation: string | null }[]; maxHours: number; now: string;
 }>();
-const mapForm = useForm({ event_id: props.eventId ?? '', checkpoint_id: '', zone_id: '' });
 const grantForm = useForm({ visitor_id: '', zone_id: '', kind: 'standard', reason: '', valid_from: '', valid_until: '' });
 const maxForm = useForm({ max_heures: props.maxHours });
 const search = useForm({ q: props.q });
@@ -16,8 +15,6 @@ const state = (e: Entitlement) => e.revoked_at ? 'Retirée' : e.suspended_at ? '
 const chosen = computed(() => props.participants.find(p => p.id === grantForm.visitor_id));
 function chooseEvent(id: string) { router.get('/administration/acces', { event: id }); }
 function find() { router.get('/administration/acces', { event: props.eventId, q: search.q }, { preserveState: true }); }
-function saveMap() { mapForm.event_id = props.eventId ?? ''; mapForm.post('/administration/acces/correspondances', { preserveScroll: true, onSuccess: () => mapForm.reset('checkpoint_id', 'zone_id') }); }
-function unmap(id: string) { if (window.confirm('Retirer cette correspondance ?')) router.post(`/administration/acces/correspondances/${id}/retirer`, {}, { preserveScroll: true }); }
 function grant() { grantForm.post('/administration/acces/habilitations', { preserveScroll: true, onSuccess: () => grantForm.reset('visitor_id', 'reason') }); }
 function act(id: string, action: 'suspendre' | 'retirer') {
   const reason = window.prompt(action === 'suspendre' ? 'Motif de la suspension ?' : 'Motif du retrait ?');
