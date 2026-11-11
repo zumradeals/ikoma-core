@@ -43,7 +43,7 @@ final class AdminOverview
         $escalated = (int) DB::table('alerts')->whereNotNull('escalated_at')->whereNull('acknowledged_at')->whereNull('resolved_at')->count();
 
         return [
-            'as_of' => $now->format('Y-m-d\TH:i:s\Z'), 'perimetre' => 'Tout le site (toutes activités et contexte permanent)',
+            'as_of' => $now->format('Y-m-d\TH:i:s\Z'), 'perimetre' => 'Tout le site (toutes activités et personnel permanent)',
             'donnees' => ['sauvegarde' => $backup['etat'], 'actualise' => $now->format('Y-m-d\TH:i:s\Z')],
             'indicateurs' => [
                 'personnes' => ['enregistrees' => (int) $personKpis['personnes']],
@@ -168,12 +168,12 @@ final class AdminOverview
             ->orderByDesc('e.occurred_at')->orderByDesc('e.id')->limit(self::MAX_MOVEMENTS)->get(['e.occurred_at', 'e.type', 'e.checkpoint', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
         $out = [];
         foreach ($rows as $r) {
-            $out[] = ['at' => (string) $r->occurred_at, 'type' => (string) $r->type, 'checkpoint' => $r->checkpoint, 'context' => $r->is_permanent ? 'Contexte permanent' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'autorise'];
+            $out[] = ['at' => (string) $r->occurred_at, 'type' => (string) $r->type, 'checkpoint' => $r->checkpoint, 'context' => $r->is_permanent ? 'Site (personnel permanent)' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'autorise'];
         }
         $refusals = DB::table('refusals as r')->join('visitors as v', 'v.id', '=', 'r.visitor_id')->join('events as ev', 'ev.id', '=', 'v.event_id')
             ->orderByDesc('r.refused_at')->limit(self::MAX_MOVEMENTS)->get(['r.refused_at', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
         foreach ($refusals as $r) {
-            $out[] = ['at' => (string) $r->refused_at, 'type' => 'refus', 'checkpoint' => null, 'context' => $r->is_permanent ? 'Contexte permanent' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'refuse'];
+            $out[] = ['at' => (string) $r->refused_at, 'type' => 'refus', 'checkpoint' => null, 'context' => $r->is_permanent ? 'Site (personnel permanent)' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'refuse'];
         }
         usort($out, fn (array $a, array $b): int => strcmp($b['at'], $a['at']));
 
