@@ -239,7 +239,7 @@ it('associe une catégorie d’événement à une catégorie institutionnelle sa
     app(InstitutionalCategories::class)->initialize($this->admin);
     [$event, [$catA, $catB]] = holderEvent();
     $zone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone, 'event_id' => null, 'name' => 'Zone fictive', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone, 'name' => 'Zone fictive', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('category_zone')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'category_id' => $catA, 'zone_id' => $zone, 'created_at' => now(), 'updated_at' => now()]);
     $zonesBefore = DB::table('category_zone')->orderBy('id')->get()->toArray();
     $link = fn (string $cat, ?string $code) => $this->actingAs($this->admin)->put('/administration/categories-institutionnelles/liaison', ['event_id' => $event, 'category_id' => $cat, 'code' => $code]);

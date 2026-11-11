@@ -17,12 +17,6 @@ class Event extends Model
         return ['starts_at' => 'immutable_datetime', 'ends_at' => 'immutable_datetime'];
     }
 
-    /** @return HasMany<Zone, $this> */
-    public function zones(): HasMany
-    {
-        return $this->hasMany(Zone::class);
-    }
-
     /** @return HasMany<Category, $this> */
     public function categories(): HasMany
     {

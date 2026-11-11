@@ -449,7 +449,7 @@ final class SiteControl
             throw new DeskRefused('point_inconnu', 'Sans activité en cours, seul le point de ce poste est contrôlé.', 422);
         }
         $row = $point['type'] === 'zone'
-            ? ActivityZones::query($poste->event_id)->where('id', $point['id'])->first(['id', 'name'])
+            ? ActivityZones::query()->where('id', $point['id'])->first(['id', 'name'])
             : DB::table('devices')->where('id', $point['id'])->where('event_id', $poste->event_id)->first(['id', 'name', 'station']);
         if ($row === null) {
             throw new DeskRefused('point_inconnu', 'Point de contrôle inconnu pour cet événement.', 422);

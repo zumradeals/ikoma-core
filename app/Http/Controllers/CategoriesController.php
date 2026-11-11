@@ -22,7 +22,7 @@ final class CategoriesController
         Gate::authorize('categories.gerer');
         $categories = Category::with(['event:id,name', 'zones:id,name'])->orderBy('name')->get()->map(fn (Category $c) => ['id' => $c->id, 'event_id' => $c->event_id, 'event_name' => $c->event->name, 'name' => $c->name, 'color' => $c->color, 'priority_circuit' => $c->priority_circuit, 'closure_supervisor_only' => $c->closure_supervisor_only, 'zone_ids' => $c->zones->pluck('id'), 'zone_names' => $c->zones->pluck('name')]);
 
-        return Inertia::render('Admin/Categories', ['events' => Event::orderBy('name')->get(['id', 'name']), 'zones' => Zone::orderBy('name')->get(['id', 'name', 'event_id']), 'categories' => $categories]);
+        return Inertia::render('Admin/Categories', ['events' => Event::orderBy('name')->get(['id', 'name']), 'zones' => Zone::orderBy('name')->get(['id', 'name']), 'categories' => $categories]);
     }
 
     /** @return array{event_id:string,name:string,color:string,priority_circuit:bool,closure_supervisor_only:bool,zone_ids:list<string>} */
@@ -31,7 +31,7 @@ final class CategoriesController
         $event = $category ? $category->event_id : $r->input('event_id');
 
         $r->validate(['event_id' => ['bail', 'required', 'uuid', $category ? Rule::in([$event]) : Rule::exists('events', 'id')]]);
-        $data = $r->validate(['event_id' => ['required', 'uuid', $category ? Rule::in([$event]) : Rule::exists('events', 'id')], 'name' => ['required', 'string', 'max:120', Rule::unique('categories')->where('event_id', $event)->ignore($category?->id)], 'color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'], 'priority_circuit' => 'required|boolean', 'zone_ids' => 'present|array', 'zone_ids.*' => ['bail', 'required', 'uuid', 'distinct', Rule::exists('zones', 'id')->where(fn ($q) => $q->where('event_id', $event)->orWhereNull('event_id'))]]);
+        $data = $r->validate(['event_id' => ['required', 'uuid', $category ? Rule::in([$event]) : Rule::exists('events', 'id')], 'name' => ['required', 'string', 'max:120', Rule::unique('categories')->where('event_id', $event)->ignore($category?->id)], 'color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'], 'priority_circuit' => 'required|boolean', 'zone_ids' => 'present|array', 'zone_ids.*' => ['bail', 'required', 'uuid', 'distinct', Rule::exists('zones', 'id')]]);
 
         return [...$data, 'priority_circuit' => $r->boolean('priority_circuit'), 'closure_supervisor_only' => $r->boolean('closure_supervisor_only'), 'zone_ids' => array_values($data['zone_ids'])];
     }

@@ -62,7 +62,7 @@ final class ParticipationEntitlements
             if ($visitor->closed_at !== null || $visitor->withdrawn_at !== null || $visitor->status === 'refuse') {
                 throw ValidationException::withMessages(['visitor_id' => 'Cette participation est clôturée, retirée ou refusée : aucune habilitation ne peut lui être accordée.']);
             }
-            if (! ActivityZones::allows($visitor->event_id, $zoneId)) {
+            if (! ActivityZones::allows($zoneId)) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
             }
             $overlap = DB::table('participation_entitlements')->where('visitor_id', $visitorId)->where('zone_id', $zoneId)->whereNull('revoked_at')->where('valid_from', '<', $end)->where('valid_until', '>', $start)->exists();

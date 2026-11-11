@@ -958,3 +958,6 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 
 ## Zones du site : Z5a, jeux d'essai en zones du site
 - Décision du dirigeant : les recettes peuvent attendre, Z5 est exécuté. Z5a : jeux d'essai et fixtures créent des zones du site (réutilisées par nom) ; Z5b (retrait du code de l'ancien chemin) et Z5c (suppression de la colonne et des tables) suivent.
+
+## Zones du site : Z5b et Z5c, retrait de l'ancien chemin
+- Une zone n'appartient plus à une activité : colonne `zones.event_id` et tables `checkpoint_zones`, `zone_policies` supprimées (migration non réversible) ; politique et garde des zones uniquement côté site ; « règles d'accès » de Site et accès lues dans les zones du site gardées.

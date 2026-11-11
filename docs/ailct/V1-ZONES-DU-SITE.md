@@ -84,3 +84,8 @@ Dans la fiche d'une activité, « Habilitations des participants » ouvre l'écr
 ## Décision proposée sur Z5 (remplacée par la décision du dirigeant ci-dessus : Z5 est exécuté)
 Z5 n'apporte **aucun changement visible** : c'est un nettoyage interne (colonne et tables devenues inutiles). Il coûte cher et comporte un risque réel : changer les jeux d'essai (`DemoSeeder`) et la quarantaine de tests qui en dépendent, sans pouvoir exécuter PHP en local. **Recommandation : suspendre Z5 jusqu'à la recette sur le serveur d'essai**, et ne le reprendre (Z5a, Z5b, Z5c ci-dessus) que si la recette confirme que le modèle « toute zone est une zone du site » convient.
 
+## Z5b et Z5c — écrites (décision du dirigeant : « fais Z5 »)
+- **Z5b** : plus de lecture ni d'écriture de `checkpoint_zones` ni de `zone_policies` ; la garde des zones par un poste est dans Site et accès (`checkpoint_site_zones`) et la politique d'une zone est celle du site (`site_zone_policies`, classification conservée). Les « règles d'accès » de Site et accès lisent les zones du site gardées par chaque poste (elles lisaient l'ancienne table).
+- **Z5c** : migration `2026_12_16_000000_drop_zone_event_ownership` (non réversible) : rejoue par sécurité les reprises Z3 et Z4b, supprime les déclencheurs « zone du site / zone d'activité », réécrit les remises à zéro de la démonstration, supprime les tables `checkpoint_zones` et `zone_policies` et la colonne `zones.event_id` (unicité du nom par site conservée). `ActivityZones` ne distingue plus rien : toute zone est une zone du site.
+- Fin de plan : aucune requête `zones` filtrée par événement dans `app/`.
+

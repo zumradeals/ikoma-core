@@ -28,7 +28,7 @@ final class AdminDashboard
         }
         $e = $event->id;
         $f06Active = app(FoundingModules::class)->f06Active();
-        $zones = (int) ActivityZones::query($e)->count();
+        $zones = (int) ActivityZones::query()->count();
         $categories = (int) DB::table('categories')->where('event_id', $e)->count();
         $visitors = (int) DB::table('visitors')->where('event_id', $e)->where(fn ($q) => $q->whereNull('status')->orWhere('status', '<>', 'refuse'))->count();
         $inCars = $f06Active ? (int) DB::table('visitors')->where('event_id', $e)->whereNotNull('group_id')->count() : 0;

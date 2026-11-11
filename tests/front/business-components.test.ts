@@ -12,21 +12,15 @@ describe('administration L2', () => {
  it('garde le libellé et la priorité même sans couleur valide', () => {
   const wrapper = mount(CategorySwatch, { props: { name: 'VIP', color: 'invalide', priority: true } }); expect(wrapper.text()).toContain('VIP'); expect(wrapper.text()).toContain('Prioritaire'); expect(wrapper.attributes('style')).toContain('border-color');
  });
- it('ne propose que les zones de l’événement choisi et efface la sélection lors du changement', async () => {
-  const wrapper = mount(CategoryForm, { props: { events: [{ id: 'a', name: 'Événement A' }, { id: 'b', name: 'Événement B' }], zones: [{ id: 'za', event_id: 'a', name: 'Zone A' }, { id: 'zb', event_id: 'b', name: 'Zone B' }] } });
-  expect(wrapper.text()).toContain('Zone A'); expect(wrapper.text()).not.toContain('Zone B');
-  await wrapper.find('input[value="za"]').setValue(true); await wrapper.get('select').setValue('b'); expect(wrapper.text()).toContain('Zone B'); expect(wrapper.text()).not.toContain('Zone A');
-  await wrapper.get('select').setValue('a'); expect((wrapper.find('input[value="za"]').element as HTMLInputElement).checked).toBe(false);
- });
- it('propose aussi les zones du site, quel que soit l’événement choisi, avec leur nature', async () => {
-  const wrapper = mount(CategoryForm, { props: { events: [{ id: 'a', name: 'Événement A' }, { id: 'b', name: 'Événement B' }], zones: [{ id: 'za', event_id: 'a', name: 'Zone A' }, { id: 'zs', event_id: null, name: 'Hall du site' }] } });
-  expect(wrapper.text()).toContain('Hall du site'); expect(wrapper.text()).toContain('zone du site'); expect(wrapper.text()).toContain('Zone A');
-  await wrapper.get('select').setValue('b'); expect(wrapper.text()).toContain('Hall du site'); expect(wrapper.text()).not.toContain('Zone A');
+ it('propose toutes les zones du site, quelle que soit l’activité choisie', async () => {
+  const wrapper = mount(CategoryForm, { props: { events: [{ id: 'a', name: 'Événement A' }, { id: 'b', name: 'Événement B' }], zones: [{ id: 'za', name: 'Hall du site' }, { id: 'zs', name: 'Parking du site' }] } });
+  expect(wrapper.text()).toContain('Hall du site'); expect(wrapper.text()).toContain('Parking du site');
+  await wrapper.find('input[value="za"]').setValue(true); await wrapper.get('select').setValue('b'); expect(wrapper.text()).toContain('Hall du site');
  });
 });
 
 it('ne permet pas d’activer la clôture réservée au superviseur tant que son parcours n’existe pas, mais permet de la retirer (S02)', () => {
-  const base = { events: [{ id: 'a', name: 'Événement A' }], zones: [] as { id: string; event_id: string; name: string }[] };
+  const base = { events: [{ id: 'a', name: 'Événement A' }], zones: [] as { id: string; name: string }[] };
   const blocked = mount(CategoryForm, { props: base });
   expect(blocked.get('[data-testid="cloture-reservee"]').attributes('disabled')).toBeDefined();
   expect(blocked.get('[data-testid="cloture-reservee-indisponible"]').text()).toContain('rendrait toute sortie impossible');

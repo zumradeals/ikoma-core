@@ -76,7 +76,7 @@ final class Desk
         $category = DB::table('categories')->where('id', $visitor->category_id)->first(['id', 'name', 'color', 'priority_circuit']);
         $unlisted = $visitor->source === 'non listé';
         $zones = $unlisted
-            ? ActivityZones::query($visitor->event_id)->where('est_accueil', true)->orderBy('name')->pluck('name')
+            ? ActivityZones::query()->where('est_accueil', true)->orderBy('name')->pluck('name')
             : DB::table('category_zone as cz')->join('zones as z', 'z.id', '=', 'cz.zone_id')->where('cz.category_id', $visitor->category_id)->orderBy('z.name')->pluck('z.name');
         $badge = DB::table('badge_assignments as a')->join('badges as b', 'b.id', '=', 'a.badge_id')->where('a.visitor_id', $visitor->id)->whereNull('a.returned_at')->whereNull('a.cancelled_at')->value('b.code');
 

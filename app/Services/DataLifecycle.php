@@ -94,7 +94,7 @@ final class DataLifecycle
             if (DB::table('badge_transfers')->where('from_event_id', $id)->orWhere('to_event_id', $id)->exists()) {
                 $reasons[] = 'Des badges ont circulé depuis ou vers cette activité : conservez ses références.';
             }
-            foreach (['category_zone', 'categories', 'zones'] as $configuration) {
+            foreach (['category_zone', 'categories'] as $configuration) {
                 $counts[$configuration] = DB::table($configuration)->where('event_id', $id)->count();
             }
         } elseif ($entity === 'categorie') {
@@ -115,7 +115,7 @@ final class DataLifecycle
             }
         }
 
-        return ['entity' => $entity, 'id' => $id, 'label' => $row->name ?? $row->full_name ?? $row->code ?? $id, 'event_id' => $entity === 'evenement' ? $id : $row->event_id, 'allowed' => $reasons === [], 'reasons' => $reasons, 'counts' => $counts, 'irreversible' => true, 'retained' => ['Journal d’audit', 'Identifiants de badges retirés, non réattribuables'], 'fingerprint' => $this->fingerprint()];
+        return ['entity' => $entity, 'id' => $id, 'label' => $row->name ?? $row->full_name ?? $row->code ?? $id, 'event_id' => $entity === 'evenement' ? $id : ($row->event_id ?? null), 'allowed' => $reasons === [], 'reasons' => $reasons, 'counts' => $counts, 'irreversible' => true, 'retained' => ['Journal d’audit', 'Identifiants de badges retirés, non réattribuables'], 'fingerprint' => $this->fingerprint()];
     }
 
     /** @return array<string,int> */
@@ -136,7 +136,7 @@ final class DataLifecycle
             if ($entity === 'lot') {
                 DB::table('badges')->where('badge_batch_id', $id)->delete();
             } elseif ($entity === 'evenement') {
-                foreach (['category_zone', 'categories', 'zones'] as $table) {
+                foreach (['category_zone', 'categories'] as $table) {
                     DB::table($table)->where('event_id', $id)->delete();
                 }
             } elseif ($entity === 'categorie') {

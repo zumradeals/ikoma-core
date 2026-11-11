@@ -28,7 +28,7 @@ final class SiteEntitlements
     /** @return list<object> */
     public function zones(): array
     {
-        return DB::table('zones as z')->leftJoin('site_zone_policies as p', 'p.zone_id', '=', 'z.id')->whereNull('z.event_id')->orderBy('z.name')
+        return DB::table('zones as z')->leftJoin('site_zone_policies as p', 'p.zone_id', '=', 'z.id')->orderBy('z.name')
             ->get(['z.id', 'z.name', 'p.permanent_allowed', 'p.offline_entry_allowed'])->all();
     }
 
@@ -39,7 +39,7 @@ final class SiteEntitlements
             throw ValidationException::withMessages(['offline' => 'Une zone fermée aux titulaires permanents ne peut pas les accepter hors ligne.']);
         }
         DB::transaction(function () use ($zoneId, $permanentAllowed, $offlineAllowed, $actor, $classification): void {
-            if (! DB::table('zones')->where('id', $zoneId)->whereNull('event_id')->exists()) {
+            if (! DB::table('zones')->where('id', $zoneId)->exists()) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone du site inconnue.']);
             }
             $classification ??= (string) (DB::table('site_zone_policies')->where('zone_id', $zoneId)->value('classification') ?? 'Standard');
@@ -63,7 +63,7 @@ final class SiteEntitlements
             if ($holder->status === 'clos') {
                 throw ValidationException::withMessages(['holder_id' => 'Cette personne est clôturée : aucune habilitation ne peut lui être accordée.']);
             }
-            if (! DB::table('zones')->where('id', $zoneId)->whereNull('event_id')->exists()) {
+            if (! DB::table('zones')->where('id', $zoneId)->exists()) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone du site inconnue.']);
             }
             $overlap = DB::table('holder_site_entitlements')->where('holder_id', $holderId)->where('zone_id', $zoneId)->whereNull('revoked_at')

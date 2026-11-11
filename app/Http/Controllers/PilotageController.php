@@ -93,7 +93,7 @@ final class PilotageController
             ...$this->shared($event), 'filters' => ['q' => $filters['q'] ?? '', 'category' => $filters['category'] ?? '', 'zone' => $filters['zone'] ?? ''],
             'rows' => $event ? $this->pilotage->presentRows($event->id, $filters, Pilotage::PER_PAGE, ($page - 1) * Pilotage::PER_PAGE) : [], 'total' => $total, 'page' => $page, 'perPage' => Pilotage::PER_PAGE,
             'categories' => $event ? DB::table('categories')->where('event_id', $event->id)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']) : [],
-            'zones' => $event ? ActivityZones::query($event->id)->orderBy('name')->pluck('name') : [],
+            'zones' => $event ? ActivityZones::query()->orderBy('name')->pluck('name') : [],
         ]);
     }
 

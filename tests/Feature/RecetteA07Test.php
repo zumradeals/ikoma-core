@@ -38,7 +38,7 @@ function a07Participation(): array
     $event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $event, 'name' => 'Événement fictif A07', 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(5), 'created_at' => now(), 'updated_at' => now()]);
     $zone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone, 'event_id' => null, 'name' => 'Hall fictif', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone, 'name' => 'Hall fictif', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('site_zone_policies')->insert(['zone_id' => $zone, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
     $device = (string) Str::uuid();
     DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', A07_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);

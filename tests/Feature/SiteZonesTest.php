@@ -26,10 +26,10 @@ it('crée une zone du site sans événement, rattachée au site, et la liste dan
 });
 
 it('refuse deux zones du site de même nom (casse ignorée)', function () {
-    $before = DB::table('zones')->whereNull('event_id')->count();
+    $before = DB::table('zones')->count();
     $this->post('/administration/site/zones', ['name' => 'Cour fictive'])->assertSessionHasNoErrors();
     $this->post('/administration/site/zones', ['name' => 'COUR fictive'])->assertSessionHasErrors('name');
-    expect(DB::table('zones')->whereNull('event_id')->count())->toBe($before + 1);
+    expect(DB::table('zones')->count())->toBe($before + 1);
 });
 
 it('renomme une zone du site', function () {

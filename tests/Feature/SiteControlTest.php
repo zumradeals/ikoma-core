@@ -59,7 +59,7 @@ beforeEach(function () {
     $this->event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $this->event, 'name' => 'Événement fictif contrôle du site', 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(10), 'created_at' => now(), 'updated_at' => now()]);
     $this->activityZone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $this->activityZone, 'event_id' => null, 'name' => 'Zone réutilisée fictive', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $this->activityZone, 'name' => 'Zone réutilisée fictive', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('site_zone_policies')->insert(['zone_id' => $this->activityZone, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
     $this->device = (string) Str::uuid();
     DB::table('devices')->insert(['id' => $this->device, 'event_id' => $this->event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', SC_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
