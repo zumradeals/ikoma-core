@@ -36,7 +36,7 @@ final class ListSnapshot
 
         // Cartes permanentes, habilitations et politiques de zone : toute révocation ou habilitation modifiée change la version et est donc reprise à la prochaine synchronisation.
         // Le point de contrôle du poste (et donc ses capacités) fait partie de la copie : le modifier change la version.
-        return sha1((string) $row->v.'|'.$e.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-').'|'.md5(json_encode([PostCapabilities::capabilities($poste), PostCapabilities::requiresDirection($poste)], JSON_THROW_ON_ERROR)));
+        return sha1((string) $row->v.'|'.$e.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e, $poste->checkpoint_id), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-').'|'.md5(json_encode([PostCapabilities::capabilities($poste), PostCapabilities::requiresDirection($poste)], JSON_THROW_ON_ERROR)));
     }
 
     private function groupMode(): string
@@ -77,7 +77,7 @@ final class ListSnapshot
             'entitlements' => DB::table('participation_entitlements')->where('event_id', $e)->whereNull('revoked_at')->whereNull('suspended_at')->where('valid_until', '>=', now())->get(['visitor_id', 'zone_id', 'valid_from', 'valid_until']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
             'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'job_title' => $v->position, 'visit_purpose' => $v->visit_purpose, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),
-            'permanent' => app(PermanentAccess::class)->snapshot($e),
+            'permanent' => app(PermanentAccess::class)->snapshot($e, $poste->checkpoint_id),
             'postes' => DB::table('devices')->where('event_id', $e)->whereNull('revoked_at')->orderBy('name')->get(['id', 'name', 'station'])->map(fn ($d) => ['id' => $d->id, 'name' => $d->station ?? $d->name])->all(),
             // Les jetons QR ne quittent jamais le serveur en clair : la tablette compare le hachage du jeton scanné. Tous les badges de l'événement
             // sont copiés pour le contrôle hors ligne ; `mine` indique ceux que ce poste peut associer (réservés à lui).

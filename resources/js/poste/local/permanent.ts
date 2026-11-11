@@ -9,6 +9,8 @@ export type PermanentSnapshot = {
   trust_minutes: number;
   cards: { hash: string; status: string; holder_id: string; identifier: string }[];
   policies: { zone_id: string; permanent_allowed: boolean; offline_entry_allowed: boolean }[];
+  /** Copie du SITE : zones du site gardées par ce poste, leurs politiques et les habilitations du site (absente si le poste ne garde aucune zone du site). */
+  site?: { zones: { id: string; name: string }[]; policies: { zone_id: string; permanent_allowed: boolean; offline_entry_allowed: boolean }[]; entitlements: { holder_id: string; zone_id: string; valid_from: string | null; valid_until: string | null }[] } | null;
   holders: { id: string; category?: { id: string; name: string; color: string; priority_circuit: boolean } | null; identifier: string; name: string; organisation: string | null; status: string; starts_on: string | null; ends_on: string | null; entitlements: { zone_id: string; valid_from: string | null; valid_until: string | null }[] }[];
 };
 
@@ -66,6 +68,48 @@ export function decidePermanentOffline(snap: PermanentSnapshot, hash: string, po
   }
   if (!permitted.some(e => policyOf(e.zone_id)?.offline_entry_allowed === true)) return refuse('hors_ligne_non_autorise', 'Cette zone n’accepte pas l’entrée des titulaires permanents hors ligne.', who);
   const names = permitted.map(e => zones.find(z => z.id === e.zone_id)?.name).filter((n): n is string => !!n);
+
+  return { allowed: true, reason: null, message: 'Carte permanente valide (contrôle hors ligne).', zones: [...new Set(names)].sort((a, b) => a.localeCompare(b, 'fr')), holder: who };
+}
+
+/**
+ * Décision d'entrée hors ligne au titre du SITE : MÊMES règles que PermanentAccess::decideSite puis offlineRefusalSite côté serveur (habilitation du site sur une zone
+ * gardée par le poste, zone ouverte aux permanents, confiance bornée, zone acceptant l'entrée hors ligne). Retourne null quand le poste ne garde aucune zone du site :
+ * l'appelant applique alors la décision d'activité. Refus par défaut, aucun privilège ajouté par la tablette.
+ */
+export function decidePermanentSiteOffline(snap: PermanentSnapshot, hash: string, now: number, knownAt: string | null): PermanentDecision | null {
+  const site = snap.site;
+  if (!site || site.zones.length === 0) return null;
+  const refuse = (reason: string, message: string, holder: PermanentDecision['holder'] = null): PermanentDecision => ({ allowed: false, reason, message, zones: [], holder });
+  const card = findPermanentCard(snap, hash);
+  if (!card) return refuse('inconnu', 'Badge inconnu.');
+  if (card.status !== 'active') {
+    const [reason, message] = CARD_REFUSALS[card.status] ?? ['carte_revoquee', 'Carte révoquée : accès refusé. Prévenez le superviseur.'];
+    return refuse(reason, message);
+  }
+  const holder = snap.holders.find(h => h.id === card.holder_id);
+  if (!holder) return refuse('habilitation_absente', 'Aucune habilitation valable pour le site : accès refusé.');
+  const who = { identifier: holder.identifier, name: holder.name, organisation: holder.organisation, category: holder.category ?? null };
+  if (holder.status !== 'actif') return refuse('titulaire_clos', 'Titulaire clos : accès refusé.', who);
+  const scoped = site.entitlements.filter(e => e.holder_id === holder.id);
+  const current = scoped.filter(e => (e.valid_from === null || Date.parse(e.valid_from) <= now) && (e.valid_until !== null && Date.parse(e.valid_until) > now));
+  if (current.length === 0) {
+    const day = (iso: string) => new Date(iso).toISOString().slice(0, 10).split('-').reverse().join('/');
+    const upcoming = scoped.filter(e => e.valid_from !== null && Date.parse(e.valid_from) > now).sort((a, b) => Date.parse(a.valid_from as string) - Date.parse(b.valid_from as string))[0];
+    if (upcoming?.valid_from) return refuse('habilitation_non_commencee', `Habilitation pas encore valable : à partir du ${day(upcoming.valid_from)}.`, who);
+    const last = scoped.filter(e => e.valid_until !== null && Date.parse(e.valid_until) <= now).sort((a, b) => Date.parse(b.valid_until as string) - Date.parse(a.valid_until as string))[0];
+    return last?.valid_until ? refuse('habilitation_expiree', `Habilitation expirée le ${day(last.valid_until)} : accès refusé.`, who) : refuse('habilitation_absente', 'Aucune habilitation valable pour le site : accès refusé.', who);
+  }
+  const policyOf = (zoneId: string) => site.policies.find(p => p.zone_id === zoneId);
+  const permitted = current.filter(e => policyOf(e.zone_id)?.permanent_allowed === true);
+  if (permitted.length === 0) return refuse('zone_sans_politique', 'Zone sans politique d’accès pour les titulaires permanents : entrée refusée par défaut.', who);
+  if (!(snap.trust_minutes >= 1)) return refuse('hors_ligne_non_autorise', 'Entrée hors ligne non autorisée : aucune durée de confiance approuvée par l’institution.', who);
+  const known = knownAt ? Date.parse(knownAt) : NaN;
+  if (Number.isNaN(known) || known > now || (now - known) / 60_000 > snap.trust_minutes) {
+    return refuse('confiance_expiree', 'Confiance hors ligne expirée : synchronisez la tablette avant toute nouvelle entrée.', who);
+  }
+  if (!permitted.some(e => policyOf(e.zone_id)?.offline_entry_allowed === true)) return refuse('hors_ligne_non_autorise', 'Cette zone du site n’accepte pas l’entrée des titulaires permanents hors ligne.', who);
+  const names = permitted.map(e => site.zones.find(z => z.id === e.zone_id)?.name).filter((n): n is string => !!n);
 
   return { allowed: true, reason: null, message: 'Carte permanente valide (contrôle hors ligne).', zones: [...new Set(names)].sort((a, b) => a.localeCompare(b, 'fr')), holder: who };
 }
