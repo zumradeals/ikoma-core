@@ -7,8 +7,8 @@ use App\Services\OperationsOverview;
 use App\Services\Participations;
 use App\Services\PermanentHolders;
 use App\Services\Persons;
-use App\Services\Pilotage;
 use App\Services\Presence;
+use App\Services\SiteMovements;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
- * Chantier Opérations — vue globale en lecture seule : les chiffres viennent des événements réels, le contexte permanent et les passages hors activité ne disparaissent pas
+ * Chantier Opérations — vue globale en lecture seule : les chiffres viennent des événements réels, le site et les passages hors activité ne disparaissent pas
  * de la supervision générale, les permissions sont vérifiées côté serveur. Données fictives uniquement.
  */
 
@@ -56,23 +56,15 @@ function opActivityVisitor(): array
     return ['event' => $event, 'visitor' => app(Participations::class)->enrol(test()->admin, $person, ['event_id' => $event, 'category_id' => $category])];
 }
 
-/** @return array{event: string, visitor: string} participation d'un titulaire dans le contexte permanent (carte émise) */
-function opPermanentVisitor(): array
+/** @return array{holder: string, person: string} titulaire permanent présent sur le site (entrée enregistrée au niveau du site) ; $person : même personne qu'une participation d'activité */
+function opPermanentVisitor(?string $person = null): array
 {
-    app(PermanentHolders::class)->createPermanentContext(test()->admin);
-    $person = app(Persons::class)->create(test()->admin, ['full_name' => 'Zzpermanent '.Str::lower(Str::random(6))]);
+    $person ??= app(Persons::class)->create(test()->admin, ['full_name' => 'Zzpermanent '.Str::lower(Str::random(6))]);
     $holder = app(PermanentHolders::class)->create(['position' => 'Formateur fictif', 'institutional_category' => 'AILCT-01'], test()->admin, false, $person);
     app(HolderCards::class)->issue($holder, test()->admin, true);
-    $event = (string) DB::table('events')->where('is_permanent', true)->value('id');
-    // Les cartes sont désormais émises au niveau du site, sans participation : on reconstitue ici la participation d'une ancienne carte du registre technique,
-    // seule forme de passage encore lue par la supervision générale avant le rattachement définitif (étape 4).
-    $category = (string) Str::uuid();
-    DB::table('categories')->insert(['id' => $category, 'event_id' => $event, 'name' => 'Ancien registre', 'color' => '#336699', 'priority_circuit' => false, 'institutional_code' => 'AILCT-01', 'created_at' => now(), 'updated_at' => now()]);
-    $row = DB::table('permanent_holders')->where('id', $holder)->first();
-    DB::table('visitors')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'full_name' => $row->full_name, 'organisation' => $row->organisation, 'position' => $row->position, 'category_id' => $category,
-        'valid_from' => now()->toDateString(), 'valid_until' => '2099-12-31', 'source' => 'listé', 'status' => 'attendu', 'holder_id' => $holder, 'created_at' => now(), 'updated_at' => now()]);
+    app(SiteMovements::class)->record($holder, 'entree', 'accueil', test()->admin);
 
-    return ['event' => $event, 'visitor' => (string) DB::table('visitors')->where('holder_id', $holder)->where('event_id', $event)->value('id')];
+    return ['holder' => $holder, 'person' => $person];
 }
 
 beforeEach(function () {
@@ -121,18 +113,13 @@ it('calcule les indicateurs sur les événements réels : entrées, sorties, con
     expect(array_sum(array_column($out['par_heure'], 'entrees')))->toBe($out['mouvements']['entrees'])->and($in)->not->toBeEmpty();
 });
 
-it('garde visibles dans la supervision générale les passages des titulaires permanents, sans activité ouverte', function () {
+it('garde visibles dans la supervision générale les passages du site des titulaires permanents, sans activité ouverte', function () {
     $overview = app(OperationsOverview::class);
     $before = $overview->general();
-    $p = opPermanentVisitor();
-    opMove($p['event'], $p['visitor'], 'entree');
+    opPermanentVisitor();
     $after = $overview->general();
     expect($after['presents']['permanents'])->toBe($before['presents']['permanents'] + 1)->and($after['presents']['total'])->toBe($before['presents']['total'] + 1)
         ->and($after['mouvements']['entrees'])->toBe($before['mouvements']['entrees'] + 1);
-    // le contexte permanent ne devient jamais l'activité affichée par défaut, mais peut être consulté explicitement
-    $pilotage = app(Pilotage::class);
-    expect($pilotage->event(null)?->id)->not->toBe($p['event'])->and($pilotage->event($p['event'])?->id)->toBe($p['event']);
-    $this->actingAs($this->admin)->get('/administration/operations?event='.$p['event'])->assertOk()->assertInertia(fn (Assert $page) => $page->where('event.id', $p['event'])->where('counters.presents', app(Presence::class)->count($p['event']))->has('centre.presents.rows'));
     // le Pilotage du superviseur affiche aussi le site entier, quelle que soit l'activité consultée
     $this->actingAs($this->supervisor)->get('/pilotage')->assertOk()->assertInertia(fn (Assert $page) => $page->where('site.presents.permanents', $after['presents']['permanents']));
 });
@@ -149,7 +136,7 @@ it('ne modifie rien : la vue Opérations ne fait que lire', function () {
     expect($counts())->toBe($before)->and(DB::table('audit_logs')->count())->toBe($audit);
 });
 
-/** Participation de la MÊME personne canonique à une autre activité (ou au contexte permanent) : une seule identité, plusieurs contextes. */
+/** Participation de la MÊME personne canonique à une autre activité (ou présence sur le site) : une seule identité, plusieurs contextes. */
 function opSecondContext(string $person): array
 {
     $event = (string) Str::uuid();
@@ -178,14 +165,13 @@ it('compte une identité physique une seule fois quand la même personne est pr�
     expect(app(Presence::class)->count($a['event']) + app(Presence::class)->count($b['event']))->toBe(2);
 });
 
-it('compte une seule fois une personne présente dans le contexte permanent et dans une activité', function () {
+it('compte une seule fois une personne présente sur le site et dans une activité', function () {
     $overview = app(OperationsOverview::class);
     $before = $overview->general();
-    $p = opPermanentVisitor();
-    $person = (string) DB::table('visitors')->where('id', $p['visitor'])->value('person_id');
-    $b = opSecondContext($person);
-    opMove($p['event'], $p['visitor'], 'entree', now()->toDateTimeString());
-    opMove($b['event'], $b['visitor'], 'entree', now()->addMinute()->toDateTimeString());
+    $a = opActivityVisitor();
+    $person = (string) DB::table('visitors')->where('id', $a['visitor'])->value('person_id');
+    opPermanentVisitor($person);
+    opMove($a['event'], $a['visitor'], 'entree', now()->addMinute()->toDateTimeString());
     $after = $overview->general();
     expect($after['presents']['total'])->toBe($before['presents']['total'] + 1)->and($after['presents']['multi_contextes'])->toBe($before['presents']['multi_contextes'] + 1);
 });
@@ -240,15 +226,15 @@ it('distingue les postes administrativement actifs, les appareils synchronisés 
 it('ne fait jamais dépendre les indicateurs du site entier de l’activité consultée', function () {
     $a = opActivityVisitor();
     opMove($a['event'], $a['visitor'], 'entree');
-    $p = opPermanentVisitor();
-    opMove($p['event'], $p['visitor'], 'entree');
+    opPermanentVisitor();
+    $other = opActivityVisitor();
     $this->actingAs($this->admin);
     $global = fn (string $query) => $this->get('/administration/operations'.$query)->assertOk()->viewData('page')['props']['general'];
     $withActivity = $global('?event='.$a['event']);
-    $withPermanent = $global('?event='.$p['event']);
+    $withOther = $global('?event='.$other['event']);
     $without = $global('');
     foreach (['mouvements', 'presents', 'alertes', 'litiges', 'postes', 'par_heure'] as $key) {
-        expect($withActivity[$key], $key)->toBe($withPermanent[$key])->and($without[$key], $key)->toBe($withActivity[$key]);
+        expect($withActivity[$key], $key)->toBe($withOther[$key])->and($without[$key], $key)->toBe($withActivity[$key]);
     }
     expect($withActivity['presents']['permanents'])->toBeGreaterThanOrEqual(1);
 });

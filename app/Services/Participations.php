@@ -31,9 +31,6 @@ final class Participations
                 throw ValidationException::withMessages(['person' => 'Cette personne est archivée.']);
             }
             $event = DB::table('events')->where('id', $data['event_id'])->lockForUpdate()->first() ?? throw ValidationException::withMessages(['event_id' => 'Activité introuvable.']);
-            if ($event->is_permanent) {
-                throw ValidationException::withMessages(['event_id' => 'Le contexte permanent n’accepte pas d’inscription ordinaire.']);
-            }
             if (in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
                 throw ValidationException::withMessages(['event_id' => 'Cette activité est clôturée, archivée ou anonymisée.']);
             }

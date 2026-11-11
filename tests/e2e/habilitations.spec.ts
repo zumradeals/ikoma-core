@@ -21,7 +21,6 @@ test('titulaires permanents : habilitations par zone, perte, révocation et remp
   await page.goto('/administration/categories-institutionnelles');
   if (await page.getByTestId('initialiser-categories').isVisible()) await page.getByTestId('initialiser-categories').click();
   await page.goto('/administration/titulaires');
-  if (await page.getByTestId('creer-contexte').isVisible()) { await page.getByTestId('creer-contexte').click(); await expect(page.getByTestId('contexte-permanent')).toContainText('en place'); }
   await page.getByText('Ajouter une personne').click();
   await page.getByTestId('creer-prenom').fill(name.split(' ')[0]);
   await page.getByTestId('creer-nom').fill(name.split(' ').slice(1).join(' '));

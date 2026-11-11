@@ -56,7 +56,6 @@ function aoActivity(): array
 /** @return array{holder: string, badge: string, card: string} carte permanente émise (non imprimée, non remise) */
 function aoCard(): array
 {
-    app(PermanentHolders::class)->createPermanentContext(test()->admin);
     $person = app(Persons::class)->create(test()->admin, ['full_name' => 'Zzcarte '.Str::lower(Str::random(6))]);
     $holder = app(PermanentHolders::class)->create(['position' => 'Formateur fictif', 'institutional_category' => 'AILCT-01'], test()->admin, false, $person);
     DB::table('permanent_holders')->where('id', $holder)->update(['photo_file' => 'portraits/fictif-'.Str::random(6).'.jpg']);

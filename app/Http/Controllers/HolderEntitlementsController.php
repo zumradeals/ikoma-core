@@ -23,7 +23,7 @@ final class HolderEntitlementsController
     public function index(Request $request, HolderEntitlements $entitlements, PermanentAccess $access, SiteEntitlements $site): Response
     {
         $this->authorizeView();
-        $events = DB::table('events')->where('is_permanent', false)->orderByDesc('starts_at')->get(['id', 'name']);
+        $events = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']);
         $requested = $request->query('event');
         $eventId = is_string($requested) && $events->contains('id', $requested) ? $requested : ($events->first()->id ?? null);
         $trust = $access->offlineTrust();
@@ -58,7 +58,7 @@ final class HolderEntitlementsController
     {
         $this->authorizeGrant();
         $data = $request->validate([
-            'event_id' => ['required', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)],
+            'event_id' => ['required', 'uuid', Rule::exists('events', 'id')],
             'holders' => ['required', 'array', 'min:1', 'max:200'], 'holders.*' => ['uuid', 'distinct'],
             'zones' => ['required', 'array', 'min:1', 'max:30'], 'zones.*' => ['uuid', 'distinct'],
             'whole_event' => ['required', 'boolean'],
@@ -116,7 +116,7 @@ final class HolderEntitlementsController
     public function policy(Request $request, string $zone, HolderEntitlements $entitlements): RedirectResponse
     {
         Gate::authorize('zones.gerer');
-        $data = $request->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)], 'classification' => ['required', 'string', 'max:40'], 'permanent_allowed' => ['required', 'boolean'], 'offline_entry_allowed' => ['required', 'boolean']]);
+        $data = $request->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')], 'classification' => ['required', 'string', 'max:40'], 'permanent_allowed' => ['required', 'boolean'], 'offline_entry_allowed' => ['required', 'boolean']]);
         $entitlements->savePolicy($data['event_id'], $zone, $data['classification'], (bool) $data['permanent_allowed'], (bool) $data['offline_entry_allowed'], $request->user());
 
         return back()->with('status', 'Politique de zone enregistrée.');

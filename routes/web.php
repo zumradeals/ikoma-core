@@ -265,7 +265,6 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/administration/titulaires', [PermanentHoldersController::class, 'index'])->middleware('can:listes.importer');
         Route::post('/administration/titulaires', [PermanentHoldersController::class, 'store'])->middleware(['can:listes.importer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/format', [PermanentHoldersController::class, 'format'])->middleware(['can:categories.gerer', 'throttle:titulaires']);
-        Route::post('/administration/titulaires/contexte-permanent', [PermanentHoldersController::class, 'createContext'])->middleware(['can:evenements.gerer', 'throttle:titulaires']);
         Route::put('/administration/titulaires/{holder}', [PermanentHoldersController::class, 'update'])->whereUuid('holder')->middleware(['can:listes.importer', 'throttle:titulaires']);
         Route::post('/administration/titulaires/{holder}/cloturer', [PermanentHoldersController::class, 'close'])->whereUuid('holder')->middleware(['can:listes.importer', 'throttle:titulaires']);
         Route::get('/administration/categories-institutionnelles', [InstitutionalCategoriesController::class, 'index'])->middleware('can:categories.gerer');

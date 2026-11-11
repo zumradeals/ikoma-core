@@ -109,8 +109,8 @@ final class BadgeIssuance
         if ($visitor->category_id === null) {
             return ['sans_categorie', 'Participation sans catégorie : aucun badge ne peut être préparé.'];
         }
-        $event = DB::table('events')->where('id', $visitor->event_id)->first(['status', 'anonymized_at', 'is_permanent']);
-        if ($event === null || $event->is_permanent || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
+        $event = DB::table('events')->where('id', $visitor->event_id)->first(['status', 'anonymized_at']);
+        if ($event === null || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
             return ['evenement_indisponible', 'Cette activité est clôturée, archivée, anonymisée ou permanente : aucun badge temporaire ne peut être préparé.'];
         }
 

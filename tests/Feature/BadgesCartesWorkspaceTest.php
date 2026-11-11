@@ -46,7 +46,6 @@ function bwTemporary(string $name = 'Zztemporaire'): array
 /** @return array{badge: string, code: string, name: string, holder: string} */
 function bwCard(string $name = 'Zzcarte'): array
 {
-    app(PermanentHolders::class)->createPermanentContext(test()->admin);
     $full = $name.' '.Str::lower(Str::random(6));
     $person = app(Persons::class)->create(test()->admin, ['full_name' => $full]);
     $holder = app(PermanentHolders::class)->create(['position' => 'Formateur fictif', 'institutional_category' => 'AILCT-01'], test()->admin, false, $person);

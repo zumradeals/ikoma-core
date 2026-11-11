@@ -78,7 +78,6 @@ it('liste les personnes d’une activité avec leur situation : à générer, su
 });
 
 it('liste les titulaires permanents avec leur situation de carte', function () {
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     $person = app(Persons::class)->create($this->admin, ['full_name' => 'Zztitulaire '.Str::lower(Str::random(6))]);
     $holder = app(PermanentHolders::class)->create(['position' => 'Formateur fictif', 'institutional_category' => 'AILCT-01'], $this->admin, false, $person);
     $r = $this->actingAs($this->admin)->getJson('/administration/badges/preparer/personnes?support=carte_permanente&q=zztitulaire')->assertOk()->json('people');

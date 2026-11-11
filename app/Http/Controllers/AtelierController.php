@@ -39,7 +39,7 @@ final class AtelierController
             Gate::authorize('listes.importer');
             $person = DB::table('visitors')->where('id', $input['person'])->whereNull('withdrawn_at')->whereNull('holder_id')->first(['id', 'event_id', 'category_id', 'full_name']);
         }
-        $events = DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name']);
+        $events = DB::table('events')->orderBy('name')->get(['id', 'name']);
         $preferences = [];
         $settings = DB::table('settings')->where('key', 'like', 'badge_atelier_%')->pluck('value', 'key');
         foreach ($events as $event) {

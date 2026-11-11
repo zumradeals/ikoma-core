@@ -69,7 +69,7 @@ it('protège en base : une habilitation du site ne se modifie pas, ne se supprim
 it('ne mélange pas les moteurs : une habilitation du site n’apparaît pas dans celles d’une activité', function () {
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $this->zone] + sePeriod());
     expect(DB::table('holder_entitlements')->where('holder_id', $this->holder)->count())->toBe(0);
-    $event = (string) DB::table('events')->where('is_permanent', false)->value('id');
+    $event = (string) DB::table('events')->value('id');
     $this->get('/administration/habilitations?event='.$event)->assertOk()->assertInertia(fn ($p) => $p->where('entitlements', []));
 });
 

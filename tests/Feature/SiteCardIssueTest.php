@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\BadgeBatch;
 use App\Models\User;
 use App\Services\BadgeLots;
 use App\Services\CardLifecycle;
@@ -30,8 +29,8 @@ it('émet la carte sans événement : ni registre technique, ni lot, ni catégor
     $holder = ($this->newHolder)();
     $before = [DB::table('events')->count(), DB::table('visitors')->count(), DB::table('categories')->count(), DB::table('badge_batches')->count()];
     $card = $this->cards->issue($holder, $this->admin, false);
-    $row = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.id', $card)->first(['k.event_id as card_event', 'b.event_id', 'b.badge_batch_id', 'b.category_id', 'b.code', 'b.status', 'b.id as badge']);
-    expect($row->card_event)->toBeNull()->and($row->event_id)->toBeNull()->and($row->badge_batch_id)->toBeNull()->and($row->category_id)->toBeNull()
+    $row = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.id', $card)->first(['b.event_id', 'b.badge_batch_id', 'b.category_id', 'b.code', 'b.status', 'b.id as badge']);
+    expect($row->event_id)->toBeNull()->and($row->badge_batch_id)->toBeNull()->and($row->category_id)->toBeNull()
         ->and($row->status)->toBe('Disponible')->and($row->code)->toMatch('/^B-\d{3,}$/')
         ->and([DB::table('events')->count(), DB::table('visitors')->count(), DB::table('categories')->count(), DB::table('badge_batches')->count()])->toBe($before);
     $ledger = DB::table('badge_issuances')->where('badge_id', $row->badge)->first();
@@ -55,16 +54,6 @@ it('numérote les cartes du site de façon continue, sans réutiliser un code re
     expect($number($third['code']))->toBe($number($spare['code']) + 1);
     expect(fn () => DB::transaction(fn () => DB::table('badges')->where('code', $codes[0])->whereNull('event_id')->delete()))->toThrow(QueryException::class);
     expect(fn () => DB::table('badges')->insert(['id' => (string) Str::uuid7(), 'event_id' => null, 'code' => $codes[0], 'qr_token' => bin2hex(random_bytes(32)), 'status' => 'Disponible', 'created_at' => now(), 'updated_at' => now()]))->toThrow(QueryException::class);
-});
-
-it('dépasse les codes des anciennes cartes du registre technique pour qu’aucun code ne se répète au rattachement', function () {
-    $context = app(PermanentHolders::class)->createPermanentContext($this->admin);
-    $category = (string) Str::uuid();
-    DB::table('categories')->insert(['id' => $category, 'event_id' => $context, 'name' => 'Ancien registre', 'color' => '#336699', 'priority_circuit' => false, 'created_at' => now(), 'updated_at' => now()]);
-    $batch = BadgeBatch::create(['event_id' => $context, 'category_id' => $category, 'name' => 'Ancienne carte', 'quantity' => 1, 'margin' => 0]);
-    DB::table('badges')->insert(['id' => (string) Str::uuid7(), 'event_id' => $context, 'category_id' => $category, 'badge_batch_id' => $batch->id, 'code' => 'B-907', 'qr_token' => bin2hex(random_bytes(32)), 'status' => 'Disponible', 'created_at' => now(), 'updated_at' => now()]);
-    $max = (int) DB::table('badges')->where(fn ($q) => $q->whereNull('event_id')->orWhere('event_id', $context))->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
-    expect($max)->toBeGreaterThanOrEqual(907)->and(app(BadgeLots::class)->issueSiteCard('Essai', $this->admin)['code'])->toBe('B-'.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT));
 });
 
 it('imprime, remplace et révoque une carte du site, et la retrouve au contrôle par son QR', function () {

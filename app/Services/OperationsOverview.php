@@ -5,7 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Vue globale du site (V1, chantier Opérations) : LECTURE SEULE, toutes activités et contexte permanent confondus.
+ * Vue globale du site (V1, chantier Opérations) : LECTURE SEULE, toutes activités et site confondus.
  *
  * Aucune table, aucun moteur, aucune règle : les chiffres sont calculés à partir des événements réels (`access_events`, `refusals`, `alerts`, `checkpoints`, `devices`)
  * et des services existants (Presence pour les compteurs par contexte, Pilotage pour le délai de silence des appareils). Le total des présents compte des identités DISTINCTES. Une activité n'est qu'un contexte de consultation : les passages des titulaires
@@ -17,7 +17,7 @@ final class OperationsOverview
 
     /**
      * @return array{as_of: string, since: string, mouvements: array{entrees: int, sorties: int, controles: int, refus: int},
-     *     presents: array{total: int, permanents: int, activites: int, contextes: list<array{event_id: string, name: string, is_permanent: bool, presents: int}>, multi_contextes: int},
+     *     presents: array{total: int, permanents: int, activites: int, contextes: list<array{event_id: string, name: string, presents: int}>, multi_contextes: int},
      *     alertes: array{a_traiter: int, critiques: int}, litiges: int, postes: array{total: int, actifs: int, appareils_enroles: int, appareils_synchronises: int, appareils_silencieux: int},
      *     par_heure: list<array{heure: string, entrees: int, sorties: int}>}
      */
@@ -36,28 +36,34 @@ final class OperationsOverview
         );
         $refus = (int) DB::table('refusals')->where('refused_at', '>=', $sinceSql)->count();
 
-        // Présence PHYSIQUE : une identité (personne canonique) est présente si son dernier mouvement confirmé et non corrigé, tous contextes confondus, est une entrée.
-        // Une même personne présente dans plusieurs activités, ou dans le contexte permanent et une activité, n'est comptée qu'UNE fois.
-        $physical = DB::selectOne(
-            "SELECT count(*) FILTER (WHERE l.type = 'entree') AS total, count(*) FILTER (WHERE l.type = 'entree' AND ev.is_permanent) AS permanents
-             FROM (
-                SELECT DISTINCT ON (COALESCE(v.person_id, v.id)) COALESCE(v.person_id, v.id) AS ident, e.type, e.event_id
+        // Présence PHYSIQUE : une identité (personne canonique) est présente si son dernier mouvement confirmé et non corrigé est une entrée, en activité ou sur le site.
+        // Une même personne présente dans plusieurs activités, ou sur le site et dans une activité, n'est comptée qu'UNE fois.
+        $activityPresent = collect(DB::select(
+            "SELECT l.ident FROM (
+                SELECT DISTINCT ON (COALESCE(v.person_id, v.id)) COALESCE(v.person_id, v.id) AS ident, e.type
                 FROM access_events e JOIN visitors v ON v.id = e.visitor_id
                 WHERE e.type IN ('entree', 'sortie') AND NOT EXISTS (SELECT 1 FROM access_events c WHERE c.corrige_id = e.id)
                 ORDER BY COALESCE(v.person_id, v.id), e.occurred_at DESC, e.seq DESC
-             ) l JOIN events ev ON ev.id = l.event_id",
-        );
-        $physicalTotal = (int) $physical->total;
-        $physicalPermanent = (int) $physical->permanents;
+             ) l WHERE l.type = 'entree'",
+        ))->pluck('ident');
+        $sitePresent = collect(DB::select(
+            "SELECT COALESCE(h.person_id, h.id) AS ident FROM (
+                SELECT DISTINCT ON (e.holder_id) e.holder_id, e.type FROM access_events e
+                WHERE e.event_id IS NULL AND e.holder_id IS NOT NULL AND e.type IN ('entree', 'sortie') AND NOT EXISTS (SELECT 1 FROM access_events c WHERE c.corrige_id = e.id)
+                ORDER BY e.holder_id, e.occurred_at DESC, e.seq DESC
+             ) l JOIN permanent_holders h ON h.id = l.holder_id WHERE l.type = 'entree'",
+        ))->pluck('ident');
+        $physicalTotal = $activityPresent->merge($sitePresent)->unique()->count();
+        $physicalPermanent = $sitePresent->unique()->count();
 
-        // Compteurs PAR CONTEXTE (chaque activité et le contexte permanent comptent leurs propres présents) : indicateurs distincts, jamais additionnés pour obtenir le total du site.
+        // Compteurs PAR ACTIVITÉ (chaque activité compte ses propres présents) : indicateurs distincts, jamais additionnés pour obtenir le total du site.
         $contexts = [];
-        $contextSum = 0;
-        foreach (DB::table('events')->whereIn('id', DB::table('access_events')->whereIn('type', ['entree', 'sortie'])->select('event_id'))->orderByDesc('is_permanent')->orderBy('name')->get(['id', 'name', 'is_permanent']) as $event) {
+        $contextSum = $physicalPermanent;
+        foreach (DB::table('events')->whereIn('id', DB::table('access_events')->whereIn('type', ['entree', 'sortie'])->select('event_id'))->orderBy('name')->get(['id', 'name']) as $event) {
             $n = $this->presence->count((string) $event->id);
             $contextSum += $n;
             if ($n > 0) {
-                $contexts[] = ['event_id' => (string) $event->id, 'name' => (string) $event->name, 'is_permanent' => (bool) $event->is_permanent, 'presents' => $n];
+                $contexts[] = ['event_id' => (string) $event->id, 'name' => (string) $event->name, 'presents' => $n];
             }
         }
 

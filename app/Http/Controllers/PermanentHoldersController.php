@@ -31,7 +31,6 @@ final class PermanentHoldersController
             'categories' => $categories->all(),
             'identifierFormat' => $holders->format(),
             'identifierExample' => $holders->formatIdentifier(1),
-            'permanentContext' => $holders->permanentContext(),
             'canConfigure' => $request->user()->can('categories.gerer'),
             'canCards' => $request->user()->can('badges.gerer'),
             'pipeline' => $request->user()->can('badges.gerer') ? app(HolderCards::class)->pipeline() : null,
@@ -122,14 +121,6 @@ final class PermanentHoldersController
         $holders->saveFormat(['prefix' => (string) ($data['prefix'] ?? ''), 'width' => (int) $data['width'], 'check' => (bool) $data['check']], $request->user());
 
         return back()->with('status', 'Format enregistré pour les prochains identifiants. Les identifiants déjà émis ne changent pas.');
-    }
-
-    public function createContext(Request $request, PermanentHolders $holders): RedirectResponse
-    {
-        Gate::authorize('evenements.gerer');
-        $holders->createPermanentContext($request->user());
-
-        return back()->with('status', 'Contexte permanent créé.');
     }
 
     /** @return array<string, mixed> */

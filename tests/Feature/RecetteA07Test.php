@@ -60,7 +60,6 @@ beforeEach(function () {
     $this->admin = a07User('administrateur');
     $this->agent = a07User('agent_accueil');
     app(InstitutionalCategories::class)->initialize($this->admin);
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     $this->actingAs($this->agent);
 });
 

@@ -245,7 +245,7 @@ it('inscrit une personne connue depuis la saisie d’un invité, sans en créer 
 
 // --- Nature de l'activité ---------------------------------------------------------------------------------------------------------------
 
-it('porte la nature de l’activité (événement, stage, visite) et réserve « permanent » au contexte permanent', function () {
+it('porte la nature de l’activité (événement, stage, visite) et n’admet plus la nature « permanent »', function () {
     $payload = ['name' => 'Stage fictif de sécurité', 'site' => 'Site fictif', 'starts_at' => '2030-11-10T08:00', 'ends_at' => '2030-11-14T18:00'];
     $this->post('/administration/evenements', [...$payload, 'kind' => 'stage'])->assertRedirect();
     expect(DB::table('events')->where('name', 'Stage fictif de sécurité')->value('kind'))->toBe('stage');
@@ -254,7 +254,7 @@ it('porte la nature de l’activité (événement, stage, visite) et réserve «
     $this->post('/administration/evenements', [...$payload, 'name' => 'Nature inconnue', 'kind' => 'permanent'])->assertSessionHasErrors('kind');
     expect(DB::table('events')->where('name', 'Nature inconnue')->exists())->toBeFalse();
     $event = DB::table('events')->where('name', 'Stage fictif de sécurité')->value('id');
-    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event)->update(['kind' => 'permanent'])))->toThrow(QueryException::class, 'réservée');
+    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event)->update(['kind' => 'permanent'])))->toThrow(QueryException::class, 'events_kind_valid'); // plus de contexte permanent : la nature n'existe plus
     expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event)->update(['kind' => 'inconnue'])))->toThrow(QueryException::class);
 });
 

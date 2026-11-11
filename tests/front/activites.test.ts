@@ -19,7 +19,7 @@ const events = [
 ];
 const kpis = { en_cours: 1, participants_actifs: 2, a_venir: 1, cloturees: 1 };
 const profile = (closed = false) => ({
-  event: { id: 'e1', name: 'Stage de sécurité opérationnelle', site: 'Salle 1', kind: 'stage', starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-03-01T18:00:00Z', status: closed ? 'clos' : null, is_permanent: false, closed, anonymized: false },
+  event: { id: 'e1', name: 'Stage de sécurité opérationnelle', site: 'Salle 1', kind: 'stage', starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-03-01T18:00:00Z', status: closed ? 'clos' : null, closed, anonymized: false },
   counts: { participants: 3, actifs: 2, presents: 1, clotures: 1, groupes: 0, vehicules: 0, badges_attribues: 1, badges_restitues: 0, habilitations: 2 },
   categories: [{ id: 'c1', name: 'Stagiaire', participants: 3 }], groups: [], zones: [{ id: 'z1', name: 'Salle fictive', habilitations: 2 }], journal: [{ id: 1, action: 'participation.creee', at: '2027-01-02T08:00:00Z' }],
   enrol: closed ? null : { categories: [{ id: 'c1', name: 'Stagiaire' }], hosts: [] },

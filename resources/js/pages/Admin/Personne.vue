@@ -14,7 +14,7 @@ const props = defineProps<{
   visits?: Record<string, Visit>; vehicleKinds?: Record<string, string>;
   events: { id: string; name: string; kind: string }[]; categories: { id: string; event_id: string; name: string }[]; hosts: { id: string; event_id: string; name: string }[];
 }>();
-const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite', permanent: 'Permanent' };
+const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite' };
 const enrol = useForm({ event_id: props.events[0]?.id ?? '', category_id: '', host_id: '' });
 const categories = computed(() => props.categories.filter(c => c.event_id === enrol.event_id));
 const hosts = computed(() => props.hosts.filter(h => h.event_id === enrol.event_id));

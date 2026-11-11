@@ -257,7 +257,6 @@ it('reprend une génération groupée interrompue sans duplication', function ()
 // --- 7 : cartes permanentes ------------------------------------------------------------------------------------------------------------------------------
 
 it('prépare en groupe les cartes de titulaires permanents éligibles, sans activation ni habilitation, et signale les inéligibles', function () {
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     $a = biHolder();
     $b = biHolder();
     $noPhoto = biHolder(false);
@@ -280,7 +279,6 @@ it('prépare en groupe les cartes de titulaires permanents éligibles, sans acti
 });
 
 it('enregistre aussi dans le registre canonique le remplacement d’une carte permanente, sans réutiliser le support remplacé', function () {
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     $a = biHolder();
     $first = $this->issuance->issueCard($a['holder'], biOp(), $this->admin);
     $newCard = app(CardLifecycle::class)->replace($a['holder'], 'perdue', null, $this->admin, false, $op = biOp());

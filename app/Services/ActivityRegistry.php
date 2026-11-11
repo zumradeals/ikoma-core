@@ -37,29 +37,29 @@ final class ActivityRegistry
         return DB::table('events as e')
             ->when($archives, fn ($q) => $q->where('e.status', 'archive'), fn ($q) => $q->where(fn ($w) => $w->whereNull('e.status')->orWhere('e.status', '<>', 'archive')))
             ->orderByDesc('e.starts_at')
-            ->get(['e.id', 'e.name', 'e.site', 'e.kind', 'e.starts_at', 'e.ends_at', 'e.status', 'e.is_permanent',
+            ->get(['e.id', 'e.name', 'e.site', 'e.kind', 'e.starts_at', 'e.ends_at', 'e.status',
                 DB::raw('(SELECT count(*) FROM visitors v WHERE v.event_id = e.id AND v.holder_id IS NULL AND v.withdrawn_at IS NULL) AS participants'),
                 DB::raw('(SELECT count(*) FROM visitors v WHERE v.event_id = e.id AND v.holder_id IS NULL AND v.withdrawn_at IS NULL AND v.closed_at IS NULL) AS participants_actifs'),
-                DB::raw("CASE WHEN e.status = 'archive' THEN 'archivee' WHEN e.status = 'clos' THEN 'cloturee' WHEN e.is_permanent THEN 'permanent' WHEN e.starts_at > '{$now}' THEN 'a_venir' WHEN e.ends_at <= '{$now}' THEN 'terminee' ELSE 'en_cours' END AS phase"),
+                DB::raw("CASE WHEN e.status = 'archive' THEN 'archivee' WHEN e.status = 'clos' THEN 'cloturee' WHEN e.starts_at > '{$now}' THEN 'a_venir' WHEN e.ends_at <= '{$now}' THEN 'terminee' ELSE 'en_cours' END AS phase"),
             ])->map(fn (object $r): array => (array) $r)->all();
     }
 
     /**
-     * Indicateurs calculés sur les données réelles (activités ordinaires seulement ; le contexte permanent n'en fait pas partie).
+     * Indicateurs calculés sur les données réelles (activités seulement : les cartes du site n'en font pas partie).
      *
      * @return array{en_cours: int, participants_actifs: int, a_venir: int, cloturees: int}
      */
     public function kpis(): array
     {
         $now = $this->now();
-        $open = fn () => DB::table('events as e')->where('e.is_permanent', false)->whereRaw(self::OPEN);
+        $open = fn () => DB::table('events as e')->whereRaw(self::OPEN);
 
         return [
             'en_cours' => $open()->where('e.starts_at', '<=', $now)->where('e.ends_at', '>', $now)->count(),
-            'participants_actifs' => (int) DB::table('visitors as v')->join('events as e', 'e.id', '=', 'v.event_id')->where('e.is_permanent', false)->whereRaw(self::OPEN)
+            'participants_actifs' => (int) DB::table('visitors as v')->join('events as e', 'e.id', '=', 'v.event_id')->whereRaw(self::OPEN)
                 ->whereNull('v.holder_id')->whereNull('v.closed_at')->whereNull('v.withdrawn_at')->count(),
             'a_venir' => $open()->where('e.starts_at', '>', $now)->count(),
-            'cloturees' => DB::table('events as e')->where('e.is_permanent', false)->where(fn ($w) => $w->whereIn('e.status', ['clos', 'archive'])->orWhereNotNull('e.anonymized_at'))->count(),
+            'cloturees' => DB::table('events as e')->where(fn ($w) => $w->whereIn('e.status', ['clos', 'archive'])->orWhereNotNull('e.anonymized_at'))->count(),
         ];
     }
 
@@ -70,7 +70,7 @@ final class ActivityRegistry
      */
     public function profile(string $eventId, bool $withJournal): ?array
     {
-        $event = DB::table('events')->where('id', $eventId)->first(['id', 'name', 'site', 'kind', 'starts_at', 'ends_at', 'status', 'is_permanent', 'anonymized_at', 'list_revision']);
+        $event = DB::table('events')->where('id', $eventId)->first(['id', 'name', 'site', 'kind', 'starts_at', 'ends_at', 'status', 'anonymized_at', 'list_revision']);
         if ($event === null) {
             return null;
         }
@@ -104,13 +104,13 @@ final class ActivityRegistry
 
         return [
             'event' => ['id' => $event->id, 'name' => $event->name, 'site' => $event->site, 'kind' => $event->kind, 'starts_at' => $event->starts_at, 'ends_at' => $event->ends_at,
-                'status' => $event->status, 'is_permanent' => (bool) $event->is_permanent, 'closed' => $closed, 'anonymized' => $event->anonymized_at !== null],
+                'status' => $event->status, 'closed' => $closed, 'anonymized' => $event->anonymized_at !== null],
             'counts' => ['participants' => (int) $counts->total, 'actifs' => (int) $counts->actifs, 'presents' => (int) $counts->presents, 'clotures' => (int) $counts->clotures,
                 'groupes' => count($groups), 'vehicules' => $vehicles, 'badges_attribues' => (int) $badges->attribues, 'badges_restitues' => (int) $badges->restitues,
                 'habilitations' => array_sum(array_column($zones, 'habilitations'))],
             'categories' => $categories, 'groups' => $groups, 'zones' => $zones, 'journal' => $journal,
-            // Choix de l'inscription : seulement pour une activité ordinaire encore ouverte (le service d'inscription refuse le reste).
-            'enrol' => $closed || $event->is_permanent ? null : [
+            // Choix de l'inscription : seulement pour une activité encore ouverte (le service d'inscription refuse le reste).
+            'enrol' => $closed ? null : [
                 'categories' => $categories,
                 'hosts' => DB::table('hosts')->where('event_id', $eventId)->orderBy('name')->get(['id', 'name'])->map(fn (object $h): array => ['id' => $h->id, 'name' => $h->name])->all(),
             ],

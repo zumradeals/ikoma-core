@@ -83,7 +83,7 @@ final class PersonsController
         Gate::authorize('listes.importer');
         $history = $this->persons->history($person);
         $taken = DB::table('visitors')->where('person_id', $person)->pluck('event_id')->all();
-        $events = DB::table('events')->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']))
+        $events = DB::table('events')->whereNull('anonymized_at')->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']))
             ->whereNotIn('id', $taken)->orderByDesc('starts_at')->get(['id', 'name', 'kind', 'starts_at', 'ends_at']);
 
         // S09 : annonce de visite et véhicules de chaque participation de la personne (administrateur seulement).

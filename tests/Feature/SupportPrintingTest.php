@@ -64,7 +64,6 @@ function spTemporary(?array $event = null): array
 /** @return array{badge: string, holder: string, card: string} */
 function spCard(): array
 {
-    app(PermanentHolders::class)->createPermanentContext(test()->admin);
     $person = app(Persons::class)->create(test()->admin, ['full_name' => 'Zzcarte '.Str::lower(Str::random(6))]);
     $holder = app(PermanentHolders::class)->create(['position' => 'Formateur fictif', 'institutional_category' => 'AILCT-01'], test()->admin, false, $person);
     DB::table('permanent_holders')->where('id', $holder)->update(['photo_file' => 'portraits/fictif-'.Str::random(6).'.jpg']);

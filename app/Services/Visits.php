@@ -50,8 +50,8 @@ final class Visits
                 throw ValidationException::withMessages(['participation' => 'Cette personne est déjà arrivée ou a été traitée : sa visite ne peut plus être annoncée.']);
             }
             $event = DB::table('events')->where('id', $v->event_id)->first();
-            if ($event === null || $event->is_permanent || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
-                throw ValidationException::withMessages(['participation' => 'Cette activité est clôturée, archivée ou permanente : aucune visite ne peut y être annoncée.']);
+            if ($event === null || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
+                throw ValidationException::withMessages(['participation' => 'Cette activité est clôturée ou archivée : aucune visite ne peut y être annoncée.']);
             }
             if ($expected->lt(Carbon::parse($event->starts_at)) || $expected->gt(Carbon::parse($event->ends_at))) {
                 throw ValidationException::withMessages(['expected_at' => 'L’heure attendue doit tomber pendant l’activité.']);

@@ -199,7 +199,7 @@ final class PersonRegistry
      */
     private function grantOptions(?object $holder, array $participations): array
     {
-        $open = fn (Builder $q): Builder => $q->where('is_permanent', false)->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
+        $open = fn (Builder $q): Builder => $q->whereNull('anonymized_at')->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['clos', 'archive']));
         $permanent = null;
         if ($holder !== null && $holder->status === 'actif') {
             $events = $open(DB::table('events'))->orderByDesc('starts_at')->limit(50)->get(['id', 'name', 'starts_at', 'ends_at']);

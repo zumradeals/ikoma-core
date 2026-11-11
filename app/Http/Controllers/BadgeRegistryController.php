@@ -24,7 +24,7 @@ final class BadgeRegistryController
         return Inertia::render('Admin/BadgeRegistre', [
             'target' => $target,
             'badges' => $registry->available($target),
-            'events' => DB::table('events')->where('is_permanent', false)->whereNotIn('status', ['clos', 'archive'])->whereNull('anonymized_at')->orderBy('name')->get(['id', 'name', 'kind']),
+            'events' => DB::table('events')->whereNotIn('status', ['clos', 'archive'])->whereNull('anonymized_at')->orderBy('name')->get(['id', 'name', 'kind']),
             'categories' => DB::table('categories')->orderBy('name')->get(['id', 'event_id', 'name', 'color']),
             'devices' => DB::table('devices')->whereNull('revoked_at')->orderBy('name')->get(['id', 'event_id', 'name', 'station']),
             'transfers' => DB::table('badge_transfers as t')->join('badges as b', 'b.id', '=', 't.badge_id')->join('events as f', 'f.id', '=', 't.from_event_id')->join('events as e', 'e.id', '=', 't.to_event_id')

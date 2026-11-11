@@ -86,7 +86,6 @@ beforeEach(function () {
     $this->admin = pxUser('administrateur');
     $this->agent = pxUser('agent_accueil');
     app(InstitutionalCategories::class)->initialize($this->admin);
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     [$this->event, $this->zone, $this->device] = pxEvent(PX_TOKEN_A);
     $this->actingAs($this->agent);
 });

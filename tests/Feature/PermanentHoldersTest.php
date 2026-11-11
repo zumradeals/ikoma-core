@@ -1,10 +1,8 @@
 <?php
 
 use App\Models\User;
-use App\Services\DataLifecycle;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
-use App\Services\Pilotage;
 use App\Services\QrSvg;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
@@ -137,7 +135,6 @@ it('réserve le registre à l’administrateur et les réglages aux droits de ca
         $this->post('/administration/titulaires', holderData())->assertForbidden();
         $this->get('/administration/categories-institutionnelles')->assertForbidden();
         $this->put('/administration/titulaires/format', ['prefix' => 'X', 'width' => 6, 'check' => true])->assertForbidden();
-        $this->post('/administration/titulaires/contexte-permanent')->assertForbidden();
     }
     expect(DB::table('permanent_holders')->count())->toBe(0);
 });
@@ -201,26 +198,6 @@ it('garde l’identifiant émis quand le format change, et le format reste confi
 });
 
 // --- A04.2 contexte permanent -----------------------------------------------------------------------------------------------
-
-it('crée un seul contexte permanent protégé contre la clôture, l’archivage, l’anonymisation et la suppression', function () {
-    $this->actingAs($this->admin)->post('/administration/titulaires/contexte-permanent')->assertRedirect();
-    $this->post('/administration/titulaires/contexte-permanent')->assertRedirect();
-    expect(DB::table('events')->where('is_permanent', true)->count())->toBe(1);
-    $event = $this->holders->permanentContext();
-    foreach (['clos', 'archive'] as $status) {
-        expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->update(['status' => $status])))->toThrow(QueryException::class, 'ne se clôt');
-    }
-    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->update(['anonymized_at' => now()])))->toThrow(QueryException::class, 'ne se clôt');
-    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->update(['is_permanent' => false])))->toThrow(QueryException::class, 'le reste');
-    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->delete()))->toThrow(QueryException::class, 'ne se supprime pas');
-    expect(fn () => DB::transaction(fn () => DB::statement('TRUNCATE events CASCADE')))->toThrow(QueryException::class, 'permission denied');
-    expect(fn () => app(DataLifecycle::class)->transition($event->id, 'cloturer', $this->admin))->toThrow(ValidationException::class);
-    expect(fn () => app(DataLifecycle::class)->transition($event->id, 'archiver', $this->admin))->toThrow(ValidationException::class);
-    $inspect = app(DataLifecycle::class)->inspect('evenement', $event->id, $this->admin);
-    expect($inspect['allowed'])->toBeFalse()->and(implode(' ', $inspect['reasons']))->toContain('contexte permanent');
-    $second = (string) Str::uuid();
-    expect(fn () => DB::transaction(fn () => DB::table('events')->insert(['id' => $second, 'name' => 'Deuxième', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'is_permanent' => true, 'created_at' => now(), 'updated_at' => now()])))->toThrow(QueryException::class);
-});
 
 it('conserve le registre quand les événements ordinaires sont clos, archivés ou supprimés', function () {
     [$event] = holderEvent();
@@ -307,7 +284,7 @@ it('n’est lu par aucun service de contrôle, d’autorisation ni de badge : se
     // Badges et cartes : BadgeIssuance (contrat d'émission canonique) et IssuanceLedger (registre des opérations d'émission) orchestrent l'émission des cartes permanentes ET des badges temporaires par le même contrat ; ils lisent le titulaire seulement pour l'éligibilité d'une carte et n'alimentent aucune décision de contrôle, d'autorisation ni d'accès.
     // V1 P1 : le registre unifié des personnes (PersonRegistry) compose en LECTURE SEULE l'identité, le profil permanent et les habilitations pour la consultation ; il n'alimente aucune décision de contrôle, d'autorisation ni de badge (seul PersonsController::index l'appelle).
     // Badges et cartes (convergence de l'interface) : SupportRegistry (registre commun des supports, lecture seule) relie une carte à son titulaire pour l'AFFICHER ; il n'alimente aucune décision de contrôle, d'autorisation ni d'accès.
-    $allowed = ['Services/AdminOverview.php', 'Services/SupportRegistry.php', 'Services/SupportPrinting.php', 'Http/Controllers/BadgePreparerController.php', 'Services/BadgeIssuance.php', 'Services/IssuanceLedger.php', 'Services/PersonRegistry.php', 'Services/BadgesCartesSummary.php', 'Services/InstitutionalCategories.php', 'Services/PermanentHolders.php', 'Services/Imports/HolderImport.php', 'Http/Controllers/InstitutionalCategoriesController.php', 'Http/Controllers/PermanentHoldersController.php', 'Services/HolderCards.php', 'Services/CardModels.php', 'Http/Controllers/AtelierCartesController.php', 'Http/Controllers/HolderCardsController.php', 'Services/CardLifecycle.php', 'Services/HolderEntitlements.php', 'Services/SiteEntitlements.php', 'Services/SiteMovements.php', 'Http/Controllers/HolderEntitlementsController.php', 'Services/PermanentAccess.php', 'Services/Poste/SiteControl.php', 'Console/Commands/PermanentFixtures.php', 'Services/DemoLab.php', 'Services/DataLifecycle.php', 'Services/DataRetention.php', 'Services/Maintenance.php', 'Services/Persons.php', 'Services/Participations.php', 'Services/Visits.php', 'Services/Vehicles.php', 'Services/SupervisorClosure.php', 'Http/Controllers/AtelierParcoursController.php'];
+    $allowed = ['Services/LegacyCardRegistry.php', 'Services/OperationsOverview.php', 'Services/AdminOverview.php', 'Services/SupportRegistry.php', 'Services/SupportPrinting.php', 'Http/Controllers/BadgePreparerController.php', 'Services/BadgeIssuance.php', 'Services/IssuanceLedger.php', 'Services/PersonRegistry.php', 'Services/BadgesCartesSummary.php', 'Services/InstitutionalCategories.php', 'Services/PermanentHolders.php', 'Services/Imports/HolderImport.php', 'Http/Controllers/InstitutionalCategoriesController.php', 'Http/Controllers/PermanentHoldersController.php', 'Services/HolderCards.php', 'Services/CardModels.php', 'Http/Controllers/AtelierCartesController.php', 'Http/Controllers/HolderCardsController.php', 'Services/CardLifecycle.php', 'Services/HolderEntitlements.php', 'Services/SiteEntitlements.php', 'Services/SiteMovements.php', 'Http/Controllers/HolderEntitlementsController.php', 'Services/PermanentAccess.php', 'Services/Poste/SiteControl.php', 'Console/Commands/PermanentFixtures.php', 'Services/DemoLab.php', 'Services/DataLifecycle.php', 'Services/DataRetention.php', 'Services/Maintenance.php', 'Services/Persons.php', 'Services/Participations.php', 'Services/Visits.php', 'Services/Vehicles.php', 'Services/SupervisorClosure.php', 'Http/Controllers/AtelierParcoursController.php'];
     $readers = [];
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path())) as $file) {
         if ($file->isFile() && str_ends_with($file->getFilename(), '.php') && preg_match('/institutional_categor|institutional_code|permanent_holders|holder_id/', (string) file_get_contents($file->getPathname())) === 1) {
@@ -328,10 +305,11 @@ it('n’est lu par aucun service de contrôle, d’autorisation ni de badge : se
 
 it('laisse le contrat QR et les fiches existantes inchangés', function () {
     expect(QrSvg::PREFIX)->toBe('IKOMA1:');
-    expect(DB::table('visitors')->whereNotNull('holder_id')->count())->toBe(0)->and(DB::table('events')->where('is_permanent', true)->count())->toBe(0);
-    foreach (['visitors' => 'holder_id', 'categories' => 'institutional_code', 'events' => 'is_permanent'] as $table => $column) {
+    expect(DB::table('visitors')->whereNotNull('holder_id')->count())->toBe(0);
+    foreach (['visitors' => 'holder_id', 'categories' => 'institutional_code'] as $table => $column) {
         expect(Schema::hasColumn($table, $column))->toBeTrue();
     }
+    expect(Schema::hasColumn('events', 'is_permanent'))->toBeFalse(); // plus de contexte permanent : les cartes appartiennent au site
 });
 
 it('autorise le rattachement facultatif d’une fiche d’événement à un titulaire, une seule fois par événement', function () {
@@ -368,28 +346,7 @@ it('protège aussi par déclencheurs, même contre le propriétaire de la base (
             }
             $owner->statement('ROLLBACK TO SAVEPOINT essai');
         }
-        $event = (string) Str::uuid();
-        $owner->table('events')->insert(['id' => $event, 'name' => 'Contexte fictif propriétaire', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'is_permanent' => true, 'created_at' => now(), 'updated_at' => now()]);
-        foreach (['DELETE FROM events WHERE is_permanent' => 'ne se supprime pas', 'TRUNCATE events CASCADE' => 'protégé'] as $sql => $message) {
-            $owner->statement('SAVEPOINT essai');
-            try {
-                $owner->statement($sql);
-                $this->fail($sql.' aurait dû être refusé.');
-            } catch (QueryException $e) {
-                expect($e->getMessage())->toContain($message);
-            }
-            $owner->statement('ROLLBACK TO SAVEPOINT essai');
-        }
     } finally {
         $owner->rollBack();
     }
-});
-
-it('ne laisse pas le contexte permanent devenir l’événement affiché par défaut', function () {
-    [$event] = holderEvent();
-    DB::table('events')->where('id', '<>', $event)->where('is_permanent', false)->update(['status' => 'archive']);
-    $this->holders->createPermanentContext($this->admin);
-    $shown = app(Pilotage::class)->event(null);
-    expect($shown->id)->toBe($event);
-    $this->actingAs($this->admin)->get('/administration')->assertOk()->assertInertia(fn (Assert $p) => $p->where('event.id', $event));
 });

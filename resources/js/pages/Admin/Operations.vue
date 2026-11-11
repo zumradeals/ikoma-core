@@ -12,13 +12,13 @@ import { displayDate } from '../../labels';
  * propriétaires (Pilotage, Postes, Journal). Aucune décision de contrôle, aucune clôture et aucun moteur ne vivent ici.
  */
 type General = {
-  as_of: string; mouvements: { entrees: number; sorties: number; controles: number; refus: number }; presents: { total: number; permanents: number; activites: number; contextes: { event_id: string; name: string; is_permanent: boolean; presents: number }[]; multi_contextes: number };
+  as_of: string; mouvements: { entrees: number; sorties: number; controles: number; refus: number }; presents: { total: number; permanents: number; activites: number; contextes: { event_id: string; name: string; presents: number }[]; multi_contextes: number };
   alertes: { a_traiter: number; critiques: number }; litiges: number; postes: { total: number; actifs: number; appareils_enroles: number; appareils_synchronises: number; appareils_silencieux: number }; par_heure: { heure: string; entrees: number; sorties: number }[];
 };
 type Counters = { attendus: number; arrives: number; presents: number; refuses: number };
 type Overview = { critiques: number; hautes: number; litiges: number; cars: { total: number; partis: number; arrives: number; ecarts: number }; postes_silencieux: number; retards?: number };
 const props = defineProps<{
-  events: { id: string; name: string; is_permanent: boolean }[]; event: { id: string; name: string; starts_at: string; ends_at: string; status: string | null; is_permanent?: boolean } | null;
+  events: { id: string; name: string }[]; event: { id: string; name: string; starts_at: string; ends_at: string; status: string | null } | null;
   general: General; counters: Counters | null; overview: Overview | null; centre: Centre | null;
   can: { presences: boolean; alertes: boolean; litiges: boolean; journal: boolean; postes: boolean; groupes: boolean };
 }>();
@@ -41,7 +41,7 @@ const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('fr
 const typeLabel: Record<string, string> = { entree: 'Entrée', sortie: 'Sortie', controle: 'Contrôle', validation: 'Validation', correction: 'Correction' };
 // « En ligne » n'est jamais affirmé : un appareil est « synchronisé récemment » (preuve : dernière synchronisation dans le délai existant) ou « sans nouvelles ».
 const posteLabel: Record<string, string> = { actif: 'Synchronisé récemment', silencieux: 'Sans nouvelles', revoque: 'Révoqué' };
-const scope = computed(() => (props.event ? (props.event.is_permanent ? 'site (personnel permanent)' : `activité « ${props.event.name} »`) : 'aucune activité'));
+const scope = computed(() => (props.event ? `activité « ${props.event.name} »` : 'aucune activité'));
 const posteClass: Record<string, string> = { actif: 'bg-green-100 text-green-900', silencieux: 'bg-amber-100 text-amber-900', revoque: 'bg-slate-200 text-slate-700' };
 </script>
 
@@ -77,7 +77,7 @@ const posteClass: Record<string, string> = { actif: 'bg-green-100 text-green-900
 
       <h2 class="text-lg font-bold" data-testid="titre-detail">Détail par activité</h2>
       <label class="block max-w-md text-sm font-semibold">Activité consultée (périmètre des panneaux ci-dessous, sauf mention « site entier »)
-        <select class="field" :value="event?.id ?? ''" data-testid="choix-activite" @change="choose"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.is_permanent ? 'Site (personnel permanent)' : e.name }}</option></select>
+        <select class="field" :value="event?.id ?? ''" data-testid="choix-activite" @change="choose"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
       </label>
 
       <!-- Supervision -->
@@ -140,7 +140,7 @@ const posteClass: Record<string, string> = { actif: 'bg-green-100 text-green-900
           <p data-testid="presences-site">{{ general.presents.total }} personne{{ general.presents.total > 1 ? 's' : '' }} présente{{ general.presents.total > 1 ? 's' : '' }} sur le site (identités distinctes ; dernier passage : {{ general.presents.permanents }} sur le site (personnel permanent), {{ general.presents.activites }} en activité). Une présence se déduit des entrées et sorties confirmées et non corrigées, jamais de la simple possession d'un badge.</p>
           <p v-if="general.presents.multi_contextes > 0" class="text-sm text-amber-900" data-testid="presences-multi">{{ general.presents.multi_contextes }} présence{{ general.presents.multi_contextes > 1 ? 's' : '' }} enregistrée{{ general.presents.multi_contextes > 1 ? 's' : '' }} dans plusieurs contextes pour une même personne : comptée{{ general.presents.multi_contextes > 1 ? 's' : '' }} une seule fois au total.</p>
           <p class="text-xs font-semibold text-slate-700">Présents par contexte (indicateurs distincts, non additionnés)</p>
-          <ul class="text-sm" data-testid="presences-contextes"><li v-for="c in general.presents.contextes" :key="c.event_id">{{ c.is_permanent ? 'Site (personnel permanent)' : c.name }} : <strong>{{ c.presents }}</strong></li></ul>
+          <ul class="text-sm" data-testid="presences-contextes"><li v-if="general.presents.permanents > 0" data-testid="presences-site">Site (personnel permanent) : <strong>{{ general.presents.permanents }}</strong></li><li v-for="c in general.presents.contextes" :key="c.event_id">{{ c.name }} : <strong>{{ c.presents }}</strong></li></ul>
         </div>
         <div v-if="centre" class="space-y-1"><p class="text-xs font-semibold text-blue-900">Périmètre : {{ scope }}</p><p data-testid="presences-activite">Dans ce contexte : <strong>{{ centre.presents.count }}</strong> présent{{ centre.presents.count > 1 ? 's' : '' }}.</p></div>
         <div class="flex flex-wrap gap-3"><Link v-if="can.presences" :href="href('/pilotage/presents')" class="site-btn site-btn-outline">Liste des présents</Link><Link v-if="can.presences" :href="href('/pilotage/evacuation')" class="site-btn site-btn-outline" data-testid="vers-evacuation">Liste d’évacuation</Link></div>

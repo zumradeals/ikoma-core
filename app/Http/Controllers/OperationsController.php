@@ -27,8 +27,8 @@ final class OperationsController
         $names = $user->can('presences.consulter');
 
         return Inertia::render('Admin/Operations', [
-            'events' => DB::table('events')->orderByDesc('is_permanent')->orderByDesc('starts_at')->get(['id', 'name', 'is_permanent']),
-            'event' => $event ? ['id' => $event->id, 'name' => $event->name, 'starts_at' => $event->starts_at, 'ends_at' => $event->ends_at, 'status' => $event->status, 'is_permanent' => (bool) $event->is_permanent] : null,
+            'events' => DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']),
+            'event' => $event ? ['id' => $event->id, 'name' => $event->name, 'starts_at' => $event->starts_at, 'ends_at' => $event->ends_at, 'status' => $event->status] : null,
             'general' => fn (): array => $this->overview->general(),
             'counters' => fn (): ?array => $event ? $this->pilotage->counters($event->id) : null,
             'overview' => fn (): ?array => $event ? $this->pilotage->overview($event->id) : null,

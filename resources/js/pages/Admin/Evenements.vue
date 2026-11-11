@@ -15,7 +15,7 @@ type EventRow = {
 };
 type Choice = { id: string; name: string };
 type Profile = {
-  event: { id: string; name: string; site: string | null; kind: string; starts_at: string; ends_at: string; status: string | null; is_permanent: boolean; closed: boolean; anonymized: boolean };
+  event: { id: string; name: string; site: string | null; kind: string; starts_at: string; ends_at: string; status: string | null; closed: boolean; anonymized: boolean };
   counts: { participants: number; actifs: number; presents: number; clotures: number; groupes: number; vehicules: number; badges_attribues: number; badges_restitues: number; habilitations: number };
   categories: (Choice & { participants: number })[]; groups: { id: string; name: string; bus_number: string | null; supervisor: string | null; members: number }[];
   zones: (Choice & { habilitations: number })[]; journal: { id: number; action: string; at: string }[];
@@ -32,8 +32,8 @@ const props = defineProps<{
   can?: { participants: boolean; journal: boolean; groupes: boolean; badges: boolean; site: boolean; zones?: boolean };
 }>();
 
-const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite', permanent: 'Permanent' };
-const phases: Record<string, string> = { a_venir: 'À venir', en_cours: 'En cours', terminee: 'Dates dépassées', cloturee: 'Clôturée', archivee: 'Archivée', permanent: 'Contexte permanent' };
+const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite' };
+const phases: Record<string, string> = { a_venir: 'À venir', en_cours: 'En cours', terminee: 'Dates dépassées', cloturee: 'Clôturée', archivee: 'Archivée' };
 const phaseOf = (e: { phase?: string; status?: string | null }) => e.phase ?? (e.status === 'archive' ? 'archivee' : e.status === 'clos' ? 'cloturee' : 'en_cours');
 const phaseClass = (p: string) => (p === 'en_cours' ? 'bg-green-100 text-green-900' : p === 'a_venir' ? 'bg-amber-100 text-amber-900' : 'bg-slate-200 text-slate-700');
 const partStatus: Record<string, string> = { attendu: 'Attendue', present: 'Présente', sorti: 'Sortie', refuse: 'Accès refusé', cloturee: 'Clôturée' };
@@ -304,7 +304,7 @@ const n = (v: number | string | undefined) => Number(v ?? 0);
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h3 class="text-lg font-bold">Participants ({{ participants?.meta.total ?? 0 }})</h3>
               <button v-if="selected.enrol" type="button" class="site-btn site-btn-accent !min-h-11" :aria-expanded="enrolOpen" data-testid="ajouter-participant" @click="toggleEnrol"><AdminIcon name="plus" :size="18" />Ajouter un participant</button>
-              <p v-else class="text-sm text-slate-600" data-testid="inscription-fermee">Inscriptions fermées : activité clôturée, archivée ou contexte permanent.</p>
+              <p v-else class="text-sm text-slate-600" data-testid="inscription-fermee">Inscriptions fermées : activité clôturée ou archivée.</p>
             </div>
 
             <div v-if="enrolOpen && selected.enrol" class="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4" data-testid="formulaire-inscription">

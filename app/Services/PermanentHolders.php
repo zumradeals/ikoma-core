@@ -343,31 +343,6 @@ final class PermanentHolders
         });
     }
 
-    public function permanentContext(): ?object
-    {
-        return DB::table('events')->where('is_permanent', true)->first(['id', 'name', 'status']);
-    }
-
-    /** Crée (une seule fois, sans effet si elle existe) le registre technique protégé qui héberge les cartes permanentes ; ce n'est pas une activité et aucune opération n'en dépend. */
-    public function createPermanentContext(User $actor): string
-    {
-        return DB::transaction(function () use ($actor): string {
-            DB::statement('SELECT pg_advisory_xact_lock(731903)');
-            if ($existing = $this->permanentContext()) {
-                return $existing->id;
-            }
-            $id = (string) Str::uuid();
-            $institution = app(Institution::class)->profile();
-            DB::table('events')->insert([
-                'id' => $id, 'name' => 'Registre des cartes du site — '.$institution['name'], 'site' => null,
-                'starts_at' => now(), 'ends_at' => '2099-12-31 23:59:59+00', 'is_permanent' => true, 'created_at' => now(), 'updated_at' => now(),
-            ]);
-            app(Audit::class)->append('contexte_permanent.cree', $actor->id, ['event_id' => $id]);
-
-            return $id;
-        });
-    }
-
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

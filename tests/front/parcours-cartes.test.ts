@@ -13,7 +13,7 @@ import Titulaires from '../../resources/js/pages/Admin/Titulaires.vue';
 
 const base = {
   holders: { data: [], links: [], total: 0 }, filters: { q: '', statut: 'actif', categorie: '', photo: '' }, categories: [], importPreview: null, bulkMax: 200,
-  identifierFormat: { prefix: 'ID', width: 6, check: true }, identifierExample: 'ID-000001-8', permanentContext: { id: 'c1', name: 'Contexte permanent' }, canConfigure: true, canCards: true,
+  identifierFormat: { prefix: 'ID', width: 6, check: true }, identifierExample: 'ID-000001-8', canConfigure: true, canCards: true,
   pipeline: { sans_carte: 3, sans_photo: 2, a_imprimer: 4, a_remettre: 1, actives: 7, prochaine_remise: 'h9' },
 };
 
@@ -42,7 +42,7 @@ describe('parcours des cartes permanentes en trois étapes', () => {
 
   it('n’affiche le parcours qu’à qui gère les badges ; le registre technique des cartes n’est plus une étape visible', () => {
     expect(mount(Titulaires, { props: { ...base, canCards: false, pipeline: null } }).find('[data-testid=parcours-cartes]').exists()).toBe(false);
-    expect(mount(Titulaires, { props: { ...base, permanentContext: null } }).find('[data-testid=parcours-cartes]').exists()).toBe(true);
-    expect(mount(Titulaires, { props: { ...base, permanentContext: null } }).find('[data-testid=creer-contexte]').exists()).toBe(false);
+    expect(mount(Titulaires, { props: base }).find('[data-testid=parcours-cartes]').exists()).toBe(true);
+    expect(mount(Titulaires, { props: base }).find('[data-testid=creer-contexte]').exists()).toBe(false);
   });
 });

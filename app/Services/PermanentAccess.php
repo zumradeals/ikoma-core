@@ -61,9 +61,9 @@ final class PermanentAccess
         if (($refusal = $this->cardRefusal($card)) !== null) {
             return $refusal;
         }
-        $event = DB::table('events')->where('id', $eventId)->first(['status', 'anonymized_at', 'is_permanent']);
+        $event = DB::table('events')->where('id', $eventId)->first(['status', 'anonymized_at']);
         $refuse = fn (string $reason, string $message): array => ['allowed' => false, 'reason' => $reason, 'message' => $message, 'zones' => []];
-        if ($event === null || $event->is_permanent || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
+        if ($event === null || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
             return $refuse('evenement_indisponible', 'Cet événement est clôturé, archivé ou anonymisé : aucune entrée n’est autorisée.');
         }
         $entitlements = DB::table('holder_entitlements as e')->join('zones as z', 'z.id', '=', 'e.zone_id')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')

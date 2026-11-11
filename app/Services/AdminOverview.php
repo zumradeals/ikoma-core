@@ -88,7 +88,7 @@ final class AdminOverview
     /** @return array{associes: int, non_restitues: int} */
     private function temporaryBadges(int $toReturn): array
     {
-        $associated = (int) DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->where('b.status', 'Associé')->count();
+        $associated = (int) DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('b.status', 'Associé')->count();
 
         return ['associes' => $associated, 'non_restitues' => $toReturn];
     }
@@ -131,7 +131,7 @@ final class AdminOverview
     private function announcedVisits(): array
     {
         $base = DB::table('visitors as v')->join('events as e', 'e.id', '=', 'v.event_id')->whereNotNull('v.expected_at')->whereNull('v.withdrawn_at')->whereNull('v.closed_at')->whereNull('v.no_show_at')
-            ->where(fn ($q) => $q->whereNull('v.status')->orWhere('v.status', 'attendu'))->where('e.is_permanent', false)->where(fn ($q) => $q->whereNull('e.status')->orWhereNotIn('e.status', ['clos', 'archive']));
+            ->where(fn ($q) => $q->whereNull('v.status')->orWhere('v.status', 'attendu'))->where(fn ($q) => $q->whereNull('e.status')->orWhereNotIn('e.status', ['clos', 'archive']));
         $late = (clone $base)->where('v.expected_at', '<', now()->subMinutes(Visits::lateAfterMinutes()))->count();
 
         return ['total' => (int) $base->count(), 'en_retard' => (int) $late];
@@ -144,7 +144,7 @@ final class AdminOverview
      */
     private function openActivities(): array
     {
-        $rows = array_values(array_filter($this->activities->rows(false), fn (array $r): bool => in_array($r['phase'], ['en_cours', 'a_venir'], true) && ! $r['is_permanent']));
+        $rows = array_values(array_filter($this->activities->rows(false), fn (array $r): bool => in_array($r['phase'], ['en_cours', 'a_venir'], true)));
         usort($rows, fn (array $a, array $b): int => [$a['phase'] === 'en_cours' ? 0 : 1, $a['starts_at']] <=> [$b['phase'] === 'en_cours' ? 0 : 1, $b['starts_at']]);
         $out = [];
         foreach (array_slice($rows, 0, self::MAX_ACTIVITIES) as $r) {
@@ -165,15 +165,15 @@ final class AdminOverview
     {
         $rows = DB::table('access_events as e')->join('visitors as v', 'v.id', '=', 'e.visitor_id')->join('events as ev', 'ev.id', '=', 'e.event_id')
             ->whereIn('e.type', ['entree', 'sortie', 'controle'])->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))
-            ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->limit(self::MAX_MOVEMENTS)->get(['e.occurred_at', 'e.type', 'e.checkpoint', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->limit(self::MAX_MOVEMENTS)->get(['e.occurred_at', 'e.type', 'e.checkpoint', 'ev.name as context', 'v.full_name']);
         $out = [];
         foreach ($rows as $r) {
-            $out[] = ['at' => (string) $r->occurred_at, 'type' => (string) $r->type, 'checkpoint' => $r->checkpoint, 'context' => $r->is_permanent ? 'Site (personnel permanent)' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'autorise'];
+            $out[] = ['at' => (string) $r->occurred_at, 'type' => (string) $r->type, 'checkpoint' => $r->checkpoint, 'context' => (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'autorise'];
         }
         $refusals = DB::table('refusals as r')->join('visitors as v', 'v.id', '=', 'r.visitor_id')->join('events as ev', 'ev.id', '=', 'v.event_id')
-            ->orderByDesc('r.refused_at')->limit(self::MAX_MOVEMENTS)->get(['r.refused_at', 'ev.name as context', 'ev.is_permanent', 'v.full_name']);
+            ->orderByDesc('r.refused_at')->limit(self::MAX_MOVEMENTS)->get(['r.refused_at', 'ev.name as context', 'v.full_name']);
         foreach ($refusals as $r) {
-            $out[] = ['at' => (string) $r->refused_at, 'type' => 'refus', 'checkpoint' => null, 'context' => $r->is_permanent ? 'Site (personnel permanent)' : (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'refuse'];
+            $out[] = ['at' => (string) $r->refused_at, 'type' => 'refus', 'checkpoint' => null, 'context' => (string) $r->context, 'name' => $withNames ? $r->full_name : null, 'resultat' => 'refuse'];
         }
         usort($out, fn (array $a, array $b): int => strcmp($b['at'], $a['at']));
 

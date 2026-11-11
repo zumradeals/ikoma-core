@@ -41,7 +41,7 @@ final class HolderCardsController
         return Inertia::render('Admin/CarteTitulaire', [
             'holder' => ['id' => $row->id, 'identifier' => $row->identifier, 'full_name' => $row->full_name, 'status' => $row->status, 'institutional_category' => $row->institutional_category, 'has_photo' => $row->photo_file !== null, 'photo_print_allowed' => (bool) $row->photo_print_allowed],
             'category' => $category === null ? null : ['code' => $category->code, 'label' => $category->label],
-            'card' => $card, 'cards' => app(CardLifecycle::class)->history($holder), 'reasons' => CardLifecycle::REASONS, 'entitlements' => app(HolderEntitlements::class)->forHolder($holder), 'preview' => $html, 'permanentContext' => $holders->permanentContext() !== null,
+            'card' => $card, 'cards' => app(CardLifecycle::class)->history($holder), 'reasons' => CardLifecycle::REASONS, 'entitlements' => app(HolderEntitlements::class)->forHolder($holder), 'preview' => $html,
             'provisional' => $row->institutional_category === null || ! app(CardModels::class)->forCategory($row->institutional_category)['validated'],
             'csrf' => csrf_token(),
         ])->withViewData([]);

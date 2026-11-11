@@ -31,7 +31,6 @@ final class BadgeLots
 
         return DB::transaction(function () use ($eventId, $categoryId, $expected, $actor): BadgeBatch {
             EventAvailability::requireOpen($eventId);
-            DB::table('events')->where('id', $eventId)->where('is_permanent', true)->doesntExist() || throw new BadgeRefused('contexte_permanent', 'Le contexte permanent ne reçoit que les cartes des titulaires : aucun lot ne s’y fabrique.');
             $category = DB::table('categories')->where('id', $categoryId)->where('event_id', $eventId)->first(['name']) ?? throw new BadgeRefused('categorie', 'Catégorie inconnue pour cet événement.');
             // Verrou par événement : deux générations simultanées ne peuvent pas produire le même code.
             DB::statement("SELECT pg_advisory_xact_lock(hashtextextended('badge-codes:'||?, 4))", [$eventId]);
@@ -87,8 +86,7 @@ final class BadgeLots
     /**
      * Fabrique le badge d'une CARTE PERMANENTE : il appartient au site (aucun événement, aucun lot, aucune catégorie d'événement, aucune participation).
      * Même format de code B-nnn et même jeton QR aléatoire que les autres badges ; le badge reste « Disponible » : aucune autorisation n'en découle.
-     * Numérotation du site sous verrou dédié ; elle dépasse aussi les codes des cartes déjà créées dans l'ancien registre technique (`is_permanent`),
-     * afin qu'aucun code ne se répète quand ces cartes seront rattachées au site. Aucun code ni jeton n'est jamais réutilisé.
+     * Numérotation du site sous verrou dédié, au-delà des codes déjà utilisés ou retirés au site. Aucun code ni jeton n'est jamais réutilisé.
      *
      * @return array{id: string, code: string}
      */
@@ -96,10 +94,8 @@ final class BadgeLots
     {
         return DB::transaction(function () use ($label, $actor): array {
             DB::statement("SELECT pg_advisory_xact_lock(hashtextextended('badge-codes:site', 4))");
-            $registry = DB::table('events')->where('is_permanent', true)->pluck('id')->all();
-            $inScope = fn ($q) => $q->whereNull('event_id')->orWhereIn('event_id', $registry);
-            $alive = (int) DB::table('badges')->where($inScope)->whereRaw("code ~ '^B-[0-9]+\$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
-            $retired = (int) DB::table('retired_badge_identifiers')->where($inScope)->whereRaw("code ~ '^B-[0-9]+\$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $alive = (int) DB::table('badges')->whereNull('event_id')->whereRaw("code ~ '^B-[0-9]+\$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
+            $retired = (int) DB::table('retired_badge_identifiers')->whereNull('event_id')->whereRaw("code ~ '^B-[0-9]+\$'")->selectRaw('max(substring(code from 3)::integer) as n')->value('n');
             $id = (string) Str::uuid7();
             $code = 'B-'.str_pad((string) (max($alive, $retired) + 1), 3, '0', STR_PAD_LEFT);
             DB::table('badges')->insert([
