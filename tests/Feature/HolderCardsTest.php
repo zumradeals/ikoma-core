@@ -126,11 +126,11 @@ it('lie la carte au titulaire sans lui donner aucun accès et le contrôle la re
     $holder = cardHolder('AILCT-05');
     $id = $this->cards->issue($holder, $this->admin);
     $row = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.id', $id)->first(['b.id as badge', 'b.status', 'b.qr_token', 'b.event_id', 'b.category_id']);
-    $permanent = app(PermanentHolders::class)->permanentContext();
-    expect($row->event_id)->toBe($permanent->id)->and($row->status)->toBe('Disponible')
-        ->and(DB::table('badge_assignments')->where('badge_id', $row->badge)->count())->toBe(0)
-        ->and(DB::table('category_zone')->where('category_id', $row->category_id)->count())->toBe(0)
-        ->and(DB::table('categories')->where('id', $row->category_id)->value('institutional_code'))->toBe('AILCT-05');
+    // La carte appartient au site : ni événement, ni catégorie d'événement, ni lot, ni participation.
+    expect($row->event_id)->toBeNull()->and($row->category_id)->toBeNull()->and($row->status)->toBe('Disponible')
+        ->and(DB::table('badges')->where('id', $row->badge)->value('badge_batch_id'))->toBeNull()
+        ->and(DB::table('visitors')->where('holder_id', $holder)->count())->toBe(0)
+        ->and(DB::table('badge_assignments')->where('badge_id', $row->badge)->count())->toBe(0);
     $verdict = app(BadgeService::class)->controler(QrSvg::payload($row->qr_token), null, null, false);
     expect($verdict->valid)->toBeFalse()->and($verdict->reason)->toBe('non_associe');
 });
@@ -309,10 +309,8 @@ it('compte les cartes par étape (préparer, imprimer, remettre) et prépare tou
 it('n’affiche jamais la carte d’une personne permanente dans la page des badges visiteurs, ni comme lot ni comme badge réservable', function () {
     $holder = cardHolder();
     $this->cards->issue($holder, $this->admin);
-    $code = (string) DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.code');
-    $permanentBatch = (string) DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.badge_batch_id');
-    $this->actingAs($this->admin)->get('/administration/badges/lots')->assertOk()->assertInertia(fn ($p) => $p->component('Admin/Badges')
-        ->where('batches', fn ($batches) => collect($batches)->doesntContain(fn ($b) => $b['id'] === $permanentBatch))
-        ->where('badges.data', fn ($rows) => collect($rows)->doesntContain(fn ($b) => $b['code'] === $code && $b['batch_name'] === DB::table('badge_batches')->where('id', $permanentBatch)->value('name'))));
-    $this->get('/administration/badges/lots?batch='.$permanentBatch)->assertOk()->assertInertia(fn ($p) => $p->has('badges.data', 0));
+    $badge = (string) DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.id');
+    expect(DB::table('badges')->where('id', $badge)->value('badge_batch_id'))->toBeNull(); // aucun lot : la carte n'a rien à faire dans l'atelier
+    $props = $this->actingAs($this->admin)->get('/administration/badges/lots')->assertOk()->viewData('page')['props'];
+    expect(json_encode($props))->not->toContain($badge);
 });

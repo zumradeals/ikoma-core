@@ -53,7 +53,7 @@ final class SupportPrinting
     /**
      * État d'impression d'un support émis.
      *
-     * @return array{badge_id: string, code: string, support_type: string, holder_id: ?string, event_id: string, printable: bool, refusal: ?string, kind: string, model_version: ?int}
+     * @return array{badge_id: string, code: string, support_type: string, holder_id: ?string, event_id: ?string, printable: bool, refusal: ?string, kind: string, model_version: ?int}
      */
     private function describe(string $badgeId, bool $lock): array
     {
@@ -62,7 +62,7 @@ final class SupportPrinting
         $origin = $badge === null ? null : DB::table('badge_issuances')->where('badge_id', $badgeId)->whereIn('purpose', ['emission', 'remplacement'])->first(['support_type', 'holder_id']);
         // Carte émise avant le registre des émissions : son porteur est connu par la carte elle-même (aucune carte existante ne devient inimprimable).
         $origin ??= $badge === null ? null : DB::table('holder_cards')->where('badge_id', $badgeId)->selectRaw("'carte_permanente' as support_type, holder_id")->first();
-        $out = ['badge_id' => $badgeId, 'code' => $badge->code ?? '', 'support_type' => $origin->support_type ?? '', 'holder_id' => $origin->holder_id ?? null, 'event_id' => $badge->event_id ?? '',
+        $out = ['badge_id' => $badgeId, 'code' => $badge->code ?? '', 'support_type' => $origin->support_type ?? '', 'holder_id' => $origin->holder_id ?? null, 'event_id' => $badge->event_id ?? null,
             'printable' => false, 'refusal' => null, 'kind' => 'emission', 'model_version' => null];
         if ($badge === null) {
             $out['refusal'] = 'Support introuvable.';

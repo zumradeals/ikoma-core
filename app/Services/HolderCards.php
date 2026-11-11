@@ -225,7 +225,7 @@ final class HolderCards
     }
 
     /**
-     * Émet la carte d'un titulaire actif : badge technique dans le contexte permanent, rattaché à une fiche de participation (non associée).
+     * Émet la carte d'un titulaire actif : badge du site (sans événement), non associé.
      * $activate = false (parcours de l'administration) : la carte n'ouvre rien tant qu'elle n'a pas été remise et activée ; true (données de démonstration, essais) : carte utilisable.
      *
      * @return string identifiant de la carte
@@ -245,19 +245,16 @@ final class HolderCards
                 if (DB::table('holder_cards')->where('holder_id', $holderId)->where('status', 'active')->exists()) {
                     throw ValidationException::withMessages(['holder' => 'Ce titulaire a déjà une carte active : réimprimez-la au lieu d’en émettre une nouvelle.']);
                 }
-                // Registre technique des cartes du site : créé en silence à la première carte (idempotent), jamais présenté comme une activité.
-                $contextId = $this->holders->createPermanentContext($actor);
-                $category = $this->eventCategory($contextId, $holder->institutional_category);
-                $visitor = $this->participation($contextId, $category, $holder);
-                $badge = $this->lots->issueSingle($contextId, $category, $visitor, 'Carte '.$holder->identifier, $actor);
+                // La carte appartient au site : badge sans événement, sans lot, sans catégorie d'événement et sans participation.
+                $badge = $this->lots->issueSiteCard('Carte '.$holder->identifier, $actor);
                 $id = (string) Str::uuid();
                 DB::table('holder_cards')->insert([
-                    'id' => $id, 'holder_id' => $holderId, 'badge_id' => $badge['id'], 'event_id' => $contextId, 'status' => 'active',
+                    'id' => $id, 'holder_id' => $holderId, 'badge_id' => $badge['id'], 'event_id' => null, 'status' => 'active',
                     'issued_by' => $actor->id, 'issued_at' => now(), 'activated_at' => $activate ? now() : null, 'activation_source' => $activate ? 'ancienne' : null, 'rank' => (int) DB::table('holder_cards')->where('holder_id', $holderId)->max('rank') + 1, 'created_at' => now(), 'updated_at' => now(),
                 ]);
                 // Toute émission de carte entre dans le registre canonique des émissions (opération identifiée, personne canonique, contexte permanent).
                 IssuanceLedger::record(['operation_id' => $operationId ?? (string) Str::uuid(), 'purpose' => $purpose, 'support_type' => 'carte_permanente', 'person_id' => $holder->person_id, 'holder_id' => $holderId,
-                    'event_id' => $contextId, 'badge_id' => $badge['id'], 'replaces_badge_id' => $replacesBadgeId, 'actor_id' => $actor->id]);
+                    'event_id' => null, 'badge_id' => $badge['id'], 'replaces_badge_id' => $replacesBadgeId, 'actor_id' => $actor->id]);
                 $this->audit->append('carte.emise', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier, 'code_badge' => $badge['code']]);
 
                 return $id;
@@ -268,36 +265,6 @@ final class HolderCards
             }
             throw $e;
         }
-    }
-
-    private function eventCategory(string $eventId, string $code): string
-    {
-        $existing = DB::table('categories')->where('event_id', $eventId)->where('institutional_code', $code)->value('id');
-        if ($existing !== null) {
-            return $existing;
-        }
-        $institutional = DB::table('institutional_categories')->where('code', $code)->first();
-        $id = (string) Str::uuid();
-        // Catégorie d'événement SANS zone : elle ne confère aucun droit d'accès (category_zone reste vide).
-        DB::table('categories')->insert(['id' => $id, 'event_id' => $eventId, 'name' => $institutional->label, 'color' => $institutional->color, 'priority_circuit' => false, 'institutional_code' => $code, 'created_at' => now(), 'updated_at' => now()]);
-
-        return $id;
-    }
-
-    private function participation(string $eventId, string $categoryId, object $holder): string
-    {
-        $existing = DB::table('visitors')->where('holder_id', $holder->id)->where('event_id', $eventId)->value('id');
-        if ($existing !== null) {
-            return $existing;
-        }
-        $id = (string) Str::uuid();
-        DB::table('visitors')->insert([
-            'id' => $id, 'event_id' => $eventId, 'full_name' => $holder->full_name, 'organisation' => $holder->organisation, 'position' => $holder->position,
-            'category_id' => $categoryId, 'valid_from' => $holder->engagement_starts_on ?? now()->toDateString(), 'valid_until' => $holder->engagement_ends_on ?? '2099-12-31',
-            'source' => 'listé', 'status' => 'attendu', 'holder_id' => $holder->id, 'created_at' => now(), 'updated_at' => now(),
-        ]);
-
-        return $id;
     }
 
     // --- Rendu ------------------------------------------------------------------------------------------------------------------
@@ -446,7 +413,10 @@ final class HolderCards
             // Le motif peut contenir des informations personnelles : il reste dans l'historique des tirages, pas dans le journal d'audit.
             $this->audit->append($first ? 'carte.imprimee' : 'carte.reimprimee', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier]);
             // Le QR est exposé sur un support imprimable : le lot du badge est marqué comme exposé (même protection que l'atelier de badges).
-            DB::table('badge_batches')->where('id', DB::table('badges')->where('id', $card->badge_id)->value('badge_batch_id'))->update(['print_exposed_at' => now()]);
+            // Les cartes du site n'ont pas de lot ; les anciennes cartes du registre gardent leur lot d'un exemplaire.
+            if (($batchId = DB::table('badges')->where('id', $card->badge_id)->value('badge_batch_id')) !== null) {
+                DB::table('badge_batches')->where('id', $batchId)->update(['print_exposed_at' => now()]);
+            }
 
             return $first ? 'emission' : 'reimpression';
         });

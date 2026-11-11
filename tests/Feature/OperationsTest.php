@@ -64,6 +64,13 @@ function opPermanentVisitor(): array
     $holder = app(PermanentHolders::class)->create(['position' => 'Formateur fictif', 'institutional_category' => 'AILCT-01'], test()->admin, false, $person);
     app(HolderCards::class)->issue($holder, test()->admin, true);
     $event = (string) DB::table('events')->where('is_permanent', true)->value('id');
+    // Les cartes sont désormais émises au niveau du site, sans participation : on reconstitue ici la participation d'une ancienne carte du registre technique,
+    // seule forme de passage encore lue par la supervision générale avant le rattachement définitif (étape 4).
+    $category = (string) Str::uuid();
+    DB::table('categories')->insert(['id' => $category, 'event_id' => $event, 'name' => 'Ancien registre', 'color' => '#336699', 'priority_circuit' => false, 'institutional_code' => 'AILCT-01', 'created_at' => now(), 'updated_at' => now()]);
+    $row = DB::table('permanent_holders')->where('id', $holder)->first();
+    DB::table('visitors')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'full_name' => $row->full_name, 'organisation' => $row->organisation, 'position' => $row->position, 'category_id' => $category,
+        'valid_from' => now()->toDateString(), 'valid_until' => '2099-12-31', 'source' => 'listé', 'status' => 'attendu', 'holder_id' => $holder, 'created_at' => now(), 'updated_at' => now()]);
 
     return ['event' => $event, 'visitor' => (string) DB::table('visitors')->where('holder_id', $holder)->where('event_id', $event)->value('id')];
 }
