@@ -348,7 +348,7 @@ final class PermanentHolders
         return DB::table('events')->where('is_permanent', true)->first(['id', 'name', 'status']);
     }
 
-    /** Crée le contexte permanent protégé (un seul). Il héberge plus tard les cartes permanentes ; aucun comportement de carte ici. */
+    /** Crée (une seule fois, sans effet si elle existe) le registre technique protégé qui héberge les cartes permanentes ; ce n'est pas une activité et aucune opération n'en dépend. */
     public function createPermanentContext(User $actor): string
     {
         return DB::transaction(function () use ($actor): string {
@@ -359,7 +359,7 @@ final class PermanentHolders
             $id = (string) Str::uuid();
             $institution = app(Institution::class)->profile();
             DB::table('events')->insert([
-                'id' => $id, 'name' => 'Contexte permanent — '.$institution['name'], 'site' => null,
+                'id' => $id, 'name' => 'Registre des cartes du site — '.$institution['name'], 'site' => null,
                 'starts_at' => now(), 'ends_at' => '2099-12-31 23:59:59+00', 'is_permanent' => true, 'created_at' => now(), 'updated_at' => now(),
             ]);
             app(Audit::class)->append('contexte_permanent.cree', $actor->id, ['event_id' => $id]);
