@@ -105,7 +105,7 @@ final class CardLifecycle
         if ($affected !== 1) {
             throw ValidationException::withMessages(['holder' => 'Le badge de cette carte n’est plus dans un état annulable : revue manuelle nécessaire.']);
         }
-        $this->audit->append('badge.annule', $actor->id, ['badge_id' => $card->badge_id, 'event_id' => $card->event_id, 'carte_permanente' => true]);
+        $this->audit->append('badge.annule', $actor->id, ['badge_id' => $card->badge_id, 'carte_permanente' => true]);
         $this->audit->append('carte.revoquee', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier, 'card_id' => $card->id, 'motif' => $reason, 'statut' => $status]);
     }
 }

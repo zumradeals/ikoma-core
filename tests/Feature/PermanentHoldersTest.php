@@ -135,7 +135,6 @@ it('réserve le registre à l’administrateur et les réglages aux droits de ca
         $this->post('/administration/titulaires', holderData())->assertForbidden();
         $this->get('/administration/categories-institutionnelles')->assertForbidden();
         $this->put('/administration/titulaires/format', ['prefix' => 'X', 'width' => 6, 'check' => true])->assertForbidden();
-        $this->post('/administration/titulaires/contexte-permanent')->assertForbidden();
     }
     expect(DB::table('permanent_holders')->count())->toBe(0);
 });

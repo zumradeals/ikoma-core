@@ -96,7 +96,6 @@ const CN_ROUTES = [
     ['GET', 'administration/titulaires', ['can:listes.importer'], []],
     ['POST', 'administration/titulaires', ['can:listes.importer'], ['throttle:titulaires']],
     ['PUT', 'administration/titulaires/format', ['can:categories.gerer'], ['throttle:titulaires']],
-    ['POST', 'administration/titulaires/contexte-permanent', ['can:evenements.gerer'], ['throttle:titulaires']],
     ['PUT', 'administration/titulaires/{holder}', ['can:listes.importer'], ['throttle:titulaires']],
     ['POST', 'administration/titulaires/{holder}/cloturer', ['can:listes.importer'], ['throttle:titulaires']],
     ['GET', 'administration/categories-institutionnelles', ['can:categories.gerer'], []],
