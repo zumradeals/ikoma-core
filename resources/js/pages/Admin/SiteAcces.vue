@@ -228,7 +228,7 @@ function toggleCreate(capability: string, on: boolean) {
           <h3 id="zones-site-titre" class="font-bold">Zones du site</h3>
           <p class="text-sm text-slate-700">Toute zone est une zone du site. Les activités choisissent parmi ces zones (dans leurs catégories) ; elles servent aussi aux habilitations du personnel permanent et au contrôle sur site.</p>
           <ul v-if="site_zones?.length" class="divide-y">
-            <li v-for="z in site_zones" :key="z.id" class="flex flex-wrap items-center gap-2 py-2" :data-testid="'zone-site-' + z.id"><strong class="min-w-0 flex-1">{{ z.name }}<span class="block text-sm font-normal text-slate-700" :data-testid="'zone-liste-' + z.id">Gardée par : {{ postsOfSiteZone(z.id).map(p => p.name).join(', ') || 'aucun poste' }}</span></strong>
+            <li v-for="z in site_zones" :key="z.id" class="flex flex-wrap items-center gap-2 py-2" :data-testid="'zone-site-' + z.id"><span class="min-w-0 flex-1"><strong>{{ z.name }}</strong><span class="block text-sm text-slate-700" :data-testid="'zone-liste-' + z.id">Gardée par : {{ postsOfSiteZone(z.id).map(p => p.name).join(', ') || 'aucun poste' }}</span></span>
               <label class="flex min-h-11 items-center gap-2"><input type="checkbox" class="h-6 w-6" :checked="!!z.est_accueil" :data-testid="'accueil-zone-' + z.id" @change="setReception(z.id, ($event.target as HTMLInputElement).checked)">Zone d’accueil</label>
               <input v-model="renaming[z.id]" class="field !min-h-10 max-w-56" maxlength="120" :placeholder="'Renommer'" :aria-label="'Nouvel intitulé de ' + z.name"><button type="button" class="btn-soft" @click="renameSiteZone(z.id)">Renommer</button></li>
           </ul>
