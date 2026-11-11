@@ -31,7 +31,14 @@ class ResolvePoste
         // Choisir une autre activité reste possible quand l'activité en cours est clôturée (c'est justement la sortie de cette situation).
         $isActivityChoice = $request->is('poste/api/activites') || ($request->is('poste/api/activite') && $request->isMethod('POST'));
         if (! $isWipeReceipt && ! $isActivityChoice) {
-            EventAvailability::requireOpen($device->event_id);
+            if ($device->event_id === null) {
+                // Tablette SANS activité (mode site) : seules la copie du site, la synchronisation, le contrôle des cartes permanentes, la sortie et le compte des présents du site.
+                if (! $request->is('poste/api/liste', 'poste/api/liste/version', 'poste/api/sync', 'poste/api/controle', 'poste/api/sortie', 'poste/api/presents')) {
+                    return response()->json(['code' => 'aucune_activite_en_cours', 'message' => 'Cette tablette n’a pas d’activité en cours : choisissez une activité pour accueillir des visiteurs.', 'action' => null], 409);
+                }
+            } else {
+                EventAvailability::requireOpen($device->event_id);
+            }
         }
         $request->attributes->set('poste', $device);
 

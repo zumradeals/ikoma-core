@@ -125,6 +125,10 @@ final class SyncProcessor
         if (User::find($op['agent_id']) === null) {
             return ['id' => $id, 'status' => 'conflit', 'code' => 'agent_inconnu', 'message' => 'Agent inconnu : l’opération est refusée.'];
         }
+        // Tablette sans activité (mode site) : seuls le contrôle des cartes permanentes et la sortie sont acceptés.
+        if ($device->event_id === null && ! in_array($type, ['controle', 'sortie'], true)) {
+            return ['id' => $id, 'status' => 'conflit', 'code' => 'aucune_activite_en_cours', 'message' => 'Cette tablette n’a pas d’activité en cours : l’opération est refusée.'];
+        }
         $hash = hash('sha256', $type.'|'.json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE).'|'.($op['agent_id']));
 
         return DB::transaction(function () use ($device, $op, $id, $type, $payload, $hash): array {
