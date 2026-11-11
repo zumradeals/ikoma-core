@@ -75,7 +75,6 @@ it('associe une zone du site à un poste de contrôle, une seule fois, puis la r
     $this->post('/administration/site/postes/'.$checkpoint.'/zones-site', ['zone_id' => $this->zone])->assertSessionHasErrors('zone_id');
     $this->get('/administration/site')->assertOk()->assertInertia(fn ($p) => $p->where('checkpoints', fn ($list) => collect($list)->firstWhere('id', $checkpoint)['site_zones'][0]['name'] === 'Hall fictif du site'));
 
-
     $mapping = (string) DB::table('checkpoint_site_zones')->value('id');
     $this->delete('/administration/site/zones-site/'.$mapping)->assertSessionHasNoErrors();
     expect(DB::table('checkpoint_site_zones')->count())->toBe(0);
