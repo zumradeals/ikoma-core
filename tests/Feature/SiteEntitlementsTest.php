@@ -44,7 +44,7 @@ it('accorde une habilitation de site sans événement, tracée, puis la retire a
     expect($row->zone_id)->toBe($this->zone)->and($row->revoked_at)->toBeNull();
     expect(DB::table('audit_logs')->where('action', 'habilitation_site.accordee')->count())->toBe(1);
 
-    $this->get('/administration/habilitations')->assertOk()->assertInertia(fn ($p) => $p->has('site.zones', 1)->has('site.entitlements', 1)->where('site.entitlements.0.zone', 'Hall fictif du site'));
+    $this->get('/administration/habilitations')->assertOk()->assertInertia(fn ($p) => $p->where('site.zones', fn ($zones) => collect($zones)->pluck('name')->contains('Hall fictif du site'))->has('site.entitlements', 1)->where('site.entitlements.0.zone', 'Hall fictif du site'));
 
     $this->post('/administration/habilitations/site/'.$row->id.'/retirer', ['reason' => 'Fin de mission fictive'])->assertSessionHasNoErrors();
     expect(DB::table('holder_site_entitlements')->where('id', $row->id)->value('revoked_at'))->not->toBeNull();
