@@ -893,3 +893,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Tablette de site, lot 5c : alertes du site
 - Décision : les alertes du site sont des alertes ordinaires dont `event_id` est vide ; l'écran « Alertes » du superviseur les affiche dans une section dédiée et les inclut dans le compteur. Aucun écran séparé.
 - Les alertes d'une tablette AVEC activité restent des alertes d'activité (comportement inchangé) ; seul le mode « site seul » lève des alertes du site.
+
+## Tablette de site, lot 5d : enrôlement sans activité ouvert
+- Décision : aucune activité autorisée, ou plusieurs sans choix = enrôlement en mode site ; une seule activité autorisée = assignée comme avant. Les refus « aucune_activite » et « activite_a_choisir » de l'enrôlement disparaissent (la clôture de l'activité en cours reste refusée).
+- Conséquence : l'écran Postes n'impose plus de choix d'activité avant d'enrôler ; l'agent choisit sur la tablette.
+- Rappel : installation de test sans donnée réelle ; aucune reprise de données.
