@@ -69,12 +69,14 @@ it('exige un motif, refuse un mouvement inconnu et un contrôle (pas une entrée
     $this->post('/pilotage/mouvements/'.$control.'/correction', ['reason' => 'Motif'])->assertSessionHasErrors('correction');
 });
 
-it('réserve la correction au superviseur : ni l’administrateur ni l’agent ne peuvent corriger', function () {
-    foreach (['administrateur', 'agent_accueil', 'hote'] as $role) {
+it('réserve la correction au superviseur et à l’administrateur : ni l’agent ni l’hôte ne peuvent corriger', function () {
+    foreach (['agent_accueil', 'hote'] as $role) {
         $this->actingAs(coUser($role));
         $this->post('/pilotage/mouvements/'.$this->entry.'/correction', ['reason' => 'Motif'])->assertForbidden();
     }
     expect(DB::table('access_events')->where('corrige_id', $this->entry)->exists())->toBeFalse();
     $this->actingAs(coUser('administrateur'));
-    $this->get('/pilotage/mouvements')->assertOk()->assertInertia(fn ($p) => $p->where('canCorrect', false));
+    $this->get('/pilotage/mouvements')->assertOk()->assertInertia(fn ($p) => $p->where('canCorrect', true));
+    $this->post('/pilotage/mouvements/'.$this->entry.'/correction', ['reason' => 'Erreur de saisie fictive'])->assertRedirect();
+    expect(DB::table('access_events')->where('corrige_id', $this->entry)->count())->toBe(1);
 });

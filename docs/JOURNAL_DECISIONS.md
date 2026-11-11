@@ -909,3 +909,6 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Choix du dirigeant (3 options présentées) : « d'abord masquer le conteneur ». Retrait complet du modèle reporté (projet à part, ~3 PR, risque sur l'émission et l'impression des cartes).
 - Fait : création automatique et idempotente du registre technique à la première carte ; suppression de l'étape visible et du blocage ; nouveau nom ; libellés « site (personnel permanent) » dans Opérations et Administration.
 - Non fait : aucune table ni contrainte n'est modifiée ; `events.is_permanent` reste la clé du registre technique. Installation de test sans donnée réelle : aucune reprise de données.
+
+## L'administrateur peut aussi corriger un mouvement (décision du dirigeant)
+- Le droit `mouvements.corriger` est attribué au superviseur **et** à l'administrateur (agent d'accueil et hôte : non). Les corrections restent des événements ajoutés au journal (motif obligatoire, une seule par mouvement, original jamais modifié), donc tracées au nom de leur auteur.
