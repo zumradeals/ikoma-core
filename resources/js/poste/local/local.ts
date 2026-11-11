@@ -2,7 +2,7 @@ import { ApiError, type ActivityChoice, type DeskSummary, type Avis, type Checkp
 import type { GroupPosteRepository } from '../repository';
 import { posteGate, OP_POLICY } from './capabilities';
 import { applyOp, type ApplyResult, ficheOf, findBadge, searchOf, type LocalOp, type OpType } from './apply';
-import { sha256Hex } from './crypto';
+import { fromB64, sha256Hex } from './crypto';
 import { getMeta } from './db';
 import { applyGroupOp, groupSummaries, groupView, type ArrivalResult, type BoardResult, type GroupSummary, type GroupView } from './group';
 import { LocalList, type Snapshot } from './list';
@@ -13,6 +13,9 @@ import type { SyncManager } from './sync';
 import type { PosteVault } from './vault';
 
 type Profile = { id: string; name: string };
+
+/** Nombre maximal de portraits copiés sur la tablette (limite la place prise et l'exposition en cas de perte). */
+export const PORTRAIT_MAX = 300;
 
 /**
  * Implémentation locale du dépôt de données du poste : tout est lu dans la copie chiffrée de la tablette et toute écriture
@@ -43,6 +46,27 @@ export class LocalPosteRepository implements GroupPosteRepository {
       this.list = new LocalList(snapshot);
       await this.replayPending();
     });
+    void this.copyPortraits();
+  }
+
+  /** Portraits gardés sur la tablette (chiffrés) pour l'accueil hors ligne : au plus PORTRAIT_MAX, retirés dès que la personne n'est plus dans la copie (autre activité, purge). */
+  private copying = false;
+  async copyPortraits(): Promise<void> {
+    if (this.copying || !this.sync || !this.online || !this.vault.unlocked) return;
+    this.copying = true;
+    try {
+      const wanted = Array.from(this.list.visitors.values()).slice(0, PORTRAIT_MAX);
+      const keep = new Set(wanted.map(v => v.id));
+      await this.store.portraitDelete((await this.store.portraitIds()).filter(id => !keep.has(id)));
+      for (const v of wanted) {
+        if (!this.online || !this.vault.unlocked) break;
+        const have = await this.store.portraitGet(v.id);
+        if (have && have.rev === (v.rev ?? null)) continue;
+        const blob = await this.sync.image('/poste/api/visiteurs/' + encodeURIComponent(v.id) + '/portrait');
+        if (!blob && !this.online) break;
+        await this.store.portraitPut(v.id, v.rev ?? null, blob ? new Uint8Array(await blob.arrayBuffer()) : null);
+      }
+    } catch { /* la copie hors ligne est un confort : une erreur ne gêne jamais l'accueil */ } finally { this.copying = false; }
   }
 
   /** Une écriture (règle appliquée à la copie puis enregistrement dans la file) et un remplacement de la copie ne se chevauchent jamais : sinon l'écriture pouvait disparaître de l'écran jusqu'à la synchronisation suivante. */
@@ -72,8 +96,17 @@ export class LocalPosteRepository implements GroupPosteRepository {
     if(!this.sync || !this.online)throw new ApiError('reseau','Reconnectez-vous pour demander l’avis de l’hôte.');
     await this.sync.sync();await this.sync.request('POST','/poste/api/avis-hote',{visitor_id:visitorId},undefined,3000);
   }
-  /** Portrait de la personne, en ligne seulement : hors ligne ou sans portrait, l'accueil affiche l'initiale. */
-  async portrait(visitorId: string): Promise<Blob | null> { return this.sync && this.online ? this.sync.image('/poste/api/visiteurs/' + encodeURIComponent(visitorId) + '/portrait') : null; }
+  /** Portrait de la personne : en ligne, lu sur le serveur ; hors ligne, lu dans la copie chiffrée de la tablette ; sans portrait, l'accueil affiche l'initiale. */
+  async portrait(visitorId: string): Promise<Blob | null> {
+    if (this.sync && this.online) {
+      const blob = await this.sync.image('/poste/api/visiteurs/' + encodeURIComponent(visitorId) + '/portrait');
+      if (blob) return blob;
+    }
+    try {
+      const copy = await this.store.portraitGet(visitorId);
+      return copy?.data ? new Blob([fromB64(copy.data) as BlobPart], { type: 'image/jpeg' }) : null;
+    } catch { return null; }
+  }
   /** Activités autorisées pour cette tablette, lues sur le serveur : hors ligne, la liste reste celle de l'activité en cours. */
   async activities(): Promise<ActivityChoice[]> {
     if (!this.sync || !this.online) throw new ApiError('reseau', 'Changer d’activité demande le réseau.');

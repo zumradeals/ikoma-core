@@ -62,7 +62,7 @@ export class SyncManager {
   /** Appel authentifié par le jeton d'appareil (aussi utilisé par le contrôle en ligne). */
   request<T>(method: 'GET' | 'POST', url: string, body?: object, operationId?: string, timeoutMs?: number): Promise<T> { return this.call<T>(method, url, body, operationId, timeoutMs); }
 
-  /** Image protégée (portrait) lue en ligne avec le jeton d'appareil : jamais copiée dans la file ni dans la copie chiffrée ; null s'il n'y en a pas ou si le réseau manque. */
+  /** Image protégée (portrait) lue en ligne avec le jeton d'appareil : jamais copiée dans la file d'opérations (la copie hors ligne, chiffrée, est faite par LocalPosteRepository.copyPortraits) ; null s'il n'y en a pas ou si le réseau manque. */
   async image(url: string, timeoutMs = 4000): Promise<Blob | null> {
     const token = await this.vault.getSecret<string>('deviceToken');
     try {

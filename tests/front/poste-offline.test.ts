@@ -565,3 +565,56 @@ it('déclare l’effacement après révocation seulement une fois les données l
   await vi.waitFor(() => expect(receipts).toEqual([{ motif: 'deconnexion', operations_perdues: 0 }]));
   expect(await runtime.vault.state()).toBe('vide');
 });
+
+describe('portraits copiés pour l’accueil hors ligne', () => {
+  const jpeg = new Uint8Array([255, 216, 255, 224, 9, 8, 7, 6]);
+  async function build(visitors: SnapVisitor[]) {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    const vault = new PosteVault(new PosteDb(dbName()), { iterations: ITER });
+    await vault.enrol({ token: 'b'.repeat(64), secret: SECRET, pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    await vault.putSecret('deviceToken', 'a'.repeat(64));
+    const store = new PosteStore(vault);
+    const snap = snapshot(visitors);
+    const urls: string[] = [];
+    const fetcher = vi.fn(async (url: string | URL | Request) => {
+      urls.push(String(url));
+      return String(url).includes('/v2/') ? new Response('', { status: 404 }) : new Response(jpeg, { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
+    }) as unknown as typeof fetch;
+    const sync = new SyncManager(vault, store, { onState: () => undefined, onSnapshot: async () => undefined, onRevoked: async () => undefined, now: () => now0, fetcher });
+    const repo = new LocalPosteRepository(snap, vault, store, { id: 'u1', name: 'Agent fictif' }, vi.fn(), 0, sync);
+    return { vault, store, repo, urls };
+  }
+
+  it('copie les portraits chiffrés, les rend hors ligne, ne redemande rien et efface ce qui quitte la liste', async () => {
+    const { vault, store, repo, urls } = await build([visitor('v1', 'Koné Mariam'), visitor('v2', 'Yao Brou')]);
+    await repo.copyPortraits();
+    expect(urls).toHaveLength(2);
+    expect(await store.portraitIds()).toEqual(expect.arrayContaining(['v1', 'v2']));
+    // le contenu stocké est scellé : aucune trace de l'image en clair
+    const raw = JSON.stringify((await vault.db.photos.toArray()).map(r => Array.from(r.data)));
+    expect(raw).not.toContain(Array.from(jpeg).join(','));
+    // hors ligne : le portrait vient de la copie
+    const nav = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const blob = await repo.portrait('v1');
+    expect(blob).not.toBeNull();
+    expect(new Uint8Array(await blob!.arrayBuffer())).toEqual(jpeg);
+    nav.mockReturnValue(true);
+    // déjà copiés à la même révision : pas de nouvelle demande
+    await repo.copyPortraits();
+    expect(urls).toHaveLength(2);
+    // la personne quitte la copie (autre activité) : son portrait est effacé
+    repo.list = new LocalList(snapshot([visitor('v1', 'Koné Mariam')]));
+    await repo.copyPortraits();
+    expect(await store.portraitIds()).toEqual(['v1']);
+  });
+
+  it('ne copie rien tant que le coffre est verrouillé et efface tout à l’effacement de la tablette', async () => {
+    const { vault, store, repo, urls } = await build([visitor('v1', 'Koné Mariam')]);
+    vault.lock();
+    await repo.copyPortraits();
+    expect(urls).toHaveLength(0);
+    await vault.wipe();
+    expect(await vault.db.photos.count()).toBe(0);
+    expect(store).toBeDefined();
+  });
+});
