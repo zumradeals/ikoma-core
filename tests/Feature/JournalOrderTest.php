@@ -9,7 +9,9 @@ uses(DatabaseTransactions::class);
 
 beforeEach(function () {
     $this->seed(DemoSeeder::class);
-    $this->visitor = DB::table('visitors')->where('status', '<>', 'refuse')->first();
+    // Visiteur sans aucun mouvement : le compte de départ de son événement est la référence.
+    $this->visitor = DB::table('visitors as v')->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as e')->whereColumn('e.visitor_id', 'v.id'))->first();
+    $this->baseline = app(Presence::class)->count($this->visitor->event_id);
 });
 
 function joEvent(object $visitor, string $id, string $type, string $at): void
@@ -25,7 +27,7 @@ it('départage une entrée et une sortie de la même seconde par l’ordre d’i
     joEvent($this->visitor, '00000000-0000-4000-8000-000000000002', 'sortie', $at);
 
     expect(app(Presence::class)->visitorPresent($this->visitor->id))->toBeFalse();
-    expect(app(Presence::class)->count($this->visitor->event_id))->toBe(0);
+    expect(app(Presence::class)->count($this->visitor->event_id))->toBe($this->baseline);
 });
 
 it('compte présente la personne dont la dernière entrée suit la sortie de la même seconde', function () {
@@ -34,5 +36,5 @@ it('compte présente la personne dont la dernière entrée suit la sortie de la 
     joEvent($this->visitor, 'ffffffff-0000-4000-8000-000000000004', 'entree', $at);
 
     expect(app(Presence::class)->visitorPresent($this->visitor->id))->toBeTrue();
-    expect(app(Presence::class)->count($this->visitor->event_id))->toBe(1);
+    expect(app(Presence::class)->count($this->visitor->event_id))->toBe($this->baseline + 1);
 });
