@@ -103,7 +103,6 @@ const rowClass: Record<ImportRow['status'], string> = { ok: 'bg-green-100 text-g
 const format = useForm({ prefix: props.identifierFormat.prefix, width: props.identifierFormat.width, check: props.identifierFormat.check });
 function saveFormat() { format.put('/administration/titulaires/format', { preserveScroll: true }); }
 function prepareAll() { router.post('/administration/titulaires/cartes/preparer-toutes', {}, { preserveScroll: true }); }
-function createContext() { router.post('/administration/titulaires/contexte-permanent', {}, { preserveScroll: true }); }
 </script>
 
 <template>
@@ -112,14 +111,9 @@ function createContext() { router.post('/administration/titulaires/contexte-perm
       <header class="col-span-full space-y-2">
         <h1 class="text-display font-bold">Personnel permanent et cartes</h1>
         <p>Vue spécialisée du personnel permanent : numéros, cartes, import et classement par lot. L’identité d’une personne se consulte et se corrige dans le <Link href="/administration/personnes" class="font-semibold underline" data-testid="ouvrir-registre-unifie">registre unifié « Personnes et habilitations »</Link>, sans second registre. Les personnes de l’institution (personnel, partenaires, stagiaires…) sont enregistrées une seule fois. Chacune reçoit un numéro stable, jamais réattribué. <strong>Enregistrer une personne ne crée aucune carte et ne donne aucun accès</strong> : la carte se prépare à part, depuis la fiche.</p>
-        <p class="text-sm font-semibold" data-testid="contexte-permanent">
-          Espace des cartes permanentes :
-          <span v-if="permanentContext">en place ({{ permanentContext.name }}), il ne se ferme ni ne se supprime.</span>
-          <span v-else>pas encore créé (à faire une fois avant de préparer des cartes). <button type="button" class="btn-soft ml-2" data-testid="creer-contexte" @click="createContext">Créer cet espace</button></span>
-        </p>
       </header>
 
-      <section v-if="canCards && pipeline && permanentContext" class="col-span-full grid gap-4 rounded-2xl border bg-white p-5 md:grid-cols-3" aria-label="Où en sont les cartes" data-testid="parcours-cartes">
+      <section v-if="canCards && pipeline" class="col-span-full grid gap-4 rounded-2xl border bg-white p-5 md:grid-cols-3" aria-label="Où en sont les cartes" data-testid="parcours-cartes">
         <div class="space-y-2 rounded-xl border-2 p-4" :class="pipeline.sans_carte > 0 ? 'border-[#0066B3]' : 'border-slate-200'" data-testid="etape-preparer">
           <h2 class="flex items-center gap-2 text-lg font-bold"><span class="grid size-8 place-items-center rounded-full bg-[#0B3C6B] text-white" aria-hidden="true">1</span>Préparer</h2>
           <p><strong class="text-2xl" data-testid="nb-sans-carte">{{ pipeline.sans_carte }}</strong> personne(s) sans carte, avec photo.</p>

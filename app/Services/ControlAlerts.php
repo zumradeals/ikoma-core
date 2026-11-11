@@ -68,7 +68,7 @@ final class ControlAlerts
                 AND (type IN ('entree', 'sortie') OR (type = 'controle' AND details->>'verdict' = 'valide'))
                 AND checkpoint IS DISTINCT FROM ?
                 AND COALESCE((details->>'heure_declaree')::timestamptz, occurred_at) BETWEEN ?::timestamptz - make_interval(secs => ?) AND ?::timestamptz + make_interval(secs => ?)
-              ORDER BY occurred_at DESC LIMIT 1",
+              ORDER BY occurred_at DESC, seq DESC LIMIT 1",
             [$eventId, $badgeId, $currentEventId, $point['name'], $at->toIso8601String(), $seconds, $at->toIso8601String(), $seconds],
         );
         if ($other === null) {

@@ -35,7 +35,7 @@ describe('Administration › Opérations', () => {
     expect(w.get('[data-testid=kpi-appareils]').text()).toBe('6 appareils synchronisés récemment · 1 silencieux');
     expect(w.get('[data-testid=kpi-presents]').text()).toBe('9');
     expect(w.get('[data-testid=kpi-presents-detail]').text()).toContain('Identités distinctes');
-    expect(w.get('[data-testid=kpi-presents-detail]').text()).toContain('4 en contexte permanent, 5 en activité');
+    expect(w.get('[data-testid=kpi-presents-detail]').text()).toContain('4 sur le site (personnel permanent), 5 en activité');
     expect(w.get('[data-testid=signal]').text()).toContain('attention');
     expect(w.findAll('[data-testid=graphique-24h] rect')).toHaveLength(48);
   });
@@ -51,9 +51,9 @@ describe('Administration › Opérations', () => {
     expect(w.text()).not.toMatch(/En ligne/);
   });
 
-  it('précise le périmètre du contexte permanent quand il est consulté', () => {
+  it('précise le périmètre du site (personnel permanent) quand il est consulté', () => {
     const w = mountPage({ event: { ...base.event, id: 'p0', name: 'Permanent', is_permanent: true } });
-    expect(w.get('[data-testid=perimetre-activite]').text()).toBe('Périmètre : contexte permanent (titulaires)');
+    expect(w.get('[data-testid=perimetre-activite]').text()).toBe('Périmètre : site (personnel permanent)');
   });
 
   it('montre la supervision générale puis les cinq onglets, chacun renvoyant vers l’écran propriétaire', async () => {
@@ -66,7 +66,7 @@ describe('Administration › Opérations', () => {
     await w.get('[data-testid=onglet-presences]').trigger('click');
     expect(w.get('[data-testid=presences-site]').text()).toContain('9 personnes présentes sur le site (identités distinctes');
     expect(w.get('[data-testid=presences-multi]').text()).toContain('2 présences enregistrées dans plusieurs contextes');
-    expect(w.findAll('[data-testid=presences-contextes] li').map(l => l.text())).toEqual(['Contexte permanent : 6', 'Stage fictif : 5']);
+    expect(w.findAll('[data-testid=presences-contextes] li').map(l => l.text())).toEqual(['Site (personnel permanent) : 6', 'Stage fictif : 5']);
     expect(w.get('[data-testid=vers-evacuation]').attributes('href')).toBe('/pilotage/evacuation?event=e1');
     await w.get('[data-testid=onglet-incidents]').trigger('click');
     expect(w.get('[data-testid=inc-litiges]').text()).toBe('2');
@@ -86,11 +86,11 @@ describe('Administration › Opérations', () => {
     expect(w.findAll('button').map(b => b.text()).filter(t => /cl[ôo]turer|restituer|valider|autoriser/i.test(t))).toEqual([]);
   });
 
-  it('change d’activité consultée, y compris le contexte permanent, et actualise sans rien écrire', async () => {
+  it('change d’activité consultée, y compris le site, et actualise sans rien écrire', async () => {
     const w = mountPage();
     await w.get('[data-testid=choix-activite]').setValue('p0');
     expect(get).toHaveBeenCalledWith('/administration/operations', { event: 'p0' }, expect.objectContaining({ preserveScroll: true }));
-    expect(w.findAll('[data-testid=choix-activite] option').map(o => o.text())).toEqual(['Stage fictif', 'Contexte permanent (titulaires)']);
+    expect(w.findAll('[data-testid=choix-activite] option').map(o => o.text())).toEqual(['Stage fictif', 'Site (personnel permanent)']);
     await w.get('[data-testid=actualiser]').trigger('click');
     expect(reload).toHaveBeenCalledWith({ only: ['general', 'counters', 'overview', 'centre'] });
   });

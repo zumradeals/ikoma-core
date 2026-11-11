@@ -40,8 +40,9 @@ describe('parcours des cartes permanentes en trois étapes', () => {
     expect(idle.find('[data-testid=nb-sans-photo]').exists()).toBe(false);
   });
 
-  it('n’affiche le parcours qu’à qui gère les badges et seulement quand l’espace des cartes existe', () => {
+  it('n’affiche le parcours qu’à qui gère les badges ; le registre technique des cartes n’est plus une étape visible', () => {
     expect(mount(Titulaires, { props: { ...base, canCards: false, pipeline: null } }).find('[data-testid=parcours-cartes]').exists()).toBe(false);
-    expect(mount(Titulaires, { props: { ...base, permanentContext: null } }).find('[data-testid=parcours-cartes]').exists()).toBe(false);
+    expect(mount(Titulaires, { props: { ...base, permanentContext: null } }).find('[data-testid=parcours-cartes]').exists()).toBe(true);
+    expect(mount(Titulaires, { props: { ...base, permanentContext: null } }).find('[data-testid=creer-contexte]').exists()).toBe(false);
   });
 });

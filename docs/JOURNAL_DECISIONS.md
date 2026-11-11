@@ -902,3 +902,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Dette : conservation des mouvements du site
 - Décision (dirigeant, lot 3) appliquée : pas de nouveau réglage ; la durée « événements » (`conservation_evenements_jours`) vaut aussi pour les mouvements du site, tant que la politique de conservation est approuvée. 0 = aucune suppression.
 - Contrainte de base respectée : la clé `corrige_id` interdit d'effacer un mouvement encore corrigé par une correction récente ; l'ordre de purge (corrections échues d'abord, puis mouvements non référencés) évite toute erreur.
+## Tablette de site, lot 6 : masquer le conteneur des cartes (décision du dirigeant)
+- Choix du dirigeant (3 options présentées) : « d'abord masquer le conteneur ». Retrait complet du modèle reporté (projet à part, ~3 PR, risque sur l'émission et l'impression des cartes).
+- Fait : création automatique et idempotente du registre technique à la première carte ; suppression de l'étape visible et du blocage ; nouveau nom ; libellés « site (personnel permanent) » dans Opérations et Administration.
+- Non fait : aucune table ni contrainte n'est modifiée ; `events.is_permanent` reste la clé du registre technique. Installation de test sans donnée réelle : aucune reprise de données.

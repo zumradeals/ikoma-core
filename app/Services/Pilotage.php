@@ -185,12 +185,12 @@ final class Pilotage
             FROM (
                 SELECT DISTINCT ON (e.visitor_id) e.visitor_id, e.type, e.occurred_at FROM access_events e
                 WHERE e.event_id = ? AND e.type IN ('entree', 'sortie') AND e.visitor_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM access_events x WHERE x.corrige_id = e.id)
-                ORDER BY e.visitor_id, e.occurred_at DESC, e.created_at DESC, e.id DESC
+                ORDER BY e.visitor_id, e.occurred_at DESC, e.seq DESC
             ) l JOIN visitors v ON v.id = l.visitor_id JOIN categories c ON c.id = v.category_id LEFT JOIN groups g ON g.id = v.group_id
             LEFT JOIN (
                 SELECT DISTINCT ON (a.visitor_id) a.visitor_id, a.checkpoint, a.occurred_at FROM access_events a
                 WHERE a.event_id = ? AND a.type = 'controle' AND a.details->>'point_type' = 'zone' AND a.visitor_id IS NOT NULL
-                ORDER BY a.visitor_id, a.occurred_at DESC
+                ORDER BY a.visitor_id, a.occurred_at DESC, a.seq DESC
             ) z ON z.visitor_id = v.id AND z.occurred_at >= l.occurred_at
             WHERE l.type = 'entree'
         ) p WHERE true";
