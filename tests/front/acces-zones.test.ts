@@ -24,9 +24,10 @@ const base = {
 };
 
 describe('accès aux zones', () => {
-  it('affiche les correspondances et l’état de chaque habilitation (active, expirée, suspendue)', () => {
+  it('renvoie vers Site et accès pour les zones des postes et affiche l’état de chaque habilitation (active, expirée, suspendue)', () => {
     const wrapper = mount(AccesZones, { props: base });
-    expect(wrapper.get('[data-testid=correspondance]').text()).toContain('Poste 2 → Hall');
+    expect(wrapper.find('[data-testid=correspondance]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid=vers-site-acces]').attributes('href')).toBe('/administration/site');
     const states = wrapper.findAll('[data-testid=etat]').map(e => e.text());
     expect(states).toEqual(['Active', 'Expirée', 'Suspendue']);
     expect(wrapper.text()).toContain('Visite officielle');

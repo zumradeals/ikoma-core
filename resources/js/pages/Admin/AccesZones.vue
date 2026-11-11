@@ -8,7 +8,6 @@ const props = defineProps<{
   events: { id: string; name: string }[]; eventId: string | null; q: string; zones: { id: string; name: string }[]; points: { id: string; name: string }[];
   mappings: { id: string; checkpoint_id: string; point: string; zone_id: string; zone: string }[]; entitlements: Entitlement[]; participants: { id: string; full_name: string; organisation: string | null }[]; maxHours: number; now: string;
 }>();
-const mapForm = useForm({ event_id: props.eventId ?? '', checkpoint_id: '', zone_id: '' });
 const grantForm = useForm({ visitor_id: '', zone_id: '', kind: 'standard', reason: '', valid_from: '', valid_until: '' });
 const maxForm = useForm({ max_heures: props.maxHours });
 const search = useForm({ q: props.q });
@@ -16,8 +15,6 @@ const state = (e: Entitlement) => e.revoked_at ? 'Retirée' : e.suspended_at ? '
 const chosen = computed(() => props.participants.find(p => p.id === grantForm.visitor_id));
 function chooseEvent(id: string) { router.get('/administration/acces', { event: id }); }
 function find() { router.get('/administration/acces', { event: props.eventId, q: search.q }, { preserveState: true }); }
-function saveMap() { mapForm.event_id = props.eventId ?? ''; mapForm.post('/administration/acces/correspondances', { preserveScroll: true, onSuccess: () => mapForm.reset('checkpoint_id', 'zone_id') }); }
-function unmap(id: string) { if (window.confirm('Retirer cette correspondance ?')) router.post(`/administration/acces/correspondances/${id}/retirer`, {}, { preserveScroll: true }); }
 function grant() { grantForm.post('/administration/acces/habilitations', { preserveScroll: true, onSuccess: () => grantForm.reset('visitor_id', 'reason') }); }
 function act(id: string, action: 'suspendre' | 'retirer') {
   const reason = window.prompt(action === 'suspendre' ? 'Motif de la suspension ?' : 'Motif du retrait ?');
@@ -28,26 +25,12 @@ function saveMax() { maxForm.put('/administration/acces/reglage', { preserveScro
 </script>
 <template>
 <AdminLayout active="acces-zones">
-<h1 class="mb-3 text-display font-bold">Administration · Accès aux zones</h1>
-<p class="mb-4 max-w-4xl">Deux réglages, réservés à l’administrateur. <strong>Quelles zones garde chaque poste</strong>, puis <strong>les habilitations des participants</strong> en complément de leur catégorie. Une habilitation <strong>exceptionnelle</strong> exige un motif et dure au plus {{ maxHours }} heure(s). Le superviseur peut consulter, jamais modifier. <strong>Suspendre ou retirer une habilitation ne retire que l’accès supplémentaire qu’elle accordait</strong> : les zones de la catégorie de la personne restent autorisées.</p>
+<h1 class="mb-3 text-display font-bold">Administration · Habilitations des participants</h1>
+<p class="mb-4 max-w-4xl">Réservé à l’administrateur. Les zones que garde chaque poste se règlent dans <a class="underline" href="/administration/site" data-testid="vers-site-acces">Site et accès</a> ; ici, <strong>les habilitations des participants</strong> d’une activité, en complément de leur catégorie. Une habilitation <strong>exceptionnelle</strong> exige un motif et dure au plus {{ maxHours }} heure(s). Le superviseur peut consulter, jamais modifier. <strong>Suspendre ou retirer une habilitation ne retire que l’accès supplémentaire qu’elle accordait</strong> : les zones de la catégorie de la personne restent autorisées.</p>
 <label class="mb-5 block max-w-md font-semibold">Activité
   <select class="field" data-testid="choix-activite" :value="eventId ?? ''" @change="chooseEvent(($event.target as HTMLSelectElement).value)"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select>
 </label>
 <template v-if="eventId">
-<section class="admin-card mb-6 space-y-3" data-testid="correspondances">
-  <h2>Points de contrôle et zones</h2>
-  <p>Sans correspondance, un poste ne juge pas la zone ; toutes ses tablettes jugent les mêmes zones. Un point qui garde plusieurs zones est franchi si la personne est autorisée dans l’une d’elles.</p>
-  <ul>
-    <li v-for="m in mappings" :key="m.id" class="my-2 flex items-center justify-between gap-3 border-b pb-2" data-testid="correspondance"><span>{{ m.point }} → <strong>{{ m.zone }}</strong></span><button type="button" class="btn-soft" @click="unmap(m.id)">Retirer</button></li>
-    <li v-if="!mappings.length">Aucune correspondance.</li>
-  </ul>
-  <form class="flex flex-wrap items-end gap-3" @submit.prevent="saveMap">
-    <label class="font-semibold">Poste<select v-model="mapForm.checkpoint_id" class="field" data-testid="map-point"><option value="">Choisir</option><option v-for="p in points" :key="p.id" :value="p.id">{{ p.name }}</option></select></label>
-    <label class="font-semibold">Zone<select v-model="mapForm.zone_id" class="field" data-testid="map-zone"><option value="">Choisir</option><option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }}</option></select></label>
-    <button type="submit" class="btn-main" :disabled="!mapForm.checkpoint_id || !mapForm.zone_id || mapForm.processing" data-testid="ajouter-correspondance">Associer</button>
-  </form>
-  <p v-if="mapForm.errors.zone_id" role="alert" class="text-red-800">{{ mapForm.errors.zone_id }}</p>
-</section>
 <section class="admin-card mb-6 space-y-3" data-testid="habilitations-participants">
   <h2>Habilitations des participants</h2>
   <form class="flex flex-wrap items-end gap-3" @submit.prevent="find"><label class="font-semibold">Chercher un participant<input v-model="search.q" class="field" minlength="2" data-testid="chercher-participant"></label><button type="submit" class="btn-soft">Chercher</button></form>

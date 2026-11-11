@@ -947,3 +947,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - L'écran « Zones » (et ses routes de création et de modification) disparaît : toute zone se crée et se renomme dans Site et accès ; `/administration/zones` redirige.
 - La zone d'accueil devient une case sur la zone du site (au moins une doit rester). Une nouvelle activité et l'installation garantissent une zone d'accueil du site (`ActivityZones::ensureSiteReception`) au lieu de créer un « Accueil » propre.
 - Écrans « Accès et zones », sélecteur de « Habilitations par zone » et jeux d'essai : étape Z4b.
+
+## Zones du site : étape Z4b, un poste, un seul endroit pour ses zones
+- Les zones gardées par un poste se règlent uniquement dans Site et accès ; les anciennes correspondances sur des zones devenues zones du site sont reprises (migration non réversible).
+- « Accès aux zones » devient « Habilitations des participants » ; dans « Habilitations par zone », le choix de l'activité n'apparaît plus qu'après la section du site.
