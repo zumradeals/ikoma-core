@@ -1,5 +1,5 @@
 export type Category = { id: string; name: string; color: string; priority_circuit: boolean; visitor_count?: number };
-export type Poste = { id: string; name: string; station: string | null; event_id: string; event_name: string };
+export type Poste = { id: string; name: string; station: string | null; event_id: string | null; event_name: string };
 export type DeskContext = { poste: { id: string; name: string; station: string | null; event_id: string }; event: { id: string; name: string; starts_at?: string; ends_at?: string; site?: string | null }; visitor_count?: number; present_count?: number; absent_count?: number; hosts: { id: string; name: string; service: string | null }[]; categories: Category[] };
 /** Activité que la tablette peut choisir (autorisée par l'administrateur, encore ouverte). */
 export type ActivityChoice = { id: string; name: string; starts_at: string; ends_at: string; current: boolean };

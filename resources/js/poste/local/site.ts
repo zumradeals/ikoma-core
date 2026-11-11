@@ -40,7 +40,11 @@ export function controlLocal(list: LocalList, printed: string | null, point: Poi
     const hash = printed.slice(PERMANENT_PREFIX.length);
     // Habilitation du SITE d'abord (poste gardant des zones du site) ; si elle n'accorde pas l'accès, l'habilitation d'activité s'applique comme avant (comme le serveur).
     const siteDecision = point?.type === 'zone' ? null : decidePermanentSiteOffline(list.snapshot.permanent, hash, now, knownAt);
-    const decision = siteDecision?.allowed ? siteDecision : decidePermanentOffline(list.snapshot.permanent, hash, point, list.snapshot.zones, now, knownAt);
+    // Sans activité (mode site) le site est la seule décision possible : son refus est rendu tel quel, comme le fait le serveur.
+    const siteOnly = list.snapshot.event === null;
+    const decision = siteOnly
+      ? (siteDecision ?? { allowed: false, reason: 'poste_sans_zone_site', message: 'Ce poste ne garde aucune zone du site : accès refusé.', zones: [], holder: null })
+      : siteDecision?.allowed ? siteDecision : decidePermanentOffline(list.snapshot.permanent, hash, point, list.snapshot.zones, now, knownAt);
 
     return { ...base, badge_code: decision.holder?.identifier ?? null, valid: decision.allowed, reason: decision.reason, message: decision.message, person: decision.allowed && decision.holder ? { name: decision.holder.name } : null, organisation: decision.holder?.organisation ?? null,
       category: decision.allowed ? (decision.holder?.category ?? null) : null,

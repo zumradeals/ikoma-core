@@ -42,7 +42,7 @@ export class PosteRuntime {
 
   private async afterSnapshot(snapshot: Snapshot): Promise<void> {
     await setMeta(this.db, 'settings', snapshot.settings);
-    await setMeta(this.db, 'eventEndsAt', snapshot.event.ends_at);
+    await setMeta(this.db, 'eventEndsAt', snapshot.event?.ends_at ?? null);
     await setMeta(this.db, 'posteName', snapshot.poste.station || snapshot.poste.name);
     const offset = (await getMeta(this.db, 'clockOffsetMs')) ?? 0;
     if (this.repo) { this.repo.setClockOffset(offset); await this.repo.replaceSnapshot(snapshot); }

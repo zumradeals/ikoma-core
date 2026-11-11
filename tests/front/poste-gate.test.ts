@@ -17,7 +17,7 @@ const snapshot: Snapshot = {
 
 async function enrolled(): Promise<PosteRuntime> {
   const runtime = new PosteRuntime(undefined, { dbName: `gate-${Math.random()}`, iterations: 1000 });
-  await runtime.vault.enrol({ token: 'd'.repeat(64), secret: toB64(randomBytes(32)), pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: snapshot.event.ends_at, settings: snapshot.settings });
+  await runtime.vault.enrol({ token: 'd'.repeat(64), secret: toB64(randomBytes(32)), pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: snapshot.event?.ends_at ?? null, settings: snapshot.settings });
   await new PosteStore(runtime.vault).saveSnapshot(snapshot);
   runtime.lock();
   return runtime;

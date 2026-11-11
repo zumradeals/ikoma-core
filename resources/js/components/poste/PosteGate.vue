@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import PosteApp from './PosteApp.vue';
 import ControleApp from './ControleApp.vue';
 import GroupeApp from './GroupeApp.vue';
+import SiteModeNotice from './SiteModeNotice.vue';
 import type { GroupPosteRepository, SitePosteRepository } from '../../poste/repository';
 import { PosteRuntime, syncRequiredMessage, type WipeReason } from '../../poste/local/runtime';
 import { getMeta } from '../../poste/local/db';
@@ -27,6 +28,8 @@ let idleTimer: number | undefined; let tick: number | undefined; let loop: numbe
 let idleMs = 300_000;
 
 const runtime = props.runtime ?? new PosteRuntime();
+/** Vrai quand la copie de la tablette n'a pas d'activité (mode site) : seul le contrôle des cartes permanentes est ouvert. */
+const siteMode = () => runtime.repo?.list.snapshot.event === null;
 runtime.handlers = {
   onState: (s: SyncState) => { sync.value = s; if (phase.value === 'ouvert') void loadConflicts(); },
   onWiped: (r: WipeReason) => { wiped.value = r; message.value = null; phase.value = 'vide'; clearTimeout(idleTimer); },
@@ -159,7 +162,8 @@ onBeforeUnmount(() => {
   </main>
 
   <template v-else>
-    <GroupeApp v-if="app === 'groupe' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
+    <SiteModeNotice v-if="app !== 'controle' && runtime.repo && siteMode()" :key="openKey" :repository="runtime.repo" :online="sync?.online ?? true" />
+    <GroupeApp v-else-if="app === 'groupe' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <ControleApp v-else-if="app === 'controle' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as SitePosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <PosteApp v-else :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
     <section v-if="conflicts.length" class="mx-auto max-w-4xl px-4 pb-8" aria-labelledby="conflits-titre" data-testid="conflits">

@@ -884,3 +884,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Décision : le mode site est piloté par `devices.event_id` vide ; les routes d'activité sont refusées par l'intergiciel (liste blanche explicite) plutôt que d'adapter chaque service d'activité : aucune régression possible sur l'accueil des visiteurs.
 - Décision : la règle « aucune activité autorisée » n'est PAS encore levée : l'enrôlement sans activité sera ouvert quand l'interface de la tablette (5b) et les alertes du site (5c) existeront, pour qu'aucune tablette ne se retrouve dans un mode à moitié construit.
 - Écart assumé : un refus du site sur une tablette sans activité est journalisé (mouvement « contrôle » + audit) mais ne lève pas d'alerte au superviseur avant 5c.
+
+## Tablette de site, lot 5b : interface en mode site
+- Décision : pas de nouvelle application « site » : le contrôle des cartes existant (`ControleApp`) sert tel quel ; l'accueil et les groupes sont remplacés, en mode site, par un écran explicatif avec le choix d'une activité. Moins de code nouveau, aucun risque pour l'accueil des visiteurs.
+- Le mode site est détecté par la copie (`event` vide), jamais par un réglage.
+- Retour au mode site depuis une activité (choisir « aucune activité ») : non fait, à décider avec le dirigeant (impact : la copie de l'activité est remplacée).
