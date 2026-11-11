@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -59,6 +60,44 @@ final class PermanentAccess
      */
     public function decide(object $card, string $eventId, array $point, CarbonInterface $now): array
     {
+        if (($refusal = $this->cardRefusal($card)) !== null) {
+            return $refusal;
+        }
+        $event = DB::table('events')->where('id', $eventId)->first(['status', 'anonymized_at', 'is_permanent']);
+        $refuse = fn (string $reason, string $message): array => ['allowed' => false, 'reason' => $reason, 'message' => $message, 'zones' => []];
+        if ($event === null || $event->is_permanent || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
+            return $refuse('evenement_indisponible', 'Cet événement est clôturé, archivé ou anonymisé : aucune entrée n’est autorisée.');
+        }
+        $entitlements = DB::table('holder_entitlements as e')->join('zones as z', 'z.id', '=', 'e.zone_id')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')
+            ->where('e.holder_id', $card->holder_id)->where('e.event_id', $eventId)->whereNull('e.revoked_at')
+            ->when($point['type'] === 'zone', fn ($q) => $q->where('e.zone_id', $point['id']))
+            ->get(['e.valid_from', 'e.valid_until', 'z.name', 'p.permanent_allowed']);
+
+        return $this->evaluate($entitlements, $now, $point['type'] === 'zone' ? 'Aucune habilitation valable pour cette zone : accès refusé.' : 'Aucune habilitation valable pour cet événement : accès refusé.');
+    }
+
+    /**
+     * Décision d'accès au SITE (tablette de site, lot 4) : mêmes refus de carte et de titulaire, habilitation = accès du titulaire à l'une des zones du site
+     * gardées par le poste (`$zoneIds`), zone ouverte aux permanents par sa politique. Aucun événement n'intervient.
+     *
+     * @param  list<string>  $zoneIds
+     * @return array{allowed: bool, reason: ?string, message: string, zones: list<string>}
+     */
+    public function decideSite(object $card, array $zoneIds, CarbonInterface $now): array
+    {
+        if (($refusal = $this->cardRefusal($card)) !== null) {
+            return $refusal;
+        }
+        $entitlements = DB::table('holder_site_entitlements as e')->join('zones as z', 'z.id', '=', 'e.zone_id')->leftJoin('site_zone_policies as p', 'p.zone_id', '=', 'z.id')
+            ->where('e.holder_id', $card->holder_id)->whereIn('e.zone_id', $zoneIds)->whereNull('e.revoked_at')
+            ->get(['e.valid_from', 'e.valid_until', 'z.name', 'p.permanent_allowed']);
+
+        return $this->evaluate($entitlements, $now, 'Aucune habilitation valable pour le site : accès refusé.');
+    }
+
+    /** @return array{allowed: bool, reason: ?string, message: string, zones: list<string>}|null */
+    private function cardRefusal(object $card): ?array
+    {
         $refuse = fn (string $reason, string $message): array => ['allowed' => false, 'reason' => $reason, 'message' => $message, 'zones' => []];
         if ($card->card_status !== 'active') {
             return match ($card->card_status) {
@@ -73,14 +112,17 @@ final class PermanentAccess
         if ($card->holder_status !== 'actif') {
             return $refuse('titulaire_clos', 'Titulaire clos : accès refusé.');
         }
-        $event = DB::table('events')->where('id', $eventId)->first(['status', 'anonymized_at', 'is_permanent']);
-        if ($event === null || $event->is_permanent || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
-            return $refuse('evenement_indisponible', 'Cet événement est clôturé, archivé ou anonymisé : aucune entrée n’est autorisée.');
-        }
-        $entitlements = DB::table('holder_entitlements as e')->join('zones as z', 'z.id', '=', 'e.zone_id')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')
-            ->where('e.holder_id', $card->holder_id)->where('e.event_id', $eventId)->whereNull('e.revoked_at')
-            ->when($point['type'] === 'zone', fn ($q) => $q->where('e.zone_id', $point['id']))
-            ->get(['e.valid_from', 'e.valid_until', 'z.name', 'p.permanent_allowed']);
+
+        return null;
+    }
+
+    /**
+     * @param  Collection<int, \stdClass>  $entitlements
+     * @return array{allowed: bool, reason: ?string, message: string, zones: list<string>}
+     */
+    private function evaluate(Collection $entitlements, CarbonInterface $now, string $absent): array
+    {
+        $refuse = fn (string $reason, string $message): array => ['allowed' => false, 'reason' => $reason, 'message' => $message, 'zones' => []];
         $current = $entitlements->filter(fn ($e) => strtotime((string) $e->valid_from) <= $now->getTimestamp())
             ->filter(fn ($e) => strtotime((string) $e->valid_until) > $now->getTimestamp());
         if ($current->isEmpty()) {
@@ -94,7 +136,7 @@ final class PermanentAccess
 
             return $lastEnd !== null
                 ? $refuse('habilitation_expiree', 'Habilitation expirée le '.$day((string) $lastEnd->valid_until).' : accès refusé.')
-                : $refuse('habilitation_absente', $point['type'] === 'zone' ? 'Aucune habilitation valable pour cette zone : accès refusé.' : 'Aucune habilitation valable pour cet événement : accès refusé.');
+                : $refuse('habilitation_absente', $absent);
         }
         $permitted = $current->filter(fn ($e) => (bool) $e->permanent_allowed);
         if ($permitted->isEmpty()) {

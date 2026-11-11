@@ -25,6 +25,30 @@ final class SiteEntitlements
             ->get(['e.id', 'e.holder_id', 'h.full_name', 'h.identifier', 'z.id as zone_id', 'z.name as zone', 'e.valid_from', 'e.valid_until', 'e.revoked_at', 'e.revocation_reason'])->all();
     }
 
+    /** @return list<object> */
+    public function zones(): array
+    {
+        return DB::table('zones as z')->leftJoin('site_zone_policies as p', 'p.zone_id', '=', 'z.id')->whereNull('z.event_id')->orderBy('z.name')
+            ->get(['z.id', 'z.name', 'p.permanent_allowed', 'p.offline_entry_allowed'])->all();
+    }
+
+    /** Politique d'une zone du site : ouverte ou non aux titulaires permanents, entrée hors ligne acceptée ou non (jamais sans l'ouverture). */
+    public function savePolicy(string $zoneId, bool $permanentAllowed, bool $offlineAllowed, User $actor): void
+    {
+        if ($offlineAllowed && ! $permanentAllowed) {
+            throw ValidationException::withMessages(['offline' => 'Une zone fermée aux titulaires permanents ne peut pas les accepter hors ligne.']);
+        }
+        DB::transaction(function () use ($zoneId, $permanentAllowed, $offlineAllowed, $actor): void {
+            if (! DB::table('zones')->where('id', $zoneId)->whereNull('event_id')->exists()) {
+                throw ValidationException::withMessages(['zone_id' => 'Zone du site inconnue.']);
+            }
+            $classification = (string) (DB::table('site_zone_policies')->where('zone_id', $zoneId)->value('classification') ?? 'Standard');
+            DB::table('site_zone_policies')->upsert([['zone_id' => $zoneId, 'classification' => $classification, 'permanent_allowed' => $permanentAllowed, 'offline_entry_allowed' => $offlineAllowed,
+                'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]], ['zone_id'], ['permanent_allowed', 'offline_entry_allowed', 'updated_by', 'updated_at']);
+            $this->audit->append('zone_site.politique_modifiee', $actor->id, ['zone_id' => $zoneId, 'permanents' => $permanentAllowed, 'hors_ligne' => $offlineAllowed]);
+        });
+    }
+
     public function grant(string $holderId, string $zoneId, string $from, string $until, User $actor): string
     {
         $start = $this->date($from, 'valid_from');

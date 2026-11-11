@@ -68,6 +68,7 @@ const CN_ROUTES = [
     ['POST', 'administration/habilitations/groupe', ['can:listes.importer', 'can:zones.gerer'], ['throttle:titulaires']],
     ['POST', 'administration/habilitations/site', ['can:listes.importer', 'can:zones.gerer'], ['throttle:titulaires']],
     ['POST', 'administration/habilitations/site/{entitlement}/retirer', ['can:listes.importer', 'can:zones.gerer'], ['throttle:titulaires']],
+    ['PUT', 'administration/habilitations/site/zones/{zone}', ['can:zones.gerer'], ['throttle:titulaires']],
     ['POST', 'administration/habilitations/{entitlement}/retirer', ['can:listes.importer', 'can:zones.gerer'], ['throttle:titulaires']],
     ['PUT', 'administration/habilitations/zones/{zone}', ['can:zones.gerer'], ['throttle:titulaires']],
     ['PUT', 'administration/habilitations/confiance', ['can:postes.gerer'], ['throttle:titulaires']],

@@ -12,6 +12,7 @@ use App\Services\ControlAlerts;
 use App\Services\PermanentAccess;
 use App\Services\Presence;
 use App\Services\QrSvg;
+use App\Services\SiteMovements;
 use App\Services\ZoneAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,7 @@ use Illuminate\Support\Str;
  */
 final class SiteControl
 {
-    public function __construct(private readonly BadgeService $badges, private readonly Audit $audit, private readonly Presence $presence, private readonly ControlAlerts $controlAlerts, private readonly PermanentAccess $permanent, private readonly ZoneAccess $zoneAccess) {}
+    public function __construct(private readonly BadgeService $badges, private readonly Audit $audit, private readonly Presence $presence, private readonly ControlAlerts $controlAlerts, private readonly PermanentAccess $permanent, private readonly ZoneAccess $zoneAccess, private readonly SiteMovements $siteMovements) {}
 
     /**
      * @param  array{type:string,id:string}|null  $point
@@ -239,6 +240,10 @@ final class SiteControl
      */
     private function permanentControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $declaredAt, ?bool $localValid, ?string $knownAt, ?string $direction = null): array
     {
+        // Habilitation du SITE d'abord (zones du site gardées par le poste) ; si elle n'accorde pas l'accès, l'habilitation d'activité s'applique comme avant.
+        if ($declaredAt === null && ($siteResult = $this->siteControl($poste, $agent, $card, $checkpoint, $direction)) !== null) {
+            return $siteResult;
+        }
         $now = now();
         $decision = $this->permanent->decide($card, $poste->event_id, $checkpoint, $now);
         if ($decision['allowed'] && $declaredAt !== null) {
@@ -276,6 +281,62 @@ final class SiteControl
     }
 
     /**
+     * Contrôle d'une carte permanente au titre du SITE : le poste doit garder au moins une zone du site et le titulaire y être habilité (zone ouverte aux
+     * permanents). Le mouvement est écrit dans le journal du site (sans événement). Retourne null quand le site n'accorde pas l'accès : l'appelant applique
+     * alors la décision d'activité existante.
+     *
+     * @param  array{type:string,id:?string,name:string}  $checkpoint
+     * @return array<string, mixed>|null
+     */
+    private function siteControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $direction): ?array
+    {
+        if ($checkpoint['type'] !== 'poste' || $poste->checkpoint_id === null) {
+            return null;
+        }
+        $zoneIds = DB::table('checkpoint_site_zones')->where('checkpoint_id', $poste->checkpoint_id)->pluck('zone_id')->all();
+        if ($zoneIds === []) {
+            return null;
+        }
+        $decision = $this->permanent->decideSite($card, array_values($zoneIds), now());
+        if (! $decision['allowed']) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($poste, $agent, $card, $checkpoint, $direction, $decision): array {
+            $entered = ! $this->siteMovements->isPresent($card->holder_id);
+            $this->siteMovements->record($card->holder_id, $entered ? 'entree' : 'controle', $checkpoint['name'], $agent, null, array_filter(['verdict' => 'valide', 'direction' => $direction, 'permanent' => true, 'identifiant' => $card->identifier,
+                'carte_rang' => $card->rank, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id], fn ($v) => $v !== null));
+
+            return [
+                'valid' => true, 'reason' => null, 'message' => 'Carte permanente valide.', 'badge_code' => $card->identifier, 'zone_ok' => null, 'point' => $checkpoint['name'],
+                'person' => ['name' => $card->full_name], 'organisation' => $card->organisation, 'category' => $this->permanent->categoryOf($card->institutional_category), 'zones' => $decision['zones'], 'source' => 'serveur',
+                'permanent' => ['identifier' => $card->identifier, 'entered' => $entered], 'direction' => $direction, 'context' => 'site',
+            ];
+        });
+    }
+
+    /**
+     * Sortie du SITE d'un titulaire présent sur le site : enregistrée sans condition d'habilitation (on doit toujours pouvoir sortir), comme la sortie d'activité.
+     *
+     * @param  array{type:string,id:?string,name:string}  $checkpoint
+     * @return array<string, mixed>|null
+     */
+    private function siteExit(Device $poste, User $agent, \stdClass $card, array $checkpoint): ?array
+    {
+        return DB::transaction(function () use ($poste, $agent, $card, $checkpoint): ?array {
+            if (! $this->siteMovements->isPresent($card->holder_id)) {
+                return null;
+            }
+            $this->siteMovements->record($card->holder_id, 'sortie', $checkpoint['name'], $agent, null, ['permanent' => true, 'identifiant' => $card->identifier, 'carte_statut' => $card->card_status, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id]);
+            if ($card->card_status !== 'active') {
+                $this->audit->append('sortie.site_carte_inactive', $agent->id, ['holder_id' => $card->holder_id, 'identifiant' => $card->identifier, 'carte_statut' => $card->card_status, 'device_id' => $poste->id]);
+            }
+
+            return ['ok' => true, 'badge_code' => $card->identifier, 'badge_status' => 'Carte conservée', 'person' => ['name' => $card->full_name], 'point' => $checkpoint['name'], 'presents' => $this->siteMovements->count(), 'source' => 'serveur', 'context' => 'site'];
+        });
+    }
+
+    /**
      * Sortie d'un titulaire permanent : enregistrée, sans restitution ni révocation de la carte, et sans aucune condition d'habilitation, de confiance ou de statut de carte
      * (on doit toujours pouvoir sortir et être décompté). Une carte révoquée qui sort déclenche seulement une alerte au superviseur.
      *
@@ -284,6 +345,10 @@ final class SiteControl
      */
     private function permanentExit(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $declaredAt): array
     {
+        if ($declaredAt === null && ($siteResult = $this->siteExit($poste, $agent, $card, $checkpoint)) !== null) {
+            return $siteResult;
+        }
+
         return DB::transaction(function () use ($poste, $agent, $card, $checkpoint, $declaredAt): array {
             $visitor = DB::table('visitors')->where('holder_id', $card->holder_id)->where('event_id', $poste->event_id)->lockForUpdate()->first();
             if ($visitor === null || $visitor->status !== 'present') {

@@ -69,10 +69,20 @@ final class SiteMovements
                 SELECT DISTINCT ON (e.holder_id) e.holder_id, e.type, e.checkpoint, e.occurred_at FROM access_events e
                 WHERE e.event_id IS NULL AND e.holder_id IS NOT NULL AND e.type IN ('entree', 'sortie')
                   AND NOT EXISTS (SELECT 1 FROM access_events x WHERE x.corrige_id = e.id)
-                ORDER BY e.holder_id, e.occurred_at DESC, e.created_at DESC, e.id DESC
+                ORDER BY e.holder_id, e.occurred_at DESC, e.seq DESC
              ) l JOIN permanent_holders h ON h.id = l.holder_id LEFT JOIN institutional_categories c ON c.code = h.institutional_category
              WHERE l.type = 'entree' ORDER BY public.ikoma_normalize(h.full_name)",
         );
+    }
+
+    /** Vrai si le dernier mouvement (entrée ou sortie) non corrigé de ce titulaire sur le site est une entrée. */
+    public function isPresent(string $holderId): bool
+    {
+        $last = DB::table('access_events as e')->whereNull('e.event_id')->where('e.holder_id', $holderId)->whereIn('e.type', ['entree', 'sortie'])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as x')->whereColumn('x.corrige_id', 'e.id'))
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->value('e.type');
+
+        return $last === 'entree';
     }
 
     public function count(): int

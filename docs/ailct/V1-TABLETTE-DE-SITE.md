@@ -75,3 +75,37 @@ Tests Pest : mouvement du site sans événement accepté, mouvement mixte refus�
 2. Conservation des mouvements du site : **même durée que les mouvements d'activité**, réglée dans l'écran Administration (jamais dans le code) ; sans réglage, aucune suppression automatique.
 3. Avant le lot 6, un titulaire entré via une activité (ancien mode) et un mouvement du site ont **chacun leur présence** ; la fusion par identité se fait à la reprise du lot 6.
 - Lot 3 (mouvements et présence du site) : `access_events.event_id` facultatif et colonne `holder_id` ; un mouvement est d'activité (comme avant) ou du site (sans événement, ni participation ni badge ; titulaire obligatoire sauf contrôle sur carte inconnue ; types entrée, sortie, contrôle, correction) : règles tenues par la base. Service `SiteMovements` (enregistrement, présents, correction unique avec motif) ; présence calculée depuis le dernier mouvement non corrigé, personnel permanent seulement. Encart « Présents sur le site » dans « Site et accès » (droit `presences.consulter`). Un titulaire ayant des mouvements du site ne peut pas être supprimé (clé étrangère). Les présences et tableaux d'activité ne changent pas ; la correction d'activité refuse un mouvement du site. Pas encore branché : l'écriture des mouvements par la tablette (lot 4), l'écran de correction, la durée de conservation automatique (aucune suppression des mouvements du site).
+
+## Lot 4 : contrôle en mode site (analyse, à valider)
+
+Statut : **projet de travail**, rien n'est implémenté. Prérequis : lot 3 fusionné (journal du site).
+
+### Constats (code lu)
+| # | Constat | Où |
+|---|---|---|
+| C1 | La décision d'une carte permanente est `PermanentAccess::decide($card, $eventId, $point, $now)` : elle lit les habilitations d'activité et refuse « événement indisponible » hors événement ordinaire. | `PermanentAccess` |
+| C2 | La politique de zone (autorisé aux permanents, accepté hors ligne) est `zone_policies` liée à `(zone, événement)` : une zone du site n'a pas de politique. | `create_permanent_access` |
+| C3 | Les refus lèvent une alerte (`alerts.event_id` obligatoire) et un audit ; l'écriture du mouvement passe par une participation dans l'événement du poste. | `SiteControl::permanentControl`, `Alerts` |
+| C4 | La copie hors ligne (`PermanentAccess::snapshot($eventId)`), la file d'opérations et le rejeu (`offlineRefusal`, confiance en minutes) sont calculés pour l'événement de la tablette ; sans activité, la copie est vide. | `PermanentAccess`, `ListSnapshot`, `PosteSyncController` |
+| C5 | Le poste de contrôle juge les zones associées : `checkpoint_zones` (activité) ; les zones du site associées (`checkpoint_site_zones`, lot 2) ne sont pas encore lues. | `ZoneAccess::judgedZones` |
+
+### Proposition (en deux livraisons, serveur d'abord)
+**4a — décision et écriture côté serveur (en ligne).**
+1. Politique de zone du site : table `site_zone_policies` (zone du site, autorisé aux permanents, accepté hors ligne), mêmes réglages et même écran que les zones d'activité (décision déjà prise).
+2. `PermanentAccess::decideSite($card, $point, $now)` : mêmes refus de carte et de titulaire ; habilitation = `holder_site_entitlements` sur les zones du site gardées par le poste (`checkpoint_site_zones`) ; mêmes messages de refus (absente, pas commencée, expirée, zone sans politique).
+3. `SiteControl` : si la tablette n'a pas d'activité, une carte permanente est jugée en mode site ; une carte de visiteur est refusée (« aucune activité en cours »). Entrée/sortie/contrôle écrits via `SiteMovements` (lot 3).
+4. Alertes du site : `alerts.event_id` facultatif (alerte du site sans événement), même gravité, mêmes règles de dédoublonnage ; visibles du superviseur.
+
+**4b — hors ligne.** Copie du site (cartes, titulaires habilités au site, politiques de zones du site), file d'opérations sans activité, rejeu avec les mêmes garde-fous de confiance. Livrée après 4a, avec ses propres tests.
+
+### Question de fond à trancher (dirigeant)
+Une tablette **avec** une activité en cours qui lit une carte permanente : quelle habilitation compte ?
+- **Recommandation** : l'habilitation du **site** est regardée d'abord (zones du site gardées par le poste) ; si elle accorde l'accès, le mouvement est écrit dans le journal du **site** ; sinon l'habilitation **d'activité** existante s'applique comme aujourd'hui (mouvement d'activité). Aucun accès n'est retiré, et le lot 6 pourra retirer l'ancien chemin sans toucher au nouveau.
+- Alternative : site seulement dès qu'une zone du site est associée au poste (plus net, mais casse les habilitations d'activité des postes déjà configurés).
+
+### Critères de validation
+Pest : refus par défaut sans habilitation du site ; habilitation valable/expirée/future ; zone sans politique ; carte perdue/volée/non activée ; visiteur refusé sans activité ; alerte du site créée ; mouvement du site écrit ; comportement avec activité inchangé ; remise à zéro de démonstration ; inventaire des routes. CI verte.
+
+### Décision du dirigeant sur le lot 4 (recommandation approuvée)
+Tablette avec activité qui lit une carte permanente : l'habilitation du **site** est regardée d'abord (zones du site gardées par le poste) ; si elle accorde l'accès, le mouvement est écrit dans le journal du **site** ; sinon l'habilitation **d'activité** existante s'applique comme aujourd'hui. Aucun accès n'est retiré.
+- Lot 4a (contrôle en mode site, en ligne) : table `site_zone_policies` (zone du site ouverte ou non aux permanents, entrée hors ligne acceptée ou non ; sans politique = refus) réglable dans « Qui peut entrer où ? » ; `PermanentAccess::decideSite` (mêmes refus de carte et messages que l'activité) ; `SiteControl` juge d'abord l'habilitation du site (zones du site gardées par le poste), écrit le mouvement dans le journal du site (entrée, puis contrôles tant que la personne est présente ; sortie sans condition d'habilitation) ; si le site n'accorde pas l'accès, l'habilitation d'activité s'applique comme avant (décision du dirigeant). Un poste qui ne garde aucune zone du site, et tout rejeu hors ligne, gardent le comportement d'activité. Pas encore fait : copie et file hors ligne du site (4b), alertes du site sans événement et tablette sans activité (lot 5), politique « hors ligne » du site non utilisée avant 4b.

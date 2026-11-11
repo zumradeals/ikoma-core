@@ -14,7 +14,7 @@ const props = defineProps<{
   categories: { code: string; label: string; color: string }[]; eventDates: { starts_at: string; ends_at: string } | null;
   decisions: Decision[]; devices: Device[]; trust: { configured: number; approved: boolean; effective: number; max: number };
   can: { grant: boolean; policies: boolean; trust: boolean };
-  site?: { zones: { id: string; name: string }[]; entitlements: Entitlement[] };
+  site?: { zones: { id: string; name: string; permanent_allowed: boolean; offline_entry_allowed: boolean }[]; entitlements: Entitlement[] };
 }>();
 
 function chooseEvent(e: Event) { router.get('/administration/habilitations', { event: (e.target as HTMLSelectElement).value }); }
@@ -24,6 +24,9 @@ const siteForm = useForm({ holder_id: '', zone_id: '', valid_from: '', valid_unt
 function submitSite() {
   siteForm.transform(d => ({ ...d, valid_from: toUtcIso(d.valid_from), valid_until: toUtcIso(d.valid_until) }))
     .post('/administration/habilitations/site', { preserveScroll: true, onSuccess: () => siteForm.reset('holder_id', 'zone_id', 'valid_from', 'valid_until') });
+}
+function setSiteZone(zone: { id: string; permanent_allowed: boolean; offline_entry_allowed: boolean }, open: boolean, offline = zone.offline_entry_allowed) {
+  router.put('/administration/habilitations/site/zones/' + zone.id, { permanent_allowed: open, offline_entry_allowed: open && offline }, { preserveScroll: true });
 }
 const siteRevoking = ref<string | null>(null);
 const siteRevoke = useForm({ reason: 'Retrait par l’administrateur' });
@@ -106,6 +109,13 @@ function when(v: string | null) { return v ? new Date(v).toLocaleString('fr-FR')
         <h2 id="habilitations-site" class="text-heading font-bold">Personnel permanent : accès au site</h2>
         <p class="max-w-4xl text-slate-700">L’accès au site se décide par zone du site, sans activité. Il s’ajoute aux accès liés aux activités, plus bas.</p>
         <p v-if="!site.zones.length" data-testid="aucune-zone-site">Aucune zone du site : créez-en dans « Site et accès », onglet Zones.</p>
+        <ul v-if="site.zones.length && can.policies" class="divide-y rounded-xl border" aria-label="Zones du site ouvertes aux personnes permanentes" data-testid="politiques-zones-site">
+          <li v-for="z in site.zones" :key="z.id" class="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3" :data-testid="'politique-site-' + z.id">
+            <strong class="min-w-0 flex-1">{{ z.name }}</strong>
+            <label class="flex items-center gap-2 font-semibold"><input type="checkbox" :checked="z.permanent_allowed" :data-testid="'site-ouverte-' + z.id" @change="setSiteZone(z, ($event.target as HTMLInputElement).checked)">Ouverte aux personnes permanentes</label>
+            <label class="flex items-center gap-2" :class="z.permanent_allowed ? '' : 'opacity-60'"><input type="checkbox" :checked="z.offline_entry_allowed" :disabled="!z.permanent_allowed" :data-testid="'site-hors-ligne-' + z.id" @change="setSiteZone(z, z.permanent_allowed, ($event.target as HTMLInputElement).checked)">Entrée acceptée hors ligne</label>
+          </li>
+        </ul>
         <form v-else-if="can.grant" class="flex flex-wrap items-end gap-3" aria-label="Accorder un accès au site" @submit.prevent="submitSite">
           <label class="font-semibold">Personne<select v-model="siteForm.holder_id" class="field mt-1" required data-testid="site-personne"><option value="" disabled>Choisir…</option><option v-for="h in holders" :key="h.id" :value="h.id">{{ h.full_name }} ({{ h.identifier }})</option></select></label>
           <label class="font-semibold">Zone du site<select v-model="siteForm.zone_id" class="field mt-1" required data-testid="site-zone"><option value="" disabled>Choisir…</option><option v-for="z in site.zones" :key="z.id" :value="z.id">{{ z.name }}</option></select></label>
