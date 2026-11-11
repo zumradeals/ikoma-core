@@ -30,18 +30,23 @@ Les lecteurs principaux : `ZoneAccess` (zones autorisées, zones jugées par un 
 - L'écran des catégories propose les zones du site (en plus des zones d'activité existantes).
 - Tests : un visiteur dont la catégorie ouvre une zone du site est accepté par un poste qui garde cette zone du site ; refus sinon ; copie hors ligne identique.
 
-**Z2 — Reprise des données (migration non réversible, testée avec le compte propriétaire comme pour le registre des cartes).**
-- Chaque zone d'activité devient une zone du site ; les zones de **même nom exact** sont fusionnées en une seule (nom unique au site). Toutes les références sont redirigées : catégories, correspondances poste–zone (vers `checkpoint_site_zones`), habilitations, politiques.
+**Z2 — Lecteurs et validations ouverts aux zones du site (ajouté après analyse : les lecteurs doivent accepter les zones du site AVANT que les données y passent).**
+- `ActivityZones` (zones propres à l'activité + zones du site) sert aux validations d'habilitation (participant et titulaire), à la correspondance poste–zone, au contrôle par zone, aux choix proposés (accès et zones, fiche personne, pilotage, tableau de bord) et à la zone d'accueil du bureau d'accueil.
+- Politique d'une zone du site visée par une habilitation d'activité : celle du site (`site_zone_policies`) ; l'écran de politique d'une activité délègue au site pour ces zones ; la copie hors ligne embarque ces politiques.
+- Aucune donnée ne change ; tests `ZonesDuSiteHabilitationsTest`.
+
+**Z3 — Reprise des données (ex-Z2) (migration non réversible, testée avec le compte propriétaire comme pour le registre des cartes).**
+- Chaque zone d'activité devient une zone du site ; les zones de **même nom exact** sont fusionnées en une seule (nom unique au site). Toutes les références sont redirigées : catégories, correspondances poste–zone (qui restent dans `checkpoint_zones`, repointées vers la zone du site, pour ne pas changer le jugement : le passage vers « le poste juge les zones du site que l'activité réutilise » se fait à l'étape écrans), habilitations, politiques (`zone_policies` vers `site_zone_policies`).
 - Politique d'une zone fusionnée : **la plus restrictive** (permanent autorisé seulement si toutes les politiques fusionnées l'autorisaient ; entrée hors ligne idem). Sécurité par défaut.
 - Zone d'accueil : la zone fusionnée est d'accueil si l'une des zones fusionnées l'était.
 - Doublons créés par la fusion (même poste, même zone) dédoublonnés ; `list_revision` de chaque activité incrémentée (les tablettes rechargent leur copie).
 
-**Z3 — Lecteurs et écrans.**
+**Z4 — Écrans (ex-Z3).**
 - Création d'une activité : plus de zone « Accueil » propre ; contrôle qu'une zone d'accueil du site existe.
 - Site et accès : toutes les zones (création, renommage, accueil, politique, postes qui les gardent) ; écrans Zones et Accès et zones retirés du menu et des routes ; habilitations des participants déplacées dans la fiche de l'activité ; « Habilitations par zone » ne demande l'événement que pour la section « accès liés aux activités ».
 - `DemoLab`, jeux d'essai, `DataLifecycle` (suppression d'une activité ne supprime plus de zones), `DemoCleanup`.
 
-**Z4 — Retrait.** Suppression de `zones.event_id` (colonne, unicités composites), des tables `checkpoint_zones` et `zone_policies`, des filtres et du code de l'ancien chemin ; critères de fin : plus aucune requête `zones` filtrée par événement dans `app/`, CI verte, recette sur le serveur d'essai.
+**Z5 — Retrait (ex-Z4).** Suppression de `zones.event_id` (colonne, unicités composites), des tables `checkpoint_zones` et `zone_policies`, des filtres et du code de l'ancien chemin ; critères de fin : plus aucune requête `zones` filtrée par événement dans `app/`, CI verte, recette sur le serveur d'essai.
 
 ## Choix retenus par défaut (à contester)
 1. Fusion par **nom exact** ; deux zones de noms différents restent deux zones.
@@ -58,3 +63,4 @@ Les lecteurs principaux : `ZoneAccess` (zones autorisées, zones jugées par un 
 ## Avancement
 - Plan écrit (ce document).
 - **Z1 écrite** (migration `2026_12_13_000000_allow_site_zones_in_activities`, `ZoneAccess::siteZonesJudged`, `ListSnapshot`, catégories) : les clés composites (zone, événement) de `category_zone`, `checkpoint_zones`, `participation_entitlements` et `holder_entitlements` deviennent une clé simple plus un déclencheur « zone de l'activité ou zone du site » ; un poste juge les zones du site qu'il garde **et que l'activité réutilise** (catégorie ou habilitation de participant) ; la copie hors ligne porte ces zones et change de version quand elles changent ; l'écran des catégories propose les zones du site. Aucun comportement existant ne change tant qu'aucune catégorie ne choisit de zone du site. Tests : `ZonesDuSiteActivitesTest` (5 scénarios), Vitest (1).
+- **Z2 écrite** : `ActivityZones`, validations et lecteurs ouverts aux zones du site (habilitations, politiques, contrôle par zone, accueil, choix des écrans, copie hors ligne). Les étapes suivantes sont renumérotées : Z3 reprise des données, Z4 écrans, Z5 retrait.

@@ -187,6 +187,12 @@ final class PersonRegistry
         foreach (DB::table('zones')->whereIn('event_id', $eventIds)->orderBy('name')->get(['id', 'event_id', 'name']) as $z) {
             $byEvent[(string) $z->event_id][] = ['id' => $z->id, 'name' => $z->name];
         }
+        // Les zones du site sont proposées à toutes les activités.
+        $siteZones = DB::table('zones')->whereNull('event_id')->orderBy('name')->get(['id', 'name'])->map(fn ($z) => ['id' => $z->id, 'name' => $z->name])->all();
+        foreach ($eventIds as $eventId) {
+            $key = (string) $eventId;
+            $byEvent[$key] = array_merge($byEvent[$key] ?? [], $siteZones);
+        }
 
         return $byEvent;
     }

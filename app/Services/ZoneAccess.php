@@ -94,7 +94,7 @@ final class ZoneAccess
             if (! DB::table('checkpoints')->where('id', $checkpointId)->where('active', true)->lockForUpdate()->exists()) {
                 throw ValidationException::withMessages(['checkpoint_id' => 'Poste inconnu ou désactivé.']);
             }
-            if (! DB::table('zones')->where('id', $zoneId)->where('event_id', $eventId)->exists()) {
+            if (! ActivityZones::allows($eventId, $zoneId)) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
             }
             if (DB::table('checkpoint_zones')->where('checkpoint_id', $checkpointId)->where('zone_id', $zoneId)->exists()) {

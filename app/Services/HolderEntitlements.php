@@ -23,8 +23,8 @@ final class HolderEntitlements
     /** @return list<object> */
     public function zones(string $eventId): array
     {
-        return DB::table('zones as z')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')->where('z.event_id', $eventId)->orderBy('z.name')
-            ->get(['z.id', 'z.name', 'p.classification', 'p.permanent_allowed', 'p.offline_entry_allowed'])->all();
+        return ActivityZones::query($eventId, 'z')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')->leftJoin('site_zone_policies as sp', 'sp.zone_id', '=', 'z.id')->orderBy('z.name')
+            ->get(['z.id', 'z.name', 'z.event_id', DB::raw('coalesce(p.classification, sp.classification) as classification'), DB::raw('coalesce(p.permanent_allowed, sp.permanent_allowed) as permanent_allowed'), DB::raw('coalesce(p.offline_entry_allowed, sp.offline_entry_allowed) as offline_entry_allowed')])->all();
     }
 
     public function savePolicy(string $eventId, string $zoneId, string $classification, bool $permanentAllowed, bool $offlineAllowed, User $actor): void
@@ -38,8 +38,15 @@ final class HolderEntitlements
         }
         $this->eventOrFail($eventId);
         DB::transaction(function () use ($eventId, $zoneId, $classification, $permanentAllowed, $offlineAllowed, $actor): void {
-            if (! DB::table('zones')->where('id', $zoneId)->where('event_id', $eventId)->exists()) {
+            $zone = ActivityZones::query($eventId)->where('id', $zoneId)->first(['id', 'event_id']);
+            if ($zone === null) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
+            }
+            if ($zone->event_id === null) {
+                // Zone du site : une seule politique, celle du site.
+                app(SiteEntitlements::class)->savePolicy($zoneId, $permanentAllowed, $offlineAllowed, $actor);
+
+                return;
             }
             DB::table('zone_policies')->upsert([['zone_id' => $zoneId, 'event_id' => $eventId, 'classification' => $classification, 'permanent_allowed' => $permanentAllowed, 'offline_entry_allowed' => $offlineAllowed, 'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]], ['zone_id'], ['classification', 'permanent_allowed', 'offline_entry_allowed', 'updated_by', 'updated_at']);
             $this->audit->append('zone.politique_modifiee', $actor->id, ['zone_id' => $zoneId, 'event_id' => $eventId, 'permanents' => $permanentAllowed, 'hors_ligne' => $offlineAllowed]);
@@ -79,7 +86,7 @@ final class HolderEntitlements
             if ($holder->status === 'clos') {
                 throw ValidationException::withMessages(['holder_id' => 'Ce titulaire est clos : aucune habilitation ne peut lui être accordée.']);
             }
-            if (! DB::table('zones')->where('id', $zoneId)->where('event_id', $eventId)->exists()) {
+            if (! ActivityZones::allows($eventId, $zoneId)) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
             }
             $overlap = DB::table('holder_entitlements')->where('holder_id', $holderId)->where('zone_id', $zoneId)->whereNull('revoked_at')

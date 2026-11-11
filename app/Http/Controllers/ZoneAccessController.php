@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ActivityZones;
 use App\Services\Audit;
 use App\Services\ParticipationEntitlements;
 use App\Services\ZoneAccess;
@@ -34,7 +35,7 @@ final class ZoneAccessController
 
         return Inertia::render('Admin/AccesZones', [
             'events' => $events, 'eventId' => $eventId, 'q' => $q,
-            'zones' => $eventId ? DB::table('zones')->where('event_id', $eventId)->orderBy('name')->get(['id', 'name']) : [],
+            'zones' => $eventId ? ActivityZones::query($eventId)->orderBy('name')->get(['id', 'name']) : [],
             'points' => DB::table('checkpoints')->where('active', true)->orderBy('code')->get(['id', DB::raw("CASE WHEN function_label IS NULL THEN name ELSE name || ' — ' || function_label END as name")]),
             'mappings' => $eventId ? $access->mappings($eventId) : [],
             'entitlements' => $eventId ? $entitlements->forEvent($eventId) : [],
