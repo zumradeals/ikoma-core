@@ -75,6 +75,16 @@ final class SiteMovements
         );
     }
 
+    /** Vrai si le dernier mouvement (entrée ou sortie) non corrigé de ce titulaire sur le site est une entrée. */
+    public function isPresent(string $holderId): bool
+    {
+        $last = DB::table('access_events as e')->whereNull('e.event_id')->where('e.holder_id', $holderId)->whereIn('e.type', ['entree', 'sortie'])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as x')->whereColumn('x.corrige_id', 'e.id'))
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.created_at')->orderByDesc('e.id')->value('e.type');
+
+        return $last === 'entree';
+    }
+
     public function count(): int
     {
         return count($this->present());

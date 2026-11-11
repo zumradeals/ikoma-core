@@ -30,7 +30,7 @@ final class HolderEntitlementsController
 
         return Inertia::render('Admin/Habilitations', [
             'events' => $events, 'eventId' => $eventId,
-            'site' => ['zones' => DB::table('zones')->whereNull('event_id')->orderBy('name')->get(['id', 'name']), 'entitlements' => $site->all()],
+            'site' => ['zones' => array_map(fn ($z) => ['id' => $z->id, 'name' => $z->name, 'permanent_allowed' => (bool) $z->permanent_allowed, 'offline_entry_allowed' => (bool) $z->offline_entry_allowed], $site->zones()), 'entitlements' => $site->all()],
             'zones' => $eventId ? array_map(fn ($z) => ['id' => $z->id, 'name' => $z->name, 'classification' => $z->classification, 'permanent_allowed' => (bool) $z->permanent_allowed, 'offline_entry_allowed' => (bool) $z->offline_entry_allowed], $entitlements->zones($eventId)) : [],
             'entitlements' => $eventId ? $entitlements->forEvent($eventId) : [],
             'holders' => DB::table('permanent_holders as h')->leftJoin('institutional_categories as c', 'c.code', '=', 'h.institutional_category')->where('h.status', 'actif')->orderByRaw('public.ikoma_normalize(h.full_name)')->limit(500)
@@ -94,6 +94,15 @@ final class HolderEntitlementsController
         $site->grant($data['holder_id'], $data['zone_id'], $data['valid_from'], $data['valid_until'], $request->user());
 
         return back()->with('status', 'Habilitation du site accordée.');
+    }
+
+    public function sitePolicy(Request $request, string $zone, SiteEntitlements $site): RedirectResponse
+    {
+        Gate::authorize('zones.gerer');
+        $data = $request->validate(['permanent_allowed' => ['required', 'boolean'], 'offline_entry_allowed' => ['required', 'boolean']]);
+        $site->savePolicy($zone, (bool) $data['permanent_allowed'], (bool) $data['offline_entry_allowed'], $request->user());
+
+        return back()->with('status', 'Politique de la zone du site enregistrée.');
     }
 
     public function revokeSite(Request $request, string $entitlement, SiteEntitlements $site): RedirectResponse

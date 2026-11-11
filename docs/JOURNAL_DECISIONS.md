@@ -862,3 +862,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Présence du site calculée à la lecture (service `SiteMovements`), jamais stockée ; personnel permanent seulement (décision du dirigeant). Aucun mouvement du site n'est supprimé automatiquement tant qu'aucun réglage de conservation n'existe.
 - `Presence::corriger` (activité) refuse un mouvement du site ; la correction du site passe par `SiteMovements::correct`.
 - Écart assumé : pas d'écran de correction ni d'écriture par la tablette au lot 3 (lot 4).
+
+## Tablette de site, lot 4a : contrôle en mode site (en ligne)
+- Décision (dirigeant) : site d'abord, activité ensuite ; aucun accès retiré. Un refus du site n'est jamais renvoyé tel quel : l'activité décide (ses messages et ses alertes restent ceux d'aujourd'hui).
+- Refactor sans changement de comportement dans `PermanentAccess` : refus de carte (`cardRefusal`) et évaluation des habilitations (`evaluate`) partagés entre `decide` (activité) et `decideSite`.
+- Sortie : si la personne est présente sur le site, la sortie est écrite dans le journal du site, sans condition d'habilitation ; sinon la sortie d'activité s'applique.
+- Écarts assumés : pas d'alerte du site (les refus restent des alertes d'activité tant que la tablette a une activité), rejeu hors ligne inchangé (lot 4b).
