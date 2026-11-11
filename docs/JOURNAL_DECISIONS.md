@@ -898,3 +898,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Décision : aucune activité autorisée, ou plusieurs sans choix = enrôlement en mode site ; une seule activité autorisée = assignée comme avant. Les refus « aucune_activite » et « activite_a_choisir » de l'enrôlement disparaissent (la clôture de l'activité en cours reste refusée).
 - Conséquence : l'écran Postes n'impose plus de choix d'activité avant d'enrôler ; l'agent choisit sur la tablette.
 - Rappel : installation de test sans donnée réelle ; aucune reprise de données.
+
+## Tablette de site, lot 6 : masquer le conteneur des cartes (décision du dirigeant)
+- Choix du dirigeant (3 options présentées) : « d'abord masquer le conteneur ». Retrait complet du modèle reporté (projet à part, ~3 PR, risque sur l'émission et l'impression des cartes).
+- Fait : création automatique et idempotente du registre technique à la première carte ; suppression de l'étape visible et du blocage ; nouveau nom ; libellés « site (personnel permanent) » dans Opérations et Administration.
+- Non fait : aucune table ni contrainte n'est modifiée ; `events.is_permanent` reste la clé du registre technique. Installation de test sans donnée réelle : aucune reprise de données.

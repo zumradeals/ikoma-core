@@ -24,7 +24,7 @@ final class Presence
                 SELECT DISTINCT ON (e.visitor_id) e.type FROM access_events e
                 WHERE e.event_id = ? AND e.type IN ('entree', 'sortie') AND e.visitor_id IS NOT NULL
                   AND NOT EXISTS (SELECT 1 FROM access_events c WHERE c.corrige_id = e.id)
-                ORDER BY e.visitor_id, e.occurred_at DESC, e.created_at DESC, e.id DESC
+                ORDER BY e.visitor_id, e.occurred_at DESC, e.seq DESC
             ) last WHERE last.type = 'entree'",
             [$eventId],
         )->n;
@@ -34,7 +34,7 @@ final class Presence
     {
         $last = DB::table('access_events as e')->where('e.visitor_id', $visitorId)->whereIn('e.type', ['entree', 'sortie'])
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))
-            ->orderByDesc('e.occurred_at')->orderByDesc('e.created_at')->orderByDesc('e.id')->value('e.type');
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->value('e.type');
 
         return $last === 'entree';
     }
@@ -64,7 +64,7 @@ final class Presence
                 DB::table('access_events')->insert(['id' => $id, 'event_id' => $event->event_id, 'visitor_id' => $event->visitor_id, 'badge_id' => $event->badge_id, 'actor_id' => $actor->id, 'type' => 'correction', 'checkpoint' => null, 'occurred_at' => $now, 'corrige_id' => $event->id, 'details' => json_encode(['motif' => mb_substr($motif, 0, 500), 'corrige_type' => $event->type], JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
                 $last = DB::table('access_events as e')->where('e.visitor_id', $event->visitor_id)->whereIn('e.type', ['entree', 'sortie'])
                     ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))
-                    ->orderByDesc('e.occurred_at')->orderByDesc('e.created_at')->orderByDesc('e.id')->value('e.type');
+                    ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->value('e.type');
                 DB::table('visitors')->where('id', $event->visitor_id)->whereIn('status', ['attendu', 'present', 'sorti'])->update(['status' => match ($last) {
                     'entree' => 'present', 'sortie' => 'sorti', default => 'attendu'
                 }, 'updated_at' => $now]);
