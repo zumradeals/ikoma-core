@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\CardLifecycle;
 use App\Services\HolderCards;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentAccess;
@@ -137,4 +138,38 @@ it('rejoue hors ligne une entrée du site et refuse toute autre opération sans 
 
     $response = $send('valider', ['visitor_id' => (string) Str::uuid()], 2);
     expect(json_encode($response->json()))->toContain('aucune_activite_en_cours');
+});
+
+it('lève une alerte du site (sans événement, sans nom) pour un refus de carte, dédoublonnée sur 5 minutes', function () {
+    [$holder, $token] = smCard();
+
+    smControl('IKOMA1:'.$token)->assertOk();
+    smControl('IKOMA1:'.$token)->assertOk();
+    $alerts = DB::table('alerts')->whereNull('event_id')->get();
+    expect($alerts)->toHaveCount(1)->and($alerts[0]->type)->toBe('controle_refuse')->and($alerts[0]->severity)->toBe('haute');
+    expect($alerts[0]->message)->not->toContain((string) DB::table('permanent_holders')->where('id', $holder)->value('full_name'));
+});
+
+it('lève une alerte critique du site pour une carte perdue ou volée, au contrôle comme à la sortie', function () {
+    [$holder, $token] = smCard();
+    smGrant($holder);
+    smControl('IKOMA1:'.$token)->assertOk()->assertJson(['valid' => true]);
+    app(CardLifecycle::class)->revoke($holder, 'volee', null, $this->admin);
+
+    smControl('IKOMA1:'.$token)->assertOk()->assertJson(['valid' => false, 'reason' => 'carte_volee']);
+    $this->postJson('/poste/api/sortie', ['code' => 'IKOMA1:'.$token, 'point' => null], smHeaders())->assertOk()->assertJson(['ok' => true, 'context' => 'site']);
+    expect(DB::table('alerts')->whereNull('event_id')->where('severity', 'critique')->count())->toBe(2);
+});
+
+it('montre les alertes du site au superviseur, les compte avec celles de l’activité et les laisse prendre en compte', function () {
+    [, $token] = smCard();
+    smControl('IKOMA1:'.$token)->assertOk();
+    $alert = (string) DB::table('alerts')->whereNull('event_id')->value('id');
+
+    $this->actingAs(smUser('superviseur'));
+    $this->get('/pilotage/alertes')->assertOk()->assertInertia(fn ($p) => $p->component('Pilotage/Alertes')->has('siteAlerts', 1)->where('openAlerts', 1));
+    $this->post('/pilotage/alertes/'.$alert.'/prendre-en-compte')->assertRedirect();
+    expect(DB::table('alerts')->where('id', $alert)->value('acknowledged_at'))->not->toBeNull();
+    $this->get('/pilotage/alertes')->assertOk()->assertInertia(fn ($p) => $p->has('siteAlerts', 0)->where('openAlerts', 0));
+    $this->get('/pilotage/alertes?etat=prises')->assertOk()->assertInertia(fn ($p) => $p->has('siteAlerts', 1));
 });

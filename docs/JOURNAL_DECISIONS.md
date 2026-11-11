@@ -889,3 +889,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Décision : pas de nouvelle application « site » : le contrôle des cartes existant (`ControleApp`) sert tel quel ; l'accueil et les groupes sont remplacés, en mode site, par un écran explicatif avec le choix d'une activité. Moins de code nouveau, aucun risque pour l'accueil des visiteurs.
 - Le mode site est détecté par la copie (`event` vide), jamais par un réglage.
 - Retour au mode site depuis une activité (choisir « aucune activité ») : non fait, à décider avec le dirigeant (impact : la copie de l'activité est remplacée).
+
+## Tablette de site, lot 5c : alertes du site
+- Décision : les alertes du site sont des alertes ordinaires dont `event_id` est vide ; l'écran « Alertes » du superviseur les affiche dans une section dédiée et les inclut dans le compteur. Aucun écran séparé.
+- Les alertes d'une tablette AVEC activité restent des alertes d'activité (comportement inchangé) ; seul le mode « site seul » lève des alertes du site.
