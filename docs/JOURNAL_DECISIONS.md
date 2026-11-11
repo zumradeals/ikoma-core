@@ -898,3 +898,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Décision : aucune activité autorisée, ou plusieurs sans choix = enrôlement en mode site ; une seule activité autorisée = assignée comme avant. Les refus « aucune_activite » et « activite_a_choisir » de l'enrôlement disparaissent (la clôture de l'activité en cours reste refusée).
 - Conséquence : l'écran Postes n'impose plus de choix d'activité avant d'enrôler ; l'agent choisit sur la tablette.
 - Rappel : installation de test sans donnée réelle ; aucune reprise de données.
+
+## Dette : conservation des mouvements du site
+- Décision (dirigeant, lot 3) appliquée : pas de nouveau réglage ; la durée « événements » (`conservation_evenements_jours`) vaut aussi pour les mouvements du site, tant que la politique de conservation est approuvée. 0 = aucune suppression.
+- Contrainte de base respectée : la clé `corrige_id` interdit d'effacer un mouvement encore corrigé par une correction récente ; l'ordre de purge (corrections échues d'abord, puis mouvements non référencés) évite toute erreur.
