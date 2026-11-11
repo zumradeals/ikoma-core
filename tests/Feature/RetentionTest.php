@@ -5,6 +5,8 @@ use App\Services\Audit;
 use App\Services\AuditChain;
 use App\Services\AuditSeal;
 use App\Services\DataRetention;
+use App\Services\InstitutionalCategories;
+use App\Services\PermanentHolders;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
@@ -166,4 +168,49 @@ it('réserve le bris de glace au dernier administrateur et journalise sans expos
     $second = User::create(['name' => 'Autre compte fictif', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24)]);
     $second->assignRole('administrateur');
     $this->artisan('comptes:bris-de-glace '.$last->id.' --confirmation=REINITIALISER-2FA')->assertFailed();
+});
+
+function retentionSiteMovement(string $holder, string $type, string $at, ?string $corrects = null): string
+{
+    $id = (string) Str::uuid();
+    DB::table('access_events')->insert(['id' => $id, 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => $holder, 'actor_id' => null, 'type' => $type, 'checkpoint' => 'Point du site fictif',
+        'occurred_at' => $at, 'corrige_id' => $corrects, 'created_at' => $at, 'updated_at' => $at]);
+
+    return $id;
+}
+
+it('purge les mouvements du site échus (même durée que l’historique des activités), garde les récents et ne fait rien sans réglage', function () {
+    $admin = User::create(['name' => 'Admin fictif conservation', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24)]);
+    $admin->assignRole('administrateur');
+    app(InstitutionalCategories::class)->initialize($admin);
+    $holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive Conservation', 'institutional_category' => 'AILCT-01'], $admin);
+    $old = retentionSiteMovement($holder, 'entree', now()->subDays(60)->toDateTimeString());
+    $oldExit = retentionSiteMovement($holder, 'sortie', now()->subDays(59)->toDateTimeString());
+    $recent = retentionSiteMovement($holder, 'entree', now()->subDays(5)->toDateTimeString());
+    DB::table('settings')->where('key', 'conservation_validee')->update(['value' => '1']);
+
+    DB::table('settings')->where('key', 'conservation_evenements_jours')->update(['value' => '0']);
+    app(DataRetention::class)->purge();
+    expect(DB::table('access_events')->whereIn('id', [$old, $oldExit, $recent])->count())->toBe(3);
+
+    DB::table('settings')->where('key', 'conservation_evenements_jours')->update(['value' => '30']);
+    $counts = app(DataRetention::class)->purge();
+    expect($counts['mouvements_site'])->toBe(2)->and(DB::table('access_events')->whereIn('id', [$old, $oldExit])->count())->toBe(0)->and(DB::table('access_events')->where('id', $recent)->exists())->toBeTrue();
+});
+
+it('garde un mouvement du site tant que sa correction n’est pas échue, puis les efface ensemble', function () {
+    $admin = User::create(['name' => 'Admin fictif conservation 2', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24)]);
+    $admin->assignRole('administrateur');
+    app(InstitutionalCategories::class)->initialize($admin);
+    $holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive Correction Conservation', 'institutional_category' => 'AILCT-01'], $admin);
+    $entry = retentionSiteMovement($holder, 'entree', now()->subDays(60)->toDateTimeString());
+    $fix = retentionSiteMovement($holder, 'correction', now()->subDays(10)->toDateTimeString(), $entry);
+    DB::table('settings')->where('key', 'conservation_validee')->update(['value' => '1']);
+    DB::table('settings')->where('key', 'conservation_evenements_jours')->update(['value' => '30']);
+
+    app(DataRetention::class)->purge();
+    expect(DB::table('access_events')->whereIn('id', [$entry, $fix])->count())->toBe(2);
+    $this->travelTo(now()->addDays(40));
+    app(DataRetention::class)->purge();
+    expect(DB::table('access_events')->whereIn('id', [$entry, $fix])->count())->toBe(0);
 });
