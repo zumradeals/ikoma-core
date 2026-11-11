@@ -101,6 +101,9 @@ function addSiteZoneToPost(p: Checkpoint) {
 }
 function removeSiteZoneFromPost(mappingId: string) { router.delete(`/administration/site/zones-site/${mappingId}`, { preserveScroll: true }); }
 function removeZone(z: PostZone) { router.post(`/administration/acces/correspondances/${z.mapping_id}/retirer`, {}, { preserveScroll: true }); }
+// Zones permanentes du site (sans événement) : ce sont elles que la page présente en premier ; les zones d'activité restent comptées à part.
+const siteZoneList = computed(() => props.site_zones ?? []);
+const postsOfSiteZone = (zoneId: string) => props.checkpoints.filter(p => p.site_zones?.some(z => z.zone_id === zoneId));
 const postsOfZone = (zoneId: string) => props.checkpoints.filter(p => p.zones.some(z => z.zone_id === zoneId));
 
 const create = reactive<Edit & { code: string }>({ code: '', name: '', function_label: '', capabilities: [], direction_required: false });
@@ -152,7 +155,7 @@ function toggleCreate(capability: string, on: boolean) {
         </section>
         <dl class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="indicateurs">
           <div class="site-kpi bg-sky-50"><span class="site-kpi-icon text-sky-700"><AdminIcon name="monitor" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-postes">{{ checkpoints.length }}</dd><dt class="font-semibold text-slate-800">Postes configurés</dt><dd class="text-sm text-slate-600">{{ activePosts.length }} actif<template v-if="activePosts.length > 1">s</template></dd></div></div>
-          <div class="site-kpi bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="layers" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-zones">{{ zones.length }}</dd><dt class="font-semibold text-slate-800">Zones définies</dt><dd class="text-sm text-slate-600">dans les activités</dd></div></div>
+          <div class="site-kpi bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="layers" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-zones">{{ siteZoneList.length }}</dd><dt class="font-semibold text-slate-800">Zones du site</dt><dd class="text-sm text-slate-600">{{ zones.length }} dans les activités</dd></div></div>
           <div class="site-kpi bg-amber-50"><span class="site-kpi-icon text-amber-700"><AdminIcon name="tablet" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-tablettes">{{ assignedTablets }}</dd><dt class="font-semibold text-slate-800">Tablettes affectées</dt><dd class="text-sm text-slate-600">{{ unassigned.length }} sans poste</dd></div></div>
           <div class="site-kpi bg-violet-50"><span class="site-kpi-icon text-violet-700"><AdminIcon name="shield" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-correspondances">{{ guardedZones }}</dd><dt class="font-semibold text-slate-800">Zones gardées</dt><dd class="text-sm text-slate-600">correspondances poste–zone</dd></div></div>
         </dl>
@@ -183,16 +186,18 @@ function toggleCreate(capability: string, on: boolean) {
 
           <!-- Zones du site -->
           <section class="site-card" aria-labelledby="zones-resume-titre" data-testid="resume-zones">
-            <header class="site-card-head"><h2 id="zones-resume-titre"><AdminIcon name="layers" :size="22" />Zones du site ({{ zones.length }})</h2><Link href="/administration/zones" class="site-btn site-btn-blue" data-testid="ajouter-zone"><AdminIcon name="plus" :size="16" />Ajouter une zone</Link></header>
-            <p v-if="!zones.length" class="p-4" data-testid="aucune-zone-resume">Aucune zone n’est définie.</p>
+            <header class="site-card-head"><h2 id="zones-resume-titre"><AdminIcon name="layers" :size="22" />Zones du site ({{ siteZoneList.length }})</h2></header>
+            <form class="flex flex-wrap items-end gap-2 p-3" aria-label="Ajouter une zone au site" @submit.prevent="addSiteZone"><label class="block">Nouvelle zone du site<input v-model="siteZoneName" class="field" maxlength="120" required data-testid="resume-nom-zone-site"></label><button type="submit" class="site-btn site-btn-blue" data-testid="ajouter-zone"><AdminIcon name="plus" :size="16" />Ajouter une zone</button></form>
+            <p v-if="!siteZoneList.length" class="p-4" data-testid="aucune-zone-resume">Aucune zone du site pour l’instant. Une zone du site existe sans activité : donnez-lui un nom, puis associez-la à un poste.</p>
             <ul v-else class="site-table site-table-zones">
-              <li class="site-row site-row-head" aria-hidden="true"><span>Zone</span><span>Activité</span><span>Gardée par</span></li>
-              <li v-for="z in zones.slice(0, PREVIEW + 1)" :key="z.id" class="site-row" :data-testid="'zone-resume-' + z.id">
-                <span class="font-semibold">{{ z.name }}</span><span class="text-sm text-slate-700">{{ z.event_name }}</span>
-                <span class="text-sm">{{ postsOfZone(z.id).map(p => p.name).join(', ') || 'aucun poste' }}</span>
+              <li class="site-row site-row-head" aria-hidden="true"><span>Zone</span><span>Nature</span><span>Gardée par</span></li>
+              <li v-for="z in siteZoneList.slice(0, PREVIEW + 1)" :key="z.id" class="site-row" :data-testid="'zone-resume-' + z.id">
+                <span class="font-semibold">{{ z.name }}</span><span class="text-sm text-slate-700">Zone du site</span>
+                <span class="text-sm">{{ postsOfSiteZone(z.id).map(p => p.name).join(', ') || 'aucun poste' }}</span>
               </li>
             </ul>
-            <p v-if="zones.length > PREVIEW + 1" class="site-more"><button type="button" class="font-semibold text-blue-800 underline" @click="tab = 'zones'">Voir toutes les zones ({{ zones.length }})</button></p>
+            <p v-if="siteZoneList.length > PREVIEW + 1" class="site-more"><button type="button" class="font-semibold text-blue-800 underline" @click="tab = 'zones'">Voir toutes les zones ({{ siteZoneList.length }})</button></p>
+            <p class="site-more text-sm text-slate-700" data-testid="resume-zones-activites">Zones des activités : <strong>{{ zones.length }}</strong>. <Link href="/administration/zones" class="font-semibold text-blue-800 underline">Gérer les zones des activités</Link></p>
           </section>
          </div>
          <div class="site-col">
@@ -203,7 +208,8 @@ function toggleCreate(capability: string, on: boolean) {
               <div><dt>Nom du site</dt><dd data-testid="nom-site">{{ site?.name ?? '—' }}</dd></div>
               <div><dt>Nombre de postes</dt><dd>{{ checkpoints.length }}</dd></div>
               <div><dt>Postes actifs</dt><dd>{{ activePosts.length }}</dd></div>
-              <div><dt>Nombre de zones</dt><dd>{{ zones.length }}</dd></div>
+              <div><dt>Zones du site</dt><dd>{{ siteZoneList.length }}</dd></div>
+              <div><dt>Zones des activités</dt><dd>{{ zones.length }}</dd></div>
               <div><dt>Tablettes affectées</dt><dd>{{ assignedTablets }}</dd></div>
               <div><dt>Tablettes sans poste</dt><dd>{{ unassigned.length }}</dd></div>
             </dl>
@@ -227,9 +233,9 @@ function toggleCreate(capability: string, on: boolean) {
 
       <!-- Zones -->
       <section v-else-if="tab === 'zones'" id="panneau-zones" role="tabpanel" aria-labelledby="tab-zones" class="admin-card space-y-3" data-testid="panneau-zones">
-        <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-heading font-bold">Zones ({{ zones.length }})</h2><Link href="/administration/zones" class="btn-soft" data-testid="gerer-zones">Gérer les zones</Link></div>
+        <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-heading font-bold">Zones du site ({{ siteZoneList.length }})</h2><Link href="/administration/zones" class="btn-soft" data-testid="gerer-zones">Gérer les zones des activités</Link></div>
         <section class="space-y-2 rounded-xl border border-slate-200 p-3" aria-labelledby="zones-site-titre" data-testid="zones-du-site">
-          <h3 id="zones-site-titre" class="font-bold">Zones du site (permanentes, sans événement)</h3>
+          <h3 id="zones-site-titre" class="font-bold">Zones permanentes du site, sans activité</h3>
           <p class="text-sm text-slate-700">Les zones du site existent indépendamment de toute activité : elles serviront aux habilitations du personnel permanent et au contrôle sur site.</p>
           <ul v-if="site_zones?.length" class="divide-y">
             <li v-for="z in site_zones" :key="z.id" class="flex flex-wrap items-center gap-2 py-2" :data-testid="'zone-site-' + z.id"><strong class="min-w-0 flex-1">{{ z.name }}</strong>
@@ -238,7 +244,7 @@ function toggleCreate(capability: string, on: boolean) {
           <p v-else data-testid="aucune-zone-site">Aucune zone du site pour l’instant.</p>
           <form class="flex flex-wrap items-end gap-2" aria-label="Nouvelle zone permanente du site" @submit.prevent="addSiteZone"><label class="block">Intitulé de la zone permanente<input v-model="siteZoneName" class="field" maxlength="120" required data-testid="nom-zone-site"></label><button type="submit" class="admin-primary" data-testid="creer-zone-site">Ajouter au site</button></form>
         </section>
-        <h3 class="font-bold">Zones des activités</h3>
+        <h3 class="font-bold">Zones des activités ({{ zones.length }})</h3>
         <p class="text-slate-700">Les zones des activités sont définies dans chaque activité. Un poste ne juge une zone que s’il lui est associé.</p>
         <p v-if="!zones.length" data-testid="aucune-zone">Aucune zone n’est définie.</p>
         <ul v-else class="divide-y">

@@ -930,6 +930,11 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Plus de conteneur : `events.is_permanent`, la nature « permanent », `holder_cards.event_id`, la route de création du contexte permanent et ses protections disparaissent. Migration non réversible.
 - Supervision générale : la présence du site vient des passages des titulaires ; une même personne présente sur le site et dans une activité compte pour une seule présence.
 
+## Site et accès : zones du site comptées et créées sans événement ; inventaire des écrans liés à un événement
+- Bug signalé par le dirigeant : sur Site et accès, une zone créée dans l'onglet Zones (zone du site) s'affichait mais les compteurs restaient à 0, et « Ajouter une zone » du résumé renvoyait vers un écran qui demande un événement. Cause : le résumé, le titre de l'onglet, l'indicateur et la fiche du site ne comptaient que les zones **d'activité**.
+- Correctif : « Zones du site (N) » compte les zones permanentes ; le résumé les liste avec les postes qui les gardent ; « Ajouter une zone » crée une zone du site sans événement ; les zones d'activité sont comptées à part avec un lien « Gérer les zones des activités ». Aucun changement serveur.
+- Inventaire demandé en priorité : docs/ailct/V1-INVENTAIRE-ECRANS-EVENEMENT.md (verdict par écran, constat, deux corrections suivantes, deux décisions à prendre).
+
 ## Poste d'accueil, étapes 2 à 7 : maquettes approuvées et mises en œuvre (décision du dirigeant)
 - Le dirigeant a validé les maquettes proposées pour les étapes Fiche, Identité et photo, Décision, Badge, Remise et Entrée (« ok, implémente les maquettes »). Même parcours et mêmes règles métier : seule la présentation change.
 - **Panneau visiteur** (`VisitorPanel`) visible à chaque étape de la fiche à l'entrée : nom, catégorie, organisation, personne reçue, validité, photo (celle qui vient d'être prise, valable hors ligne, sinon le portrait lu en ligne, sinon « Photo non prise ») et badge associé à partir de l'étape badge. Tout vient de la fiche locale.
