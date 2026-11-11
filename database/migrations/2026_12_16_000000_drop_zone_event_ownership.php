@@ -21,6 +21,10 @@ return new class extends Migration
             throw new RuntimeException('Retrait interrompu : des zones d\'activité, correspondances ou politiques d\'activité subsistent après la reprise.');
         }
 
+        // Les tables d'activité disparaissent d'abord (leurs déclencheurs dépendent des fonctions retirées plus bas).
+        DB::statement('DROP TABLE public.checkpoint_zones');
+        DB::statement('DROP TABLE public.zone_policies');
+
         // Plus de distinction zone du site / zone d'activité.
         foreach (['category_zone', 'participation_entitlements', 'holder_entitlements'] as $table) {
             DB::unprepared('DROP TRIGGER IF EXISTS '.$table.'_zone_of_event_or_site ON '.$table.';');
@@ -41,8 +45,6 @@ return new class extends Migration
             DB::unprepared($updated);
         }
 
-        DB::statement('DROP TABLE public.checkpoint_zones');
-        DB::statement('DROP TABLE public.zone_policies');
         DB::statement('CREATE UNIQUE INDEX zones_site_name_unique_all ON public.zones (site_id, name)');
         DB::statement('ALTER TABLE public.zones DROP COLUMN event_id');
     }
