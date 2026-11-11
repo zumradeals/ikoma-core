@@ -39,6 +39,10 @@ final class SiteControl
         if (($card = $this->permanent->resolveCard($code)) !== null) {
             return $this->permanentControl($poste, $agent, $card, $checkpoint, $declaredAt, $localValid, $knownAt, $direction);
         }
+        if ($poste->event_id === null) {
+            return ['valid' => false, 'reason' => 'aucune_activite', 'message' => 'Aucune activité en cours : seules les cartes permanentes sont contrôlées sur cette tablette.', 'badge_code' => null, 'zone_ok' => null,
+                'point' => $checkpoint['name'], 'person' => null, 'organisation' => null, 'category' => null, 'zones' => [], 'source' => 'serveur', 'direction' => $direction];
+        }
         $verdict = $this->badges->controler($code, $poste->event_id, $agent, false);
         $badge = $verdict->badgeId ? DB::table('badges')->where('id', $verdict->badgeId)->first(['id', 'event_id', 'code']) : null;
         $valid = $verdict->valid;
@@ -135,6 +139,9 @@ final class SiteControl
     private function giveBackTarget(Device $poste, string $code, bool $lock): array
     {
         $refus = fn (?string $badgeId, string $reason, string $message): array => ['badge' => null, 'visitor' => null, 'badge_id' => $badgeId, 'refus' => ['ok' => false, 'refus' => true, 'reason' => $reason, 'message' => $message, 'badge_code' => null, 'source' => 'serveur']];
+        if ($poste->event_id === null) {
+            return $this->refused($poste, $agent, null, 'aucune_activite', 'Aucune activité en cours : seules les cartes permanentes sortent sur cette tablette.');
+        }
         $input = trim($code);
         if (str_starts_with($input, QrSvg::PREFIX)) {
             $input = substr($input, strlen(QrSvg::PREFIX));
@@ -241,8 +248,12 @@ final class SiteControl
     private function permanentControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $declaredAt, ?bool $localValid, ?string $knownAt, ?string $direction = null): array
     {
         // Habilitation du SITE d'abord (zones du site gardées par le poste) ; si elle n'accorde pas l'accès, l'habilitation d'activité s'applique comme avant.
-        if (($siteResult = $this->siteControl($poste, $agent, $card, $checkpoint, $direction, $declaredAt, $knownAt, $localValid)) !== null) {
+        $siteOnly = $poste->event_id === null;
+        if (($siteResult = $this->siteControl($poste, $agent, $card, $checkpoint, $direction, $declaredAt, $knownAt, $localValid, $siteOnly)) !== null) {
             return $siteResult;
+        }
+        if ($siteOnly) {
+            throw new DeskRefused('aucune_activite', 'Aucune activité en cours : la décision d’accès ne peut être prise qu’au titre du site.', 409);
         }
         $now = now();
         $decision = $this->permanent->decide($card, $poste->event_id, $checkpoint, $now);
@@ -288,22 +299,21 @@ final class SiteControl
      * @param  array{type:string,id:?string,name:string}  $checkpoint
      * @return array<string, mixed>|null
      */
-    private function siteControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $direction, ?string $declaredAt = null, ?string $knownAt = null, ?bool $localValid = null): ?array
+    private function siteControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $direction, ?string $declaredAt = null, ?string $knownAt = null, ?bool $localValid = null, bool $siteOnly = false): ?array
     {
-        if ($checkpoint['type'] !== 'poste' || $poste->checkpoint_id === null) {
-            return null;
-        }
-        $zoneIds = DB::table('checkpoint_site_zones')->where('checkpoint_id', $poste->checkpoint_id)->pluck('zone_id')->all();
+        // Sans activité (`$siteOnly`), le site est la seule décision possible : un refus est rendu et journalisé au lieu de passer la main à l'activité.
+        $refuse = fn (string $reason, string $message): ?array => $siteOnly ? $this->siteRefusal($poste, $agent, $card, $checkpoint, $direction, $declaredAt, $localValid, $reason, $message) : null;
+        $zoneIds = $checkpoint['type'] === 'poste' && $poste->checkpoint_id !== null ? DB::table('checkpoint_site_zones')->where('checkpoint_id', $poste->checkpoint_id)->pluck('zone_id')->all() : [];
         if ($zoneIds === []) {
-            return null;
+            return $refuse('poste_sans_zone_site', 'Ce poste ne garde aucune zone du site : accès refusé.');
         }
         $decision = $this->permanent->decideSite($card, array_values($zoneIds), now());
         if (! $decision['allowed']) {
-            return null;
+            return $refuse((string) $decision['reason'], $decision['message']);
         }
         // Décision rejouée après un fonctionnement hors ligne : mêmes garde-fous que l'activité (confiance bornée, zone acceptant l'entrée hors ligne).
-        if ($declaredAt !== null && $this->permanent->offlineRefusalSite($card, array_values($zoneIds), $declaredAt, $knownAt) !== null) {
-            return null;
+        if ($declaredAt !== null && ($offline = $this->permanent->offlineRefusalSite($card, array_values($zoneIds), $declaredAt, $knownAt)) !== null) {
+            return $refuse($offline['reason'], $offline['message']);
         }
 
         return DB::transaction(function () use ($poste, $agent, $card, $checkpoint, $direction, $decision, $declaredAt, $localValid): array {
@@ -318,6 +328,24 @@ final class SiteControl
                 'permanent' => ['identifier' => $card->identifier, 'entered' => $entered], 'direction' => $direction, 'context' => 'site',
             ];
         });
+    }
+
+    /**
+     * Refus d'une carte permanente au titre du site sur une tablette sans activité : mouvement « contrôle » du site (le refus se lit dans le journal) et audit.
+     * Aucune alerte n'est levée ici : les alertes du site viennent avec l'écran du superviseur.
+     *
+     * @param  array{type:string,id:?string,name:string}  $checkpoint
+     * @return array<string, mixed>
+     */
+    private function siteRefusal(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $direction, ?string $declaredAt, ?bool $localValid, string $reason, string $message): array
+    {
+        $this->siteMovements->record($card->holder_id, 'controle', $checkpoint['name'], $agent, null, array_filter(['verdict' => 'refuse', 'raison' => $reason, 'direction' => $direction, 'permanent' => true, 'identifiant' => $card->identifier,
+            'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id, 'heure_declaree' => $declaredAt, 'differe' => $declaredAt !== null ? true : null,
+            'verdict_tablette' => $localValid === null ? null : ($localValid ? 'valide' : 'refuse')], fn ($v) => $v !== null));
+        $this->audit->append('controle.refuse', $agent->id, ['device_id' => $poste->id, 'holder_id' => $card->holder_id, 'identifiant' => $card->identifier, 'raison' => $reason, 'point_id' => $checkpoint['id'], 'contexte' => 'site']);
+
+        return ['valid' => false, 'reason' => $reason, 'message' => $message, 'badge_code' => $card->identifier, 'zone_ok' => null, 'point' => $checkpoint['name'], 'person' => null, 'organisation' => null, 'category' => null,
+            'zones' => [], 'source' => 'serveur', 'permanent' => ['identifier' => $card->identifier, 'entered' => false], 'direction' => $direction, 'context' => 'site'];
     }
 
     /**
@@ -409,6 +437,9 @@ final class SiteControl
     {
         if ($point === null) {
             return ['type' => 'poste', 'id' => $poste->id, 'name' => $poste->station ?? $poste->name];
+        }
+        if ($poste->event_id === null && ($point['type'] === 'zone' || $point['id'] !== $poste->id)) {
+            throw new DeskRefused('point_inconnu', 'Sans activité en cours, seul le point de ce poste est contrôlé.', 422);
         }
         $row = $point['type'] === 'zone'
             ? DB::table('zones')->where('id', $point['id'])->where('event_id', $poste->event_id)->first(['id', 'name'])

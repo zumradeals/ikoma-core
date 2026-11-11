@@ -40,7 +40,9 @@ final class Operations
             }
             try {
                 if ($device !== null) {
-                    EventAvailability::requireOpen($device->event_id);
+                    if ($device->event_id !== null) {
+                        EventAvailability::requireOpen($device->event_id);
+                    }
                     if (DB::table('devices')->where('id', $device->id)->whereNotNull('revoked_at')->exists()) {
                         throw new DeskRefused('appareil_revoque', 'Cette tablette a été révoquée.', 401);
                     }

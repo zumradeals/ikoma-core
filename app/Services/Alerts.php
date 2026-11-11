@@ -18,7 +18,7 @@ final class Alerts
     public function __construct(private readonly Audit $audit) {}
 
     /** Crée l'alerte si la même cause n'en a pas déjà créé une (clé de dédoublonnage). */
-    public function raise(string $eventId, string $type, string $severity, ?string $subjectType, ?string $subjectId, string $message, ?string $dedupeKey = null): void
+    public function raise(?string $eventId, string $type, string $severity, ?string $subjectType, ?string $subjectId, string $message, ?string $dedupeKey = null): void
     {
         $now = now();
         DB::table('alerts')->insertOrIgnore(['id' => (string) Str::uuid(), 'event_id' => $eventId, 'type' => $type, 'severity' => $severity, 'subject_type' => $subjectType, 'subject_id' => $subjectId, 'dedupe_key' => $dedupeKey, 'message' => mb_substr($message, 0, 200), 'created_at' => $now, 'updated_at' => $now]);

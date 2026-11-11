@@ -9,6 +9,7 @@ use App\Services\Poste\Operations;
 use App\Services\Poste\PosteConsultation;
 use App\Services\Poste\SiteControl;
 use App\Services\Presence;
+use App\Services\SiteMovements;
 use App\Services\Vehicles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -177,8 +178,10 @@ final class PosteApiController
     public function presents(Request $r): JsonResponse
     {
         $event = $this->poste($r)->event_id;
+        // Tablette sans activité : le compte est celui du site (personnel permanent).
+        $count = $event === null ? app(SiteMovements::class)->count() : $this->presence->count($event);
 
-        return response()->json(['count' => $this->presence->count($event), 'as_of' => now()->utc()->format('Y-m-d\TH:i:s.u\Z')]);
+        return response()->json(['count' => $count, 'as_of' => now()->utc()->format('Y-m-d\TH:i:s.u\Z')]);
     }
 
     private function poste(Request $r): Device

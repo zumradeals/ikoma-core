@@ -13,6 +13,9 @@ final class ListSnapshot
 {
     public function version(Device $poste): string
     {
+        if ($poste->event_id === null) {
+            return $this->siteVersion($poste);
+        }
         $e = $poste->event_id;
         $row = DB::selectOne("SELECT concat_ws('|',
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM visitors WHERE event_id = ?),
@@ -39,6 +42,47 @@ final class ListSnapshot
         return sha1((string) $row->v.'|'.$e.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot($e, $poste->checkpoint_id), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-').'|'.md5(json_encode([PostCapabilities::capabilities($poste), PostCapabilities::requiresDirection($poste)], JSON_THROW_ON_ERROR)));
     }
 
+    /** Version de la copie d'une tablette SANS activité : cartes, habilitations et politiques du site, point de contrôle, capacités et réglages du poste. */
+    private function siteVersion(Device $poste): string
+    {
+        $settings = DB::selectOne("SELECT md5(coalesce(string_agg(key || '=' || value, ',' ORDER BY key), '')) AS v FROM settings WHERE key LIKE 'poste\\_%'")->v;
+
+        return sha1('site|'.$poste->id.'|'.md5(json_encode(app(PermanentAccess::class)->snapshot(null, $poste->checkpoint_id), JSON_THROW_ON_ERROR)).'|'.($poste->point_code ?? '-').'|'
+            .md5(json_encode([PostCapabilities::capabilities($poste), PostCapabilities::requiresDirection($poste)], JSON_THROW_ON_ERROR)).'|'.$settings);
+    }
+
+    /**
+     * Copie d'une tablette SANS activité (mode site) : même forme que la copie d'activité, sans événement ni visiteurs ; seuls les titulaires permanents
+     * (cartes, habilitations et politiques du site) y figurent.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildSite(Device $poste): array
+    {
+        $setting = fn (string $key, int $default): int => (int) (DB::table('settings')->where('key', $key)->value('value') ?? $default);
+
+        return [
+            'version' => $this->version($poste),
+            'server_time' => now()->utc()->format('Y-m-d\TH:i:s.u\Z'),
+            'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => null, 'point_code' => $poste->point_code, 'capabilities' => PostCapabilities::capabilities($poste), 'direction_required' => PostCapabilities::requiresDirection($poste)],
+            'event' => null,
+            'settings' => $this->settings($setting, false),
+            'categories' => [], 'zones' => [], 'category_zone' => [], 'point_zones' => [], 'entitlements' => [], 'hosts' => [], 'visitors' => [], 'badges' => [], 'groups' => [], 'members' => [],
+            'permanent' => app(PermanentAccess::class)->snapshot(null, $poste->checkpoint_id),
+            'postes' => [],
+        ];
+    }
+
+    /**
+     * @param  callable(string, int): int  $setting
+     * @return array<string, mixed>
+     */
+    private function settings(callable $setting, bool $f06Active): array
+    {
+        return ['inactivity_minutes' => $setting('poste_inactivite_minutes', 5), 'clock_skew_seconds' => $setting('poste_ecart_horloge_secondes', 300), 'pin_max_failures' => $setting('poste_echecs_pin_max', 15), 'controle_stagiaires' => $this->groupMode(), 'f06_active' => $f06Active,
+            'identity_document' => Desk::documentRequired(), 'offline_call_minutes' => $setting('poste_delai_appel_minutes', 15), 'offline_max_hours' => $setting('poste_hors_reseau_max_heures', 12), 'offline_trust_hours' => PostCapabilities::offlineTrustHours(), 'low_badges_percent' => $setting('poste_badges_bas_pourcent', 10), 'low_badges_min' => $setting('poste_badges_bas_minimum', 5)];
+    }
+
     private function groupMode(): string
     {
         $mode = (string) DB::table('settings')->where('key', 'controle_stagiaires')->value('value');
@@ -49,6 +93,9 @@ final class ListSnapshot
     /** @return array<string, mixed> */
     public function build(Device $poste): array
     {
+        if ($poste->event_id === null) {
+            return $this->buildSite($poste);
+        }
         $e = $poste->event_id;
         $f06Active = app(FoundingModules::class)->f06Active();
         $setting = fn (string $key, int $default): int => (int) (DB::table('settings')->where('key', $key)->value('value') ?? $default);
@@ -66,8 +113,7 @@ final class ListSnapshot
             'server_time' => now()->utc()->format('Y-m-d\TH:i:s.u\Z'),
             'poste' => ['id' => $poste->id, 'name' => $poste->name, 'station' => $poste->station, 'event_id' => $e, 'point_code' => $poste->point_code, 'capabilities' => PostCapabilities::capabilities($poste), 'direction_required' => PostCapabilities::requiresDirection($poste)],
             'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at', 'site']),
-            'settings' => ['inactivity_minutes' => $setting('poste_inactivite_minutes', 5), 'clock_skew_seconds' => $setting('poste_ecart_horloge_secondes', 300), 'pin_max_failures' => $setting('poste_echecs_pin_max', 15), 'controle_stagiaires' => $this->groupMode(), 'f06_active' => $f06Active,
-                'identity_document' => Desk::documentRequired(), 'offline_call_minutes' => $setting('poste_delai_appel_minutes', 15), 'offline_max_hours' => $setting('poste_hors_reseau_max_heures', 12), 'offline_trust_hours' => PostCapabilities::offlineTrustHours(), 'low_badges_percent' => $setting('poste_badges_bas_pourcent', 10), 'low_badges_min' => $setting('poste_badges_bas_minimum', 5)],
+            'settings' => $this->settings($setting, $f06Active),
             'categories' => DB::table('categories')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
             'zones' => DB::table('zones')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),

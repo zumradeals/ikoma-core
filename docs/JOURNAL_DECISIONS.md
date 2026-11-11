@@ -879,3 +879,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Refactor sans changement de comportement dans `PermanentAccess` : la garde « confiance hors ligne » (`offlineTrustRefusal`) est partagée entre l'activité et le site.
 - Rejeu : site d'abord puis activité (décision du dirigeant) ; un refus du site n'est jamais renvoyé tel quel, l'activité décide.
 - Écarts assumés : la copie hors ligne reste liée à l'événement de la tablette (une copie sans activité vient au lot 5).
+
+## Tablette de site, lot 5a : tablette sans activité (serveur, dormant)
+- Décision : le mode site est piloté par `devices.event_id` vide ; les routes d'activité sont refusées par l'intergiciel (liste blanche explicite) plutôt que d'adapter chaque service d'activité : aucune régression possible sur l'accueil des visiteurs.
+- Décision : la règle « aucune activité autorisée » n'est PAS encore levée : l'enrôlement sans activité sera ouvert quand l'interface de la tablette (5b) et les alertes du site (5c) existeront, pour qu'aucune tablette ne se retrouve dans un mode à moitié construit.
+- Écart assumé : un refus du site sur une tablette sans activité est journalisé (mouvement « contrôle » + audit) mais ne lève pas d'alerte au superviseur avant 5c.

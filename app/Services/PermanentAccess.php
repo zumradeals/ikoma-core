@@ -320,7 +320,7 @@ final class PermanentAccess
      *
      * @return array<string, mixed>
      */
-    public function snapshot(string $eventId, ?string $checkpointId = null): array
+    public function snapshot(?string $eventId, ?string $checkpointId = null): array
     {
         $context = $this->holders->permanentContext();
         $trust = $this->offlineTrust();
@@ -332,10 +332,11 @@ final class PermanentAccess
             // Carte pas encore remise : la tablette la refuse (statut « non_activee »), comme le serveur.
             ->map(fn ($c) => ['hash' => hash('sha256', $c->qr_token), 'status' => $c->status === 'active' && $c->activated_at === null ? 'non_activee' : $c->status, 'holder_id' => $c->holder_id, 'identifier' => $c->identifier])->all();
         $site = $this->siteSnapshot($checkpointId, $iso);
-        $holderIds = DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->distinct()->pluck('holder_id')->merge($site['holder_ids'])->unique()->values();
+        $holderIds = ($eventId === null ? collect() : DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->distinct()->pluck('holder_id'))->merge($site['holder_ids'])->unique()->values();
         $holders = DB::table('permanent_holders')->whereIn('id', $holderIds)->get(['id', 'identifier', 'full_name', 'organisation', 'status', 'engagement_starts_on', 'engagement_ends_on', 'institutional_category']);
-        $entitlements = DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->get(['holder_id', 'zone_id', 'valid_from', 'valid_until'])->groupBy('holder_id');
-        $policies = DB::table('zone_policies')->where('event_id', $eventId)->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->all();
+        // Sans activité (mode site) : aucune habilitation ni politique d'activité, seulement celles du site.
+        $entitlements = $eventId === null ? collect() : DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->get(['holder_id', 'zone_id', 'valid_from', 'valid_until'])->groupBy('holder_id');
+        $policies = $eventId === null ? [] : DB::table('zone_policies')->where('event_id', $eventId)->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->all();
 
         return [
             'directory' => $this->directory(),
