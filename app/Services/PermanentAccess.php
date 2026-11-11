@@ -28,7 +28,7 @@ final class PermanentAccess
 {
     public const OFFLINE_MAX_MINUTES = 1440;
 
-    public function __construct(private readonly PermanentHolders $holders, private readonly Audit $audit) {}
+    public function __construct(private readonly Audit $audit) {}
 
     /**
      * Retrouve la carte permanente (peu importe son statut) à partir du QR « IKOMA1:<jeton> », du jeton, ou de « PC:<sha256 du jeton> » (rejeu d'une tablette
@@ -37,11 +37,8 @@ final class PermanentAccess
     public function resolveCard(string $code): ?object
     {
         $input = trim($code);
-        $context = $this->holders->permanentContext();
-        if ($context === null) {
-            return null;
-        }
-        $query = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id')->where('b.event_id', $context->id);
+        // Une carte permanente est un badge lié à une fiche carte (holder_cards) : son rattachement à un événement (ancien registre) ou au site est indifférent.
+        $query = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id');
         if (preg_match('/^PC:([0-9a-f]{64})$/i', $input, $m) === 1) {
             $query->whereRaw("encode(sha256(convert_to(b.qr_token, 'UTF8')), 'hex') = ?", [strtolower($m[1])]);
         } else {
@@ -322,11 +319,7 @@ final class PermanentAccess
      */
     public function snapshot(?string $eventId, ?string $checkpointId = null): array
     {
-        $context = $this->holders->permanentContext();
         $trust = $this->offlineTrust();
-        if ($context === null) {
-            return ['directory' => [], 'trust_minutes' => $trust['effective'], 'cards' => [], 'holders' => []];
-        }
         $iso = fn (?string $v): ?string => $v === null ? null : Carbon::parse($v)->utc()->format('Y-m-d\TH:i:s.u\Z');
         $cards = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id')->get(['b.qr_token', 'k.status', 'k.activated_at', 'h.id as holder_id', 'h.identifier'])
             // Carte pas encore remise : la tablette la refuse (statut « non_activee »), comme le serveur.

@@ -916,3 +916,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Hors ligne, `LocalPosteRepository.portrait` lit la copie ; sans copie, l'initiale reste affichée. En ligne, la lecture serveur reste prioritaire.
 - Effacement : à chaque nouvelle copie, les portraits des personnes qui ne sont plus dans la liste (autre activité, purge) sont supprimés ; l'effacement de la tablette (révocation, PIN, wipe) vide toute la table. Le serveur continue d'envoyer `Cache-Control: no-store, private`.
 - Règle de sécurité du plan (§4.1/4.3) précisée : le portrait n'est plus « jamais copié » mais « copié chiffré, borné, effaçable ». Les portraits du personnel permanent ne sont pas concernés (pas de route dédiée).
+
+## Retrait du registre des cartes, étapes 2 et 3 : cartes émises au niveau du site
+- Toute nouvelle carte permanente est un badge du site : aucun événement technique n'est plus créé à la première carte, aucun lot, aucune catégorie d'événement, aucune participation. Le contrôle reconnaît une carte par sa fiche `holder_cards`, pas par son événement.
+- Les codes `B-nnn` du site dépassent ceux de l'ancien registre pour éviter tout doublon quand l'étape 4 rattachera les anciennes cartes au site ; index unique sur les codes du site.
+- Étapes 2 et 3 livrées ensemble (les lecteurs devaient suivre l'émission) ; l'étape 4 (suppression du conteneur) reste à faire. Détail : docs/ailct/V1-RETRAIT-REGISTRE-CARTES.md.

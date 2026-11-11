@@ -135,7 +135,7 @@ it('interdit toute réactivation d’une carte révoquée et tout recyclage de s
     expect(fn () => DB::transaction(fn () => DB::table('badges')->where('id', $badge->id)->update(['status' => 'Disponible'])))->toThrow(QueryException::class);
     expect(fn () => DB::transaction(fn () => DB::table('badges')->where('id', $badge->id)->delete()))->not->toThrow(Throwable::class);
     // Supprimé ou non, le code reste réservé : aucun nouveau badge ne le reprend.
-    $next = app(BadgeLots::class)->issueSingle(DB::table('events')->where('is_permanent', true)->value('id'), DB::table('categories')->where('id', $badge->category_id)->value('id'), DB::table('visitors')->where('holder_id', $holder)->value('id'), 'Essai', $this->admin);
+    $next = app(BadgeLots::class)->issueSiteCard('Essai', $this->admin);
     expect($next['code'])->not->toBe($badge->code);
 });
 
