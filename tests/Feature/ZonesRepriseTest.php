@@ -49,8 +49,8 @@ it('fusionne les zones de même nom, garde la politique la plus restrictive et r
         $hallA = (string) Str::uuid();
         $hallB = (string) Str::uuid();
         $owner->table('zones')->insert([
-            ['id' => $zoneA, 'event_id' => $a, 'site_id' => $site, 'name' => 'Réfectoire reprise', ...$at],
-            ['id' => $zoneB, 'event_id' => $b, 'site_id' => $site, 'name' => 'Réfectoire reprise', ...$at],
+            ['id' => $zoneA, 'event_id' => $a, 'site_id' => $site, 'name' => 'Réfectoire reprise', 'est_accueil' => false, ...$at],
+            ['id' => $zoneB, 'event_id' => $b, 'site_id' => $site, 'name' => 'Réfectoire reprise', 'est_accueil' => false, ...$at],
             ['id' => $hallA, 'event_id' => $a, 'site_id' => $site, 'name' => 'Hall reprise', 'est_accueil' => true, ...$at],
             ['id' => $hallB, 'event_id' => $b, 'site_id' => $site, 'name' => 'Hall reprise', 'est_accueil' => false, ...$at],
         ]);
