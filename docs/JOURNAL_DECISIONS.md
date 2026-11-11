@@ -938,3 +938,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Zones du site : étape Z2, les lecteurs acceptent les zones du site avant la reprise des données
 - Après analyse, les lecteurs (habilitations de participants et de titulaires, politiques de zone, correspondance poste–zone, contrôle par zone, zone d'accueil, copie hors ligne, choix des écrans) doivent accepter les zones du site **avant** que les données y passent ; les étapes sont renumérotées (Z3 reprise des données, Z4 écrans, Z5 retrait).
 - `ActivityZones` décrit la règle en un seul endroit : zones propres à l'activité + zones du site. Une zone du site visée par une habilitation d'activité suit la politique du site (une seule politique par zone).
+
+## Zones du site : étape Z3, reprise des données
+- Migration non réversible : toute zone d'activité devient une zone du site ; fusion par nom exact ; politique la plus restrictive (zone sans politique = refus par défaut) ; `zone_policies` vidée ; accueil par OU logique ; doublons de références supprimés ; `list_revision` incrémentée ; récapitulatif d'audit `zones.reprise_vers_site`.
+- Les écrans qui créent encore des zones d'activité (écran Zones, zone « Accueil » d'une nouvelle activité) restent pour l'étape Z4 ; ils continuent de fonctionner (une zone d'activité reste permise jusqu'à Z5).
