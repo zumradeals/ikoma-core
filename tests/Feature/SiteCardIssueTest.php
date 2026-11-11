@@ -10,6 +10,7 @@ use App\Services\PermanentAccess;
 use App\Services\PermanentHolders;
 use App\Services\QrSvg;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -47,7 +48,7 @@ it('numérote les cartes du site de façon continue, sans réutiliser un code re
     DB::table('badges')->where('code', 'B-002')->delete();
     $third = app(BadgeLots::class)->issueSiteCard('Essai', $this->admin);
     expect($third['code'])->toBe('B-003');
-    expect(fn () => DB::table('badges')->insert(['id' => (string) Str::uuid7(), 'event_id' => null, 'code' => 'B-001', 'qr_token' => bin2hex(random_bytes(32)), 'status' => 'Disponible', 'created_at' => now(), 'updated_at' => now()]))->toThrow(Illuminate\Database\QueryException::class);
+    expect(fn () => DB::table('badges')->insert(['id' => (string) Str::uuid7(), 'event_id' => null, 'code' => 'B-001', 'qr_token' => bin2hex(random_bytes(32)), 'status' => 'Disponible', 'created_at' => now(), 'updated_at' => now()]))->toThrow(QueryException::class);
 });
 
 it('dépasse les codes des anciennes cartes du registre technique pour qu’aucun code ne se répète au rattachement', function () {

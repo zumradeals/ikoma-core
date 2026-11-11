@@ -63,7 +63,8 @@ final class DataLifecycle
                 || $has('badge_assignments', 'badge_id', $id)
                 || $has('access_events', 'badge_id', $id)
                 || $has('badge_transfers', 'badge_id', $id)
-                || $has('groups', 'badge_batch_id', $row->badge_batch_id)) {
+                || $has('holder_cards', 'badge_id', $id)
+                || ($row->badge_batch_id !== null && $has('groups', 'badge_batch_id', $row->badge_batch_id))) {
                 $reasons[] = 'Badge déjà utilisé, réservé, nominatif ou présenté à l’impression. Il peut être annulé par un superviseur, mais pas supprimé individuellement.';
             }
         } elseif ($entity === 'lot') {
