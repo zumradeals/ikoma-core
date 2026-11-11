@@ -22,12 +22,6 @@ final class SiteMovements
 
     public function __construct(private readonly Audit $audit) {}
 
-    /** Heure avec microsecondes : sans elles, une entrée et une sortie de la même seconde seraient à égalité et l'ordre dépendrait de l'identifiant. */
-    private static function stamp(Carbon $at): string
-    {
-        return $at->copy()->utc()->format('Y-m-d H:i:s.uP');
-    }
-
     /**
      * Enregistre un mouvement du site pour un titulaire (ou un contrôle sur une carte inconnue si `$holderId` est null).
      *
@@ -51,9 +45,9 @@ final class SiteMovements
                 $identifier = $holder->identifier;
             }
             $id = (string) Str::uuid();
-            $now = self::stamp(now());
+            $now = now();
             DB::table('access_events')->insert(['id' => $id, 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => $holderId, 'actor_id' => $actor?->id, 'type' => $type, 'checkpoint' => $point,
-                'occurred_at' => $at === null ? $now : self::stamp($at), 'details' => $details === [] ? null : json_encode($details, JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
+                'occurred_at' => $at ?? $now, 'details' => $details === [] ? null : json_encode($details, JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
             if ($type === 'entree') {
                 $this->audit->append('entree.site', $actor?->id, ['access_event_id' => $id, 'holder_id' => $holderId, 'identifiant' => $identifier, 'point' => $point]);
             }
@@ -75,7 +69,7 @@ final class SiteMovements
                 SELECT DISTINCT ON (e.holder_id) e.holder_id, e.type, e.checkpoint, e.occurred_at FROM access_events e
                 WHERE e.event_id IS NULL AND e.holder_id IS NOT NULL AND e.type IN ('entree', 'sortie')
                   AND NOT EXISTS (SELECT 1 FROM access_events x WHERE x.corrige_id = e.id)
-                ORDER BY e.holder_id, e.occurred_at DESC, e.created_at DESC, e.id DESC
+                ORDER BY e.holder_id, e.occurred_at DESC, e.seq DESC
              ) l JOIN permanent_holders h ON h.id = l.holder_id LEFT JOIN institutional_categories c ON c.code = h.institutional_category
              WHERE l.type = 'entree' ORDER BY public.ikoma_normalize(h.full_name)",
         );
@@ -86,7 +80,7 @@ final class SiteMovements
     {
         $last = DB::table('access_events as e')->whereNull('e.event_id')->where('e.holder_id', $holderId)->whereIn('e.type', ['entree', 'sortie'])
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as x')->whereColumn('x.corrige_id', 'e.id'))
-            ->orderByDesc('e.occurred_at')->orderByDesc('e.created_at')->orderByDesc('e.id')->value('e.type');
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->value('e.type');
 
         return $last === 'entree';
     }
@@ -114,7 +108,7 @@ final class SiteMovements
                     throw new DeskRefused('deja_corrige', 'Ce mouvement a déjà été corrigé.', 409);
                 }
                 $id = (string) Str::uuid();
-                $now = self::stamp(now());
+                $now = now();
                 DB::table('access_events')->insert(['id' => $id, 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => $movement->holder_id, 'actor_id' => $actor->id, 'type' => 'correction', 'checkpoint' => null,
                     'occurred_at' => $now, 'corrige_id' => $movement->id, 'details' => json_encode(['motif' => mb_substr($reason, 0, 500), 'corrige_type' => $movement->type], JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
                 $this->audit->append('presence_site.corrigee', $actor->id, ['access_event_id' => $movement->id, 'correction_id' => $id, 'holder_id' => $movement->holder_id, 'type_corrige' => $movement->type]);
