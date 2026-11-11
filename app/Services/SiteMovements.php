@@ -21,7 +21,11 @@ final class SiteMovements
 
     public function __construct(private readonly Audit $audit) {}
 
-    /** Enregistre un mouvement du site pour un titulaire (ou un contrôle sur une carte inconnue si `$holderId` est null). */
+    /**
+     * Enregistre un mouvement du site pour un titulaire (ou un contrôle sur une carte inconnue si `$holderId` est null).
+     *
+     * @param  array<string, mixed>  $details
+     */
     public function record(?string $holderId, string $type, ?string $point, ?User $actor, ?Carbon $at = null, array $details = []): string
     {
         if (! in_array($type, self::TYPES, true)) {
@@ -51,7 +55,11 @@ final class SiteMovements
         });
     }
 
-    /** Personnes présentes sur le site : dernier mouvement (entrée ou sortie) non corrigé = une entrée. @return list<object> */
+    /**
+     * Personnes présentes sur le site : dernier mouvement (entrée ou sortie) non corrigé = une entrée.
+     *
+     * @return list<object>
+     */
     public function present(): array
     {
         return DB::select(
