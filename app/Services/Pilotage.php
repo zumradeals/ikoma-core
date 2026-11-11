@@ -94,6 +94,31 @@ final class Pilotage
             ->map(fn ($a) => (array) $a + ['link' => $this->link($a->subject_type, $a->subject_id, $a->type)])->all();
     }
 
+    /**
+     * Alertes du SITE (sans événement) : refus de cartes permanentes et conflits des tablettes sans activité.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function siteAlerts(string $state, int $limit = 100): array
+    {
+        $q = DB::table('alerts')->whereNull('event_id');
+        $state === 'prises' ? $q->where(fn ($w) => $w->whereNotNull('acknowledged_at')->orWhereNotNull('resolved_at')) : $q->whereNull('acknowledged_at')->whereNull('resolved_at');
+
+        return $q->orderByRaw("CASE severity WHEN 'critique' THEN 0 WHEN 'haute' THEN 1 ELSE 2 END")->orderByDesc('created_at')->limit($limit)
+            ->get(['id', 'type', 'severity', 'subject_type', 'subject_id', 'message', 'created_at', 'acknowledged_at', 'resolved_at', 'escalated_at'])
+            ->map(fn ($a) => (array) $a + ['link' => $this->link($a->subject_type, $a->subject_id, $a->type)])->all();
+    }
+
+    public function siteOpenAlertCount(): int
+    {
+        return DB::table('alerts')->whereNull('event_id')->whereNull('acknowledged_at')->whereNull('resolved_at')->count();
+    }
+
+    public function siteCriticalAlertCount(): int
+    {
+        return DB::table('alerts')->whereNull('event_id')->where('severity', 'critique')->whereNull('acknowledged_at')->whereNull('resolved_at')->count();
+    }
+
     /** Alertes critiques encore ouvertes : l'application du superviseur sonne plus fort pour celles-ci. */
     public function criticalAlertCount(string $eventId): int
     {

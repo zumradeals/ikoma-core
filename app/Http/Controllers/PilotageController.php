@@ -41,8 +41,9 @@ final class PilotageController
         return [
             'event' => $event ? ['id' => $event->id, 'name' => $event->name] : null,
             'events' => DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']),
-            'openAlerts' => $event ? $this->pilotage->openAlertCount($event->id) : 0,
-            'criticalAlerts' => $event ? $this->pilotage->criticalAlertCount($event->id) : 0,
+            // Le compte des alertes à traiter comprend celles du site (sans événement) : le superviseur ne doit en manquer aucune.
+            'openAlerts' => ($event ? $this->pilotage->openAlertCount($event->id) : 0) + $this->pilotage->siteOpenAlertCount(),
+            'criticalAlerts' => ($event ? $this->pilotage->criticalAlertCount($event->id) : 0) + $this->pilotage->siteCriticalAlertCount(),
         ];
     }
 
@@ -67,7 +68,8 @@ final class PilotageController
         $state = $r->query('etat') === 'prises' ? 'prises' : 'a_traiter';
         $event = $this->event($r);
 
-        return Inertia::render('Pilotage/Alertes', [...$this->shared($event), 'state' => $state, 'alerts' => fn () => $event ? $this->pilotage->alerts($event->id, $state) : []]);
+        return Inertia::render('Pilotage/Alertes', [...$this->shared($event), 'state' => $state, 'alerts' => fn () => $event ? $this->pilotage->alerts($event->id, $state) : [],
+            'siteAlerts' => fn () => $this->pilotage->siteAlerts($state)]);
     }
 
     public function prendreEnCompte(Request $r, string $alert): RedirectResponse

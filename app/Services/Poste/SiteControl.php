@@ -332,7 +332,7 @@ final class SiteControl
 
     /**
      * Refus d'une carte permanente au titre du site sur une tablette sans activité : mouvement « contrôle » du site (le refus se lit dans le journal) et audit.
-     * Aucune alerte n'est levée ici : les alertes du site viennent avec l'écran du superviseur.
+     * Une alerte du site (sans événement) est levée pour le superviseur.
      *
      * @param  array{type:string,id:?string,name:string}  $checkpoint
      * @return array<string, mixed>
@@ -343,6 +343,10 @@ final class SiteControl
             'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id, 'heure_declaree' => $declaredAt, 'differe' => $declaredAt !== null ? true : null,
             'verdict_tablette' => $localValid === null ? null : ($localValid ? 'valide' : 'refuse')], fn ($v) => $v !== null));
         $this->audit->append('controle.refuse', $agent->id, ['device_id' => $poste->id, 'holder_id' => $card->holder_id, 'identifiant' => $card->identifier, 'raison' => $reason, 'point_id' => $checkpoint['id'], 'contexte' => 'site']);
+        // Alerte du site (sans événement) : un refus de carte est visible du superviseur ; critique pour une carte perdue, volée ou révoquée. Pas de nom : seulement l'identifiant.
+        $bucket = intdiv($declaredAt !== null ? (int) strtotime($declaredAt) : now()->getTimestamp(), 300);
+        app(Alerts::class)->raise(null, 'controle_refuse', str_starts_with($reason, 'carte_') ? 'critique' : 'haute', null, null,
+            'Carte permanente '.$card->identifier.' refusée au point « '.$checkpoint['name'].' » (site) : '.$message.($declaredAt !== null ? ' (contrôle hors ligne rejoué)' : ''), 'site:'.$card->holder_id.':'.$reason.':'.$checkpoint['name'].':'.$bucket);
 
         return ['valid' => false, 'reason' => $reason, 'message' => $message, 'badge_code' => $card->identifier, 'zone_ok' => null, 'point' => $checkpoint['name'], 'person' => null, 'organisation' => null, 'category' => null,
             'zones' => [], 'source' => 'serveur', 'permanent' => ['identifier' => $card->identifier, 'entered' => false], 'direction' => $direction, 'context' => 'site'];
@@ -363,6 +367,8 @@ final class SiteControl
             $this->siteMovements->record($card->holder_id, 'sortie', $checkpoint['name'], $agent, null, ['permanent' => true, 'identifiant' => $card->identifier, 'carte_statut' => $card->card_status, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id]);
             if ($card->card_status !== 'active') {
                 $this->audit->append('sortie.site_carte_inactive', $agent->id, ['holder_id' => $card->holder_id, 'identifiant' => $card->identifier, 'carte_statut' => $card->card_status, 'device_id' => $poste->id]);
+                app(Alerts::class)->raise(null, 'controle_refuse', 'critique', null, null, 'Carte permanente '.$card->identifier.' ('.$card->card_status.') présentée à la sortie « '.$checkpoint['name'].' » (site) : sortie enregistrée.',
+                    'siteexit:'.$card->holder_id.':'.intdiv(now()->getTimestamp(), 300));
             }
 
             return ['ok' => true, 'badge_code' => $card->identifier, 'badge_status' => 'Carte conservée', 'person' => ['name' => $card->full_name], 'point' => $checkpoint['name'], 'presents' => $this->siteMovements->count(), 'source' => 'serveur', 'context' => 'site'];
