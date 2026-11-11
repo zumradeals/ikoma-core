@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Services\Poste\DeskRefused;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -87,21 +88,25 @@ final class SiteMovements
             throw new DeskRefused('motif_obligatoire', 'Le motif de la correction est obligatoire.');
         }
 
-        return DB::transaction(function () use ($movementId, $actor, $reason): string {
-            $movement = DB::table('access_events')->where('id', $movementId)->whereNull('event_id')->lockForUpdate()->first();
-            if ($movement === null || ! in_array($movement->type, ['entree', 'sortie'], true)) {
-                throw new DeskRefused('correction_impossible', 'Seule une entrée ou une sortie du site peut être corrigée.');
-            }
-            if (DB::table('access_events')->where('corrige_id', $movement->id)->exists()) {
-                throw new DeskRefused('deja_corrige', 'Ce mouvement a déjà été corrigé.', 409);
-            }
-            $id = (string) Str::uuid();
-            $now = now();
-            DB::table('access_events')->insert(['id' => $id, 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => $movement->holder_id, 'actor_id' => $actor->id, 'type' => 'correction', 'checkpoint' => null,
-                'occurred_at' => $now, 'corrige_id' => $movement->id, 'details' => json_encode(['motif' => mb_substr($reason, 0, 500), 'corrige_type' => $movement->type], JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
-            $this->audit->append('presence_site.corrigee', $actor->id, ['access_event_id' => $movement->id, 'correction_id' => $id, 'holder_id' => $movement->holder_id, 'type_corrige' => $movement->type]);
+        try {
+            return DB::transaction(function () use ($movementId, $actor, $reason): string {
+                $movement = DB::table('access_events')->where('id', $movementId)->whereNull('event_id')->first();
+                if ($movement === null || ! in_array($movement->type, ['entree', 'sortie'], true)) {
+                    throw new DeskRefused('correction_impossible', 'Seule une entrée ou une sortie du site peut être corrigée.');
+                }
+                if (DB::table('access_events')->where('corrige_id', $movement->id)->exists()) {
+                    throw new DeskRefused('deja_corrige', 'Ce mouvement a déjà été corrigé.', 409);
+                }
+                $id = (string) Str::uuid();
+                $now = now();
+                DB::table('access_events')->insert(['id' => $id, 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => $movement->holder_id, 'actor_id' => $actor->id, 'type' => 'correction', 'checkpoint' => null,
+                    'occurred_at' => $now, 'corrige_id' => $movement->id, 'details' => json_encode(['motif' => mb_substr($reason, 0, 500), 'corrige_type' => $movement->type], JSON_THROW_ON_ERROR), 'created_at' => $now, 'updated_at' => $now]);
+                $this->audit->append('presence_site.corrigee', $actor->id, ['access_event_id' => $movement->id, 'correction_id' => $id, 'holder_id' => $movement->holder_id, 'type_corrige' => $movement->type]);
 
-            return $id;
-        });
+                return $id;
+            });
+        } catch (UniqueConstraintViolationException) {
+            throw new DeskRefused('deja_corrige', 'Ce mouvement a déjà été corrigé.', 409);
+        }
     }
 }
