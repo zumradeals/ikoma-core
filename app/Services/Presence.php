@@ -53,7 +53,7 @@ final class Presence
         try {
             return DB::transaction(function () use ($accessEventId, $actor, $motif): string {
                 $event = DB::table('access_events')->where('id', $accessEventId)->first();
-                if ($event === null || ! in_array($event->type, ['entree', 'sortie'], true)) {
+                if ($event === null || $event->event_id === null || ! in_array($event->type, ['entree', 'sortie'], true)) {
                     throw new DeskRefused('correction_impossible', 'Seule une entrée ou une sortie peut être corrigée.');
                 }
                 if (DB::table('access_events')->where('corrige_id', $event->id)->exists()) {

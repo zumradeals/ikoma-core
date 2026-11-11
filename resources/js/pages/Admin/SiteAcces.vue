@@ -16,7 +16,7 @@ type Checkpoint = { id: string; code: string; name: string; function_label: stri
 type SiteZone = { id: string; name: string; event_id: string; event_name: string };
 const props = defineProps<{
   site: { id: string; name: string } | null; checkpoints: Checkpoint[]; catalogue: Record<string, string>; unassigned: Tablet[];
-  zones: SiteZone[]; site_zones?: { id: string; name: string }[];
+  zones: SiteZone[]; site_zones?: { id: string; name: string }[]; site_presence?: { id: string; name: string; identifier: string; category: string | null; point: string | null; since: string }[] | null;
   history: { id: string; device: string; checkpoint: string | null; assigned_at: string; ended_at: string | null; reason: string | null; by: string | null }[];
 }>();
 const siteZoneName = ref(''); const renaming = reactive<Record<string, string>>({});
@@ -139,6 +139,17 @@ function toggleCreate(capability: string, on: boolean) {
 
       <!-- Vue d'ensemble : indicateurs, registre des postes, informations du site, zones, règles -->
       <section v-if="tab === 'postes'" id="panneau-postes" role="tabpanel" aria-labelledby="tab-postes" class="space-y-5" data-testid="panneau-postes">
+        <section v-if="site_presence" class="site-card" aria-labelledby="presents-site-titre" data-testid="presents-site">
+          <header class="site-card-head"><h2 id="presents-site-titre"><AdminIcon name="layers" :size="22" />Présents sur le site ({{ site_presence.length }})</h2></header>
+          <p class="px-4 pt-3 text-sm text-slate-700">Personnel permanent seulement ; les visiteurs sont comptés dans leur activité.</p>
+          <p v-if="!site_presence.length" class="p-4" data-testid="aucun-present-site">Personne n’est enregistré présent sur le site.</p>
+          <ul v-else class="divide-y">
+            <li v-for="p in site_presence" :key="p.id" class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5" :data-testid="'present-site-' + p.identifier">
+              <strong class="min-w-0 flex-1">{{ p.name }}</strong><span class="font-mono text-sm">{{ p.identifier }}</span><span v-if="p.category" class="text-sm text-slate-700">{{ p.category }}</span>
+              <span class="text-sm text-slate-700">{{ p.point ?? 'Point non précisé' }} · {{ new Date(p.since).toLocaleString('fr-FR') }}</span>
+            </li>
+          </ul>
+        </section>
         <dl class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="indicateurs">
           <div class="site-kpi bg-sky-50"><span class="site-kpi-icon text-sky-700"><AdminIcon name="monitor" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-postes">{{ checkpoints.length }}</dd><dt class="font-semibold text-slate-800">Postes configurés</dt><dd class="text-sm text-slate-600">{{ activePosts.length }} actif<template v-if="activePosts.length > 1">s</template></dd></div></div>
           <div class="site-kpi bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="layers" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-zones">{{ zones.length }}</dd><dt class="font-semibold text-slate-800">Zones définies</dt><dd class="text-sm text-slate-600">dans les activités</dd></div></div>
