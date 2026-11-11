@@ -20,7 +20,8 @@ export interface PosteRepository {
   /** Activités que cette tablette peut choisir (en ligne seulement). */
   activities?(): Promise<ActivityChoice[]>;
   /** Change l'activité du jour : envoie d'abord la file, puis recharge la copie de la nouvelle activité (en ligne seulement). */
-  switchActivity?(eventId: string): Promise<void>;
+  /** Change l'activité en cours ; `null` : retour au mode site (aucune activité). */
+  switchActivity?(eventId: string | null): Promise<void>;
   /** Recherche d'une personne permanente, en lecture seule ; absent quand le poste travaille directement sur le serveur. */
   searchPermanent?(query: string): Promise<PermanentResult[]>;
   /** Véhicules (S09), EN LIGNE UNIQUEMENT : recherche par plaque, entrée et sortie. Absent quand le poste n'a pas ces opérations. */
