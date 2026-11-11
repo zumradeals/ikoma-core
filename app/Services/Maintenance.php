@@ -44,7 +44,10 @@ final class Maintenance
             ];
         }
 
-        return ['events' => $eligible, 'fingerprint' => app(DataLifecycle::class)->fingerprint(), 'retained' => ['Journal d’audit intact', 'Références statistiques conservées', 'Les fichiers détachés sont effacés après validation, avec reprise']];
+        // Mouvements du site (sans événement) : même échéance que l'historique des activités.
+        $siteMovements = $days['evenements'] > 0 ? DB::table('access_events')->whereNull('event_id')->where('occurred_at', '<', now()->subDays($days['evenements']))->count() : 0;
+
+        return ['events' => $eligible, 'mouvements_site' => $siteMovements, 'fingerprint' => app(DataLifecycle::class)->fingerprint(), 'retained' => ['Journal d’audit intact', 'Références statistiques conservées', 'Les fichiers détachés sont effacés après validation, avec reprise']];
     }
 
     public function request(string $operation, User $actor, string $fingerprint): string

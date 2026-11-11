@@ -92,6 +92,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/pilotage/alertes/{alert}/prendre-en-compte', [PilotageController::class, 'prendreEnCompte'])->whereUuid('alert')->middleware('can:alertes.prendre_en_compte');
         Route::get('/pilotage/presents', [PilotageController::class, 'presents'])->middleware('can:presences.consulter');
         Route::get('/pilotage/mouvements', [PilotageController::class, 'mouvements'])->middleware('can:presences.consulter');
+        Route::post('/pilotage/mouvements/{movement}/correction', [PilotageController::class, 'corriger'])->whereUuid('movement')->middleware(['can:mouvements.corriger', 'throttle:titulaires']);
         Route::get('/pilotage/acces', [PilotageController::class, 'acces'])->middleware('can:pilotage.consulter');
         Route::get('/pilotage/attendus', [PilotageController::class, 'attendus'])->middleware('can:pilotage.consulter');
         Route::post('/pilotage/visiteurs/{visitor}/absence', [PilotageController::class, 'absence'])->whereUuid('visitor')->middleware('can:pilotage.consulter');

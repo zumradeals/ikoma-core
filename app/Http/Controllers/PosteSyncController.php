@@ -42,7 +42,7 @@ final class PosteSyncController
     /** Change l'activité du jour de la tablette (l'agent choisit parmi les activités autorisées). */
     public function activite(Request $r, Devices $devices): JsonResponse
     {
-        $data = $r->validate(['event_id' => 'required|uuid']);
+        $data = $r->validate(['event_id' => 'present|nullable|uuid']);
         $devices->switchActivity($this->poste($r), $data['event_id'], $r->user());
 
         return response()->json(['activites' => $devices->choices($this->poste($r)->refresh())]);
