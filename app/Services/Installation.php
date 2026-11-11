@@ -101,7 +101,7 @@ final class Installation
             $event = (string) Str::uuid();
             $now = now();
             DB::table('events')->insert(['id' => $event, 'name' => $data['event_name'], 'site' => $data['site'] ?: null, 'starts_at' => $data['starts_at'], 'ends_at' => $data['ends_at'], 'created_at' => $now, 'updated_at' => $now]);
-            DB::table('zones')->insert(['id' => (string) Str::uuid(), 'event_id' => $event, 'name' => 'Accueil', 'est_accueil' => true, 'created_at' => $now, 'updated_at' => $now]);
+            ActivityZones::ensureSiteReception();
             if (app()->environment('production')) {
                 DB::table('settings')->where('key', 'sauvegarde_active')->update(['value' => '1']); // le suivi des sauvegardes commence avec la mise en service
             }

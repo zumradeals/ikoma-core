@@ -66,7 +66,7 @@ test('administration unifiée : connexion, modules réels, liens directs, histor
   await expect(page.getByTestId('sous-menu-donnees')).toHaveAttribute('aria-current', 'page');
   await page.goto('/administration/badges/lots?status=Disponible&page=2');
   await expect(page.getByTestId('menu-badges-cartes')).toHaveAttribute('aria-current', 'page');
-  await page.goto('/administration/zones');
+  await page.goto('/administration/site');
   await page.screenshot({ path: 'test-results/administration/zones-bureau.png', fullPage: true });
   await page.goto('/espace');
   await expect(page).toHaveURL(/\/administration$/);

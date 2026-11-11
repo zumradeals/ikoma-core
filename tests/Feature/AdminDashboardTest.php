@@ -105,7 +105,7 @@ it('oriente administrateur et superviseur vers leurs tableaux sans changer les a
 });
 
 it('fournit le même contexte aux modules et garde les liens profonds accessibles', function () {
-    foreach (['/administration', '/administration/comptes', '/administration/badges/lots?status=Disponible&page=2', '/administration/zones', '/administration/categories', '/administration/imports', '/administration/postes', '/administration/groupes', '/administration/journal', '/administration/conservation', '/securite'] as $url) {
+    foreach (['/administration', '/administration/comptes', '/administration/badges/lots?status=Disponible&page=2', '/administration/categories', '/administration/imports', '/administration/postes', '/administration/groupes', '/administration/journal', '/administration/conservation', '/securite'] as $url) {
         $this->actingAs($this->admin)->withSession(['auth.password_confirmed_at' => time()])->get($url)->assertOk()->assertInertia(fn (Assert $p) => $p->where('auth.isAdmin', true)->where('adminContext.event.id', $this->event));
     }
 });

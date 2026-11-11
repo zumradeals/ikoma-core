@@ -46,7 +46,6 @@ use App\Http\Controllers\SiteAccesController;
 use App\Http\Controllers\SupportPrintController;
 use App\Http\Controllers\VisitsController;
 use App\Http\Controllers\ZoneAccessController;
-use App\Http\Controllers\ZonesController;
 use App\Http\Middleware\EnsureAgentAccueil;
 use App\Http\Middleware\EnsureDemoLab;
 use App\Http\Middleware\EnsureF06Active;
@@ -121,9 +120,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/imports/apercu', [ListImportsController::class, 'preview'])->middleware('can:listes.importer');
         Route::post('/administration/imports/confirmer', [ListImportsController::class, 'confirm'])->middleware('can:listes.importer');
         Route::post('/administration/imports/abandonner', [ListImportsController::class, 'abandon'])->middleware('can:listes.importer');
-        Route::get('/administration/zones', [ZonesController::class, 'index'])->middleware('can:zones.gerer');
-        Route::post('/administration/zones', [ZonesController::class, 'store'])->middleware('can:zones.gerer');
-        Route::put('/administration/zones/{zone}', [ZonesController::class, 'update'])->middleware('can:zones.gerer');
+        // Toute zone est une zone du site : l'ancien écran « Zones » est remplacé par « Site et accès ».
+        Route::get('/administration/zones', fn () => redirect('/administration/site'))->middleware('can:zones.gerer');
         Route::get('/administration/categories', [CategoriesController::class, 'index'])->middleware('can:categories.gerer');
         Route::post('/administration/categories', [CategoriesController::class, 'store'])->middleware('can:categories.gerer');
         Route::put('/administration/categories/{category}', [CategoriesController::class, 'update'])->middleware('can:categories.gerer');
@@ -196,6 +194,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::put('/administration/site', [SiteAccesController::class, 'rename'])->middleware('can:postes.gerer');
         Route::post('/administration/site/zones', [SiteAccesController::class, 'createZone'])->middleware('can:postes.gerer');
         Route::put('/administration/site/zones/{zone}', [SiteAccesController::class, 'renameZone'])->whereUuid('zone')->middleware('can:postes.gerer');
+        Route::put('/administration/site/zones/{zone}/accueil', [SiteAccesController::class, 'setReception'])->whereUuid('zone')->middleware('can:postes.gerer');
         Route::post('/administration/site/postes/{checkpoint}/zones-site', [SiteAccesController::class, 'mapSiteZone'])->whereUuid('checkpoint')->middleware('can:postes.gerer');
         Route::delete('/administration/site/zones-site/{mapping}', [SiteAccesController::class, 'unmapSiteZone'])->whereUuid('mapping')->middleware('can:postes.gerer');
         Route::post('/administration/site/postes', [SiteAccesController::class, 'createCheckpoint'])->middleware('can:postes.gerer');

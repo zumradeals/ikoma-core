@@ -942,3 +942,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 ## Zones du site : étape Z3, reprise des données
 - Migration non réversible : toute zone d'activité devient une zone du site ; fusion par nom exact ; politique la plus restrictive (zone sans politique = refus par défaut) ; `zone_policies` vidée ; accueil par OU logique ; doublons de références supprimés ; `list_revision` incrémentée ; récapitulatif d'audit `zones.reprise_vers_site`.
 - Les écrans qui créent encore des zones d'activité (écran Zones, zone « Accueil » d'une nouvelle activité) restent pour l'étape Z4 ; ils continuent de fonctionner (une zone d'activité reste permise jusqu'à Z5).
+
+## Zones du site : étape Z4a, un seul endroit pour les zones
+- L'écran « Zones » (et ses routes de création et de modification) disparaît : toute zone se crée et se renomme dans Site et accès ; `/administration/zones` redirige.
+- La zone d'accueil devient une case sur la zone du site (au moins une doit rester). Une nouvelle activité et l'installation garantissent une zone d'accueil du site (`ActivityZones::ensureSiteReception`) au lieu de créer un « Accueil » propre.
+- Écrans « Accès et zones », sélecteur de « Habilitations par zone » et jeux d'essai : étape Z4b.

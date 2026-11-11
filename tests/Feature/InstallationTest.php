@@ -51,7 +51,7 @@ it('affiche les vérifications puis crée l’administrateur, l’événement et
         ->and($admin->requiresTwoFactor())->toBeFalse();
     $event = DB::table('events')->where('name', 'Événement fictif')->first();
     expect($event)->not->toBeNull();
-    expect($event->name)->toBe('Événement fictif')->and(DB::table('zones')->where('event_id', $event->id)->where('est_accueil', true)->where('name', 'Accueil')->exists())->toBeTrue();
+    expect($event->name)->toBe('Événement fictif')->and(DB::table('zones')->whereNull('event_id')->where('est_accueil', true)->exists())->toBeTrue();
     expect(DB::table('settings')->where('key', 'installation_terminee')->value('value'))->toBe('1');
     $log = DB::table('audit_logs')->where('id', '>', $this->audit)->whereIn('action', ['installation.terminee', 'compte.cree'])->get()->map(fn ($l) => json_encode($l))->implode('');
     expect($log)->toContain('installation.terminee')->not->toContain($this->installPassword)->not->toContain($this->installToken)->not->toContain('admin-install@');

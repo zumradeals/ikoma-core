@@ -39,7 +39,7 @@ it('affiche les evenements de l administrateur', function () {
             ->where('events.0.id', DemoSeeder::id('event')));
 });
 
-it('cree un evenement et la zone d accueil puis le selectionne', function () {
+it('cree un evenement, sans zone propre, avec une zone d accueil du site, puis le selectionne', function () {
     $before = DB::table('events')->count();
 
     $response = $this->actingAs($this->administrator)
@@ -49,7 +49,8 @@ it('cree un evenement et la zone d accueil puis le selectionne', function () {
     expect($event)->not->toBeNull()
         ->and(DB::table('events')->count())->toBe($before + 1)
         ->and($event->site)->toBe('Abidjan - Cocody')
-        ->and(DB::table('zones')->where('event_id', $event->id)->where('name', 'Accueil')->where('est_accueil', true)->count())->toBe(1)
+        ->and(DB::table('zones')->where('event_id', $event->id)->count())->toBe(0)
+        ->and(DB::table('zones')->whereNull('event_id')->where('est_accueil', true)->exists())->toBeTrue()
         ->and(DB::table('audit_logs')->where('action', 'evenement.cree')->exists())->toBeTrue();
 
     $response->assertRedirect('/administration?event='.$event->id)
