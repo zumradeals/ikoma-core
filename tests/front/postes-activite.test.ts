@@ -13,7 +13,7 @@ vi.mock('@inertiajs/vue3', () => ({
 import Postes from '../../resources/js/pages/Admin/Postes.vue';
 
 const poste = (over: object = {}) => ({ id: 'p1', name: 'Tablette fictive', station: 'Entrée', point_code: 'poste_2', event_id: null, event_name: 'Aucune activité en cours', activities: ['e1'], state: 'non_enrole', enrolled_at: null, ...over });
-const props = (postes: object[]) => ({ events: [{ id: 'e1', name: 'Stage fictif' }], postes, points: { poste_2: 'Poste 2' }, settings: { inactivity: 5, skew: 300, pin: 15, pointsDelay: 15, burstCount: 3, burstMinutes: 10 }, newCode: null, conflicts: [] });
+const props = (postes: object[]): never => ({ events: [{ id: 'e1', name: 'Stage fictif' }], postes, points: { poste_2: 'Poste 2' }, settings: { inactivity: 5, skew: 300, pin: 15, pointsDelay: 15, burstCount: 3, burstMinutes: 10 }, newCode: null, conflicts: [] }) as never;
 
 describe('écran Postes : l’activité du jour se choisit sur la tablette', () => {
   it('ne propose plus de choisir une « activité en cours » : il l’affiche, avec le mode site quand elle est vide', () => {
