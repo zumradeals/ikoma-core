@@ -11,8 +11,11 @@ use App\Services\PermanentHolders;
 use App\Services\QrSvg;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+
+uses(DatabaseTransactions::class);
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
