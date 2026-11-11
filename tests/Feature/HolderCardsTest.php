@@ -309,8 +309,8 @@ it('compte les cartes par étape (préparer, imprimer, remettre) et prépare tou
 it('n’affiche jamais la carte d’une personne permanente dans la page des badges visiteurs, ni comme lot ni comme badge réservable', function () {
     $holder = cardHolder();
     $this->cards->issue($holder, $this->admin);
-    $code = (string) DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.code');
-    expect(DB::table('badges')->where('code', $code)->whereNull('event_id')->value('badge_batch_id'))->toBeNull(); // aucun lot : la carte n'a rien à faire dans l'atelier
-    $this->actingAs($this->admin)->get('/administration/badges/lots')->assertOk()->assertInertia(fn ($p) => $p->component('Admin/Badges')
-        ->where('badges.data', fn ($rows) => collect($rows)->doesntContain(fn ($b) => $b['code'] === $code)));
+    $badge = (string) DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->where('k.holder_id', $holder)->value('b.id');
+    expect(DB::table('badges')->where('id', $badge)->value('badge_batch_id'))->toBeNull(); // aucun lot : la carte n'a rien à faire dans l'atelier
+    $props = $this->actingAs($this->admin)->get('/administration/badges/lots')->assertOk()->viewData('page')['props'];
+    expect(json_encode($props))->not->toContain($badge);
 });
