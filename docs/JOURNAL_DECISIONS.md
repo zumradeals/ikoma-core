@@ -909,3 +909,10 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Choix du dirigeant (3 options présentées) : « d'abord masquer le conteneur ». Retrait complet du modèle reporté (projet à part, ~3 PR, risque sur l'émission et l'impression des cartes).
 - Fait : création automatique et idempotente du registre technique à la première carte ; suppression de l'étape visible et du blocage ; nouveau nom ; libellés « site (personnel permanent) » dans Opérations et Administration.
 - Non fait : aucune table ni contrainte n'est modifiée ; `events.is_permanent` reste la clé du registre technique. Installation de test sans donnée réelle : aucune reprise de données.
+
+## Portraits copiés sur la tablette pour l'affichage hors ligne (décision du dirigeant)
+- Après chaque nouvelle copie de liste, la tablette récupère (en ligne, jeton d'appareil) le portrait des personnes de la copie, au plus 300 (`PORTRAIT_MAX`), et le range dans la table `photos` d'IndexedDB, **scellé par la clé de données** (clé `portrait:<visiteur>`, AAD identique) : illisible tablette verrouillée.
+- Un portrait n'est redemandé que si la révision de la fiche change ; l'absence de portrait est mémorisée de la même façon.
+- Hors ligne, `LocalPosteRepository.portrait` lit la copie ; sans copie, l'initiale reste affichée. En ligne, la lecture serveur reste prioritaire.
+- Effacement : à chaque nouvelle copie, les portraits des personnes qui ne sont plus dans la liste (autre activité, purge) sont supprimés ; l'effacement de la tablette (révocation, PIN, wipe) vide toute la table. Le serveur continue d'envoyer `Cache-Control: no-store, private`.
+- Règle de sécurité du plan (§4.1/4.3) précisée : le portrait n'est plus « jamais copié » mais « copié chiffré, borné, effaçable ». Les portraits du personnel permanent ne sont pas concernés (pas de route dédiée).

@@ -89,6 +89,20 @@ export class PosteStore {
     return row ? toB64(await openBytes(this.key, row.data, `photo:${id}`)) : '';
   }
 
+  /** Portraits copiés pour l'affichage hors ligne : scellés par la clé de données dans la table des photos, sous `portrait:<visiteur>` ; `data` nul = pas de portrait côté serveur (on ne le redemande qu'à la prochaine révision de la fiche). */
+  async portraitGet(visitorId: string): Promise<{ rev: string | null; data: string | null } | null> {
+    const row = await this.db.photos.get(`portrait:${visitorId}`);
+    return row ? openJson<{ rev: string | null; data: string | null }>(this.key, row.data, `portrait:${visitorId}`) : null;
+  }
+  async portraitPut(visitorId: string, rev: string | null, bytes: Uint8Array | null): Promise<void> {
+    const id = `portrait:${visitorId}`;
+    await this.db.photos.put({ id, data: await sealJson(this.key, { rev, data: bytes ? toB64(bytes) : null }, id) });
+  }
+  async portraitIds(): Promise<string[]> {
+    return (await this.db.photos.toCollection().primaryKeys()).filter(k => k.startsWith('portrait:')).map(k => k.slice('portrait:'.length));
+  }
+  async portraitDelete(ids: string[]): Promise<void> { await this.db.photos.bulkDelete(ids.map(id => `portrait:${id}`)); }
+
   async setStatus(op: LocalOp, status: 'done' | 'conflict'): Promise<void> {
     const data = await sealJson(this.key, op, `op:${op.id}`);
     await this.db.transaction('rw', [this.db.ops, this.db.photos], () => {
