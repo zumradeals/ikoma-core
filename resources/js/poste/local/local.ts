@@ -84,7 +84,7 @@ export class LocalPosteRepository implements GroupPosteRepository {
    * Change l'activité du jour. Toute la file est d'abord envoyée : l'ancienne activité n'est jamais changée sous des opérations en attente ;
    * ensuite la synchronisation recharge la copie de la nouvelle activité (la version de la liste dépend de l'activité).
    */
-  async switchActivity(eventId: string): Promise<void> {
+  async switchActivity(eventId: string | null): Promise<void> {
     if (!this.sync || !this.online) throw new ApiError('reseau', 'Changer d’activité demande le réseau : reconnectez la tablette.');
     await this.sync.sync();
     if ((await this.store.count('pending')) > 0) throw new ApiError('operations_en_attente', 'Des opérations ne sont pas encore envoyées : attendez la fin de l’envoi avant de changer d’activité.');
