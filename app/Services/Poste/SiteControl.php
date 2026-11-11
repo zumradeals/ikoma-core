@@ -241,7 +241,7 @@ final class SiteControl
     private function permanentControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $declaredAt, ?bool $localValid, ?string $knownAt, ?string $direction = null): array
     {
         // Habilitation du SITE d'abord (zones du site gardées par le poste) ; si elle n'accorde pas l'accès, l'habilitation d'activité s'applique comme avant.
-        if ($declaredAt === null && ($siteResult = $this->siteControl($poste, $agent, $card, $checkpoint, $direction)) !== null) {
+        if (($siteResult = $this->siteControl($poste, $agent, $card, $checkpoint, $direction, $declaredAt, $knownAt, $localValid)) !== null) {
             return $siteResult;
         }
         $now = now();
@@ -288,7 +288,7 @@ final class SiteControl
      * @param  array{type:string,id:?string,name:string}  $checkpoint
      * @return array<string, mixed>|null
      */
-    private function siteControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $direction): ?array
+    private function siteControl(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $direction, ?string $declaredAt = null, ?string $knownAt = null, ?bool $localValid = null): ?array
     {
         if ($checkpoint['type'] !== 'poste' || $poste->checkpoint_id === null) {
             return null;
@@ -301,11 +301,16 @@ final class SiteControl
         if (! $decision['allowed']) {
             return null;
         }
+        // Décision rejouée après un fonctionnement hors ligne : mêmes garde-fous que l'activité (confiance bornée, zone acceptant l'entrée hors ligne).
+        if ($declaredAt !== null && $this->permanent->offlineRefusalSite($card, array_values($zoneIds), $declaredAt, $knownAt) !== null) {
+            return null;
+        }
 
-        return DB::transaction(function () use ($poste, $agent, $card, $checkpoint, $direction, $decision): array {
+        return DB::transaction(function () use ($poste, $agent, $card, $checkpoint, $direction, $decision, $declaredAt, $localValid): array {
             $entered = ! $this->siteMovements->isPresent($card->holder_id);
             $this->siteMovements->record($card->holder_id, $entered ? 'entree' : 'controle', $checkpoint['name'], $agent, null, array_filter(['verdict' => 'valide', 'direction' => $direction, 'permanent' => true, 'identifiant' => $card->identifier,
-                'carte_rang' => $card->rank, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id], fn ($v) => $v !== null));
+                'carte_rang' => $card->rank, 'point_type' => $checkpoint['type'], 'point_id' => $checkpoint['id'], 'poste_id' => $poste->id,
+                'heure_declaree' => $declaredAt, 'differe' => $declaredAt !== null ? true : null, 'verdict_tablette' => $localValid === null ? null : ($localValid ? 'valide' : 'refuse')], fn ($v) => $v !== null));
 
             return [
                 'valid' => true, 'reason' => null, 'message' => 'Carte permanente valide.', 'badge_code' => $card->identifier, 'zone_ok' => null, 'point' => $checkpoint['name'],
@@ -345,7 +350,7 @@ final class SiteControl
      */
     private function permanentExit(Device $poste, User $agent, \stdClass $card, array $checkpoint, ?string $declaredAt): array
     {
-        if ($declaredAt === null && ($siteResult = $this->siteExit($poste, $agent, $card, $checkpoint)) !== null) {
+        if (($siteResult = $this->siteExit($poste, $agent, $card, $checkpoint)) !== null) {
             return $siteResult;
         }
 

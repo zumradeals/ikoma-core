@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LocalList, type Snapshot } from '../../resources/js/poste/local/list';
-import { PERMANENT_PREFIX, decidePermanentOffline, trustRemainingMinutes, type PermanentSnapshot } from '../../resources/js/poste/local/permanent';
+import { PERMANENT_PREFIX, decidePermanentOffline, decidePermanentSiteOffline, trustRemainingMinutes, type PermanentSnapshot } from '../../resources/js/poste/local/permanent';
 import { controlLocal, exitLocal, resolveBadge } from '../../resources/js/poste/local/site';
 import { sha256Hex } from '../../resources/js/poste/local/crypto';
 
@@ -131,5 +131,57 @@ describe('titulaires permanents hors ligne', () => {
     expect(control).toMatchObject({ valid: false, reason: 'carte_perdue', source: 'local' });
     const exit = exitLocal(l, printed, gate, iso(-600 * MIN));
     expect(exit).toMatchObject({ ok: true, permanent: { card_kept: true } });
+  });
+});
+
+describe('titulaires permanents hors ligne : habilitation du site', () => {
+  const siteOf = (over: Partial<NonNullable<PermanentSnapshot['site']>> = {}): NonNullable<PermanentSnapshot['site']> => ({
+    zones: [{ id: 's1', name: 'Hall du site' }],
+    policies: [{ zone_id: 's1', permanent_allowed: true, offline_entry_allowed: true }],
+    entitlements: [{ holder_id: 'h1', zone_id: 's1', valid_from: iso(-60 * MIN), valid_until: iso(240 * MIN) }],
+    ...over,
+  });
+
+  it('ne juge pas quand le poste ne garde aucune zone du site : l’activité s’applique', async () => {
+    const snap = await permanent();
+    expect(decidePermanentSiteOffline(snap, await sha256Hex(TOKEN), T0, iso(-5 * MIN))).toBeNull();
+    expect(decidePermanentSiteOffline({ ...snap, site: { zones: [], policies: [], entitlements: [] } }, await sha256Hex(TOKEN), T0, iso(-5 * MIN))).toBeNull();
+  });
+
+  it('autorise l’entrée habilitée au site quand la confiance est valide et la zone accepte le hors ligne', async () => {
+    const snap = await permanent({ site: siteOf() });
+    const d = decidePermanentSiteOffline(snap, await sha256Hex(TOKEN), T0, iso(-10 * MIN));
+    expect(d?.allowed).toBe(true);
+    expect(d?.zones).toEqual(['Hall du site']);
+  });
+
+  it('refuse par défaut : habilitation absente, future, expirée, zone sans politique, hors ligne non accepté, confiance expirée', async () => {
+    const hash = await sha256Hex(TOKEN);
+    const known = iso(-10 * MIN);
+    expect(decidePermanentSiteOffline(await permanent({ site: siteOf({ entitlements: [] }) }), hash, T0, known)?.reason).toBe('habilitation_absente');
+    expect(decidePermanentSiteOffline(await permanent({ site: siteOf({ entitlements: [{ holder_id: 'h1', zone_id: 's1', valid_from: iso(2 * 24 * 60 * MIN), valid_until: iso(3 * 24 * 60 * MIN) }] }) }), hash, T0, known)?.reason).toBe('habilitation_non_commencee');
+    expect(decidePermanentSiteOffline(await permanent({ site: siteOf({ entitlements: [{ holder_id: 'h1', zone_id: 's1', valid_from: iso(-3 * 24 * 60 * MIN), valid_until: iso(-2 * 24 * 60 * MIN) }] }) }), hash, T0, known)?.reason).toBe('habilitation_expiree');
+    expect(decidePermanentSiteOffline(await permanent({ site: siteOf({ policies: [] }) }), hash, T0, known)?.reason).toBe('zone_sans_politique');
+    expect(decidePermanentSiteOffline(await permanent({ site: siteOf({ policies: [{ zone_id: 's1', permanent_allowed: true, offline_entry_allowed: false }] }) }), hash, T0, known)?.reason).toBe('hors_ligne_non_autorise');
+    expect(decidePermanentSiteOffline(await permanent({ site: siteOf() }), hash, T0, iso(-90 * MIN))?.reason).toBe('confiance_expiree');
+    expect(decidePermanentSiteOffline(await permanent({ site: siteOf(), trust_minutes: 0 }), hash, T0, known)?.reason).toBe('hors_ligne_non_autorise');
+  });
+
+  it('dans le contrôle local : le site est regardé d’abord, puis l’activité (aucun accès retiré)', async () => {
+    const hash = await sha256Hex(TOKEN);
+    // Habilité au site seulement : accordé par le site.
+    const siteOnly = await permanent({ site: siteOf() });
+    siteOnly.holders[0].entitlements = [];
+    const l1 = await list(siteOnly);
+    const printed1 = await resolveBadge(l1, TOKEN);
+    expect(controlLocal(l1, printed1, gate, T0, iso(-10 * MIN))).toMatchObject({ valid: true, zones: ['Hall du site'] });
+    // Le site refuse (zone sans politique) mais l'activité accorde : le contrôle reste valide (comportement d'activité).
+    const fallback = await permanent({ site: siteOf({ policies: [] }) });
+    const l2 = await list(fallback);
+    expect(controlLocal(l2, await resolveBadge(l2, TOKEN), gate, T0, iso(-10 * MIN))).toMatchObject({ valid: true });
+    // Un point de type zone ne regarde jamais le site.
+    const l3 = await list(siteOnly);
+    expect(controlLocal(l3, await resolveBadge(l3, TOKEN), zone('z1'), T0, iso(-10 * MIN))).toMatchObject({ valid: false });
+    expect(hash).toHaveLength(64);
   });
 });

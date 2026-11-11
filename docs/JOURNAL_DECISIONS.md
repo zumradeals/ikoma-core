@@ -873,3 +873,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Constat (CI du lot 4a, test intermittent) : sous Laravel 13 les colonnes de date sont créées en `timestamp(0)` (à la seconde) ; une entrée et une sortie de la même seconde étaient à égalité et la présence dépendait de l'identifiant tiré au hasard. Envoyer des microsecondes ne change rien : PostgreSQL arrondit à la précision de la colonne.
 - Décision : colonne `access_events.seq` (identité, croissante) ; la présence du site s'ordonne par `occurred_at` puis `seq`.
 - Point de vigilance, non modifié ici : le journal d'activité (`Presence`, contrôle des visiteurs) a la même limite et peut utiliser `seq` ; à traiter dans un lot dédié.
+
+## Tablette de site, lot 4b : contrôle hors ligne du site
+- Décision : la section `site` de la copie est calculée par poste (zones du site gardées) ; la version de la copie inclut déjà l'empreinte du snapshot permanent, donc aucune règle de version supplémentaire.
+- Refactor sans changement de comportement dans `PermanentAccess` : la garde « confiance hors ligne » (`offlineTrustRefusal`) est partagée entre l'activité et le site.
+- Rejeu : site d'abord puis activité (décision du dirigeant) ; un refus du site n'est jamais renvoyé tel quel, l'activité décide.
+- Écarts assumés : la copie hors ligne reste liée à l'événement de la tablette (une copie sans activité vient au lot 5).

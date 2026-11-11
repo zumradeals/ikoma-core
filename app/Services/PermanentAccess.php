@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -155,25 +156,57 @@ final class PermanentAccess
      */
     public function offlineRefusal(object $card, string $eventId, array $point, string $declaredAt, ?string $knownAt, CarbonInterface $now): ?array
     {
-        $refuse = fn (string $reason, string $message): array => ['allowed' => false, 'reason' => $reason, 'message' => $message, 'zones' => []];
-        $trust = $this->offlineTrust()['effective'];
-        if ($trust < 1) {
-            return $refuse('hors_ligne_non_autorise', 'Entrée hors ligne non autorisée : aucune durée de confiance approuvée par l’institution.');
-        }
-        try {
-            $declared = Carbon::parse($declaredAt);
-            $known = $knownAt === null ? null : Carbon::parse($knownAt);
-        } catch (\Throwable) {
-            return $refuse('confiance_expiree', 'Confiance hors ligne expirée : heure de dernière synchronisation illisible.');
-        }
-        if ($known === null || $known->greaterThan($declared) || $known->diffInMinutes($declared) > $trust) {
-            return $refuse('confiance_expiree', 'Confiance hors ligne expirée : la tablette n’avait pas été synchronisée assez récemment pour autoriser cette entrée.');
+        if (($refusal = $this->offlineTrustRefusal($declaredAt, $knownAt)) !== null) {
+            return $refusal;
         }
         $allowed = DB::table('holder_entitlements as e')->join('zone_policies as p', 'p.zone_id', '=', 'e.zone_id')
             ->where('e.holder_id', $card->holder_id)->where('e.event_id', $eventId)->whereNull('e.revoked_at')->where('p.permanent_allowed', true)->where('p.offline_entry_allowed', true)
             ->when($point['type'] === 'zone', fn ($q) => $q->where('e.zone_id', $point['id']))->exists();
 
-        return $allowed ? null : $refuse('hors_ligne_non_autorise', 'Cette zone n’accepte pas l’entrée des titulaires permanents hors ligne.');
+        return $allowed ? null : $this->offlineRefuse('hors_ligne_non_autorise', 'Cette zone n’accepte pas l’entrée des titulaires permanents hors ligne.');
+    }
+
+    /**
+     * Mêmes garde-fous hors ligne pour une décision rejouée au titre du SITE : la zone du site gardée par le poste doit accepter l'entrée hors ligne.
+     *
+     * @param  list<string>  $zoneIds
+     * @return array{allowed: false, reason: string, message: string, zones: list<string>}|null
+     */
+    public function offlineRefusalSite(object $card, array $zoneIds, string $declaredAt, ?string $knownAt): ?array
+    {
+        if (($refusal = $this->offlineTrustRefusal($declaredAt, $knownAt)) !== null) {
+            return $refusal;
+        }
+        $allowed = DB::table('holder_site_entitlements as e')->join('site_zone_policies as p', 'p.zone_id', '=', 'e.zone_id')
+            ->where('e.holder_id', $card->holder_id)->whereIn('e.zone_id', $zoneIds)->whereNull('e.revoked_at')->where('p.permanent_allowed', true)->where('p.offline_entry_allowed', true)->exists();
+
+        return $allowed ? null : $this->offlineRefuse('hors_ligne_non_autorise', 'Cette zone du site n’accepte pas l’entrée des titulaires permanents hors ligne.');
+    }
+
+    /** @return array{allowed: false, reason: string, message: string, zones: list<string>} */
+    private function offlineRefuse(string $reason, string $message): array
+    {
+        return ['allowed' => false, 'reason' => $reason, 'message' => $message, 'zones' => []];
+    }
+
+    /** @return array{allowed: false, reason: string, message: string, zones: list<string>}|null */
+    private function offlineTrustRefusal(string $declaredAt, ?string $knownAt): ?array
+    {
+        $trust = $this->offlineTrust()['effective'];
+        if ($trust < 1) {
+            return $this->offlineRefuse('hors_ligne_non_autorise', 'Entrée hors ligne non autorisée : aucune durée de confiance approuvée par l’institution.');
+        }
+        try {
+            $declared = Carbon::parse($declaredAt);
+            $known = $knownAt === null ? null : Carbon::parse($knownAt);
+        } catch (\Throwable) {
+            return $this->offlineRefuse('confiance_expiree', 'Confiance hors ligne expirée : heure de dernière synchronisation illisible.');
+        }
+        if ($known === null || $known->greaterThan($declared) || $known->diffInMinutes($declared) > $trust) {
+            return $this->offlineRefuse('confiance_expiree', 'Confiance hors ligne expirée : la tablette n’avait pas été synchronisée assez récemment pour autoriser cette entrée.');
+        }
+
+        return null;
     }
 
     /** Fiche de participation du titulaire à l'événement (créée à la première entrée autorisée ; une seule par titulaire et par événement). */
@@ -287,7 +320,7 @@ final class PermanentAccess
      *
      * @return array<string, mixed>
      */
-    public function snapshot(string $eventId): array
+    public function snapshot(string $eventId, ?string $checkpointId = null): array
     {
         $context = $this->holders->permanentContext();
         $trust = $this->offlineTrust();
@@ -298,16 +331,40 @@ final class PermanentAccess
         $cards = DB::table('holder_cards as k')->join('badges as b', 'b.id', '=', 'k.badge_id')->join('permanent_holders as h', 'h.id', '=', 'k.holder_id')->get(['b.qr_token', 'k.status', 'k.activated_at', 'h.id as holder_id', 'h.identifier'])
             // Carte pas encore remise : la tablette la refuse (statut « non_activee »), comme le serveur.
             ->map(fn ($c) => ['hash' => hash('sha256', $c->qr_token), 'status' => $c->status === 'active' && $c->activated_at === null ? 'non_activee' : $c->status, 'holder_id' => $c->holder_id, 'identifier' => $c->identifier])->all();
-        $holderIds = DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->distinct()->pluck('holder_id');
+        $site = $this->siteSnapshot($checkpointId, $iso);
+        $holderIds = DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->distinct()->pluck('holder_id')->merge($site['holder_ids'])->unique()->values();
         $holders = DB::table('permanent_holders')->whereIn('id', $holderIds)->get(['id', 'identifier', 'full_name', 'organisation', 'status', 'engagement_starts_on', 'engagement_ends_on', 'institutional_category']);
         $entitlements = DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->get(['holder_id', 'zone_id', 'valid_from', 'valid_until'])->groupBy('holder_id');
         $policies = DB::table('zone_policies')->where('event_id', $eventId)->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->all();
 
         return [
             'directory' => $this->directory(),
-            'trust_minutes' => $trust['effective'], 'cards' => $cards, 'policies' => $policies,
+            'trust_minutes' => $trust['effective'], 'cards' => $cards, 'policies' => $policies, 'site' => $site['data'],
             'holders' => $holders->map(fn ($h) => ['id' => $h->id, 'category' => $this->categoryOf($h->institutional_category), 'identifier' => $h->identifier, 'name' => $h->full_name, 'organisation' => $h->organisation, 'status' => $h->status, 'starts_on' => $h->engagement_starts_on, 'ends_on' => $h->engagement_ends_on,
                 'entitlements' => ($entitlements[$h->id] ?? collect())->map(fn ($e) => ['zone_id' => $e->zone_id, 'valid_from' => $iso($e->valid_from), 'valid_until' => $iso($e->valid_until)])->values()->all()])->all(),
+        ];
+    }
+
+    /**
+     * Copie du SITE pour la tablette (contrôle hors ligne) : zones du site gardées par le poste, leurs politiques et les habilitations du site non retirées.
+     * Les titulaires concernés rejoignent la liste `holders` de la copie (sans habilitation d'activité s'ils n'en ont pas).
+     *
+     * @return array{data: array<string, mixed>|null, holder_ids: list<string>}
+     */
+    private function siteSnapshot(?string $checkpointId, Closure $iso): array
+    {
+        $zoneIds = $checkpointId === null ? [] : DB::table('checkpoint_site_zones')->where('checkpoint_id', $checkpointId)->pluck('zone_id')->all();
+        if ($zoneIds === []) {
+            return ['data' => null, 'holder_ids' => []];
+        }
+        $zones = DB::table('zones')->whereIn('id', $zoneIds)->orderBy('name')->get(['id', 'name'])->map(fn ($z) => ['id' => $z->id, 'name' => $z->name])->all();
+        $policies = DB::table('site_zone_policies')->whereIn('zone_id', $zoneIds)->orderBy('zone_id')->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])
+            ->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->all();
+        $rows = DB::table('holder_site_entitlements')->whereIn('zone_id', $zoneIds)->whereNull('revoked_at')->orderBy('holder_id')->orderBy('zone_id')->orderBy('valid_from')->get(['holder_id', 'zone_id', 'valid_from', 'valid_until']);
+
+        return [
+            'data' => ['zones' => $zones, 'policies' => $policies, 'entitlements' => $rows->map(fn ($e) => ['holder_id' => $e->holder_id, 'zone_id' => $e->zone_id, 'valid_from' => $iso($e->valid_from), 'valid_until' => $iso($e->valid_until)])->all()],
+            'holder_ids' => $rows->pluck('holder_id')->unique()->values()->all(),
         ];
     }
 }

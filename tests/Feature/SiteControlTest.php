@@ -1,11 +1,13 @@
 <?php
 
+use App\Models\Device;
 use App\Models\User;
 use App\Services\HolderCards;
 use App\Services\HolderEntitlements;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentAccess;
 use App\Services\PermanentHolders;
+use App\Services\Poste\ListSnapshot;
 use App\Services\SiteConfiguration;
 use App\Services\SiteEntitlements;
 use App\Services\SiteMovements;
@@ -14,6 +16,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\ValidationException;
 
 uses(DatabaseTransactions::class);
@@ -172,4 +175,82 @@ it('règle la politique d’une zone du site : ouverte, hors ligne seulement si 
     expect(fn () => app(SiteEntitlements::class)->savePolicy((string) $this->activityZone, true, false, $this->admin))->toThrow(ValidationException::class);
     $this->get('/administration/habilitations')->assertOk()->assertInertia(fn ($p) => $p->where('site.zones.0.permanent_allowed', true)->where('site.zones.0.offline_entry_allowed', true));
     expect(DB::table('audit_logs')->where('action', 'zone_site.politique_modifiee')->count())->toBe(1);
+});
+
+function scReplay(string $type, string $token, string $knownAt): TestResponse
+{
+    $payload = ['code' => 'PC:'.hash('sha256', $token), 'point' => null];
+    if ($type === 'controle') {
+        $payload += ['local_valid' => true, 'known_at' => $knownAt];
+    }
+
+    return test()->postJson('/poste/api/sync', ['operations' => [['id' => (string) Str::uuid(), 'seq' => (int) DB::table('devices')->where('id', test()->device)->value('sync_seq') + 1, 'type' => $type, 'agent_id' => test()->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => $payload]]],
+        ['X-Device-Token' => SC_TOKEN, 'Accept' => 'application/json'])->assertOk();
+}
+
+it('remet à la tablette la copie du site : zones gardées, politiques, habilitations, et les titulaires concernés', function () {
+    scOpenSite();
+    [$holder] = scCard();
+    scGrantSite($holder);
+    $access = app(PermanentAccess::class);
+
+    expect($access->snapshot($this->event)['site'])->toBeNull();
+    $snapshot = $access->snapshot($this->event, $this->checkpoint);
+    expect($snapshot['site']['zones'])->toBe([['id' => $this->siteZone, 'name' => 'Hall fictif du site']])
+        ->and($snapshot['site']['policies'][0]['permanent_allowed'])->toBeTrue()
+        ->and($snapshot['site']['entitlements'][0]['holder_id'])->toBe($holder);
+    expect(collect($snapshot['holders'])->firstWhere('id', $holder)['entitlements'])->toBe([]);
+});
+
+it('change la version de la copie quand une habilitation du site est accordée ou retirée', function () {
+    scOpenSite();
+    [$holder] = scCard();
+    $device = Device::query()->findOrFail($this->device);
+    $before = app(ListSnapshot::class)->version($device);
+    scGrantSite($holder);
+    $granted = app(ListSnapshot::class)->version($device);
+    expect($granted)->not->toBe($before);
+    app(SiteEntitlements::class)->revoke((string) DB::table('holder_site_entitlements')->where('holder_id', $holder)->value('id'), 'Fin fictive', $this->admin);
+    expect(app(ListSnapshot::class)->version($device))->not->toBe($granted);
+});
+
+it('rejoue une entrée faite hors ligne au titre du site, avec les garde-fous de confiance et de zone', function () {
+    scOpenSite(policy: false);
+    app(SiteEntitlements::class)->savePolicy($this->siteZone, true, true, $this->admin);
+    app(PermanentAccess::class)->saveOfflineTrust(60, true, $this->admin);
+    [$holder, $token] = scCard();
+    scGrantSite($holder);
+
+    scReplay('controle', $token, now()->subMinutes(2)->toIso8601String());
+    $row = DB::table('access_events')->where('holder_id', $holder)->whereNull('event_id')->first();
+    expect($row->type)->toBe('entree')->and(json_decode((string) $row->details, true)['differe'])->toBeTrue();
+    expect(app(SiteMovements::class)->count())->toBe(1);
+});
+
+it('refuse de rejouer au titre du site une zone qui n’accepte pas le hors ligne, une confiance expirée ou absente', function () {
+    scOpenSite(policy: false);
+    app(PermanentAccess::class)->saveOfflineTrust(60, true, $this->admin);
+    [$holder, $token] = scCard();
+    scGrantSite($holder);
+
+    app(SiteEntitlements::class)->savePolicy($this->siteZone, true, false, $this->admin);
+    scReplay('controle', $token, now()->subMinutes(2)->toIso8601String());
+    app(SiteEntitlements::class)->savePolicy($this->siteZone, true, true, $this->admin);
+    scReplay('controle', $token, now()->subHours(5)->toIso8601String());
+    app(PermanentAccess::class)->saveOfflineTrust(0, false, $this->admin);
+    scReplay('controle', $token, now()->subMinutes(2)->toIso8601String());
+
+    expect(DB::table('access_events')->where('holder_id', $holder)->count())->toBe(0);
+});
+
+it('rejoue une sortie faite hors ligne dans le journal du site, sans condition', function () {
+    scOpenSite();
+    [$holder, $token] = scCard();
+    scGrantSite($holder);
+    scControl($token)->assertOk();
+    expect(app(SiteMovements::class)->count())->toBe(1);
+
+    scReplay('sortie', $token, now()->toIso8601String());
+    expect(app(SiteMovements::class)->count())->toBe(0);
+    expect(DB::table('access_events')->where('holder_id', $holder)->where('type', 'sortie')->whereNull('event_id')->count())->toBe(1);
 });

@@ -3,7 +3,7 @@ import { outsidePeriod } from './apply';
 import type { PosteRefusal } from './capabilities';
 import { sha256Hex } from './crypto';
 import type { LocalList } from './list';
-import { PERMANENT_PREFIX, decidePermanentOffline, findPermanentCard } from './permanent';
+import { PERMANENT_PREFIX, decidePermanentOffline, decidePermanentSiteOffline, findPermanentCard } from './permanent';
 
 /** Retrouve un badge de l'événement à partir du code imprimé ou du contenu du QR (comparé par hachage : le jeton n'est jamais conservé). */
 export async function resolveBadge(list: LocalList, input: string): Promise<string | null> {
@@ -37,7 +37,10 @@ export function controlLocal(list: LocalList, printed: string | null, point: Poi
   const base = { badge_code: printed, zone_ok: null, point: pointName(list, point), person: null, organisation: null, category: null, zones: [] as string[], source: 'local' as const, known_at: knownAt };
   const refuse = (reason: string): ControlResult => ({ ...base, valid: false, reason, message: REFUSALS[reason] });
   if (printed?.startsWith(PERMANENT_PREFIX) && list.snapshot.permanent) {
-    const decision = decidePermanentOffline(list.snapshot.permanent, printed.slice(PERMANENT_PREFIX.length), point, list.snapshot.zones, now, knownAt);
+    const hash = printed.slice(PERMANENT_PREFIX.length);
+    // Habilitation du SITE d'abord (poste gardant des zones du site) ; si elle n'accorde pas l'accès, l'habilitation d'activité s'applique comme avant (comme le serveur).
+    const siteDecision = point?.type === 'zone' ? null : decidePermanentSiteOffline(list.snapshot.permanent, hash, now, knownAt);
+    const decision = siteDecision?.allowed ? siteDecision : decidePermanentOffline(list.snapshot.permanent, hash, point, list.snapshot.zones, now, knownAt);
 
     return { ...base, badge_code: decision.holder?.identifier ?? null, valid: decision.allowed, reason: decision.reason, message: decision.message, person: decision.allowed && decision.holder ? { name: decision.holder.name } : null, organisation: decision.holder?.organisation ?? null,
       category: decision.allowed ? (decision.holder?.category ?? null) : null,
