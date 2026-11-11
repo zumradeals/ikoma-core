@@ -9,6 +9,8 @@ use App\Services\BadgeService;
 use App\Services\OperationsOverview;
 use App\Services\Pilotage;
 use App\Services\Poste\DeskRefused;
+use App\Services\Presence;
+use App\Services\SiteMovements;
 use App\Services\Supervision;
 use App\Services\SupervisionCentre;
 use App\Services\SupervisorClosure;
@@ -107,8 +109,28 @@ final class PilotageController
             'filters' => ['q' => $filters['q'] ?? '', 'type' => $filters['type'] ?? '', 'point' => $filters['point'] ?? '', 'outcome' => $filters['outcome'] ?? '', 'from' => $filters['from'] ?? '', 'until' => $filters['until'] ?? ''],
             'rows' => $event ? $this->supervision->movements($event->id, $filters, Supervision::PER_PAGE, ($page - 1) * Supervision::PER_PAGE) : [],
             'total' => $event ? $this->supervision->movementCount($event->id, $filters) : 0, 'page' => $page, 'perPage' => Supervision::PER_PAGE,
+            'canCorrect' => $r->user()->can('mouvements.corriger'),
+            'siteMovements' => fn () => array_map(fn ($m) => ['id' => $m->id, 'type' => $m->type, 'checkpoint' => $m->checkpoint, 'occurred_at' => $m->occurred_at, 'identifier' => $m->identifier, 'full_name' => $m->full_name, 'corrected' => (bool) $m->corrected], app(SiteMovements::class)->recent()),
             'points' => $event ? $this->supervision->points($event->id) : [], 'types' => Supervision::TYPES,
         ]);
+    }
+
+    /**
+     * Corrige une entrée ou une sortie saisie par erreur : un nouvel événement « correction » avec motif obligatoire, l'original n'est jamais modifié.
+     * Mouvement d'activité : `Presence::corriger` ; mouvement du site (sans événement) : `SiteMovements::correct`.
+     */
+    public function corriger(Request $r, string $movement): RedirectResponse
+    {
+        $reason = (string) $r->validate(['reason' => 'required|string|max:500'])['reason'];
+        $row = DB::table('access_events')->where('id', $movement)->first(['id', 'event_id']);
+        abort_if($row === null, 404);
+        try {
+            $row->event_id === null ? app(SiteMovements::class)->correct($movement, $r->user(), $reason) : app(Presence::class)->corriger($movement, $r->user(), $reason);
+        } catch (DeskRefused $e) {
+            return back()->withErrors(['correction' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Mouvement corrigé : la présence est recalculée.');
     }
 
     /** Accès et badges à surveiller (S07) : habilitations de participation (lecture seule) et badges à récupérer. */

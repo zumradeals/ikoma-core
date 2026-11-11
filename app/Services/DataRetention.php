@@ -36,7 +36,7 @@ final class DataRetention
             DB::table('hosts')->orderBy('id')->lockForUpdate()->get(['id']);
             DB::table('devices')->orderBy('id')->lockForUpdate()->get(['id']);
             DB::table('visitors')->orderBy('id')->lockForUpdate()->get(['id']);
-            $counts = array_fill_keys(self::TYPES, 0);
+            $counts = array_fill_keys(self::TYPES, 0) + ['mouvements_site' => 0];
             $now = now();
             foreach (DB::table('events')->where('ends_at', '<', $now)->where('is_permanent', false)->orderBy('id')->lockForUpdate()->get() as $event) {
                 // Ne jamais effacer une identité nécessaire à une évacuation en cours, même si la date de fin est dépassée.
@@ -108,6 +108,10 @@ final class DataRetention
                     DB::table('devices')->where('event_id', $event->id)->update(['name' => DB::raw("'Poste anonymisé ' || id::text"), 'station' => null]);
                 }
             }
+            // Mouvements du SITE (sans événement) : même durée que l'historique des activités (réglage « événements »), jamais sans réglage approuvé.
+            if ($days['evenements'] > 0) {
+                $counts['mouvements_site'] = $this->purgeSiteMovements($days['evenements'], $now);
+            }
             app(Audit::class)->append('donnees.purgees', null, ['nombres' => $counts]);
 
             return $counts;
@@ -115,6 +119,19 @@ final class DataRetention
         DB::afterCommit(fn () => app(FileDeletionQueue::class)->drain());
 
         return $counts;
+    }
+
+    /**
+     * Efface les mouvements du site plus anciens que `$days` jours. Une correction plus récente garde le mouvement qu'elle corrige (clé étrangère) : il part
+     * avec elle, une fois la correction échue.
+     */
+    private function purgeSiteMovements(int $days, Carbon $now): int
+    {
+        $limit = $now->copy()->subDays($days);
+        $deleted = DB::table('access_events')->whereNull('event_id')->where('type', 'correction')->where('occurred_at', '<', $limit)->delete();
+
+        return $deleted + DB::table('access_events as e')->whereNull('e.event_id')->where('e.occurred_at', '<', $limit)
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('access_events as c')->whereColumn('c.corrige_id', 'e.id'))->delete();
     }
 
     public function requirePrivileged(): void

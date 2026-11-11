@@ -11,11 +11,10 @@ const props = defineProps<{
 const create = useForm({ event_ids: [] as string[], name: '', station: '', point_code: '' });
 const page = usePage<{ errors?: Record<string, string> }>();
 const refusal = (p: Poste) => page.props.errors?.['poste_' + p.id] ?? null;
-const chosen = reactive<Record<string, string[]>>({}); const current = reactive<Record<string, string>>({});
+const chosen = reactive<Record<string, string[]>>({});
 const selection = (p: Poste) => (chosen[p.id] ??= [...p.activities]);
 const toggle = (p: Poste, id: string, on: boolean) => { const list = selection(p); const at = list.indexOf(id); if (on && at < 0) list.push(id); if (!on && at >= 0) list.splice(at, 1); };
 const saveActivities = (p: Poste) => router.put(`/administration/postes/${p.id}/activites`, { event_ids: selection(p) }, { preserveScroll: true });
-const setCurrent = (p: Poste) => current[p.id] && router.put(`/administration/postes/${p.id}/activite`, { event_id: current[p.id] }, { preserveScroll: true });
 const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, offlineApproved: props.settings.offlineApproved, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, lateMinutes: props.settings.lateMinutes, escalationMinutes: props.settings.escalationMinutes, identityDocument: props.settings.identityDocument });
 const states = { non_enrole: ['○', 'Non enrôlé'], enrole: ['●', 'Enrôlé'], revoque: ['⛔', 'Révoqué'] } as const;
 const reasons: Record<string, string> = { deja_associe: 'Badge déjà associé', autre_poste: 'Badge réservé à un autre poste', deja_present: 'Visiteur déjà entré', agent_desactive: 'Agent désactivé', fiche_modifiee: 'Fiche modifiée entre-temps', horloge_suspecte: 'Horloge de la tablette décalée', hote_en_attente: 'Accord de l’hôte manquant', visiteur_refuse: 'Visiteur refusé', annule: 'Badge annulé' };
@@ -24,7 +23,7 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <template>
 <AdminLayout active="postes">
 <h1 class="mb-4 text-display font-bold">Administration · Postes</h1>
-<p class="mb-6">Un poste est une tablette d’accueil. Pour l’enrôler : générez un code, saisissez-le sur la tablette dans les 15 minutes ; il ne sert qu’une fois. Une tablette révoquée est effacée dès qu’elle contacte le serveur.</p>
+<p class="mb-6">Un poste est une tablette du site : elle contrôle le personnel permanent et, si l’agent choisit une activité, accueille les visiteurs. Pour l’enrôler : générez un code, saisissez-le sur la tablette dans les 15 minutes ; il ne sert qu’une fois. Une tablette révoquée est effacée dès qu’elle contacte le serveur.</p>
 <div v-if="newCode" role="status" class="mb-6 rounded-2xl border-4 border-ikoma-orange bg-orange-50 p-6" data-testid="code">
   <p class="text-heading font-bold">Code d’enrôlement (affiché une seule fois)</p>
   <p class="my-3 text-display font-bold tracking-widest">{{ newCode.code }}</p>
@@ -49,7 +48,7 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <p data-testid="compteurs">Opérations reçues : <strong>{{ poste.received }}</strong> · appliquées : <strong>{{ poste.applied }}</strong> · en conflit : <strong>{{ poste.conflicts }}</strong></p>
 <p v-if="refusal(poste)" role="alert" class="my-3 rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" :data-testid="'refus-' + poste.id">⚠ {{ refusal(poste) }}</p>
 <fieldset class="my-4 space-y-2" :data-testid="'activites-' + poste.id"><legend class="font-semibold">Activités autorisées</legend><p v-if="!events.length" class="rounded-lg border border-dashed p-3 text-slate-700" data-testid="aucune-activite">Aucune activité n’existe pour l’instant : créez d’abord une activité (menu Activités), puis revenez cocher celles que cette tablette peut utiliser.</p><label v-for="event in events" :key="event.id" class="flex items-center gap-3"><input type="checkbox" class="size-5" :checked="selection(poste).includes(event.id)" :disabled="poste.event_id === event.id" @change="toggle(poste, event.id, ($event.target as HTMLInputElement).checked)"> {{ event.name }}<span v-if="poste.event_id === event.id" class="text-sm text-slate-600">(activité en cours)</span></label><button type="button" class="action" @click="saveActivities(poste)">Enregistrer les activités</button>
-<div v-if="poste.state !== 'enrole'" class="flex flex-wrap items-end gap-3"><label class="block">Activité en cours<select v-model="current[poste.id]" class="field"><option value="">Choisir…</option><option v-for="event in events.filter(e => poste.activities.includes(e.id))" :key="event.id" :value="event.id">{{ event.name }}</option></select></label><button type="button" class="action" :disabled="!current[poste.id]" @click="setCurrent(poste)">Définir comme activité en cours</button></div></fieldset>
+<p class="text-sm text-slate-700" :data-testid="'activite-en-cours-' + poste.id">Activité en cours : <strong>{{ poste.event_id ? poste.event_name : 'aucune (mode site)' }}</strong>. L’agent choisit l’activité du jour sur la tablette, parmi celles cochées ci-dessus ; sans activité, la tablette contrôle le personnel permanent du site.</p></fieldset>
 <div class="mt-4 flex flex-wrap gap-4"><button type="button" class="action" @click="router.post(`/administration/postes/${poste.id}/code`)">{{ poste.state === 'enrole' ? 'Réenrôler : nouveau code' : 'Générer un code d’enrôlement' }}</button><button v-if="poste.state !== 'revoque'" type="button" class="min-h-14 rounded-xl border-2 border-red-700 px-6 py-3 font-semibold text-red-800" @click="revoke(poste)">{{ poste.state === 'enrole' ? 'Révoquer ce poste' : 'Retirer ce poste' }}</button></div>
 </BaseCard>
 <p v-if="!postes.length">Aucun poste pour le moment.</p>
