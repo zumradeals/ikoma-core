@@ -912,6 +912,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 
 ## L'administrateur peut aussi corriger un mouvement (décision du dirigeant)
 - Le droit `mouvements.corriger` est attribué au superviseur **et** à l'administrateur (agent d'accueil et hôte : non). Les corrections restent des événements ajoutés au journal (motif obligatoire, une seule par mouvement, original jamais modifié), donc tracées au nom de leur auteur.
+
 ## Portraits copiés sur la tablette pour l'affichage hors ligne (décision du dirigeant)
 - Après chaque nouvelle copie de liste, la tablette récupère (en ligne, jeton d'appareil) le portrait des personnes de la copie, au plus 300 (`PORTRAIT_MAX`), et le range dans la table `photos` d'IndexedDB, **scellé par la clé de données** (clé `portrait:<visiteur>`, AAD identique) : illisible tablette verrouillée.
 - Un portrait n'est redemandé que si la révision de la fiche change ; l'absence de portrait est mémorisée de la même façon.
