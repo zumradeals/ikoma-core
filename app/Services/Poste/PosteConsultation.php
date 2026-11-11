@@ -46,7 +46,7 @@ final class PosteConsultation
         $controls = DB::table('access_events as e')->leftJoin('visitors as v', 'v.id', '=', 'e.visitor_id')->leftJoin('badges as b', 'b.id', '=', 'e.badge_id')
             ->where('e.event_id', $poste->event_id)->where('e.type', 'controle')->whereRaw("e.details->>'poste_id' = ?", [$poste->id])
             ->where(fn ($q) => $q->whereRaw("coalesce(e.details->>'verdict', '') <> 'valide'")->orWhereRaw("e.details->>'zone_ok' = 'false'"))
-            ->orderByDesc('e.occurred_at')->limit(10)
+            ->orderByDesc('e.occurred_at')->orderByDesc('e.seq')->limit(10)
             ->get(['e.id', 'e.occurred_at', 'e.checkpoint', 'v.full_name', 'b.code as badge_code', DB::raw("e.details->>'raison' as reason"), DB::raw("e.details->>'zone_ok' as zone_ok")])
             ->map(fn ($c) => ['id' => $c->id, 'occurred_at' => $c->occurred_at, 'checkpoint' => $c->checkpoint, 'full_name' => $c->full_name, 'badge_code' => $c->badge_code, 'reason' => $c->zone_ok === 'false' ? 'zone_non_autorisee' : $c->reason, 'poste_id' => $poste->id])
             ->values()->all();

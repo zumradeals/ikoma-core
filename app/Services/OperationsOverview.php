@@ -44,7 +44,7 @@ final class OperationsOverview
                 SELECT DISTINCT ON (COALESCE(v.person_id, v.id)) COALESCE(v.person_id, v.id) AS ident, e.type, e.event_id
                 FROM access_events e JOIN visitors v ON v.id = e.visitor_id
                 WHERE e.type IN ('entree', 'sortie') AND NOT EXISTS (SELECT 1 FROM access_events c WHERE c.corrige_id = e.id)
-                ORDER BY COALESCE(v.person_id, v.id), e.occurred_at DESC, e.created_at DESC, e.id DESC
+                ORDER BY COALESCE(v.person_id, v.id), e.occurred_at DESC, e.seq DESC
              ) l JOIN events ev ON ev.id = l.event_id",
         );
         $physicalTotal = (int) $physical->total;
