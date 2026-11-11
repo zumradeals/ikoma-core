@@ -123,7 +123,7 @@ it('ne crée aucune carte, aucun badge, aucune fiche de participation ni habilit
     $ids = DB::table('permanent_holders')->where('full_name', 'like', '%'.$this->tag)->pluck('id')->all();
     expect($ids)->toHaveCount(3);
     $this->post('/administration/titulaires/groupe/categorie', ['ids' => $ids, 'category' => 'AILCT-03'])->assertSessionHasNoErrors();
-    expect(cardTablesCounts())->toBe($before)->and(DB::table('events')->where('is_permanent', true)->count())->toBe($before['events'] === 0 ? 0 : DB::table('events')->where('is_permanent', true)->count());
+    expect(cardTablesCounts())->toBe($before);
 });
 
 // --- Import ---------------------------------------------------------------------------------------------------------------------

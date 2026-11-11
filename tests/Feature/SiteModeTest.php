@@ -57,7 +57,6 @@ beforeEach(function () {
     $this->admin = smUser('administrateur');
     $this->agent = smUser('agent_accueil');
     app(InstitutionalCategories::class)->initialize($this->admin);
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     // Tablette SANS activité en cours (mode site), affectée au poste « poste_2 ».
     $this->device = (string) Str::uuid();
     DB::table('devices')->insert(['id' => $this->device, 'event_id' => null, 'name' => 'Tablette fictive du site', 'station' => 'Entrée du site', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', SM_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);

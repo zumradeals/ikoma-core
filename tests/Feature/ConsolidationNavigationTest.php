@@ -264,6 +264,6 @@ it('fournit les compteurs du cadre seulement sur les pages de l’espace Badges 
 
 it('compte les badges disponibles et les badges à restituer d’après les tables existantes', function () {
     $summary = app(BadgesCartesSummary::class)->get();
-    expect($summary['visitors']['available'])->toBe((int) DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->where('b.status', 'Disponible')->count())
+    expect($summary['visitors']['available'])->toBe((int) DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('b.status', 'Disponible')->count())
         ->and($summary['cards']['active'])->toBe((int) DB::table('holder_cards')->where('status', 'active')->count());
 });

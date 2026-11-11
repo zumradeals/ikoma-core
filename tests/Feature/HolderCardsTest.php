@@ -2,7 +2,6 @@
 
 use App\Models\User;
 use App\Services\BadgeLots;
-use App\Services\BadgeRefused;
 use App\Services\BadgeService;
 use App\Services\CardModels;
 use App\Services\HolderCards;
@@ -45,7 +44,6 @@ beforeEach(function () {
     $this->seed(RoleSeeder::class);
     $this->admin = cardUser('administrateur');
     app(InstitutionalCategories::class)->initialize($this->admin);
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     $this->cards = app(HolderCards::class);
 });
 
@@ -135,7 +133,7 @@ it('lie la carte au titulaire sans lui donner aucun accès et le contrôle la re
     expect($verdict->valid)->toBeFalse()->and($verdict->reason)->toBe('non_associe');
 });
 
-it('refuse une seconde carte active, un titulaire clos ou sans catégorie, et l’absence de contexte permanent', function () {
+it('refuse une seconde carte active, un titulaire clos ou sans catégorie', function () {
     $holder = cardHolder();
     $this->cards->issue($holder, $this->admin);
     expect(fn () => $this->cards->issue($holder, $this->admin))->toThrow(ValidationException::class);
@@ -145,7 +143,7 @@ it('refuse une seconde carte active, un titulaire clos ou sans catégorie, et l�
     $closed = cardHolder();
     app(PermanentHolders::class)->close($closed, 'Motif fictif', $this->admin);
     expect(fn () => $this->cards->issue($closed, $this->admin))->toThrow(ValidationException::class);
-    expect(fn () => DB::transaction(fn () => DB::table('holder_cards')->insert(['id' => (string) Str::uuid(), 'holder_id' => $holder, 'badge_id' => DB::table('badges')->value('id'), 'event_id' => DB::table('badges')->value('event_id'), 'status' => 'active', 'issued_at' => now(), 'created_at' => now(), 'updated_at' => now()])))->toThrow(QueryException::class);
+    expect(fn () => DB::transaction(fn () => DB::table('holder_cards')->insert(['id' => (string) Str::uuid(), 'holder_id' => $holder, 'badge_id' => DB::table('badges')->value('id'), 'status' => 'active', 'issued_at' => now(), 'created_at' => now(), 'updated_at' => now()])))->toThrow(QueryException::class);
 });
 
 it('réimprime sans jamais réattribuer le badge, le QR ni l’identifiant, avec motif obligatoire et historique', function () {
@@ -268,15 +266,6 @@ it('sépare l’impression définitive (recto et verso seulement) de l’essai d
         ->and($align)->not->toContain('data-template')->and(DB::table('holder_card_prints')->count())->toBe($prints);
     // L'essai ne s'enclenche jamais seul : l'impression ne le contient pas et l'essai se demande par sa propre adresse.
     $this->post('/administration/titulaires/alignement')->assertStatus(405);
-});
-
-it('écarte le contexte permanent des écrans et des opérations ordinaires (imports, lots de badges)', function () {
-    $context = app(PermanentHolders::class)->permanentContext();
-    $this->actingAs($this->admin);
-    $this->get('/administration/imports')->assertInertia(fn ($p) => $p->where('events', fn ($events) => collect($events)->doesntContain(fn ($e) => $e['id'] === $context->id)));
-    $this->get('/administration/imports?event_id='.$context->id)->assertSessionHasErrors('event_id');
-    $category = DB::table('categories')->insertGetId(['id' => $id = (string) Str::uuid(), 'event_id' => $context->id, 'name' => 'Cat test', 'color' => '#336699', 'priority_circuit' => false, 'created_at' => now(), 'updated_at' => now()]) ? $id : $id;
-    expect(fn () => app(BadgeLots::class)->generate($context->id, $category, 5, $this->admin))->toThrow(BadgeRefused::class);
 });
 
 it('compte les cartes par étape (préparer, imprimer, remettre) et prépare toutes les cartes des personnes avec photo, sans rien activer', function () {

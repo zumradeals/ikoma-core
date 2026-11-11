@@ -134,7 +134,7 @@ const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('fr-
 const dateTime = (iso: string) => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');
 const n = (value: number | string) => Number(value);
-const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite', permanent: 'Contexte permanent' };
+const kinds: Record<string, string> = { evenement: 'Événement', stage: 'Stage', visite: 'Visite' };
 const stateLabel: Record<string, string> = {
   active: 'Active', suspendue: 'Suspendue', retiree: 'Retirée', expiree: 'Expirée', a_venir: 'À venir', participation_close: 'Participation clôturée', activite_close: 'Activité terminée', profil_clos: 'Profil clos',
 };

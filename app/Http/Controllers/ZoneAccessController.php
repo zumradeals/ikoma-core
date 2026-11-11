@@ -21,7 +21,7 @@ final class ZoneAccessController
     public function index(Request $request, ZoneAccess $access, ParticipationEntitlements $entitlements): Response
     {
         Gate::authorize('zones.gerer');
-        $events = DB::table('events')->where('is_permanent', false)->orderByDesc('starts_at')->get(['id', 'name']);
+        $events = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']);
         $requested = $request->query('event');
         $eventId = is_string($requested) && $events->contains('id', $requested) ? $requested : ($events->first()->id ?? null);
         $q = trim((string) $request->query('q', ''));

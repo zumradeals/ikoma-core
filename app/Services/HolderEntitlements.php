@@ -147,9 +147,9 @@ final class HolderEntitlements
 
     private function eventOrFail(string $eventId): void
     {
-        $event = DB::table('events')->where('id', $eventId)->first(['is_permanent', 'status', 'anonymized_at']);
-        if ($event === null || $event->is_permanent) {
-            throw ValidationException::withMessages(['event_id' => 'Choisissez un événement ordinaire : le contexte permanent n’a pas de zones.']);
+        $event = DB::table('events')->where('id', $eventId)->first(['status', 'anonymized_at']);
+        if ($event === null) {
+            throw ValidationException::withMessages(['event_id' => 'Choisissez un événement existant.']);
         }
         if (in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
             throw ValidationException::withMessages(['event_id' => 'Cet événement est clôturé, archivé ou anonymisé.']);

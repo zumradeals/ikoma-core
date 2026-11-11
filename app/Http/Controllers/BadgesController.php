@@ -46,8 +46,8 @@ final class BadgesController
         Gate::authorize('badges.gerer');
         $filters = $r->validate(['status' => ['nullable', Rule::enum(BadgeStatus::class)], 'batch' => 'bail|nullable|uuid|exists:badge_batches,id', 'reserved' => ['nullable', Rule::in(['oui', 'non'])]]);
         $query = DB::table('badges as b')->join('badge_batches as batch', 'batch.id', '=', 'b.badge_batch_id')->leftJoin('devices as device', 'device.id', '=', 'b.reserved_device_id')->leftJoin('groups as grp', 'grp.id', '=', 'b.reserved_group_id')->leftJoin('categories as cat', 'cat.id', '=', 'b.category_id')
-            // Cette page ne concerne que les badges des visiteurs : les cartes des personnes permanentes (contexte permanent) n'y figurent jamais.
-            ->join('events as bev', 'bev.id', '=', 'batch.event_id')->where('bev.is_permanent', false);
+            // Cette page ne concerne que les badges des visiteurs : les cartes des personnes permanentes (badges du site) n'y figurent jamais.
+            ->join('events as bev', 'bev.id', '=', 'batch.event_id');
         if (! empty($filters['status'])) {
             $query->where('b.status', $filters['status']);
         }
@@ -61,7 +61,7 @@ final class BadgesController
             $query->whereNull('b.reserved_device_id')->whereNull('b.reserved_group_id');
         }
         $number = "CASE WHEN code ~ '^B-[0-9]+\$' THEN substring(code from 3)::integer END";
-        $batches = DB::table('badge_batches as batch')->leftJoin('categories as cat', 'cat.id', '=', 'batch.category_id')->join('events as ev', 'ev.id', '=', 'batch.event_id')->where('ev.is_permanent', false)
+        $batches = DB::table('badge_batches as batch')->leftJoin('categories as cat', 'cat.id', '=', 'batch.category_id')->join('events as ev', 'ev.id', '=', 'batch.event_id')
             ->selectRaw("batch.id, batch.name, batch.event_id, ev.name as event_name, batch.quantity, batch.margin, cat.name as category_name, (SELECT min($number) FROM badges WHERE badge_batch_id = batch.id) as first_number, (SELECT max($number) FROM badges WHERE badge_batch_id = batch.id) as last_number")
             ->orderBy('batch.name')->get();
         $setting = fn (string $key) => DB::table('settings')->where('key', $key)->value('value');
@@ -72,7 +72,7 @@ final class BadgesController
             'batches' => $batches,
             'statuses' => array_column(BadgeStatus::cases(), 'value'),
             'filters' => $filters,
-            'events' => DB::table('events')->where('is_permanent', false)->orderBy('name')->get(['id', 'name']),
+            'events' => DB::table('events')->orderBy('name')->get(['id', 'name']),
             'categories' => DB::table('categories')->orderBy('name')->get(['id', 'event_id', 'name', 'color']),
             'devices' => DB::table('devices')->orderBy('name')->get(['id', 'event_id', 'name', 'station']),
             'groups' => DB::table('groups')->orderBy('name')->get(['id', 'event_id', 'name']),

@@ -63,8 +63,7 @@ it('génère des personnes permanentes fictives avec leurs cartes, puis la remis
     // Une impression tracée (registre en ajout seul) fait aussi partie de ce qui s'efface.
     $holder = (string) DB::table('permanent_holders')->value('id');
     app(HolderCards::class)->recordPrint($holder, null, $this->admin);
-    $context = (string) DB::table('events')->where('is_permanent', true)->value('id');
-    DB::table('badge_print_runs')->insert(['id' => (string) Str::uuid(), 'kind' => 'permanent', 'event_id' => $context, 'operator_id' => $this->admin->id, 'nature' => 'officiel', 'format' => 'cr80', 'face' => 'recto', 'badge_count' => 1, 'options' => '{}', 'generated_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('badge_print_runs')->insert(['id' => (string) Str::uuid(), 'kind' => 'permanent', 'event_id' => null, 'operator_id' => $this->admin->id, 'nature' => 'officiel', 'format' => 'cr80', 'face' => 'recto', 'badge_count' => 1, 'options' => '{}', 'generated_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
 
     $this->post('/administration/demonstration/remettre-a-zero', ['_token' => 'jeton', 'confirmation' => 'REMETTRE A ZERO IKOMA', 'password' => 'Motdepasse-De-Test-12345!', 'acknowledge' => true, 'clear_users' => false])->assertRedirect();
     foreach (['permanent_holders', 'holder_cards', 'holder_card_prints', 'badge_print_runs', 'holder_entitlements', 'events', 'badges'] as $table) {
@@ -73,7 +72,6 @@ it('génère des personnes permanentes fictives avec leurs cartes, puis la remis
     expect(DB::table('users')->where('id', $this->admin->id)->exists())->toBeTrue();
     // Les protections « ajout seul » sont rétablies après la remise à zéro.
     app(InstitutionalCategories::class)->initialize($this->admin);
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     $again = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive '.Str::random(6), 'institutional_category' => 'AILCT-01'], $this->admin);
     app(HolderCards::class)->issue($again, $this->admin);
     expect(fn () => DB::table('holder_cards')->where('holder_id', $again)->delete())->toThrow(QueryException::class);

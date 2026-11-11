@@ -181,8 +181,8 @@ it('expose à la tablette les capacités du poste pour adapter l’écran', func
 // --- Parcours de l'atelier -------------------------------------------------------------------------------------------------------------
 
 it('ne compte pas les badges des cartes permanentes parmi les badges visiteurs dans les compteurs de l’espace', function () {
-    $before = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->count();
-    $available = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false)->where('b.status', 'Disponible')->count();
+    $before = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->count();
+    $available = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('b.status', 'Disponible')->count();
     $this->actingAs($this->admin)->get('/administration/badges')->assertOk()->assertInertia(fn ($page) => $page->where('badgesCartes.visitors.available', $available)->has('badgesCartes.cards.holders'));
     expect($before)->toBeGreaterThan(0)->and($available)->toBeGreaterThanOrEqual(4);
 });

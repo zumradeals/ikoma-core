@@ -4,7 +4,6 @@ use App\Models\User;
 use App\Services\DataLifecycle;
 use App\Services\InstitutionalCategories;
 use App\Services\PermanentHolders;
-use App\Services\Pilotage;
 use App\Services\QrSvg;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\QueryException;
@@ -202,26 +201,6 @@ it('garde l’identifiant émis quand le format change, et le format reste confi
 
 // --- A04.2 contexte permanent -----------------------------------------------------------------------------------------------
 
-it('crée un seul contexte permanent protégé contre la clôture, l’archivage, l’anonymisation et la suppression', function () {
-    $this->actingAs($this->admin)->post('/administration/titulaires/contexte-permanent')->assertRedirect();
-    $this->post('/administration/titulaires/contexte-permanent')->assertRedirect();
-    expect(DB::table('events')->where('is_permanent', true)->count())->toBe(1);
-    $event = $this->holders->permanentContext();
-    foreach (['clos', 'archive'] as $status) {
-        expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->update(['status' => $status])))->toThrow(QueryException::class, 'ne se clôt');
-    }
-    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->update(['anonymized_at' => now()])))->toThrow(QueryException::class, 'ne se clôt');
-    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->update(['is_permanent' => false])))->toThrow(QueryException::class, 'le reste');
-    expect(fn () => DB::transaction(fn () => DB::table('events')->where('id', $event->id)->delete()))->toThrow(QueryException::class, 'ne se supprime pas');
-    expect(fn () => DB::transaction(fn () => DB::statement('TRUNCATE events CASCADE')))->toThrow(QueryException::class, 'permission denied');
-    expect(fn () => app(DataLifecycle::class)->transition($event->id, 'cloturer', $this->admin))->toThrow(ValidationException::class);
-    expect(fn () => app(DataLifecycle::class)->transition($event->id, 'archiver', $this->admin))->toThrow(ValidationException::class);
-    $inspect = app(DataLifecycle::class)->inspect('evenement', $event->id, $this->admin);
-    expect($inspect['allowed'])->toBeFalse()->and(implode(' ', $inspect['reasons']))->toContain('contexte permanent');
-    $second = (string) Str::uuid();
-    expect(fn () => DB::transaction(fn () => DB::table('events')->insert(['id' => $second, 'name' => 'Deuxième', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'is_permanent' => true, 'created_at' => now(), 'updated_at' => now()])))->toThrow(QueryException::class);
-});
-
 it('conserve le registre quand les événements ordinaires sont clos, archivés ou supprimés', function () {
     [$event] = holderEvent();
     $id = $this->holders->create(holderData(), $this->admin);
@@ -328,10 +307,11 @@ it('n’est lu par aucun service de contrôle, d’autorisation ni de badge : se
 
 it('laisse le contrat QR et les fiches existantes inchangés', function () {
     expect(QrSvg::PREFIX)->toBe('IKOMA1:');
-    expect(DB::table('visitors')->whereNotNull('holder_id')->count())->toBe(0)->and(DB::table('events')->where('is_permanent', true)->count())->toBe(0);
-    foreach (['visitors' => 'holder_id', 'categories' => 'institutional_code', 'events' => 'is_permanent'] as $table => $column) {
+    expect(DB::table('visitors')->whereNotNull('holder_id')->count())->toBe(0);
+    foreach (['visitors' => 'holder_id', 'categories' => 'institutional_code'] as $table => $column) {
         expect(Schema::hasColumn($table, $column))->toBeTrue();
     }
+    expect(Schema::hasColumn('events', 'is_permanent'))->toBeFalse(); // plus de contexte permanent : les cartes appartiennent au site
 });
 
 it('autorise le rattachement facultatif d’une fiche d’événement à un titulaire, une seule fois par événement', function () {
@@ -368,28 +348,8 @@ it('protège aussi par déclencheurs, même contre le propriétaire de la base (
             }
             $owner->statement('ROLLBACK TO SAVEPOINT essai');
         }
-        $event = (string) Str::uuid();
-        $owner->table('events')->insert(['id' => $event, 'name' => 'Contexte fictif propriétaire', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'is_permanent' => true, 'created_at' => now(), 'updated_at' => now()]);
-        foreach (['DELETE FROM events WHERE is_permanent' => 'ne se supprime pas', 'TRUNCATE events CASCADE' => 'protégé'] as $sql => $message) {
-            $owner->statement('SAVEPOINT essai');
-            try {
-                $owner->statement($sql);
-                $this->fail($sql.' aurait dû être refusé.');
-            } catch (QueryException $e) {
-                expect($e->getMessage())->toContain($message);
-            }
-            $owner->statement('ROLLBACK TO SAVEPOINT essai');
-        }
     } finally {
         $owner->rollBack();
     }
 });
 
-it('ne laisse pas le contexte permanent devenir l’événement affiché par défaut', function () {
-    [$event] = holderEvent();
-    DB::table('events')->where('id', '<>', $event)->where('is_permanent', false)->update(['status' => 'archive']);
-    $this->holders->createPermanentContext($this->admin);
-    $shown = app(Pilotage::class)->event(null);
-    expect($shown->id)->toBe($event);
-    $this->actingAs($this->admin)->get('/administration')->assertOk()->assertInertia(fn (Assert $p) => $p->where('event.id', $event));
-});

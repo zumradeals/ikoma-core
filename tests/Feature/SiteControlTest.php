@@ -57,7 +57,6 @@ beforeEach(function () {
     $this->admin = scUser('administrateur');
     $this->agent = scUser('agent_accueil');
     app(InstitutionalCategories::class)->initialize($this->admin);
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     $this->event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $this->event, 'name' => 'Événement fictif contrôle du site', 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(10), 'created_at' => now(), 'updated_at' => now()]);
     $this->activityZone = (string) Str::uuid();

@@ -25,7 +25,7 @@ final class Maintenance
         }
         $days = app(DataRetention::class)->settings();
         $eligible = [];
-        foreach (DB::table('events')->where('ends_at', '<', now())->where('is_permanent', false)->orderBy('id')->get() as $event) {
+        foreach (DB::table('events')->where('ends_at', '<', now())->orderBy('id')->get() as $event) {
             if (app(DataLifecycle::class)->closureReasons($event->id) !== [] || DB::table('alerts')->where('event_id', $event->id)->whereNull('resolved_at')->exists()) {
                 throw new RuntimeException('Un événement terminé contient des présences, appareils ou opérations non résolus. Clôturez les événements avant le nettoyage.');
             }

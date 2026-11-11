@@ -18,7 +18,7 @@ final class InstitutionalCategoriesController
     {
         Gate::authorize('categories.gerer');
         $event = app(Pilotage::class)->event(is_string($request->query('event')) ? $request->query('event') : null);
-        $events = DB::table('events')->where('is_permanent', false)->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'ouvert'))->orderByDesc('starts_at')->get(['id', 'name']);
+        $events = DB::table('events')->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'ouvert'))->orderByDesc('starts_at')->get(['id', 'name']);
 
         return Inertia::render('Admin/CategoriesInstitutionnelles', [
             'categories' => $categories->all(),

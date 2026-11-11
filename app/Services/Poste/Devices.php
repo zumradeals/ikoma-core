@@ -51,7 +51,7 @@ final class Devices
             if ($device->event_id !== null && ! in_array($device->event_id, $eventIds, true)) {
                 throw new DeskRefused('activite_en_cours', 'L’activité en cours de cette tablette ne peut pas être retirée : choisissez d’abord une autre activité en cours.', 422);
             }
-            $known = DB::table('events')->whereIn('id', $eventIds)->where('is_permanent', false)->pluck('id')->all();
+            $known = DB::table('events')->whereIn('id', $eventIds)->pluck('id')->all();
             if (count($known) !== count($eventIds)) {
                 throw new DeskRefused('activite_inconnue', 'Activité inconnue.', 422);
             }
@@ -94,7 +94,7 @@ final class Devices
     public function choices(Device $device): array
     {
         return DB::table('device_activities as a')->join('events as e', 'e.id', '=', 'a.event_id')
-            ->where('a.device_id', $device->id)->where('e.is_permanent', false)->whereNull('e.anonymized_at')
+            ->where('a.device_id', $device->id)->whereNull('e.anonymized_at')
             ->where(fn ($q) => $q->whereNull('e.status')->orWhereNotIn('e.status', ['clos', 'archive']))
             ->orderBy('e.starts_at')->orderBy('e.name')->get(['e.id', 'e.name', 'e.starts_at', 'e.ends_at'])
             ->map(fn ($e) => ['id' => $e->id, 'name' => $e->name, 'starts_at' => Carbon::parse($e->starts_at)->toIso8601String(), 'ends_at' => Carbon::parse($e->ends_at)->toIso8601String(), 'current' => $e->id === $device->event_id])->all();

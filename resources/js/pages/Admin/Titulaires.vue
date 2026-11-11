@@ -19,7 +19,7 @@ type ImportPreview = {
 };
 const props = defineProps<{
   holders: Page; filters: { q: string; statut: string; categorie: string; photo: string }; categories: Category[]; importPreview: ImportPreview | null; bulkMax: number;
-  identifierFormat: { prefix: string; width: number; check: boolean }; identifierExample: string; permanentContext: { id: string; name: string } | null; canConfigure: boolean; canCards: boolean;
+  identifierFormat: { prefix: string; width: number; check: boolean }; identifierExample: string; canConfigure: boolean; canCards: boolean;
   pipeline: { sans_carte: number; sans_photo: number; a_imprimer: number; a_remettre: number; actives: number; prochaine_remise: string | null } | null;
 }>();
 

@@ -50,7 +50,6 @@ it('garde deux parcours distincts : le formulaire d’invité refuse un titulair
 
 it('imprime à la fois un lot de badges visiteurs et la carte d’un titulaire sans que l’un modifie l’autre', function () {
     app(InstitutionalCategories::class)->initialize($this->admin);
-    app(PermanentHolders::class)->createPermanentContext($this->admin);
     DB::table('settings')->where('key', 'badge_marge_pourcent')->update(['value' => '0']);
     $batch = app(BadgeLots::class)->generate(DemoSeeder::id('event'), DemoSeeder::id('category1'), 3, $this->admin);
     $holder = app(PermanentHolders::class)->create(['full_name' => 'Titulaire Impression Fictif', 'institutional_category' => 'AILCT-03'], $this->admin);

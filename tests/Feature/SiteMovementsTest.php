@@ -56,7 +56,7 @@ it('corrige un mouvement du site une seule fois et recalcule la présence', func
 });
 
 it('refuse en base un mouvement mêlant activité et site, ou sans personne identifiée', function () {
-    $event = (string) DB::table('events')->where('is_permanent', false)->value('id');
+    $event = (string) DB::table('events')->value('id');
     $base = ['id' => '', 'event_id' => null, 'visitor_id' => null, 'badge_id' => null, 'holder_id' => null, 'actor_id' => null, 'type' => 'entree', 'checkpoint' => null, 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now()];
     $insert = fn (array $row) => fn () => DB::transaction(fn () => DB::table('access_events')->insert($row + ['id' => (string) Str::uuid()] + $base));
     expect($insert(['event_id' => $event, 'holder_id' => $this->holder]))->toThrow(QueryException::class);
@@ -90,7 +90,7 @@ it('affiche les présents du site dans « Site et accès » pour qui a le droit 
 });
 
 it('ne change pas les chiffres des activités : les mouvements du site n’apparaissent pas dans la présence d’une activité', function () {
-    $event = (string) DB::table('events')->where('is_permanent', false)->value('id');
+    $event = (string) DB::table('events')->value('id');
     $before = app(Presence::class)->count($event);
     $this->movements->record($this->holder, 'entree', 'Entrée fictive', $this->admin);
     expect(app(Presence::class)->count($event))->toBe($before);

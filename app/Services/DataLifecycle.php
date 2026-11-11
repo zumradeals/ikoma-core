@@ -82,9 +82,6 @@ final class DataLifecycle
                 $reasons[] = 'Lot réservé, nominatif, utilisé ou exposé à une tablette : suppression interdite.';
             }
         } elseif ($entity === 'evenement') {
-            if ($row->is_permanent) {
-                $reasons[] = 'Le contexte permanent ne se supprime pas : il porte les titulaires permanents.';
-            }
             if ($row->status !== null) {
                 $reasons[] = 'Cet événement possède un état opérationnel : conservez ses références.';
             }
@@ -197,9 +194,6 @@ final class DataLifecycle
             $this->lock();
             $event = DB::table('events')->where('id', $id)->first();
             abort_unless($event !== null, 404);
-            if ($event->is_permanent) {
-                throw ValidationException::withMessages(['operation' => 'Le contexte permanent ne se clôt ni ne s’archive : il porte les titulaires permanents.']);
-            }
             if ($action === 'archiver') {
                 $reasons = $event->status === 'clos' ? $this->closureReasons($id) : ['Clôturez cet événement avant de l’archiver.'];
             } else {

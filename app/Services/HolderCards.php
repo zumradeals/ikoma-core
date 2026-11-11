@@ -249,10 +249,10 @@ final class HolderCards
                 $badge = $this->lots->issueSiteCard('Carte '.$holder->identifier, $actor);
                 $id = (string) Str::uuid();
                 DB::table('holder_cards')->insert([
-                    'id' => $id, 'holder_id' => $holderId, 'badge_id' => $badge['id'], 'event_id' => null, 'status' => 'active',
+                    'id' => $id, 'holder_id' => $holderId, 'badge_id' => $badge['id'], 'status' => 'active',
                     'issued_by' => $actor->id, 'issued_at' => now(), 'activated_at' => $activate ? now() : null, 'activation_source' => $activate ? 'ancienne' : null, 'rank' => (int) DB::table('holder_cards')->where('holder_id', $holderId)->max('rank') + 1, 'created_at' => now(), 'updated_at' => now(),
                 ]);
-                // Toute émission de carte entre dans le registre canonique des émissions (opération identifiée, personne canonique, contexte permanent).
+                // Toute émission de carte entre dans le registre canonique des émissions (opération identifiée, personne canonique, site).
                 IssuanceLedger::record(['operation_id' => $operationId ?? (string) Str::uuid(), 'purpose' => $purpose, 'support_type' => 'carte_permanente', 'person_id' => $holder->person_id, 'holder_id' => $holderId,
                     'event_id' => null, 'badge_id' => $badge['id'], 'replaces_badge_id' => $replacesBadgeId, 'actor_id' => $actor->id]);
                 $this->audit->append('carte.emise', $actor->id, ['holder_id' => $holderId, 'identifiant' => $holder->identifier, 'code_badge' => $badge['code']]);

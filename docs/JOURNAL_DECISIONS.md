@@ -924,3 +924,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Toute nouvelle carte permanente est un badge du site : aucun événement technique n'est plus créé à la première carte, aucun lot, aucune catégorie d'événement, aucune participation. Le contrôle reconnaît une carte par sa fiche `holder_cards`, pas par son événement.
 - Les codes `B-nnn` du site dépassent ceux de l'ancien registre pour éviter tout doublon quand l'étape 4 rattachera les anciennes cartes au site ; index unique sur les codes du site.
 - Étapes 2 et 3 livrées ensemble (les lecteurs devaient suivre l'émission) ; l'étape 4 (suppression du conteneur) reste à faire. Détail : docs/ailct/V1-RETRAIT-REGISTRE-CARTES.md.
+
+## Retrait du registre des cartes, étape 4 : l'ancien registre est effacé (décision du dirigeant)
+- Le dirigeant a choisi d'effacer l'ancien registre technique : installation d'essai, aucune donnée réelle. Les cartes existantes passent au site (mêmes codes `B-nnn`, mêmes jetons QR, mêmes identifiants) ; passages, participations, lots, catégories et événement de l'ancien registre sont supprimés.
+- Plus de conteneur : `events.is_permanent`, la nature « permanent », `holder_cards.event_id`, la route de création du contexte permanent et ses protections disparaissent. Migration non réversible.
+- Supervision générale : la présence du site vient des passages des titulaires ; une même personne présente sur le site et dans une activité compte pour une seule présence.

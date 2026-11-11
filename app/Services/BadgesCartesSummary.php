@@ -13,7 +13,7 @@ final class BadgesCartesSummary
     /** @return array{visitors: array{available: int, to_return: int, batches: int, print_runs: int}, cards: array{holders: int, active: int, prints: int}, totals: array{supports_actifs: int, cartes_permanentes: int, badges_visiteurs: int, tirages_30j: int}} */
     public function get(): array
     {
-        $visitorBadges = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')->where('e.is_permanent', false);
+        $visitorBadges = DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id');
         $toReturn = DB::table('badge_assignments as a')->join('visitors as v', 'v.id', '=', 'a.visitor_id')->whereNull('a.returned_at')->whereNull('a.cancelled_at')
             ->where(fn ($q) => $q->where('v.status', 'sorti')->orWhereNotNull('v.closed_at'))->count();
 
@@ -27,7 +27,7 @@ final class BadgesCartesSummary
             'visitors' => [
                 'available' => (int) (clone $visitorBadges)->where('b.status', 'Disponible')->count(),
                 'to_return' => $toReturn,
-                'batches' => DB::table('badge_batches as g')->join('events as e', 'e.id', '=', 'g.event_id')->where('e.is_permanent', false)->count(),
+                'batches' => DB::table('badge_batches as g')->join('events as e', 'e.id', '=', 'g.event_id')->count(),
                 'print_runs' => DB::table('badge_print_runs')->where('kind', 'visiteur')->count(),
             ],
             'cards' => [

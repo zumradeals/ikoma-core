@@ -20,16 +20,16 @@ final class ListImportsController
     public function index(Request $r, ListImport $imports): Response
     {
         Gate::authorize('listes.importer');
-        $input = $r->validate(['event_id' => ['nullable', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)], 'q' => ['nullable', 'string', 'max:160']]);
+        $input = $r->validate(['event_id' => ['nullable', 'uuid', Rule::exists('events', 'id')], 'q' => ['nullable', 'string', 'max:160']]);
         $event = $input['event_id'] ?? null;
 
-        return Inertia::render('Admin/Imports', ['events' => DB::table('events')->where('is_permanent', false)->select('id', 'name')->orderBy('name')->get(), 'preview' => $event ? $imports->show($event, (string) $r->user()->id) : null, 'result' => $r->session()->get('import_result'), 'selectedEvent' => $event, 'results' => $event && ! empty($input['q']) ? app(VisitorSearch::class)->search($event, $input['q']) : []]);
+        return Inertia::render('Admin/Imports', ['events' => DB::table('events')->select('id', 'name')->orderBy('name')->get(), 'preview' => $event ? $imports->show($event, (string) $r->user()->id) : null, 'result' => $r->session()->get('import_result'), 'selectedEvent' => $event, 'results' => $event && ! empty($input['q']) ? app(VisitorSearch::class)->search($event, $input['q']) : []]);
     }
 
     public function preview(Request $r, ListImport $imports): RedirectResponse
     {
         Gate::authorize('listes.importer');
-        $input = $r->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)], 'file' => ['required', 'file', 'max:5120'], 'create_hosts' => ['required', 'boolean']]);
+        $input = $r->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')], 'file' => ['required', 'file', 'max:5120'], 'create_hosts' => ['required', 'boolean']]);
 
         return $this->safe(function () use ($r, $imports, $input) {
             $imports->preview($input['event_id'], (string) $r->user()->id, $r->file('file'), (bool) $input['create_hosts']);
@@ -41,7 +41,7 @@ final class ListImportsController
     public function confirm(Request $r, ListImport $imports): RedirectResponse
     {
         Gate::authorize('listes.importer');
-        $input = $r->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)], 'id' => ['required', 'uuid']]);
+        $input = $r->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')], 'id' => ['required', 'uuid']]);
 
         return $this->safe(function () use ($r, $imports, $input) {
             $result = $imports->confirm($input['event_id'], (string) $r->user()->id, $input['id']);
@@ -53,7 +53,7 @@ final class ListImportsController
     public function abandon(Request $r, ListImport $imports): RedirectResponse
     {
         Gate::authorize('listes.importer');
-        $input = $r->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')->where('is_permanent', false)], 'id' => ['required', 'uuid']]);
+        $input = $r->validate(['event_id' => ['required', 'uuid', Rule::exists('events', 'id')], 'id' => ['required', 'uuid']]);
 
         return $this->safe(function () use ($r, $imports, $input) {
             $imports->abandon($input['event_id'], (string) $r->user()->id, $input['id']);

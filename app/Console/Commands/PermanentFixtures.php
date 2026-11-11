@@ -56,7 +56,6 @@ class PermanentFixtures extends Command
         $deviceModel = Device::findOrFail($device);
 
         app(InstitutionalCategories::class)->initialize($admin);
-        app(PermanentHolders::class)->createPermanentContext($admin);
         app(PermanentAccess::class)->saveOfflineTrust(30, true, $admin);
 
         $registry = app(PermanentHolders::class);

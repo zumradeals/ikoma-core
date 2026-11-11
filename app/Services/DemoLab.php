@@ -248,9 +248,6 @@ final class DemoLab
         if (! $categories->initialized()) {
             $categories->initialize($actor);
         }
-        if ($holders->permanentContext() === null) {
-            $holders->createPermanentContext($actor);
-        }
         $codes = DB::table('institutional_categories')->orderBy('sort_order')->pluck('code')->all();
         $tag = Str::upper(Str::random(3));
         DB::transaction(function () use ($quantity, $actor, $holders, $cards, $codes, $tag): void {
@@ -266,6 +263,6 @@ final class DemoLab
         });
         app(Audit::class)->append('demo.permanents_generes', $actor->id, ['nombre' => $quantity]);
 
-        return (string) $holders->permanentContext()?->id;
+        return ''; // aucune activité : les cartes appartiennent au site
     }
 }

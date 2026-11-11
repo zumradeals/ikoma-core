@@ -11,7 +11,7 @@ vi.mock('@inertiajs/vue3', () => ({
 import Operations from '../../resources/js/pages/Admin/Operations.vue';
 
 const general = {
-  as_of: '2027-01-10T10:00:00Z', mouvements: { entrees: 12, sorties: 5, controles: 3, refus: 2 }, presents: { total: 9, permanents: 4, activites: 5, multi_contextes: 2, contextes: [{ event_id: 'p0', name: 'Permanent', is_permanent: true, presents: 6 }, { event_id: 'e1', name: 'Stage fictif', is_permanent: false, presents: 5 }] }, alertes: { a_traiter: 1, critiques: 0 }, litiges: 2,
+  as_of: '2027-01-10T10:00:00Z', mouvements: { entrees: 12, sorties: 5, controles: 3, refus: 2 }, presents: { total: 9, permanents: 4, activites: 5, multi_contextes: 2, contextes: [{ event_id: 'e1', name: 'Stage fictif', presents: 5 }] }, alertes: { a_traiter: 1, critiques: 0 }, litiges: 2,
   postes: { total: 8, actifs: 7, appareils_enroles: 7, appareils_synchronises: 6, appareils_silencieux: 1 }, par_heure: Array.from({ length: 24 }, (_, i) => ({ heure: String(i).padStart(2, '0'), entrees: i % 5, sorties: i % 3 })),
 };
 const centre = {
@@ -19,7 +19,7 @@ const centre = {
   operations: [], presents: { count: 3, rows: [] }, movements: [{ id: 'm1', occurred_at: '2027-01-10T09:55:00Z', type: 'entree', checkpoint: 'accueil', visitor_id: 'v1', full_name: 'Aminata Fictive', badge_code: 'B-001', verdict: null, zone_ok: null, direction: null }],
   visits: { counts: {}, late_after_minutes: 15, rows: [] }, vehicles: [], vehicles_count: 2, badges_to_return: { count: 1, rows: [] }, refusals: { pending: 0, rows: [] }, incidents: [], closable: [],
 };
-const base = { events: [{ id: 'e1', name: 'Stage fictif', is_permanent: false }, { id: 'p0', name: 'Permanent', is_permanent: true }], event: { id: 'e1', name: 'Stage fictif', starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-03-01T18:00:00Z', status: null },
+const base = { events: [{ id: 'e1', name: 'Stage fictif' }, { id: 'e2', name: 'Visite fictive' }], event: { id: 'e1', name: 'Stage fictif', starts_at: '2027-01-01T08:00:00Z', ends_at: '2027-03-01T18:00:00Z', status: null },
   general, counters: { attendus: 40, arrives: 30, presents: 3, refuses: 2 }, overview: { critiques: 0, hautes: 0, litiges: 2, cars: { total: 0, partis: 0, arrives: 0, ecarts: 0 }, postes_silencieux: 1, retards: 1 }, centre,
   can: { presences: true, alertes: true, litiges: true, journal: true, postes: true, groupes: true } };
 const mountPage = (extra: object = {}) => mount(Operations, { props: { ...base, ...extra } as never });
@@ -51,11 +51,6 @@ describe('Administration › Opérations', () => {
     expect(w.text()).not.toMatch(/En ligne/);
   });
 
-  it('précise le périmètre du site (personnel permanent) quand il est consulté', () => {
-    const w = mountPage({ event: { ...base.event, id: 'p0', name: 'Permanent', is_permanent: true } });
-    expect(w.get('[data-testid=perimetre-activite]').text()).toBe('Périmètre : site (personnel permanent)');
-  });
-
   it('montre la supervision générale puis les cinq onglets, chacun renvoyant vers l’écran propriétaire', async () => {
     const w = mountPage();
     expect(w.get('[data-testid=activite-effectifs]').text()).toContain('Attendus : 40');
@@ -66,7 +61,7 @@ describe('Administration › Opérations', () => {
     await w.get('[data-testid=onglet-presences]').trigger('click');
     expect(w.get('[data-testid=presences-site]').text()).toContain('9 personnes présentes sur le site (identités distinctes');
     expect(w.get('[data-testid=presences-multi]').text()).toContain('2 présences enregistrées dans plusieurs contextes');
-    expect(w.findAll('[data-testid=presences-contextes] li').map(l => l.text())).toEqual(['Site (personnel permanent) : 6', 'Stage fictif : 5']);
+    expect(w.findAll('[data-testid=presences-contextes] li').map(l => l.text())).toEqual(['Site (personnel permanent) : 4', 'Stage fictif : 5']);
     expect(w.get('[data-testid=vers-evacuation]').attributes('href')).toBe('/pilotage/evacuation?event=e1');
     await w.get('[data-testid=onglet-incidents]').trigger('click');
     expect(w.get('[data-testid=inc-litiges]').text()).toBe('2');
@@ -86,11 +81,11 @@ describe('Administration › Opérations', () => {
     expect(w.findAll('button').map(b => b.text()).filter(t => /cl[ôo]turer|restituer|valider|autoriser/i.test(t))).toEqual([]);
   });
 
-  it('change d’activité consultée, y compris le site, et actualise sans rien écrire', async () => {
+  it('change d’activité consultée et actualise sans rien écrire', async () => {
     const w = mountPage();
-    await w.get('[data-testid=choix-activite]').setValue('p0');
-    expect(get).toHaveBeenCalledWith('/administration/operations', { event: 'p0' }, expect.objectContaining({ preserveScroll: true }));
-    expect(w.findAll('[data-testid=choix-activite] option').map(o => o.text())).toEqual(['Stage fictif', 'Site (personnel permanent)']);
+    await w.get('[data-testid=choix-activite]').setValue('e2');
+    expect(get).toHaveBeenCalledWith('/administration/operations', { event: 'e2' }, expect.objectContaining({ preserveScroll: true }));
+    expect(w.findAll('[data-testid=choix-activite] option').map(o => o.text())).toEqual(['Stage fictif', 'Visite fictive']);
     await w.get('[data-testid=actualiser]').trigger('click');
     expect(reload).toHaveBeenCalledWith({ only: ['general', 'counters', 'overview', 'centre'] });
   });

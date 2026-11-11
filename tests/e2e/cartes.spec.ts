@@ -61,7 +61,6 @@ test('cartes institutionnelles : préparation, aperçu recto/verso CR80, QR lisi
 
   // Titulaire fictif de catégorie AILCT-04.
   await page.goto('/administration/titulaires');
-  if (await page.getByTestId('creer-contexte').isVisible()) { await page.getByTestId('creer-contexte').click(); await expect(page.getByTestId('contexte-permanent')).toContainText('en place'); }
   await page.getByText('Ajouter une personne').click();
   await page.getByTestId('creer-prenom').fill(name.split(' ')[0]);
   await page.getByTestId('creer-nom').fill(name.split(' ').slice(1).join(' '));

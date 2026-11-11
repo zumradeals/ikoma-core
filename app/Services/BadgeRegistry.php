@@ -37,9 +37,8 @@ final class BadgeRegistry
 
         return DB::transaction(function () use ($badgeIds, $toEventId, $categoryId, $reserveDeviceId, $actor): int {
             EventAvailability::requireOpen($toEventId);
-            $target = DB::table('events')->where('id', $toEventId)->first(['id', 'is_permanent']);
-            if ($target === null || $target->is_permanent) {
-                throw new BadgeRefused('activite', 'Choisissez une activité temporaire (le contexte permanent ne reçoit que ses cartes).');
+            if (! DB::table('events')->where('id', $toEventId)->exists()) {
+                throw new BadgeRefused('activite', 'Choisissez une activité existante.');
             }
             if (! DB::table('categories')->where('id', $categoryId)->where('event_id', $toEventId)->exists()) {
                 throw new BadgeRefused('categorie', 'Cette catégorie n’appartient pas à l’activité choisie.');
@@ -68,8 +67,8 @@ final class BadgeRegistry
                 if ($badge->printed_for_visitor_id !== null) {
                     throw new BadgeRefused('imprime_pour_une_personne', "Le badge {$badge->code} a été imprimé pour une personne précise.");
                 }
-                if (DB::table('events')->where('id', $badge->event_id)->where('is_permanent', true)->exists()) {
-                    throw new BadgeRefused('carte_permanente', "Le badge {$badge->code} appartient au contexte permanent.");
+                if ($badge->event_id === null) {
+                    throw new BadgeRefused('carte_permanente', "Le badge {$badge->code} appartient au site : il ne devient pas un badge d’activité.");
                 }
                 if (DB::table('badges')->where('event_id', $toEventId)->where('code', $badge->code)->exists()) {
                     throw new BadgeRefused('code_deja_utilise', "L’activité choisie possède déjà un badge de code {$badge->code}.");
@@ -100,7 +99,7 @@ final class BadgeRegistry
     public function available(?string $notInEventId = null, int $limit = 200): Collection
     {
         return DB::table('badges as b')->join('events as e', 'e.id', '=', 'b.event_id')
-            ->where('b.status', 'Disponible')->where('e.is_permanent', false)->whereNull('b.printed_for_visitor_id')
+            ->where('b.status', 'Disponible')->whereNull('b.printed_for_visitor_id')
             ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('holder_cards as h')->whereColumn('h.badge_id', 'b.id'))
             ->when($notInEventId !== null, fn ($q) => $q->where('b.event_id', '<>', $notInEventId))
             ->orderBy('e.name')->orderBy('b.code')->limit($limit)

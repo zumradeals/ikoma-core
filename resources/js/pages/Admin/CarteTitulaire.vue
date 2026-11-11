@@ -10,7 +10,7 @@ type Card = { id: string; issued_at: string; activated_at: string | null; activa
 const props = defineProps<{
   holder: { id: string; identifier: string; full_name: string; status: 'actif' | 'clos'; institutional_category: string | null; has_photo: boolean; photo_print_allowed: boolean };
   category: { code: string; label: string } | null; card: Card | null; preview: { recto: string; verso: string } | null;
-  permanentContext: boolean; provisional: boolean; csrf: string;
+  provisional: boolean; csrf: string;
   cards: CardRow[]; reasons: Record<string, string>; entitlements: { id: string; event: string; zone: string; valid_from: string; valid_until: string; revoked_at: string | null }[];
 }>();
 
