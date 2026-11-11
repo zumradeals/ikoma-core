@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-const props = defineProps<{ name: string; badgeCode: string; zones: string[]; durationMs: number }>();
+const props = defineProps<{ name: string; badgeCode: string; zones: string[]; durationMs: number; pending?: number; online?: boolean }>();
 defineEmits<{ next: [] }>();
 const seconds = computed(() => Math.round(props.durationMs / 1000));
 const label = computed(() => `${Math.floor(seconds.value / 60)} min ${String(seconds.value % 60).padStart(2, '0')} s`);
@@ -14,6 +14,7 @@ const label = computed(() => `${Math.floor(seconds.value / 60)} min ${String(sec
       <p class="mt-4 text-xl" data-testid="chrono">Parcours terminé en <strong>{{ label }}</strong></p>
       <p class="font-semibold" :class="seconds <= 60 ? 'text-green-800' : 'text-red-800'"><span aria-hidden="true">{{ seconds <= 60 ? '✓' : '⚠' }}</span> {{ seconds <= 60 ? 'Objectif de 60 secondes tenu' : 'Objectif de 60 secondes dépassé' }}</p>
     </div>
-    <button type="button" class="btn-main" @click="$emit('next')">Visiteur suivant</button>
+    <p class="flex items-center gap-3 rounded-xl border-2 border-slate-300 bg-white p-4 text-lg font-semibold text-slate-700" data-testid="etat-envoi"><span aria-hidden="true">⟳</span>{{ (pending ?? 0) > 0 || online === false ? 'Enregistré sur la tablette. Envoi au serveur en cours : rien n’est perdu si le réseau coupe.' : 'Enregistré et envoyé au serveur.' }}</p>
+    <div class="poste-actionbar poste-actionbar-end"><button type="button" class="btn-main" @click="$emit('next')">Visiteur suivant</button></div>
   </section>
 </template>

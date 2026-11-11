@@ -7,7 +7,7 @@ import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../p
 import { ApiError, type ActivityChoice, type Avis, type DeskContext, type DeskSummary, type Fiche, type IdentityDocument, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
 import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.vue'; import PosteSelect from './PosteSelect.vue'; import StepSearch from './StepSearch.vue'; import StepFiche from './StepFiche.vue';
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
-import PosteFooter from './PosteFooter.vue'; import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
+import VisitorPanel from './VisitorPanel.vue'; import PosteFooter from './PosteFooter.vue'; import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
 
 import type { SyncState } from '../../poste/local/sync';
 const props = defineProps<{ agent: string; repository?: PosteRepository; sync?: SyncState | null; autoSelect?: boolean }>();
@@ -18,7 +18,7 @@ const repo: PosteRepository = props.repository ?? new HttpPosteRepository(() => 
 const ops = new OperationIds();
 
 const postes = ref<Poste[]>([]); const context = ref<DeskContext | null>(null);
-const ctx = ref(initial()); const fiche = ref<Fiche | null>(null); const homonyms = ref(1); const entryZones = ref<string[]>([]);
+const ctx = ref(initial()); const fiche = ref<Fiche | null>(null); const homonyms = ref(1); const others = ref<SearchResult[]>([]); const takenPhoto = ref<string | null>(null); const entryZones = ref<string[]>([]);
 const error = ref<ApiError | null>(null); const busy = ref(false); const online = ref(navigator.onLine); const pending = ref(0); const now = ref(Date.now());
 let clock: number | undefined;
 
@@ -112,8 +112,14 @@ async function choosePoste(id: string) {
 }
 async function refreshFiche(id: string) { fiche.value = await repo.visitor(id); return fiche.value; }
 
+// Homonymes : les autres fiches de même nom (organisation, personne reçue) aident l'agent à ne pas confondre deux personnes.
+async function loadOthers(f: Fiche, homonymCount: number) {
+  others.value = [];
+  if (homonymCount < 2) return;
+  try { others.value = (await repo.search(f.full_name)).filter(r => r.id !== f.id && r.full_name === f.full_name); } catch { /* confort : la case du second critère reste obligatoire */ }
+}
 function selectVisitor(id: string, homonymCount: number) {
-  return run(async () => { const f = await repo.visitor(id); fiche.value = f; homonyms.value = homonymCount; send({ type: 'SELECT', fiche: f }); });
+  return run(async () => { const f = await repo.visitor(id); fiche.value = f; homonyms.value = homonymCount; send({ type: 'SELECT', fiche: f }); void loadOthers(f, homonymCount); });
 }
 const onSelect = (result: SearchResult) => selectVisitor(result.id, result.homonyms);
 const onConfirm = () => send({ type: 'CONFIRM_FICHE' });
@@ -121,6 +127,8 @@ function onIdentity(photo: Blob, doc: IdentityDocument | undefined) {
   return run(async () => {
     const id = ctx.value.visitorId as string; const key = `identite:${id}`;
     await repo.saveIdentity(ops.get(key), id, photo, doc); ops.done(key);
+    if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.value);
+    try { takenPhoto.value = URL.createObjectURL(photo); } catch { takenPhoto.value = null; } // l'aperçu est un confort : l'enregistrement a déjà réussi
     await refreshFiche(id); send({ type: 'IDENTITY_SAVED' });
   });
 }
@@ -172,7 +180,8 @@ async function onRequestAdvice(){
   await run(async()=>{await repo.requestHostAdvice!(id);fiche.value=repo.refreshHost?await repo.refreshHost(id):await repo.visitor(id);});
 }
 async function onAdviceRefresh(){const id=ctx.value.visitorId;if(!id)return;await run(async()=>{fiche.value=repo.refreshHost?await repo.refreshHost(id):await repo.visitor(id);});}
-function onNext() { ctx.value = reduce(ctx.value, { type: 'NEXT' }); if (ctx.value.step === 'recherche') { fiche.value = null; error.value = null; homonyms.value = 1; } }
+function onNext() { ctx.value = reduce(ctx.value, { type: 'NEXT' }); if (ctx.value.step === 'recherche') { fiche.value = null; error.value = null; homonyms.value = 1; others.value = []; if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.value); takenPhoto.value = null; } }
+const inFlow = computed(() => !!fiche.value && ['fiche', 'attente_hote', 'identite', 'decision', 'badge', 'remise', 'entree', 'refus'].includes(ctx.value.step));
 function onBack() { error.value = null; send({ type: 'BACK' }); }
 
 const offlineSince = ref<number | null>(navigator.onLine ? null : Date.now());
@@ -187,7 +196,7 @@ onMounted(async () => {
   if (props.autoSelect && postes.value.length === 1) await choosePoste(postes.value[0].id);
   else if (saved && postes.value.some(p => p.id === saved)) await choosePoste(saved);
 });
-onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.removeEventListener('offline', setOnline); window.clearInterval(clock); });
+onBeforeUnmount(() => { if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.value); window.removeEventListener('online', setOnline); window.removeEventListener('offline', setOnline); window.clearInterval(clock); });
 </script>
 
 <template>
@@ -215,6 +224,7 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
             <p v-else class="poste-chip-box"><AdminIcon name="calendar" :size="22" /> Événement : <strong>{{ context.event.name }}</strong></p>
             <p v-if="repo.switchActivity" class="poste-chip-box"><button type="button" class="btn-soft" :disabled="!canLeaveForSite" data-testid="passer-mode-site" @click="onLeaveForSite">Passer en mode site</button></p>
             <p class="poste-chip-box"><AdminIcon name="layers" :size="22" /> Opérations en attente : <strong data-testid="en-attente">{{ sync ? sync.pending : pending }}</strong></p>
+            <p v-if="summary" class="poste-chip-box" data-testid="badges-disponibles"><AdminIcon name="tag" :size="22" /> Badges disponibles : <strong>{{ summary.badges.restants }}</strong></p>
           </div>
         </div>
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -233,14 +243,19 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
           <DeskPanel v-if="summary" :summary="summary" :online="online" :syncing="sync?.syncing" @sync="emit('sync')" @select="id => selectVisitor(id, 1)" />
         </template>
         <UnlistedForm v-else-if="ctx.step === 'non_liste'" :context="context" :busy="busy" @submit="onCreateUnlisted" @back="onBack" />
-        <StepFiche v-else-if="ctx.step === 'fiche' && fiche" :key="fiche.id" :fiche="fiche" :homonyms="homonyms" @confirm="onConfirm" @back="onBack" />
-        <StepWaitHost v-else-if="ctx.step === 'attente_hote' && fiche" :fiche="fiche" :refused="ctx.hostRefused" :busy="busy" @refresh="onHostRefresh" @next="onNext" />
-        <StepIdentity v-else-if="ctx.step === 'identite' && fiche" :name="fiche.full_name" :busy="busy" :document-required="fiche.identity_document === true" @done="onIdentity" @back="onBack" />
-        <StepDecision v-else-if="ctx.step === 'decision' && fiche" :name="fiche.full_name" :hors-periode="fiche.hors_periode" :blocked-reason="blockedReason" :busy="busy" :host-advice="fiche.host_advice?.state" :can-request="!!repo.requestHostAdvice" @request-advice="onRequestAdvice" @refresh-advice="onAdviceRefresh" @validate="onValidate" @refuse="onRefuse" @back="onBack" />
-        <StepBadge v-else-if="ctx.step === 'badge' && fiche" :name="fiche.full_name" :busy="busy" @submit="onBadge" />
-        <StepHandover v-else-if="ctx.step === 'remise' && fiche" :fiche="fiche" :badge-code="ctx.badgeCode ?? ''" :busy="busy" @enter="onEnter" />
-        <StepDone v-else-if="ctx.step === 'entree' && fiche" :name="fiche.full_name" :badge-code="ctx.badgeCode ?? ''" :zones="entryZones" :duration-ms="ctx.durationMs ?? 0" @next="onNext" />
-        <StepRefused v-else-if="ctx.step === 'refus' && fiche" :name="fiche.full_name" @next="onNext" />
+        <div v-else-if="inFlow && fiche" class="poste-flow" data-testid="parcours">
+          <VisitorPanel :fiche="fiche" :repository="repo" :photo-url="takenPhoto" :badge-code="ctx.badgeCode" />
+          <div class="poste-flow-main">
+          <StepFiche v-if="ctx.step === 'fiche' && fiche" :key="fiche.id" :fiche="fiche" :homonyms="homonyms" :others="others" @confirm="onConfirm" @back="onBack" />
+          <StepWaitHost v-else-if="ctx.step === 'attente_hote' && fiche" :fiche="fiche" :refused="ctx.hostRefused" :busy="busy" @refresh="onHostRefresh" @next="onNext" />
+          <StepIdentity v-else-if="ctx.step === 'identite' && fiche" :name="fiche.full_name" :busy="busy" :document-required="fiche.identity_document === true" @done="onIdentity" @back="onBack" />
+          <StepDecision v-else-if="ctx.step === 'decision' && fiche" :name="fiche.full_name" :fiche="fiche" :hors-periode="fiche.hors_periode" :blocked-reason="blockedReason" :busy="busy" :host-advice="fiche.host_advice?.state" :can-request="!!repo.requestHostAdvice" @request-advice="onRequestAdvice" @refresh-advice="onAdviceRefresh" @validate="onValidate" @refuse="onRefuse" @back="onBack" />
+          <StepBadge v-else-if="ctx.step === 'badge' && fiche" :name="fiche.full_name" :busy="busy" :available="summary?.badges.restants ?? null" @submit="onBadge" />
+          <StepHandover v-else-if="ctx.step === 'remise' && fiche" :fiche="fiche" :badge-code="ctx.badgeCode ?? ''" :busy="busy" @enter="onEnter" />
+          <StepDone v-else-if="ctx.step === 'entree' && fiche" :name="fiche.full_name" :badge-code="ctx.badgeCode ?? ''" :zones="entryZones" :duration-ms="ctx.durationMs ?? 0" :pending="sync ? sync.pending : pending" :online="online" @next="onNext" />
+          <StepRefused v-else-if="ctx.step === 'refus' && fiche" :name="fiche.full_name" @next="onNext" />
+          </div>
+        </div>
         <PosteFooter :poste="posteName" :device="context.poste.name" :agent="agent" :online="online" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" />
       </template>
     </div>
