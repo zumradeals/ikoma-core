@@ -56,6 +56,7 @@ it('fusionne les zones de même nom, garde la politique la plus restrictive et r
         ]);
         $owner->table('zones')->where('id', $hallA)->update(['created_at' => now()->subDay()]); // la plus ancienne est retenue
         $owner->table('zone_policies')->insert([
+            ['zone_id' => $zoneA, 'event_id' => $a, 'classification' => 'Interne', 'permanent_allowed' => true, 'offline_entry_allowed' => true, ...$at],
             ['zone_id' => $zoneB, 'event_id' => $b, 'classification' => 'Restreint', 'permanent_allowed' => true, 'offline_entry_allowed' => false, ...$at],
             ['zone_id' => $hallA, 'event_id' => $a, 'classification' => 'Public', 'permanent_allowed' => true, 'offline_entry_allowed' => true, ...$at],
         ]);
