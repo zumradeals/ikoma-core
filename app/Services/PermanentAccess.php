@@ -66,10 +66,10 @@ final class PermanentAccess
         if ($event === null || in_array($event->status, ['clos', 'archive'], true) || $event->anonymized_at !== null) {
             return $refuse('evenement_indisponible', 'Cet événement est clôturé, archivé ou anonymisé : aucune entrée n’est autorisée.');
         }
-        $entitlements = DB::table('holder_entitlements as e')->join('zones as z', 'z.id', '=', 'e.zone_id')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')
+        $entitlements = DB::table('holder_entitlements as e')->join('zones as z', 'z.id', '=', 'e.zone_id')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')->leftJoin('site_zone_policies as sp', 'sp.zone_id', '=', 'z.id')
             ->where('e.holder_id', $card->holder_id)->where('e.event_id', $eventId)->whereNull('e.revoked_at')
             ->when($point['type'] === 'zone', fn ($q) => $q->where('e.zone_id', $point['id']))
-            ->get(['e.valid_from', 'e.valid_until', 'z.name', 'p.permanent_allowed']);
+            ->get(['e.valid_from', 'e.valid_until', 'z.name', DB::raw('coalesce(p.permanent_allowed, sp.permanent_allowed) as permanent_allowed')]);
 
         return $this->evaluate($entitlements, $now, $point['type'] === 'zone' ? 'Aucune habilitation valable pour cette zone : accès refusé.' : 'Aucune habilitation valable pour cet événement : accès refusé.');
     }
@@ -156,8 +156,10 @@ final class PermanentAccess
         if (($refusal = $this->offlineTrustRefusal($declaredAt, $knownAt)) !== null) {
             return $refusal;
         }
-        $allowed = DB::table('holder_entitlements as e')->join('zone_policies as p', 'p.zone_id', '=', 'e.zone_id')
-            ->where('e.holder_id', $card->holder_id)->where('e.event_id', $eventId)->whereNull('e.revoked_at')->where('p.permanent_allowed', true)->where('p.offline_entry_allowed', true)
+        // Politique de la zone d'activité (ancien chemin) ou, pour une zone du site, politique du site.
+        $allowed = DB::table('holder_entitlements as e')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'e.zone_id')->leftJoin('site_zone_policies as sp', 'sp.zone_id', '=', 'e.zone_id')
+            ->where('e.holder_id', $card->holder_id)->where('e.event_id', $eventId)->whereNull('e.revoked_at')
+            ->whereRaw('coalesce(p.permanent_allowed, sp.permanent_allowed) IS TRUE')->whereRaw('coalesce(p.offline_entry_allowed, sp.offline_entry_allowed) IS TRUE')
             ->when($point['type'] === 'zone', fn ($q) => $q->where('e.zone_id', $point['id']))->exists();
 
         return $allowed ? null : $this->offlineRefuse('hors_ligne_non_autorise', 'Cette zone n’accepte pas l’entrée des titulaires permanents hors ligne.');
@@ -329,7 +331,10 @@ final class PermanentAccess
         $holders = DB::table('permanent_holders')->whereIn('id', $holderIds)->get(['id', 'identifier', 'full_name', 'organisation', 'status', 'engagement_starts_on', 'engagement_ends_on', 'institutional_category']);
         // Sans activité (mode site) : aucune habilitation ni politique d'activité, seulement celles du site.
         $entitlements = $eventId === null ? collect() : DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->get(['holder_id', 'zone_id', 'valid_from', 'valid_until'])->groupBy('holder_id');
-        $policies = $eventId === null ? [] : DB::table('zone_policies')->where('event_id', $eventId)->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->all();
+        // Politiques des zones de l'activité (ancien chemin) et des zones du site visées par ses habilitations.
+        $policies = $eventId === null ? [] : DB::table('zone_policies')->where('event_id', $eventId)->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed'])
+            ->concat(DB::table('site_zone_policies')->whereIn('zone_id', DB::table('holder_entitlements')->where('event_id', $eventId)->whereNull('revoked_at')->select('zone_id'))->get(['zone_id', 'permanent_allowed', 'offline_entry_allowed']))
+            ->map(fn ($p) => ['zone_id' => $p->zone_id, 'permanent_allowed' => (bool) $p->permanent_allowed, 'offline_entry_allowed' => (bool) $p->offline_entry_allowed])->values()->all();
 
         return [
             'directory' => $this->directory(),

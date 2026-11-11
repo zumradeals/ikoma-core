@@ -929,3 +929,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **Trois initiatives du proposant, approuvées avec les maquettes** : (1) les autres fiches du même nom (organisation, personne reçue) sont listées sous l'alerte d'homonyme ; la case du second critère reste obligatoire ; (2) « Badges disponibles » dans l'en-tête du poste ; (3) message d'état d'envoi à l'étape finale.
 - Non repris des maquettes : la barre de progression reste celle existante (numérotée, verte puis orange) ; la barre supérieure marine des maquettes fait double emploi avec l'en-tête actuel du poste (poste, activité, connexion, opérations en attente).
 - Aucune route, table ni permission nouvelle ; tests Vitest ajoutés (5 scénarios).
+
+## Zones du site : étape Z2, les lecteurs acceptent les zones du site avant la reprise des données
+- Après analyse, les lecteurs (habilitations de participants et de titulaires, politiques de zone, correspondance poste–zone, contrôle par zone, zone d'accueil, copie hors ligne, choix des écrans) doivent accepter les zones du site **avant** que les données y passent ; les étapes sont renumérotées (Z3 reprise des données, Z4 écrans, Z5 retrait).
+- `ActivityZones` décrit la règle en un seul endroit : zones propres à l'activité + zones du site. Une zone du site visée par une habilitation d'activité suit la politique du site (une seule politique par zone).

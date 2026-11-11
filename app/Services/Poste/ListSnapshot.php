@@ -127,7 +127,7 @@ final class ListSnapshot
             'settings' => $this->settings($setting, $f06Active),
             'categories' => DB::table('categories')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
             // Zones de l'activité (ancien chemin) et zones du site réutilisées par l'activité (catégories, habilitations de participants, zones gardées par ce poste).
-            'zones' => DB::table('zones')->where(fn ($q) => $q->where('event_id', $e)->orWhere(fn ($s) => $s->whereNull('event_id')->whereIn('id', $this->usedSiteZones($e))))->orderBy('name')->get(['id', 'name', 'est_accueil']),
+            'zones' => DB::table('zones')->where(fn ($q) => $q->where('event_id', $e)->orWhere(fn ($s) => $s->whereNull('event_id')->where(fn ($u) => $u->whereIn('id', $this->usedSiteZones($e))->orWhere('est_accueil', true))))->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
             // S06 : zones gardées par chaque point, et habilitations de participation actives (ni retirées ni suspendues) ; la période est jugée par la tablette.
             // La correspondance est portée par le poste : chaque tablette de l'activité affectée à ce poste en hérite (format inchangé pour les tablettes).
