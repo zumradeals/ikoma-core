@@ -5,12 +5,22 @@ namespace App\Services\Poste;
 use App\Models\Device;
 use App\Services\FoundingModules;
 use App\Services\PermanentAccess;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /** Copie de travail envoyée à la tablette : uniquement ce dont le poste a besoin, jamais de photo ni de jeton QR en clair. */
 final class ListSnapshot
 {
+    /**
+     * Zones du site réutilisées par l'activité d'une tablette : choisies par une catégorie ou par une habilitation de participant.
+     *
+     */
+    private function usedSiteZones(string $eventId): Builder
+    {
+        return DB::table('category_zone')->where('event_id', $eventId)->select('zone_id')->union(DB::table('participation_entitlements')->where('event_id', $eventId)->select('zone_id'));
+    }
+
     public function version(Device $poste): string
     {
         if ($poste->event_id === null) {
@@ -35,7 +45,9 @@ final class ListSnapshot
             (SELECT value FROM settings WHERE key = 'module_f06_active'),
             (SELECT md5(string_agg(key || '=' || value, ',' ORDER BY key)) FROM settings WHERE key IN ('poste_delai_appel_minutes', 'poste_hors_reseau_max_heures', 'poste_hors_reseau_approuve', 'poste_badges_bas_pourcent', 'poste_badges_bas_minimum', 'poste_inactivite_minutes', 'poste_ecart_horloge_secondes', 'poste_echecs_pin_max', 'identite_piece_active')),
             (SELECT list_revision FROM events WHERE id = ?),
-            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->id]);
+            (SELECT coalesce(md5(string_agg(z.id::text || z.name || z.est_accueil::text, ',' ORDER BY z.id)), '') FROM zones z WHERE z.event_id IS NULL AND z.id IN (SELECT zone_id FROM category_zone WHERE event_id = ? UNION SELECT zone_id FROM participation_entitlements WHERE event_id = ?)),
+            (SELECT coalesce(md5(string_agg(zone_id::text, ',' ORDER BY zone_id)), '') FROM checkpoint_site_zones WHERE checkpoint_id = ?),
+            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->checkpoint_id, $poste->id]);
 
         // Cartes permanentes, habilitations et politiques de zone : toute révocation ou habilitation modifiée change la version et est donc reprise à la prochaine synchronisation.
         // Le point de contrôle du poste (et donc ses capacités) fait partie de la copie : le modifier change la version.
@@ -115,11 +127,13 @@ final class ListSnapshot
             'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at', 'site']),
             'settings' => $this->settings($setting, $f06Active),
             'categories' => DB::table('categories')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
-            'zones' => DB::table('zones')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'est_accueil']),
+            // Zones de l'activité (ancien chemin) et zones du site réutilisées par l'activité (catégories, habilitations de participants, zones gardées par ce poste).
+            'zones' => DB::table('zones')->where(fn ($q) => $q->where('event_id', $e)->orWhere(fn ($s) => $s->whereNull('event_id')->whereIn('id', $this->usedSiteZones($e))))->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
             // S06 : zones gardées par chaque point, et habilitations de participation actives (ni retirées ni suspendues) ; la période est jugée par la tablette.
             // La correspondance est portée par le poste : chaque tablette de l'activité affectée à ce poste en hérite (format inchangé pour les tablettes).
-            'point_zones' => DB::table('checkpoint_zones as c')->join('devices as d', 'd.checkpoint_id', '=', 'c.checkpoint_id')->where('c.event_id', $e)->where('d.event_id', $e)->orderBy('d.id')->orderBy('c.zone_id')->get(['d.id as device_id', 'c.zone_id']),
+            'point_zones' => DB::table('checkpoint_zones as c')->join('devices as d', 'd.checkpoint_id', '=', 'c.checkpoint_id')->where('c.event_id', $e)->where('d.event_id', $e)->orderBy('d.id')->orderBy('c.zone_id')->get(['d.id as device_id', 'c.zone_id'])
+                ->concat(DB::table('checkpoint_site_zones as s')->join('devices as d', 'd.checkpoint_id', '=', 's.checkpoint_id')->where('d.event_id', $e)->whereIn('s.zone_id', $this->usedSiteZones($e))->orderBy('d.id')->orderBy('s.zone_id')->get(['d.id as device_id', 's.zone_id']))->values(),
             'entitlements' => DB::table('participation_entitlements')->where('event_id', $e)->whereNull('revoked_at')->whereNull('suspended_at')->where('valid_until', '>=', now())->get(['visitor_id', 'zone_id', 'valid_from', 'valid_until']),
             'hosts' => DB::table('hosts')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'service']),
             'visitors' => array_map(fn ($v) => ['id' => $v->id, 'full_name' => $v->full_name, 'organisation' => $v->organisation, 'job_title' => $v->position, 'visit_purpose' => $v->visit_purpose, 'host_id' => $v->host_id, 'category_id' => $v->category_id, 'valid_from' => $iso($v->valid_from), 'valid_until' => $iso($v->valid_until), 'source' => $v->source, 'status' => $v->status ?? 'attendu', 'host_validation' => $v->host_validation, 'access_note' => $v->access_note, 'group_id' => $v->group_id, 'a_rebadger' => (bool) $v->a_rebadger, 'rev' => $iso($v->rev), 'identity_done' => (bool) $v->identity_done, 'photo_done' => (bool) $v->photo_done, 'validated' => (bool) $v->validated, 'badge_code' => $v->badge_code], $visitors),

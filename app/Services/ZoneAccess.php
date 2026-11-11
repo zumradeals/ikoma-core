@@ -43,8 +43,25 @@ final class ZoneAccess
         }
         // La correspondance est portée par le POSTE : la tablette (point de type « poste ») juge les zones du poste auquel elle est affectée.
         $ids = DB::table('checkpoint_zones as c')->join('devices as d', 'd.checkpoint_id', '=', 'c.checkpoint_id')->where('c.event_id', $eventId)->where('d.id', $checkpoint['id'])->pluck('c.zone_id')->all();
+        $ids = array_merge($ids, $this->siteZonesJudged($eventId, (string) $checkpoint['id']));
 
-        return $ids === [] ? null : array_values($ids);
+        return $ids === [] ? null : array_values(array_unique($ids));
+    }
+
+    /**
+     * Zones DU SITE gardées par le poste de cette tablette ET utilisées par l'activité (par une catégorie ou par une habilitation de participant) :
+     * une zone du site que l'activité ne réutilise pas ne change rien au jugement de ses visiteurs.
+     *
+     * @return list<string>
+     */
+    public function siteZonesJudged(string $eventId, string $deviceId): array
+    {
+        $used = DB::table('category_zone')->where('event_id', $eventId)->select('zone_id')->union(DB::table('participation_entitlements')->where('event_id', $eventId)->select('zone_id'));
+
+        /** @var list<string> $ids */
+        $ids = DB::table('checkpoint_site_zones as s')->join('devices as d', 'd.checkpoint_id', '=', 's.checkpoint_id')->where('d.id', $deviceId)->whereIn('s.zone_id', $used)->pluck('s.zone_id')->all();
+
+        return $ids;
     }
 
     /**

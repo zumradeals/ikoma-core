@@ -57,3 +57,4 @@ Les lecteurs principaux : `ZoneAccess` (zones autorisées, zones jugées par un 
 
 ## Avancement
 - Plan écrit (ce document).
+- **Z1 écrite** (migration `2026_12_13_000000_allow_site_zones_in_activities`, `ZoneAccess::siteZonesJudged`, `ListSnapshot`, catégories) : les clés composites (zone, événement) de `category_zone`, `checkpoint_zones`, `participation_entitlements` et `holder_entitlements` deviennent une clé simple plus un déclencheur « zone de l'activité ou zone du site » ; un poste juge les zones du site qu'il garde **et que l'activité réutilise** (catégorie ou habilitation de participant) ; la copie hors ligne porte ces zones et change de version quand elles changent ; l'écran des catégories propose les zones du site. Aucun comportement existant ne change tant qu'aucune catégorie ne choisit de zone du site. Tests : `ZonesDuSiteActivitesTest` (5 scénarios), Vitest (1).

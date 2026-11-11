@@ -929,3 +929,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Le dirigeant a choisi d'effacer l'ancien registre technique : installation d'essai, aucune donnée réelle. Les cartes existantes passent au site (mêmes codes `B-nnn`, mêmes jetons QR, mêmes identifiants) ; passages, participations, lots, catégories et événement de l'ancien registre sont supprimés.
 - Plus de conteneur : `events.is_permanent`, la nature « permanent », `holder_cards.event_id`, la route de création du contexte permanent et ses protections disparaissent. Migration non réversible.
 - Supervision générale : la présence du site vient des passages des titulaires ; une même personne présente sur le site et dans une activité compte pour une seule présence.
+
+## Zones du site réutilisées par les activités : décisions du dirigeant et étape Z1
+- Décisions : toute zone devient une zone du site que les activités réutilisent ; l'écran « Accès et zones » est fusionné dans « Site et accès » ; les recettes ne sont pas urgentes. Plan en quatre étapes : docs/ailct/V1-ZONES-DU-SITE.md (fusion par nom exact, politique la plus restrictive, migration non réversible).
+- Étape Z1 : schéma souple et lecteurs doubles ; aucun comportement existant ne change tant qu'une catégorie ne choisit pas de zone du site. Un poste ne juge pour une activité que les zones du site qu'elle réutilise.
