@@ -139,9 +139,6 @@ final class SiteControl
     private function giveBackTarget(Device $poste, string $code, bool $lock): array
     {
         $refus = fn (?string $badgeId, string $reason, string $message): array => ['badge' => null, 'visitor' => null, 'badge_id' => $badgeId, 'refus' => ['ok' => false, 'refus' => true, 'reason' => $reason, 'message' => $message, 'badge_code' => null, 'source' => 'serveur']];
-        if ($poste->event_id === null) {
-            return $this->refused($poste, $agent, null, 'aucune_activite', 'Aucune activité en cours : seules les cartes permanentes sortent sur cette tablette.');
-        }
         $input = trim($code);
         if (str_starts_with($input, QrSvg::PREFIX)) {
             $input = substr($input, strlen(QrSvg::PREFIX));
@@ -185,6 +182,9 @@ final class SiteControl
         $checkpoint = $this->point($poste, $point);
         if (($card = $this->permanent->resolveCard($code)) !== null) {
             return $this->permanentExit($poste, $agent, $card, $checkpoint, $declaredAt);
+        }
+        if ($poste->event_id === null) {
+            return $this->refused($poste, $agent, null, 'aucune_activite', 'Aucune activité en cours : seules les cartes permanentes sortent sur cette tablette.');
         }
         $input = trim($code);
         if (str_starts_with($input, QrSvg::PREFIX)) {
