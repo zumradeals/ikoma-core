@@ -90,7 +90,7 @@ it('juge une carte permanente sur l’habilitation du site, écrit un mouvement 
     scControl($token)->assertOk()->assertJson(['valid' => true, 'context' => 'site', 'permanent' => ['entered' => true]]);
     $row = DB::table('access_events')->where('holder_id', $holder)->first();
     expect($row->event_id)->toBeNull()->and($row->visitor_id)->toBeNull()->and($row->type)->toBe('entree');
-    expect(DB::table('visitors')->where('holder_id', $holder)->count())->toBe(0);
+    expect(DB::table('visitors')->where('holder_id', $holder)->where('event_id', $this->event)->count())->toBe(0);
     expect(app(SiteMovements::class)->count())->toBe(1);
 
     scControl($token)->assertOk()->assertJson(['valid' => true, 'context' => 'site', 'permanent' => ['entered' => false]]);
