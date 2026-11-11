@@ -76,6 +76,6 @@ onBeforeUnmount(() => { cameraRequest++; closeCamera(video.value, stream); if (p
       </div>
       <div v-else class="agent-badge-help"><h2>Contrôle de l’identité</h2><p class="mt-3">Vérifiez que le visiteur correspond à la fiche. La photographie du document n’est pas demandée et aucun document n’est enregistré.</p><p class="agent-help">Les vérifications restent obligatoires avant de passer à la décision.</p></div>
     </div>
-    <div class="agent-step-actions"><button type="button" class="btn-soft" @click="$emit('back')">Retour</button><div><button type="button" class="btn-main" :disabled="!!reason || busy" :aria-describedby="reason ? 'identite-raison' : undefined" @click="photo && emit('done', photo, documentRequired && docPhoto ? { type: docType, number: docNumber.trim() || undefined, photo: docPhoto } : undefined)">Enregistrer et passer à la décision</button><p v-if="reason" id="identite-raison" class="mt-2">{{ reason }}</p></div></div>
+    <div class="agent-step-actions poste-actionbar"><button type="button" class="btn-soft" @click="$emit('back')">Retour</button><div><button type="button" class="btn-main" :disabled="!!reason || busy" :aria-describedby="reason ? 'identite-raison' : undefined" @click="photo && emit('done', photo, documentRequired && docPhoto ? { type: docType, number: docNumber.trim() || undefined, photo: docPhoto } : undefined)">Enregistrer et passer à la décision</button><p v-if="reason" id="identite-raison" class="mt-2">{{ reason }}</p></div></div>
   </section>
 </template>
