@@ -16,8 +16,6 @@ const CV_ROUTES = [
     ['PUT', 'administration/comptes/delai-hote', ['can:comptes.gerer'], []],
     ['PUT', 'administration/comptes/{user}/hotes', ['can:comptes.gerer'], []],
     ['GET', 'administration/zones', ['can:zones.gerer'], []],
-    ['POST', 'administration/zones', ['can:zones.gerer'], []],
-    ['PUT', 'administration/zones/{zone}', ['can:zones.gerer'], []],
     ['GET', 'administration/categories', ['can:categories.gerer'], []],
     ['POST', 'administration/categories', ['can:categories.gerer'], []],
     ['PUT', 'administration/categories/{category}', ['can:categories.gerer'], []],

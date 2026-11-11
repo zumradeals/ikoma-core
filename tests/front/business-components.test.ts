@@ -4,7 +4,6 @@ import { describe, it, expect, vi } from 'vitest';
 import BadgeState from '../../resources/js/components/BadgeState.vue';
 import CategorySwatch from '../../resources/js/components/CategorySwatch.vue';
 import CategoryForm from '../../resources/js/components/CategoryForm.vue';
-import ZoneForm from '../../resources/js/components/ZoneForm.vue';
 vi.mock('@inertiajs/vue3', () => ({ useForm: (data: object) => reactive({ ...data, errors: {}, processing: false, post: vi.fn(), put: vi.fn(), reset: vi.fn() }) }));
 describe('administration L2', () => {
  it.each(['Disponible', 'Associé', 'Restitué', 'Annulé', 'Clos'])('identifie le statut %s avec un mot et un symbole', status => {
@@ -23,9 +22,6 @@ describe('administration L2', () => {
   const wrapper = mount(CategoryForm, { props: { events: [{ id: 'a', name: 'Événement A' }, { id: 'b', name: 'Événement B' }], zones: [{ id: 'za', event_id: 'a', name: 'Zone A' }, { id: 'zs', event_id: null, name: 'Hall du site' }] } });
   expect(wrapper.text()).toContain('Hall du site'); expect(wrapper.text()).toContain('zone du site'); expect(wrapper.text()).toContain('Zone A');
   await wrapper.get('select').setValue('b'); expect(wrapper.text()).toContain('Hall du site'); expect(wrapper.text()).not.toContain('Zone A');
- });
- it('interdit de déplacer une zone existante vers un autre événement', () => {
-  const wrapper = mount(ZoneForm, { props: { events: [{ id: 'a', name: 'Événement A' }], zone: { id: 'z', name: 'Zone existante', event_id: 'a' } } }); expect(wrapper.get('select').attributes('disabled')).toBeDefined(); expect(wrapper.get('input').element.value).toBe('Zone existante');
  });
 });
 

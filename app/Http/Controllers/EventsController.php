@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
-use App\Models\Zone;
 use App\Services\ActivityRegistry;
+use App\Services\ActivityZones;
 use App\Services\Audit;
 use App\Services\DataLifecycle;
 use Illuminate\Http\RedirectResponse;
@@ -88,8 +88,8 @@ final class EventsController
                 'starts_at' => $data['starts_at'],
                 'ends_at' => $data['ends_at'],
             ]);
-            // L'accueil existe immédiatement, comme dans le parcours d'installation L12.
-            Zone::create(['event_id' => $event->id, 'name' => 'Accueil', 'est_accueil' => true]);
+            // Les zones sont celles du site : une zone d'accueil du site existe toujours (créée au besoin), l'activité n'a plus la sienne.
+            ActivityZones::ensureSiteReception();
             app(Audit::class)->append('evenement.cree', auth()->id(), [
                 'id' => $event->id,
                 'fields' => ['name', 'site', 'kind', 'starts_at', 'ends_at'],

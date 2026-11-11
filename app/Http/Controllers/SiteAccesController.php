@@ -40,7 +40,8 @@ final class SiteAccesController
     public function createZone(Request $request, SiteConfiguration $site): RedirectResponse
     {
         Gate::authorize('postes.gerer');
-        $site->createSiteZone((string) $request->validate(['name' => 'required|string|max:120'])['name'], $request->user());
+        $data = $request->validate(['name' => 'required|string|max:120', 'est_accueil' => 'sometimes|boolean']);
+        $site->createSiteZone((string) $data['name'], $request->user(), (bool) ($data['est_accueil'] ?? false));
 
         return back()->with('status', 'Zone du site créée.');
     }
@@ -67,6 +68,14 @@ final class SiteAccesController
         $site->renameSiteZone($zone, (string) $request->validate(['name' => 'required|string|max:120'])['name'], $request->user());
 
         return back()->with('status', 'Zone du site renommée.');
+    }
+
+    public function setReception(Request $request, string $zone, SiteConfiguration $site): RedirectResponse
+    {
+        Gate::authorize('postes.gerer');
+        $site->setSiteZoneReception($zone, (bool) $request->validate(['est_accueil' => 'required|boolean'])['est_accueil'], $request->user());
+
+        return back()->with('status', 'Zone d’accueil enregistrée.');
     }
 
     public function createCheckpoint(Request $request, SiteConfiguration $site): RedirectResponse

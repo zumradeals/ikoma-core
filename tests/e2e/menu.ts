@@ -12,11 +12,10 @@ export async function openMenu(page: Page, menu: string): Promise<void> {
   await page.getByTestId(`menu-${menu}`).click();
 }
 
-/** Va à la gestion des zones : depuis la section « Zones » de Site et accès (pas de navigation concurrente). */
+/** Va à la gestion des zones : toute zone est une zone du site, gérée dans la section « Zones » de Site et accès. */
 export async function openZones(page: Page): Promise<void> {
   await openMenu(page, 'site');
   await page.getByTestId('tab-zones').click();
-  await page.getByTestId('gerer-zones').click();
 }
 
 /** Va à une page d'un menu, par son sous-menu (onglet sous le titre) : `openPage(page, 'administration', 'comptes')`. */

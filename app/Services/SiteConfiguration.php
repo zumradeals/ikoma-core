@@ -42,7 +42,7 @@ final class SiteConfiguration
             'checkpoints' => $checkpoints,
             'catalogue' => PostCapabilities::CATALOGUE,
             'unassigned' => $tablets->whereNull('checkpoint_id')->where('state', '!=', 'revoque')->values()->all(),
-            'site_zones' => DB::table('zones')->whereNull('event_id')->orderBy('name')->get(['id', 'name'])->map(fn ($z) => ['id' => $z->id, 'name' => $z->name])->all(),
+            'site_zones' => DB::table('zones')->whereNull('event_id')->orderBy('name')->get(['id', 'name', 'est_accueil'])->map(fn ($z) => ['id' => $z->id, 'name' => $z->name, 'est_accueil' => (bool) $z->est_accueil])->all(),
             'zones' => DB::table('zones as z')->join('events as e', 'e.id', '=', 'z.event_id')->orderBy('e.name')->orderBy('z.name')->get(['z.id', 'z.name', 'z.event_id', 'e.name as event_name']),
             'history' => DB::table('device_assignments as a')->join('devices as d', 'd.id', '=', 'a.device_id')->leftJoin('checkpoints as p', 'p.id', '=', 'a.checkpoint_id')->leftJoin('users as u', 'u.id', '=', 'a.assigned_by')
                 ->orderByDesc('a.assigned_at')->orderByDesc('a.id')->limit(25)->get(['a.id', 'd.name as device', 'p.name as checkpoint', 'a.assigned_at', 'a.ended_at', 'a.reason', 'u.name as by']),
@@ -50,19 +50,19 @@ final class SiteConfiguration
     }
 
     /** Crée une zone du site (permanente, sans événement). */
-    public function createSiteZone(string $name, User $actor): string
+    public function createSiteZone(string $name, User $actor, bool $reception = false): string
     {
         $this->authorize($actor);
         $name = (string) $this->text($name, 120, 'name', true);
 
-        return DB::transaction(function () use ($name, $actor): string {
+        return DB::transaction(function () use ($name, $actor, $reception): string {
             DB::statement('SELECT pg_advisory_xact_lock(731904)');
             $siteId = (string) DB::table('sites')->orderBy('created_at')->orderBy('id')->value('id');
             if (DB::table('zones')->where('site_id', $siteId)->whereNull('event_id')->whereRaw('lower(name) = lower(?)', [$name])->exists()) {
                 throw ValidationException::withMessages(['name' => 'Une zone du site porte déjà ce nom.']);
             }
             $id = (string) Str::uuid();
-            DB::table('zones')->insert(['id' => $id, 'event_id' => null, 'site_id' => $siteId, 'name' => $name, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('zones')->insert(['id' => $id, 'event_id' => null, 'site_id' => $siteId, 'name' => $name, 'est_accueil' => $reception, 'created_at' => now(), 'updated_at' => now()]);
             $this->audit->append('site.zone_creee', $actor->id, ['zone_id' => $id]);
 
             return $id;
@@ -113,6 +113,25 @@ final class SiteConfiguration
             }
             DB::table('zones')->where('id', $zoneId)->update(['name' => $name, 'updated_at' => now()]);
             $this->audit->append('site.zone_renommee', $actor->id, ['zone_id' => $zoneId]);
+        });
+    }
+
+    /** Zone d'accueil du site : seule zone accessible aux visiteurs non listés. Au moins une doit rester, tant qu'une zone du site existe. */
+    public function setSiteZoneReception(string $zoneId, bool $reception, User $actor): void
+    {
+        $this->authorize($actor);
+        DB::transaction(function () use ($zoneId, $reception, $actor): void {
+            DB::statement('SELECT pg_advisory_xact_lock(731904)');
+            $zone = DB::table('zones')->where('id', $zoneId)->whereNull('event_id')->lockForUpdate()->first(['id', 'est_accueil']);
+            abort_if($zone === null, 404);
+            if ((bool) $zone->est_accueil === $reception) {
+                return;
+            }
+            if (! $reception && ! DB::table('zones')->whereNull('event_id')->where('id', '<>', $zoneId)->where('est_accueil', true)->exists()) {
+                throw ValidationException::withMessages(['est_accueil' => 'La zone d’accueil obligatoire doit être conservée : désignez d’abord une autre zone d’accueil.']);
+            }
+            DB::table('zones')->where('id', $zoneId)->update(['est_accueil' => $reception, 'updated_at' => now()]);
+            $this->audit->append('site.zone_accueil', $actor->id, ['zone_id' => $zoneId, 'est_accueil' => $reception]);
         });
     }
 

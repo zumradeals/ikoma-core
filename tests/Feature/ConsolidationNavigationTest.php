@@ -113,6 +113,7 @@ const CN_ADDED = [
     ['POST', 'administration/site/postes', ['can:postes.gerer'], []],
     ['POST', 'administration/site/zones', ['can:postes.gerer'], []],
     ['PUT', 'administration/site/zones/{zone}', ['can:postes.gerer'], []],
+    ['PUT', 'administration/site/zones/{zone}/accueil', ['can:postes.gerer'], []],
     ['POST', 'administration/site/postes/{checkpoint}/zones-site', ['can:postes.gerer'], []],
     ['DELETE', 'administration/site/zones-site/{mapping}', ['can:postes.gerer'], []],
     ['PUT', 'administration/site/postes/{checkpoint}', ['can:postes.gerer'], []],

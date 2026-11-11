@@ -130,9 +130,8 @@ it('refuse les écrans et écritures sans la permission correspondante', functio
         foreach (['zones', 'categories', 'badges'] as $screen) {
             $this->actingAs($user)->get('/administration/'.$screen)->assertForbidden();
         }
-        foreach (['zones', 'categories'] as $screen) {
-            $this->post('/administration/'.$screen, [])->assertForbidden();
-        }
+        $this->post('/administration/categories', [])->assertForbidden();
+        $this->post('/administration/site/zones', [])->assertForbidden();
     }
 });
 it('journalise la création et la modification des zones et catégories sans données superflues', function () {
@@ -141,18 +140,19 @@ it('journalise la création et la modification des zones et catégories sans don
     $this->actingAs($admin);
     $name = 'Zone test '.Str::uuid();
     $event = DemoSeeder::id('event');
-    $this->post('/administration/zones', ['event_id' => $event, 'name' => $name])->assertRedirect();
+    $this->post('/administration/site/zones', ['name' => $name])->assertRedirect();
     $zone = DB::table('zones')->where('name', $name)->first();
-    $this->put('/administration/zones/'.$zone->id, ['name' => $name.' modifiée'])->assertRedirect();
+    expect($zone->event_id)->toBeNull(); // toute zone est une zone du site
+    $this->put('/administration/site/zones/'.$zone->id, ['name' => $name.' modifiée'])->assertRedirect();
     $categoryName = 'Catégorie test '.Str::uuid();
     $data = ['event_id' => $event, 'name' => $categoryName, 'color' => '#0F5AA6', 'priority_circuit' => false, 'zone_ids' => [$zone->id]];
     $this->post('/administration/categories', $data)->assertRedirect();
     $category = DB::table('categories')->where('name', $categoryName)->first();
     $this->put('/administration/categories/'.$category->id, [...$data, 'name' => $categoryName.' modifiée', 'zone_ids' => [DemoSeeder::id('zone0')]])->assertRedirect();
-    foreach (['zone.creee', 'zone.modifiee', 'categorie.creee', 'categorie.modifiee'] as $action) {
+    foreach (['site.zone_creee' => ['zone_id'], 'site.zone_renommee' => ['zone_id'], 'categorie.creee' => ['id', 'event_id', 'fields'], 'categorie.modifiee' => ['id', 'event_id', 'fields']] as $action => $keys) {
         $entry = DB::table('audit_logs')->where('actor_id', $admin->id)->where('action', $action)->first();
         expect($entry)->not->toBeNull();
-        expect(array_keys(json_decode($entry->details, true)))->toBe(['id', 'event_id', 'fields']);
+        expect(array_keys(json_decode($entry->details, true)))->toBe($keys);
     }
     expect(DB::table('category_zone')->where('category_id', $category->id)->pluck('zone_id')->all())->toBe([DemoSeeder::id('zone0')]);
     $this->artisan('audit:verify')->assertSuccessful();
