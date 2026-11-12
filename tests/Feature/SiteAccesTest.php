@@ -172,10 +172,10 @@ it('juge les mêmes zones pour toutes les tablettes d’un poste, et aucune pour
     $one = saDevice('Tablette fictive 1', 'poste_2');
     $two = saDevice('Tablette fictive 2', 'poste_2');
     $other = saDevice('Tablette fictive 3', 'poste_3');
-    $access->map(DemoSeeder::id('event'), saPost('poste_2'), DemoSeeder::id('zone1'), $this->admin);
+    $this->site->mapSiteZone(saPost('poste_2'), DemoSeeder::id('zone1'), $this->admin);
     $judged = fn (Device $d) => $access->judgedZones(DemoSeeder::id('event'), ['type' => 'poste', 'id' => $d->id]);
     expect($judged($one))->toBe([DemoSeeder::id('zone1')])->and($judged($two))->toBe([DemoSeeder::id('zone1')])->and($judged($other))->toBeNull();
-    expect(fn () => $access->map(DemoSeeder::id('event'), saPost('poste_2'), DemoSeeder::id('zone1'), $this->admin))->toThrow(ValidationException::class);
+    expect(fn () => $this->site->mapSiteZone(saPost('poste_2'), DemoSeeder::id('zone1'), $this->admin))->toThrow(ValidationException::class);
     // la copie hors ligne de chaque tablette du poste porte la correspondance
     $snapshot = app(ListSnapshot::class)->build($one->fresh());
     expect($snapshot['point_zones']->where('device_id', $two->id)->pluck('zone_id')->all())->toBe([DemoSeeder::id('zone1')]);
@@ -183,7 +183,7 @@ it('juge les mêmes zones pour toutes les tablettes d’un poste, et aucune pour
     $this->site->assign($one->id, saPost('poste_3'), null, $this->admin);
     expect($judged($one->fresh()))->toBeNull();
     $this->site->setActive(saPost('poste_3'), false, 1, $this->admin);
-    expect(fn () => $access->map(DemoSeeder::id('event'), saPost('poste_3'), DemoSeeder::id('zone1'), $this->admin))->toThrow(ValidationException::class);
+    expect(fn () => $this->site->mapSiteZone(saPost('poste_3'), DemoSeeder::id('zone1'), $this->admin))->toThrow(ValidationException::class);
 });
 
 // --- Écran « Site et accès » : serveur ---------------------------------------------------------------------------------------------

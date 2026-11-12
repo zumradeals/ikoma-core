@@ -56,9 +56,9 @@ function pxEvent(string $token, bool $policy = true, bool $offline = false): arr
     $event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $event, 'name' => 'Événement fictif A06 '.Str::random(4), 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(10), 'created_at' => now(), 'updated_at' => now()]);
     $zone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone, 'event_id' => $event, 'name' => 'Zone P', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone, 'event_id' => null, 'name' => 'Zone P '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
     if ($policy) {
-        DB::table('zone_policies')->insert(['zone_id' => $zone, 'event_id' => $event, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => $offline, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('site_zone_policies')->insert(['zone_id' => $zone, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => $offline, 'created_at' => now(), 'updated_at' => now()]);
     }
     $device = (string) Str::uuid();
     DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', $token), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
@@ -226,8 +226,8 @@ it('refuse sans habilitation, hors zone habilitée, après expiration ou retrait
     pxControl($token)->assertJson(['valid' => true]);
     // Une autre zone de l'événement, non habilitée.
     $other = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $other, 'event_id' => $this->event, 'name' => 'Zone interdite', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('zone_policies')->insert(['zone_id' => $other, 'event_id' => $this->event, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $other, 'event_id' => null, 'name' => 'Zone interdite '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('site_zone_policies')->insert(['zone_id' => $other, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
     pxControl($token, ['type' => 'zone', 'id' => $other])->assertJson(['valid' => false, 'reason' => 'habilitation_absente']);
     // Aucune catégorie AILCT ne donne de zone : la catégorie d'événement créée pour la participation n'a aucune zone.
     expect(DB::table('category_zone')->where('event_id', $this->event)->count())->toBe(0);
@@ -339,7 +339,7 @@ it('signale en conflit une entrée jugée valide hors ligne dont la carte a ét�
     [$holder, $token] = pxCard();
     pxGrant($holder, $this->event, $this->zone);
     app(PermanentAccess::class)->saveOfflineTrust(60, true, $this->admin);
-    DB::table('zone_policies')->where('zone_id', $this->zone)->update(['offline_entry_allowed' => true]);
+    DB::table('site_zone_policies')->where('zone_id', $this->zone)->update(['offline_entry_allowed' => true]);
     app(CardLifecycle::class)->revoke($holder, 'volee', null, $this->admin);
     $response = $this->postJson('/poste/api/sync', ['operations' => [['id' => (string) Str::uuid(), 'seq' => 1, 'type' => 'controle', 'agent_id' => $this->agent->id, 'client_time' => now()->toIso8601String(), 'payload' => ['code' => 'PC:'.hash('sha256', $token), 'point' => null, 'local_valid' => true, 'known_at' => now()->subMinutes(2)->toIso8601String()]]]], ['X-Device-Token' => PX_TOKEN_A, 'Accept' => 'application/json'])->assertOk();
     expect(json_encode($response->json()))->toContain('conflit')->and(DB::table('access_events')->where('event_id', $this->event)->where('type', 'entree')->count())->toBe(0)
@@ -409,7 +409,7 @@ it('accorde, retire et configure par HTTP avec les permissions existantes, journ
     $this->post('/administration/habilitations', ['holder_id' => $holder, 'event_id' => $this->event, 'zone_id' => $this->zone, 'valid_from' => now()->toIso8601String(), 'valid_until' => now()->addHours(2)->toIso8601String()])->assertSessionHasErrors('valid_from');
     $this->post('/administration/habilitations', ['holder_id' => $holder, 'event_id' => $this->event, 'zone_id' => $this->zone, 'valid_from' => now()->addDays(3)->toIso8601String(), 'valid_until' => now()->addDays(2)->toIso8601String()])->assertSessionHasErrors('valid_until');
     $this->put('/administration/habilitations/zones/'.$this->zone, ['event_id' => $this->event, 'classification' => 'NEUTRE-B', 'permanent_allowed' => true, 'offline_entry_allowed' => true])->assertRedirect();
-    expect(DB::table('zone_policies')->where('zone_id', $this->zone)->value('classification'))->toBe('NEUTRE-B');
+    expect(DB::table('site_zone_policies')->where('zone_id', $this->zone)->value('classification'))->toBe('NEUTRE-B');
     $this->put('/administration/habilitations/confiance', ['minutes' => 20, 'approved' => true])->assertRedirect();
     expect(app(PermanentAccess::class)->offlineTrust()['effective'])->toBe(20);
     $this->post('/administration/habilitations/'.$id.'/retirer', ['reason' => ''])->assertSessionHasErrors('reason');
@@ -418,7 +418,7 @@ it('accorde, retire et configure par HTTP avec les permissions existantes, journ
     foreach (["UPDATE holder_entitlements SET valid_until = valid_until + interval '1 day'", 'DELETE FROM holder_entitlements', 'TRUNCATE holder_entitlements'] as $sql) {
         expect(fn () => DB::transaction(fn () => DB::statement($sql)))->toThrow(QueryException::class);
     }
-    $audit = DB::table('audit_logs')->whereIn('action', ['habilitation.accordee', 'habilitation.retiree', 'zone.politique_modifiee', 'titulaire.confiance_hors_ligne_modifiee'])->pluck('details')->implode(' ');
+    $audit = DB::table('audit_logs')->whereIn('action', ['habilitation.accordee', 'habilitation.retiree', 'zone_site.politique_modifiee', 'titulaire.confiance_hors_ligne_modifiee'])->pluck('details')->implode(' ');
     expect($audit)->not->toContain('Personne Fictive')->and($audit)->not->toContain('Fin de mission');
     foreach (['agent_accueil', 'superviseur', 'hote', 'encadreur'] as $role) {
         $this->actingAs(pxUser($role));
@@ -565,7 +565,7 @@ it('imprime plusieurs cartes par la route d’impression unique avec un tirage t
 it('accorde l’accès à plusieurs personnes et zones d’un coup : un accès individuel par couple, doublons ignorés, jamais par catégorie', function () {
     $this->actingAs($this->admin);
     $zone2 = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone2, 'event_id' => $this->event, 'name' => 'Zone Q', 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone2, 'event_id' => null, 'name' => 'Zone Q '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
     [$a] = pxCard('AILCT-01');
     [$b] = pxCard('AILCT-02');
     $payload = ['event_id' => $this->event, 'holders' => [$a, $b], 'zones' => [$this->zone, $zone2], 'whole_event' => true];

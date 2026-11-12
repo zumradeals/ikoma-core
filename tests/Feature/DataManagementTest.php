@@ -4,7 +4,6 @@ use App\Models\Device;
 use App\Models\Event;
 use App\Models\User;
 use App\Models\Visitor;
-use App\Models\Zone;
 use App\Services\BadgeArtwork;
 use App\Services\BadgeLots;
 use App\Services\DataLifecycle;
@@ -138,7 +137,6 @@ it('clôture archive et conserve la consultation en bloquant les nouvelles admis
 it('supprime un événement de préparation mais protège un événement avec activité', function () {
     expect($this->engine->inspect('evenement', $this->eventId, $this->admin)['allowed'])->toBeFalse();
     $event = Event::create(['name' => 'Préparation fictive L33', 'starts_at' => now(), 'ends_at' => now()->addDay()]);
-    Zone::create(['event_id' => $event->id, 'name' => 'Accueil', 'est_accueil' => true]);
     $report = $this->engine->inspect('evenement', $event->id, $this->admin);
     $this->engine->delete('evenement', $event->id, $this->admin, $report['fingerprint']);
     expect(Event::find($event->id))->toBeNull();

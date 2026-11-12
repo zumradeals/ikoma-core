@@ -24,15 +24,6 @@ beforeEach(function () {
     $this->holder = app(PermanentHolders::class)->create(['full_name' => 'Personne Fictive Site '.Str::random(6), 'institutional_category' => 'AILCT-01'], $this->admin);
 });
 
-/** Ancienne zone propre à une activité (ancien chemin, avant son retrait) : sert à vérifier que le site la refuse. */
-function seActivityZone(): string
-{
-    $id = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $id, 'event_id' => DemoSeeder::id('event'), 'name' => 'Zone propre fictive '.Str::random(5), 'created_at' => now(), 'updated_at' => now()]);
-
-    return $id;
-}
-
 function sePeriod(): array
 {
     return ['valid_from' => now()->subDay()->toIso8601String(), 'valid_until' => now()->addMonth()->toIso8601String()];
@@ -52,10 +43,7 @@ it('accorde une habilitation de site sans événement, tracée, puis la retire a
     expect(DB::table('holder_site_entitlements')->count())->toBe(1);
 });
 
-it('refuse une zone d’activité, un chevauchement, une période inversée et une personne clôturée', function () {
-    $activityZone = seActivityZone();
-    $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $activityZone] + sePeriod())->assertSessionHasErrors('zone_id');
-
+it('refuse un chevauchement, une période inversée et une personne clôturée', function () {
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $this->zone] + sePeriod())->assertSessionHasNoErrors();
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $this->zone] + sePeriod())->assertSessionHasErrors('valid_from');
 
@@ -71,8 +59,6 @@ it('protège en base : une habilitation du site ne se modifie pas, ne se supprim
     $id = (string) DB::table('holder_site_entitlements')->value('id');
     expect(fn () => DB::transaction(fn () => DB::table('holder_site_entitlements')->where('id', $id)->update(['valid_until' => now()->addYears(5)])))->toThrow(QueryException::class);
     expect(fn () => DB::transaction(fn () => DB::table('holder_site_entitlements')->where('id', $id)->delete()))->toThrow(QueryException::class);
-    $activityZone = seActivityZone();
-    expect(fn () => DB::transaction(fn () => DB::table('holder_site_entitlements')->insert(['id' => (string) Str::uuid(), 'holder_id' => $this->holder, 'zone_id' => $activityZone, 'valid_from' => now(), 'valid_until' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()])))->toThrow(QueryException::class);
 });
 
 it('ne mélange pas les moteurs : une habilitation du site n’apparaît pas dans celles d’une activité', function () {
@@ -88,9 +74,6 @@ it('associe une zone du site à un poste de contrôle, une seule fois, puis la r
     $this->post('/administration/site/postes/'.$checkpoint.'/zones-site', ['zone_id' => $this->zone])->assertSessionHasNoErrors();
     $this->post('/administration/site/postes/'.$checkpoint.'/zones-site', ['zone_id' => $this->zone])->assertSessionHasErrors('zone_id');
     $this->get('/administration/site')->assertOk()->assertInertia(fn ($p) => $p->where('checkpoints', fn ($list) => collect($list)->firstWhere('id', $checkpoint)['site_zones'][0]['name'] === 'Hall fictif du site'));
-
-    $activityZone = seActivityZone();
-    $this->post('/administration/site/postes/'.$checkpoint.'/zones-site', ['zone_id' => $activityZone])->assertSessionHasErrors('zone_id');
 
     $mapping = (string) DB::table('checkpoint_site_zones')->value('id');
     $this->delete('/administration/site/zones-site/'.$mapping)->assertSessionHasNoErrors();

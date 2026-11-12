@@ -38,8 +38,8 @@ function a07Participation(): array
     $event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $event, 'name' => 'Événement fictif A07', 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(5), 'created_at' => now(), 'updated_at' => now()]);
     $zone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone, 'event_id' => $event, 'name' => 'Hall fictif', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('zone_policies')->insert(['zone_id' => $zone, 'event_id' => $event, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone, 'event_id' => null, 'name' => 'Hall fictif', 'est_accueil' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('site_zone_policies')->insert(['zone_id' => $zone, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
     $device = (string) Str::uuid();
     DB::table('devices')->insert(['id' => $device, 'event_id' => $event, 'name' => 'Poste fictif', 'station' => 'Entrée', 'point_code' => 'poste_2', 'token_hash' => hash('sha256', A07_TOKEN), 'enrolled_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     $admin = test()->admin;
@@ -146,7 +146,7 @@ it('empêche la clôture d’un événement tant qu’un titulaire permanent y e
 it('ne modifie jamais le registre permanent depuis les parcours d’invités temporaires', function () {
     $this->seed(DemoSeeder::class);
     [$event, , , $holder] = a07Participation();
-    $snapshot = fn () => md5(json_encode([DB::table('permanent_holders')->orderBy('id')->get(), DB::table('holder_cards')->orderBy('id')->get(), DB::table('holder_card_prints')->orderBy('id')->get(), DB::table('holder_entitlements')->orderBy('id')->get(), DB::table('zone_policies')->orderBy('zone_id')->get(), DB::table('institutional_categories')->orderBy('code')->get()]));
+    $snapshot = fn () => md5(json_encode([DB::table('permanent_holders')->orderBy('id')->get(), DB::table('holder_cards')->orderBy('id')->get(), DB::table('holder_card_prints')->orderBy('id')->get(), DB::table('holder_entitlements')->orderBy('id')->get(), DB::table('site_zone_policies')->orderBy('zone_id')->get(), DB::table('institutional_categories')->orderBy('code')->get()]));
     $before = $snapshot();
     $demo = DemoSeeder::id('event');
     $this->actingAs($this->admin);

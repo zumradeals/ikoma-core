@@ -11,12 +11,10 @@ import { displayDate } from '../../labels';
  * Une tablette s'affecte à un poste ; un poste peut en avoir plusieurs. Un poste se désactive, il ne se supprime pas.
  */
 type Tablet = { id: string; name: string; station: string | null; checkpoint_id: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; last_synced_at: string | null; event_name: string };
-type PostZone = { mapping_id: string; zone_id: string; event_id: string; name: string; event_name: string };
-type Checkpoint = { id: string; code: string; name: string; function_label: string | null; capabilities: string[]; direction_required: boolean; active: boolean; version: number; tablets: Tablet[]; zones: PostZone[]; site_zones?: { mapping_id: string; zone_id: string; name: string }[] };
-type SiteZone = { id: string; name: string; event_id: string; event_name: string };
+type Checkpoint = { id: string; code: string; name: string; function_label: string | null; capabilities: string[]; direction_required: boolean; active: boolean; version: number; tablets: Tablet[]; site_zones?: { mapping_id: string; zone_id: string; name: string }[] };
 const props = defineProps<{
   site: { id: string; name: string } | null; checkpoints: Checkpoint[]; catalogue: Record<string, string>; unassigned: Tablet[];
-  zones: SiteZone[]; site_zones?: { id: string; name: string; est_accueil?: boolean }[]; site_presence?: { id: string; name: string; identifier: string; category: string | null; point: string | null; since: string }[] | null;
+  site_zones?: { id: string; name: string; est_accueil?: boolean }[]; site_presence?: { id: string; name: string; identifier: string; category: string | null; point: string | null; since: string }[] | null;
   history: { id: string; device: string; checkpoint: string | null; assigned_at: string; ended_at: string | null; reason: string | null; by: string | null }[];
 }>();
 const siteZoneName = ref(''); const renaming = reactive<Record<string, string>>({});
@@ -48,9 +46,9 @@ function onTabKey(event: KeyboardEvent) {
 // Indicateurs : uniquement des comptes réels.
 const activePosts = computed(() => props.checkpoints.filter(p => p.active));
 const assignedTablets = computed(() => props.checkpoints.reduce((n, p) => n + p.tablets.length, 0));
-const guardedZones = computed(() => props.checkpoints.reduce((n, p) => n + p.zones.length, 0));
+const guardedZones = computed(() => props.checkpoints.reduce((n, p) => n + (p.site_zones?.length ?? 0), 0));
 // Règles d'accès réelles = correspondances poste–zone ; une règle est active tant que son poste l'est.
-const rules = computed(() => props.checkpoints.flatMap(p => p.zones.map(z => ({ ...z, post: p, active: p.active }))));
+const rules = computed(() => props.checkpoints.flatMap(p => (p.site_zones ?? []).map(z => ({ ...z, post: p, active: p.active }))));
 const PREVIEW = 4;
 const allTablets = computed(() => [
   ...props.checkpoints.flatMap(p => p.tablets.map(t => ({ ...t, post: p.name }))),
@@ -75,10 +73,9 @@ type Edit = { name: string; function_label: string; capabilities: string[]; dire
 const edit = reactive<Record<string, Edit>>({});
 function sync() { for (const p of props.checkpoints) edit[p.id] = { name: p.name, function_label: p.function_label ?? '', capabilities: [...p.capabilities], direction_required: p.direction_required }; }
 const target = reactive<Record<string, string>>({});
-const zoneChoice = reactive<Record<string, string>>({});
 // Les listes de choix partent vides (invite affichée) ; une valeur déjà choisie est conservée.
 function syncChoices() {
-  for (const p of props.checkpoints) { zoneChoice[p.id] ??= ''; for (const t of p.tablets) target[t.id] ??= ''; }
+  for (const p of props.checkpoints) { for (const t of p.tablets) target[t.id] ??= ''; }
   for (const t of props.unassigned) target[t.id] ??= '';
 }
 sync(); syncChoices();
@@ -92,20 +89,14 @@ function activation(p: Checkpoint) { router.post(`/administration/site/postes/${
 
 function assign(tablet: { id: string }) { router.post(`/administration/site/tablettes/${tablet.id}/affectation`, { checkpoint_id: target[tablet.id] || null }, { preserveScroll: true }); }
 
-function addZone(p: Checkpoint) {
-  const zone = props.zones.find(z => z.id === zoneChoice[p.id]);
-  if (zone) router.post('/administration/acces/correspondances', { event_id: zone.event_id, checkpoint_id: p.id, zone_id: zone.id }, { preserveScroll: true });
-}
 const siteZoneChoice = reactive<Record<string, string>>({});
 function addSiteZoneToPost(p: Checkpoint) {
   if (siteZoneChoice[p.id]) router.post(`/administration/site/postes/${p.id}/zones-site`, { zone_id: siteZoneChoice[p.id] }, { preserveScroll: true, onSuccess: () => { siteZoneChoice[p.id] = ''; } });
 }
 function removeSiteZoneFromPost(mappingId: string) { router.delete(`/administration/site/zones-site/${mappingId}`, { preserveScroll: true }); }
-function removeZone(z: PostZone) { router.post(`/administration/acces/correspondances/${z.mapping_id}/retirer`, {}, { preserveScroll: true }); }
 // Zones permanentes du site (sans événement) : ce sont elles que la page présente en premier ; les zones d'activité restent comptées à part.
 const siteZoneList = computed(() => props.site_zones ?? []);
 const postsOfSiteZone = (zoneId: string) => props.checkpoints.filter(p => p.site_zones?.some(z => z.zone_id === zoneId));
-const postsOfZone = (zoneId: string) => props.checkpoints.filter(p => p.zones.some(z => z.zone_id === zoneId));
 
 const create = reactive<Edit & { code: string }>({ code: '', name: '', function_label: '', capabilities: [], direction_required: false });
 function createPost() {
@@ -156,7 +147,7 @@ function toggleCreate(capability: string, on: boolean) {
         </section>
         <dl class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="indicateurs">
           <div class="site-kpi bg-sky-50"><span class="site-kpi-icon text-sky-700"><AdminIcon name="monitor" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-postes">{{ checkpoints.length }}</dd><dt class="font-semibold text-slate-800">Postes configurés</dt><dd class="text-sm text-slate-600">{{ activePosts.length }} actif<template v-if="activePosts.length > 1">s</template></dd></div></div>
-          <div class="site-kpi bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="layers" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-zones">{{ siteZoneList.length }}</dd><dt class="font-semibold text-slate-800">Zones du site</dt><dd class="text-sm text-slate-600">{{ zones.length }} dans les activités</dd></div></div>
+          <div class="site-kpi bg-emerald-50"><span class="site-kpi-icon text-emerald-700"><AdminIcon name="layers" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-zones">{{ siteZoneList.length }}</dd><dt class="font-semibold text-slate-800">Zones du site</dt><dd class="text-sm text-slate-600">utilisables par les activités</dd></div></div>
           <div class="site-kpi bg-amber-50"><span class="site-kpi-icon text-amber-700"><AdminIcon name="tablet" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-tablettes">{{ assignedTablets }}</dd><dt class="font-semibold text-slate-800">Tablettes affectées</dt><dd class="text-sm text-slate-600">{{ unassigned.length }} sans poste</dd></div></div>
           <div class="site-kpi bg-violet-50"><span class="site-kpi-icon text-violet-700"><AdminIcon name="shield" :size="40" /></span><div><dd class="text-3xl font-extrabold" data-testid="kpi-correspondances">{{ guardedZones }}</dd><dt class="font-semibold text-slate-800">Zones gardées</dt><dd class="text-sm text-slate-600">correspondances poste–zone</dd></div></div>
         </dl>
@@ -198,7 +189,6 @@ function toggleCreate(capability: string, on: boolean) {
               </li>
             </ul>
             <p v-if="siteZoneList.length > PREVIEW + 1" class="site-more"><button type="button" class="font-semibold text-blue-800 underline" @click="tab = 'zones'">Voir toutes les zones ({{ siteZoneList.length }})</button></p>
-            <p class="site-more text-sm text-slate-700" data-testid="resume-zones-activites">Zones des activités : <strong>{{ zones.length }}</strong>. <Link href="/administration/zones" class="font-semibold text-blue-800 underline">Gérer les zones des activités</Link></p>
           </section>
          </div>
          <div class="site-col">
@@ -210,7 +200,6 @@ function toggleCreate(capability: string, on: boolean) {
               <div><dt>Nombre de postes</dt><dd>{{ checkpoints.length }}</dd></div>
               <div><dt>Postes actifs</dt><dd>{{ activePosts.length }}</dd></div>
               <div><dt>Zones du site</dt><dd>{{ siteZoneList.length }}</dd></div>
-              <div><dt>Zones des activités</dt><dd>{{ zones.length }}</dd></div>
               <div><dt>Tablettes affectées</dt><dd>{{ assignedTablets }}</dd></div>
               <div><dt>Tablettes sans poste</dt><dd>{{ unassigned.length }}</dd></div>
             </dl>
@@ -222,7 +211,7 @@ function toggleCreate(capability: string, on: boolean) {
             <p v-if="!rules.length" class="p-4" data-testid="aucune-regle-resume">Aucune règle poste–zone : sans correspondance, un poste ne refuse pas pour une zone.</p>
             <ul v-else class="divide-y">
               <li v-for="r in rules.slice(0, PREVIEW)" :key="r.mapping_id" class="flex items-center justify-between gap-3 px-4 py-2.5" :data-testid="'regle-resume-' + r.mapping_id">
-                <span class="min-w-0"><strong>{{ r.name }}</strong><span class="block text-sm text-slate-600">{{ r.post.name }} · {{ r.event_name }}</span></span>
+                <span class="min-w-0"><strong>{{ r.name }}</strong><span class="block text-sm text-slate-600">{{ r.post.name }}</span></span>
                 <span class="shrink-0 rounded-md px-2 py-0.5 text-xs font-bold" :class="r.active ? 'bg-green-100 text-green-900' : 'bg-slate-200 text-slate-700'">{{ r.active ? 'Active' : 'Poste désactivé' }}</span>
               </li>
             </ul>
@@ -239,22 +228,13 @@ function toggleCreate(capability: string, on: boolean) {
           <h3 id="zones-site-titre" class="font-bold">Zones du site</h3>
           <p class="text-sm text-slate-700">Toute zone est une zone du site. Les activités choisissent parmi ces zones (dans leurs catégories) ; elles servent aussi aux habilitations du personnel permanent et au contrôle sur site.</p>
           <ul v-if="site_zones?.length" class="divide-y">
-            <li v-for="z in site_zones" :key="z.id" class="flex flex-wrap items-center gap-2 py-2" :data-testid="'zone-site-' + z.id"><strong class="min-w-0 flex-1">{{ z.name }}</strong>
+            <li v-for="z in site_zones" :key="z.id" class="flex flex-wrap items-center gap-2 py-2" :data-testid="'zone-site-' + z.id"><span class="min-w-0 flex-1"><strong>{{ z.name }}</strong><span class="block text-sm text-slate-700" :data-testid="'zone-liste-' + z.id">Gardée par : {{ postsOfSiteZone(z.id).map(p => p.name).join(', ') || 'aucun poste' }}</span></span>
               <label class="flex min-h-11 items-center gap-2"><input type="checkbox" class="h-6 w-6" :checked="!!z.est_accueil" :data-testid="'accueil-zone-' + z.id" @change="setReception(z.id, ($event.target as HTMLInputElement).checked)">Zone d’accueil</label>
               <input v-model="renaming[z.id]" class="field !min-h-10 max-w-56" maxlength="120" :placeholder="'Renommer'" :aria-label="'Nouvel intitulé de ' + z.name"><button type="button" class="btn-soft" @click="renameSiteZone(z.id)">Renommer</button></li>
           </ul>
           <p v-else data-testid="aucune-zone-site">Aucune zone du site pour l’instant.</p>
           <form class="flex flex-wrap items-end gap-2" aria-label="Nouvelle zone permanente du site" @submit.prevent="addSiteZone"><label class="block">Intitulé de la zone permanente<input v-model="siteZoneName" class="field" maxlength="120" required data-testid="nom-zone-site"></label><button type="submit" class="admin-primary" data-testid="creer-zone-site">Ajouter au site</button></form>
         </section>
-        <h3 class="font-bold">Zones des activités ({{ zones.length }})</h3>
-        <p class="text-slate-700">Les zones des activités sont définies dans chaque activité. Un poste ne juge une zone que s’il lui est associé.</p>
-        <p v-if="!zones.length" data-testid="aucune-zone">Aucune zone n’est définie.</p>
-        <ul v-else class="divide-y">
-          <li v-for="z in zones" :key="z.id" class="space-y-1 py-2" :data-testid="'zone-liste-' + z.id">
-            <p><strong>{{ z.name }}</strong> · {{ z.event_name }}</p>
-            <p class="text-sm text-slate-700">Gardée par : <template v-if="postsOfZone(z.id).length"><template v-for="(p, i) in postsOfZone(z.id)" :key="p.id"><template v-if="i > 0">, </template><button type="button" class="font-semibold text-blue-900 underline" @click="configure(p)">{{ p.name }}</button></template></template><template v-else>aucun poste</template></p>
-          </li>
-        </ul>
       </section>
 
       <!-- Tablettes -->
@@ -283,7 +263,7 @@ function toggleCreate(capability: string, on: boolean) {
           <li v-for="p in checkpoints" :key="p.id" class="space-y-1 py-3" :data-testid="'regle-' + p.code">
             <div class="flex flex-wrap items-center justify-between gap-2"><p class="font-bold">{{ p.name }} <small class="font-normal text-slate-600">({{ p.code }}){{ p.active ? '' : ' · désactivé' }}</small></p><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" :aria-label="'Modifier les règles de ' + p.name" @click="configure(p)">Modifier</button></div>
             <p class="text-sm"><span class="font-semibold">Opérations :</span> {{ p.capabilities.length ? p.capabilities.map(short).join(', ') : 'aucune' }}<template v-if="p.direction_required"> · sens Entrée / Sortie obligatoire</template></p>
-            <p class="text-sm"><span class="font-semibold">Zones jugées :</span> {{ p.zones.length ? p.zones.map(z => z.name).join(', ') : 'aucune' }}</p>
+            <p class="text-sm"><span class="font-semibold">Zones jugées :</span> {{ p.site_zones?.length ? p.site_zones.map(z => z.name).join(', ') : 'aucune' }}</p>
           </li>
         </ul>
       </section>
@@ -361,12 +341,7 @@ function toggleCreate(capability: string, on: boolean) {
             </div>
 
             <div class="space-y-2" :data-testid="'zones-' + selected.code">
-              <h3 class="font-bold">Zones gardées ({{ selected.zones.length }})</h3>
-              <p v-if="!selected.zones.length" class="text-slate-700">Ce poste ne juge aucune zone : sans correspondance, il ne refuse pas pour une zone.</p>
-              <ul v-else class="space-y-1">
-                <li v-for="z in selected.zones" :key="z.mapping_id" class="flex items-center justify-between gap-3" :data-testid="'zone-' + z.mapping_id"><span><strong>{{ z.name }}</strong> · {{ z.event_name }}</span><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" :aria-label="'Retirer la zone ' + z.name" @click="removeZone(z)">Retirer</button></li>
-              </ul>
-              <h3 class="pt-2 font-bold">Zones du site gardées ({{ selected.site_zones?.length ?? 0 }})</h3>
+              <h3 class="font-bold">Zones gardées ({{ selected.site_zones?.length ?? 0 }})</h3>
               <p v-if="!selected.site_zones?.length" class="text-slate-700" data-testid="aucune-zone-site-poste">Ce poste ne garde aucune zone du site.</p>
               <ul v-else class="space-y-1">
                 <li v-for="z in selected.site_zones" :key="z.mapping_id" class="flex items-center justify-between gap-3" :data-testid="'zone-site-poste-' + z.mapping_id"><strong>{{ z.name }}</strong><button type="button" class="btn-soft !min-h-11 !px-3 !py-1 text-sm" :aria-label="'Retirer la zone du site ' + z.name" @click="removeSiteZoneFromPost(z.mapping_id)">Retirer</button></li>
@@ -374,10 +349,6 @@ function toggleCreate(capability: string, on: boolean) {
               <div v-if="site_zones?.length" class="flex flex-wrap items-center gap-2">
                 <select v-model="siteZoneChoice[selected.id]" class="field !mt-0 grow" :aria-label="'Zone du site à associer à ' + selected.name" :data-testid="'zone-site-choix-' + selected.code"><option value="">Choisir une zone du site…</option><option v-for="z in site_zones" :key="z.id" :value="z.id">{{ z.name }}</option></select>
                 <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!siteZoneChoice[selected.id]" :data-testid="'zone-site-ajouter-' + selected.code" @click="addSiteZoneToPost(selected)">Associer</button>
-              </div>
-              <div v-if="zones.length" class="flex flex-wrap items-center gap-2">
-                <select v-model="zoneChoice[selected.id]" class="field !mt-0 grow" :aria-label="'Zone à associer à ' + selected.name" :data-testid="'zone-choix-' + selected.code"><option value="">Choisir une zone…</option><option v-for="z in zones" :key="z.id" :value="z.id">{{ z.name }} · {{ z.event_name }}</option></select>
-                <button type="button" class="btn-soft !min-h-11 !px-4 !py-2 !text-sm" :disabled="!zoneChoice[selected.id]" :data-testid="'zone-ajouter-' + selected.code" @click="addZone(selected)">Associer</button>
               </div>
             </div>
           </template>

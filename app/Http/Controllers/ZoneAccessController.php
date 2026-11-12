@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Services\ActivityZones;
 use App\Services\Audit;
 use App\Services\ParticipationEntitlements;
-use App\Services\ZoneAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,12 +13,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Accès aux zones (S06) : correspondance point de contrôle / zones et habilitations des participations. Administrateur seulement
+ * Habilitations des participants (S06) : accès aux zones du site en complément de la catégorie ; la garde des zones par un poste se règle dans Site et accès. Administrateur seulement
  * (« zones.gerer », « listes.importer », « postes.gerer »). Le superviseur consulte les habilitations dans le centre de supervision (S07), sans les modifier.
  */
 final class ZoneAccessController
 {
-    public function index(Request $request, ZoneAccess $access, ParticipationEntitlements $entitlements): Response
+    public function index(Request $request, ParticipationEntitlements $entitlements): Response
     {
         Gate::authorize('zones.gerer');
         $events = DB::table('events')->orderByDesc('starts_at')->get(['id', 'name']);
@@ -36,28 +35,11 @@ final class ZoneAccessController
         return Inertia::render('Admin/AccesZones', [
             'events' => $events, 'eventId' => $eventId, 'q' => $q,
             'zones' => $eventId ? ActivityZones::query($eventId)->orderBy('name')->get(['id', 'name']) : [],
-            'points' => DB::table('checkpoints')->where('active', true)->orderBy('code')->get(['id', DB::raw("CASE WHEN function_label IS NULL THEN name ELSE name || ' — ' || function_label END as name")]),
-            'mappings' => $eventId ? $access->mappings($eventId) : [],
             'entitlements' => $eventId ? $entitlements->forEvent($eventId) : [],
             'participants' => $participants,
             'maxHours' => ParticipationEntitlements::maxExceptionalHours(),
             'now' => now()->toIso8601String(),
         ]);
-    }
-
-    public function map(Request $r, ZoneAccess $access): RedirectResponse
-    {
-        $data = $r->validate(['event_id' => 'required|uuid|exists:events,id', 'checkpoint_id' => 'required|uuid', 'zone_id' => 'required|uuid']);
-        $access->map($data['event_id'], $data['checkpoint_id'], $data['zone_id'], $r->user());
-
-        return back()->with('status', 'Correspondance enregistrée. Synchronisez les postes.');
-    }
-
-    public function unmap(Request $r, string $mapping, ZoneAccess $access): RedirectResponse
-    {
-        $access->unmap($mapping, $r->user());
-
-        return back()->with('status', 'Correspondance retirée.');
     }
 
     public function grant(Request $r, ParticipationEntitlements $entitlements): RedirectResponse

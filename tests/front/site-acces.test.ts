@@ -10,11 +10,11 @@ import SiteAcces from '../../resources/js/pages/Admin/SiteAcces.vue';
 const catalogue = { accueil: 'Accueil : identité, admission et attribution de badge', scan: 'Contrôle d’un badge (entrée ou passage)', sortie: 'Sortie du site (la restitution du badge reste une opération distincte, permise par la même capacité)' };
 const tablet = (id: string, checkpoint: string | null) => ({ id, name: 'Tablette ' + id, station: null, checkpoint_id: checkpoint, state: 'enrole' as const, last_synced_at: null, event_name: 'Activité fictive' });
 const posts = [
-  { id: 'c1', code: 'poste_1', name: 'Poste 1', function_label: 'Entrée principale', capabilities: [], direction_required: false, active: true, version: 1, tablets: [], zones: [] },
-  { id: 'c2', code: 'poste_2', name: 'Poste 2', function_label: 'Accès Académie', capabilities: ['accueil', 'scan', 'sortie'], direction_required: false, active: true, version: 3, site_zones: [{ mapping_id: 'sm1', zone_id: 'sz1', name: 'Hall du site' }], tablets: [tablet('t1', 'c2'), tablet('t2', 'c2')], zones: [{ mapping_id: 'm1', zone_id: 'z1', event_id: 'e1', name: 'Hall', event_name: 'Activité fictive' }] },
-  { id: 'c5', code: 'soute', name: 'Point 5', function_label: 'La Soute', capabilities: ['scan'], direction_required: true, active: false, version: 2, tablets: [], zones: [] },
+  { id: 'c1', code: 'poste_1', name: 'Poste 1', function_label: 'Entrée principale', capabilities: [], direction_required: false, active: true, version: 1, tablets: [] },
+  { id: 'c2', code: 'poste_2', name: 'Poste 2', function_label: 'Accès Académie', capabilities: ['accueil', 'scan', 'sortie'], direction_required: false, active: true, version: 3, site_zones: [{ mapping_id: 'sm1', zone_id: 'sz1', name: 'Hall du site' }], tablets: [tablet('t1', 'c2'), tablet('t2', 'c2')] },
+  { id: 'c5', code: 'soute', name: 'Point 5', function_label: 'La Soute', capabilities: ['scan'], direction_required: true, active: false, version: 2, tablets: [] },
 ];
-const props = { site: { id: 's1', name: 'Site fictif' }, site_zones: [{ id: 'sz1', name: 'Hall du site' }, { id: 'sz2', name: 'Parking du site' }], checkpoints: posts, catalogue, unassigned: [tablet('t3', null)], zones: [{ id: 'z1', name: 'Hall', event_id: 'e1', event_name: 'Activité fictive' }, { id: 'z2', name: 'Salle', event_id: 'e1', event_name: 'Activité fictive' }], history: [{ id: 'h1', device: 'Tablette t1', checkpoint: 'Poste 2', assigned_at: '2027-01-10T10:00:00Z', ended_at: null, reason: 'Mise en service', by: 'Administrateur fictif' }] };
+const props = { site: { id: 's1', name: 'Site fictif' }, site_zones: [{ id: 'sz1', name: 'Hall du site' }, { id: 'sz2', name: 'Parking du site' }], checkpoints: posts, catalogue, unassigned: [tablet('t3', null)], history: [{ id: 'h1', device: 'Tablette t1', checkpoint: 'Poste 2', assigned_at: '2027-01-10T10:00:00Z', ended_at: null, reason: 'Mise en service', by: 'Administrateur fictif' }] };
 const render = (over: object = {}) => mount(SiteAcces, { props: { ...props, ...over } as never, global: { stubs: { AdminLayout: { template: '<main><slot /></main>' } } } });
 /** Ouvre la configuration détaillée d'un poste (elle n'est affichée que sur sélection). */
 async function open(wrapper: ReturnType<typeof render>, code: string) { await wrapper.get(`[data-testid="selectionner-${code}"]`).trigger('click'); return wrapper; }
@@ -42,12 +42,12 @@ describe('écran Site et accès', () => {
     const wrapper = render();
     for (const id of ['registre-postes', 'infos-site', 'resume-zones', 'resume-regles']) expect(wrapper.find(`[data-testid="${id}"]`).exists(), id).toBe(true);
     expect(wrapper.get('[data-testid="infos-site"]').text()).toContain('Site fictif');
-    // le résumé présente les zones PERMANENTES du site ; les zones d'activité sont comptées à part
+    // le résumé présente les zones du site
     expect(wrapper.findAll('[data-testid^="zone-resume-"]').map(a => a.attributes('data-testid'))).toEqual(['zone-resume-sz1', 'zone-resume-sz2']);
     expect(wrapper.get('[data-testid="zone-resume-sz1"]').text()).toContain('Poste 2');
     expect(wrapper.get('[data-testid="zone-resume-sz2"]').text()).toContain('aucun poste');
     expect(wrapper.get('[data-testid="resume-zones"] h2').text()).toBe('Zones du site (2)');
-    expect(wrapper.get('[data-testid="resume-zones-activites"]').text()).toContain('Zones des activités : 2');
+    expect(wrapper.find('[data-testid="resume-zones-activites"]').exists()).toBe(false); // plus de zones propres aux activités
     // une seule correspondance poste–zone existe dans les données : une seule règle
     expect(wrapper.findAll('[data-testid^="regle-resume-"]')).toHaveLength(1);
     expect(wrapper.get('[data-testid="resume-regles"]').text()).toContain('Règles d’accès (1)');
@@ -82,7 +82,7 @@ describe('écran Site et accès', () => {
   it('affiche des indicateurs tirés des données réelles', () => {
     const wrapper = render();
     expect(wrapper.get('[data-testid="kpi-postes"]').text()).toBe('3');
-    expect(wrapper.get('[data-testid="kpi-zones"]').text()).toBe('2'); // zones du site ; les 2 zones d'activité sont indiquées en dessous
+    expect(wrapper.get('[data-testid="kpi-zones"]').text()).toBe('2'); // toute zone est une zone du site
     expect(wrapper.get('[data-testid="kpi-tablettes"]').text()).toBe('2');
     expect(wrapper.get('[data-testid="kpi-correspondances"]').text()).toBe('1');
   });
@@ -107,7 +107,7 @@ describe('écran Site et accès', () => {
     expect(wrapper.get('[data-testid="zones-poste_2"]').text()).toContain('Hall');
     await open(wrapper, 'poste_1');
     expect(wrapper.get('[data-testid="tablettes-poste_1"]').text()).toContain('Aucune tablette affectée');
-    expect(wrapper.get('[data-testid="zones-poste_1"]').text()).toContain('ne juge aucune zone');
+    expect(wrapper.get('[data-testid="zones-poste_1"]').text()).toContain('ne garde aucune zone du site');
     await wrapper.get('[data-testid="tab-parametres"]').trigger('click');
     expect(wrapper.get('[data-testid="historique-affectations"]').text()).toContain('Tablette t1');
   });
@@ -165,17 +165,6 @@ describe('écran Site et accès', () => {
     expect(router.post).toHaveBeenCalledWith('/administration/site/tablettes/t2/affectation', { checkpoint_id: 'c1' }, expect.anything());
   });
 
-  it('associe et retire une zone par les routes existantes des accès', async () => {
-    const wrapper = render();
-    await open(wrapper, 'poste_1');
-    await wrapper.get('[data-testid="zone-choix-poste_1"]').setValue('z2');
-    await wrapper.get('[data-testid="zone-ajouter-poste_1"]').trigger('click');
-    expect(router.post).toHaveBeenCalledWith('/administration/acces/correspondances', { event_id: 'e1', checkpoint_id: 'c1', zone_id: 'z2' }, expect.anything());
-    await open(wrapper, 'poste_2');
-    await wrapper.get('[data-testid="zone-m1"] button').trigger('click');
-    expect(router.post).toHaveBeenLastCalledWith('/administration/acces/correspondances/m1/retirer', {}, expect.anything());
-  });
-
   it('crée un poste avec ses capacités depuis « Ajouter un poste »', async () => {
     const wrapper = render();
     expect(wrapper.find('[data-testid="creer-poste"]').exists()).toBe(false);
@@ -192,8 +181,8 @@ describe('écran Site et accès', () => {
     expect(wrapper.findAll('[role="tab"]').map(t => t.text())).toEqual(['Postes de contrôle', 'Zones', 'Tablettes', 'Règles d’accès', 'Paramètres']);
     await wrapper.get('[data-testid="tab-zones"]').trigger('click');
     expect(wrapper.get('[data-testid="panneau-zones"] h2').text()).toBe('Zones du site (2)');
-    expect(wrapper.get('[data-testid="zone-liste-z1"]').text()).toContain('Gardée par : Poste 2');
-    expect(wrapper.get('[data-testid="zone-liste-z2"]').text()).toContain('aucun poste');
+    expect(wrapper.get('[data-testid="zone-liste-sz1"]').text()).toContain('Gardée par : Poste 2');
+    expect(wrapper.get('[data-testid="zone-liste-sz2"]').text()).toContain('aucun poste');
     expect(wrapper.find('[data-testid="gerer-zones"]').exists()).toBe(false); // plus d'écran séparé : toute zone est une zone du site
     await wrapper.get('[data-testid="tab-regles"]').trigger('click');
     expect(wrapper.get('[data-testid="regle-poste_2"]').text()).toContain('Hall');
@@ -213,14 +202,14 @@ describe('écran Site et accès', () => {
 
   it('affiche les refus du serveur et les états vides explicitement', async () => {
     page.props.errors = { version: 'Ce poste a été modifié entre-temps par un autre administrateur : rechargez la page avant de réessayer.' };
-    const wrapper = render({ checkpoints: [], unassigned: [], history: [], site: null, zones: [] });
+    const wrapper = render({ checkpoints: [], unassigned: [], history: [], site: null, site_zones: [] });
     expect(wrapper.get('[data-testid="erreurs-site"]').text()).toContain('modifié entre-temps');
     expect(wrapper.get('[data-testid="aucun-poste"]').text()).toContain('Aucun poste');
     expect(wrapper.find('[data-testid="aucun-site"]').exists()).toBe(true);
     await wrapper.get('[data-testid="tab-tablettes"]').trigger('click');
     expect(wrapper.find('[data-testid="aucune-tablette"]').exists()).toBe(true);
     await wrapper.get('[data-testid="tab-zones"]').trigger('click');
-    expect(wrapper.find('[data-testid="aucune-zone"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="aucune-zone-site"]').exists()).toBe(true);
     await wrapper.get('[data-testid="tab-parametres"]').trigger('click');
     expect(wrapper.get('[data-testid="historique-affectations"]').text()).toContain('Aucune affectation');
   });

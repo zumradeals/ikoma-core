@@ -225,8 +225,6 @@ Route::middleware(['auth'])->group(function (): void {
         Route::post('/administration/demonstration/{event}/nettoyer', [DemoLabController::class, 'clear'])->whereUuid('event')->middleware([EnsureDemoLab::class, 'can:comptes.gerer', 'throttle:3,1']);
         Route::get('/administration/habilitations', [HolderEntitlementsController::class, 'index'])->middleware('can:listes.importer');
         Route::get('/administration/acces', [ZoneAccessController::class, 'index'])->middleware('can:zones.gerer');
-        Route::post('/administration/acces/correspondances', [ZoneAccessController::class, 'map'])->middleware(['can:zones.gerer', 'can:postes.gerer', 'throttle:titulaires']);
-        Route::post('/administration/acces/correspondances/{mapping}/retirer', [ZoneAccessController::class, 'unmap'])->whereUuid('mapping')->middleware(['can:zones.gerer', 'can:postes.gerer', 'throttle:titulaires']);
         Route::post('/administration/acces/habilitations', [ZoneAccessController::class, 'grant'])->middleware(['can:zones.gerer', 'can:listes.importer', 'throttle:titulaires']);
         Route::post('/administration/acces/habilitations/{entitlement}/suspendre', [ZoneAccessController::class, 'suspend'])->whereUuid('entitlement')->middleware(['can:zones.gerer', 'can:listes.importer', 'throttle:titulaires']);
         Route::post('/administration/acces/habilitations/{entitlement}/reprendre', [ZoneAccessController::class, 'resume'])->whereUuid('entitlement')->middleware(['can:zones.gerer', 'can:listes.importer', 'throttle:titulaires']);

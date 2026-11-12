@@ -85,7 +85,7 @@ final class DataLifecycle
             if ($row->status !== null) {
                 $reasons[] = 'Cet événement possède un état opérationnel : conservez ses références.';
             }
-            foreach (['visitors', 'hosts', 'devices', 'badge_batches', 'badges', 'groups', 'import_batches', 'access_events', 'badge_assignments', 'notifications', 'alerts', 'sync_conflicts', 'holder_entitlements', 'participation_entitlements', 'checkpoint_zones'] as $dependency) {
+            foreach (['visitors', 'hosts', 'devices', 'badge_batches', 'badges', 'groups', 'import_batches', 'access_events', 'badge_assignments', 'notifications', 'alerts', 'sync_conflicts', 'holder_entitlements', 'participation_entitlements'] as $dependency) {
                 if ($has($dependency, 'event_id', $id)) {
                     $reasons[] = 'Cet événement contient des personnes, des équipements, des badges ou une activité. Seule une préparation inutilisée peut être supprimée.';
                     break;
@@ -106,7 +106,7 @@ final class DataLifecycle
             }
             $counts['category_zone'] = DB::table('category_zone')->where('category_id', $id)->count();
         } elseif ($entity === 'zone') {
-            if ($row->est_accueil || $has('holder_entitlements', 'zone_id', $id) || $has('participation_entitlements', 'zone_id', $id) || $has('checkpoint_zones', 'zone_id', $id) || $has('category_zone', 'zone_id', $id) || $has('devices', 'event_id', $row->event_id) || $has('access_events', 'event_id', $row->event_id)) {
+            if ($row->est_accueil || $has('holder_entitlements', 'zone_id', $id) || $has('holder_site_entitlements', 'zone_id', $id) || $has('participation_entitlements', 'zone_id', $id) || $has('checkpoint_site_zones', 'zone_id', $id) || $has('category_zone', 'zone_id', $id)) {
                 $reasons[] = 'Zone d’accueil obligatoire, règle d’accès ou dépendance opérationnelle : suppression interdite.';
             }
         } elseif ($entity === 'groupe') {
@@ -141,6 +141,8 @@ final class DataLifecycle
                 }
             } elseif ($entity === 'categorie') {
                 DB::table('category_zone')->where('category_id', $id)->delete();
+            } elseif ($entity === 'zone') {
+                DB::table('site_zone_policies')->where('zone_id', $id)->delete();
             }
             $batchId = $entity === 'badge' ? DB::table('badges')->where('id', $id)->value('badge_batch_id') : null;
             DB::table(self::ENTITIES[$entity][0])->where('id', $id)->delete();

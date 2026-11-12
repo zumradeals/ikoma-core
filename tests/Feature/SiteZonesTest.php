@@ -32,14 +32,11 @@ it('refuse deux zones du site de même nom (casse ignorée)', function () {
     expect(DB::table('zones')->whereNull('event_id')->count())->toBe($before + 1);
 });
 
-it('renomme une zone du site, jamais une zone d’activité', function () {
+it('renomme une zone du site', function () {
     $this->post('/administration/site/zones', ['name' => 'Parking fictif']);
     $id = (string) DB::table('zones')->where('name', 'Parking fictif')->value('id');
     $this->put('/administration/site/zones/'.$id, ['name' => 'Parking visiteurs fictif'])->assertSessionHasNoErrors();
     expect(DB::table('zones')->where('id', $id)->value('name'))->toBe('Parking visiteurs fictif');
-    $activityZone = (string) Str::uuid(); // ancienne zone propre à une activité (ancien chemin, avant son retrait)
-    DB::table('zones')->insert(['id' => $activityZone, 'event_id' => DemoSeeder::id('event'), 'name' => 'Zone propre fictive', 'created_at' => now(), 'updated_at' => now()]);
-    $this->put('/administration/site/zones/'.$activityZone, ['name' => 'Autre nom'])->assertNotFound();
 });
 
 it('réserve la gestion des zones du site à la permission « postes.gerer »', function () {
@@ -47,10 +44,4 @@ it('réserve la gestion des zones du site à la permission « postes.gerer »', 
     $agent->assignRole('agent_accueil');
     $this->actingAs($agent)->post('/administration/site/zones', ['name' => 'Zone interdite'])->assertForbidden();
     expect(DB::table('zones')->where('name', 'Zone interdite')->exists())->toBeFalse();
-});
-
-it('laisse les zones des activités inchangées : une zone du site n’apparaît dans aucune liste d’activité', function () {
-    $this->post('/administration/site/zones', ['name' => 'Zone du site fictive']);
-    $event = DemoSeeder::id('event');
-    expect(DB::table('zones')->where('event_id', $event)->where('name', 'Zone du site fictive')->exists())->toBeFalse();
 });

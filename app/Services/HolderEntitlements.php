@@ -23,8 +23,8 @@ final class HolderEntitlements
     /** @return list<object> */
     public function zones(string $eventId): array
     {
-        return ActivityZones::query($eventId, 'z')->leftJoin('zone_policies as p', 'p.zone_id', '=', 'z.id')->leftJoin('site_zone_policies as sp', 'sp.zone_id', '=', 'z.id')->orderBy('z.name')
-            ->get(['z.id', 'z.name', 'z.event_id', DB::raw('coalesce(p.classification, sp.classification) as classification'), DB::raw('coalesce(p.permanent_allowed, sp.permanent_allowed) as permanent_allowed'), DB::raw('coalesce(p.offline_entry_allowed, sp.offline_entry_allowed) as offline_entry_allowed')])->all();
+        return ActivityZones::query($eventId, 'z')->leftJoin('site_zone_policies as sp', 'sp.zone_id', '=', 'z.id')->orderBy('z.name')
+            ->get(['z.id', 'z.name', 'z.event_id', 'sp.classification', 'sp.permanent_allowed', 'sp.offline_entry_allowed'])->all();
     }
 
     public function savePolicy(string $eventId, string $zoneId, string $classification, bool $permanentAllowed, bool $offlineAllowed, User $actor): void
@@ -37,20 +37,11 @@ final class HolderEntitlements
             throw ValidationException::withMessages(['offline' => 'Une zone fermée aux titulaires permanents ne peut pas les accepter hors ligne.']);
         }
         $this->eventOrFail($eventId);
-        DB::transaction(function () use ($eventId, $zoneId, $classification, $permanentAllowed, $offlineAllowed, $actor): void {
-            $zone = ActivityZones::query($eventId)->where('id', $zoneId)->first(['id', 'event_id']);
-            if ($zone === null) {
-                throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
-            }
-            if ($zone->event_id === null) {
-                // Zone du site : une seule politique, celle du site.
-                app(SiteEntitlements::class)->savePolicy($zoneId, $permanentAllowed, $offlineAllowed, $actor);
-
-                return;
-            }
-            DB::table('zone_policies')->upsert([['zone_id' => $zoneId, 'event_id' => $eventId, 'classification' => $classification, 'permanent_allowed' => $permanentAllowed, 'offline_entry_allowed' => $offlineAllowed, 'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now()]], ['zone_id'], ['classification', 'permanent_allowed', 'offline_entry_allowed', 'updated_by', 'updated_at']);
-            $this->audit->append('zone.politique_modifiee', $actor->id, ['zone_id' => $zoneId, 'event_id' => $eventId, 'permanents' => $permanentAllowed, 'hors_ligne' => $offlineAllowed]);
-        });
+        if (! ActivityZones::allows($eventId, $zoneId)) {
+            throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
+        }
+        // Toute zone est une zone du site : une seule politique, celle du site.
+        app(SiteEntitlements::class)->savePolicy($zoneId, $permanentAllowed, $offlineAllowed, $actor, $classification);
     }
 
     // --- Habilitations ------------------------------------------------------------------------------------------------------------

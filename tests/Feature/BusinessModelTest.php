@@ -159,24 +159,6 @@ it('journalise la création et la modification des zones et catégories sans don
     expect(DB::table('category_zone')->where('category_id', $category->id)->pluck('zone_id')->all())->toBe([DemoSeeder::id('zone0')]);
     $this->artisan('audit:verify')->assertSuccessful();
 });
-it('refuse des zones d’un autre événement et ne crée aucun journal en cas de validation refusée', function () {
-    $admin = businessAccount('administrateur');
-    $admin->update(['two_factor_confirmed_at' => now()]);
-    $this->actingAs($admin);
-    $event = (string) Str::uuid();
-    DB::table('events')->insert(['id' => $event, 'name' => 'Autre exercice fictif', 'starts_at' => now(), 'ends_at' => now()->addDay()]);
-    $zone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone, 'event_id' => $event, 'name' => 'Zone hors événement']);
-    $count = DB::table('audit_logs')->where('actor_id', $admin->id)->where('action', 'categorie.creee')->count();
-    $this->post('/administration/categories', ['event_id' => DemoSeeder::id('event'), 'name' => 'Catégorie interdite', 'color' => '#0F5AA6', 'priority_circuit' => false, 'zone_ids' => [$zone]])->assertSessionHasErrors('zone_ids.0');
-    expect(DB::table('audit_logs')->where('actor_id', $admin->id)->where('action', 'categorie.creee')->count())->toBe($count);
-    try {
-        DB::transaction(fn () => DB::table('category_zone')->insert(['id' => (string) Str::uuid(), 'event_id' => DemoSeeder::id('event'), 'category_id' => DemoSeeder::id('category0'), 'zone_id' => $zone]));
-        $this->fail('Mélange événements accepté');
-    } catch (QueryException $e) {
-        expect($e->getCode())->toBe('23514');
-    }
-});
 it('affiche les badges en lecture seule sans jeton QR et filtre les réservations', function () {
     $admin = businessAccount('administrateur');
     $admin->update(['two_factor_confirmed_at' => now()]);
