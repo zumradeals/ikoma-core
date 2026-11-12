@@ -44,7 +44,7 @@ return new class extends Migration
                 '/public\.(?:checkpoint_zones|zone_policies)\s*,\s*/',
                 '/\s*,\s*public\.(?:checkpoint_zones|zone_policies)\b/',
             ], '', $definition);
-            if ($updated === null || preg_match('/.{0,120}(?:checkpoint_zones|zone_policies|zones WHERE event_id).{0,120}/s', $updated, $left) === 1) {
+            if ($updated === null || preg_match('/.{0,120}(?:public\.(?:checkpoint_zones|zone_policies)\b|public\.zones WHERE event_id).{0,120}/s', $updated, $left) === 1) {
                 throw new RuntimeException('Fonction de remise à zéro inattendue ('.$signature.') : revue du contrat requise. Reste : '.preg_replace('/\s+/', ' ', $left[0] ?? ''));
             }
             DB::unprepared($updated);
