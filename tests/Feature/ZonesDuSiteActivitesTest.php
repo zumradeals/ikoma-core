@@ -6,7 +6,6 @@ use App\Services\Poste\ListSnapshot;
 use App\Services\ZoneAccess;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -24,7 +23,7 @@ beforeEach(function () {
     $this->category = DemoSeeder::id('category0');
     $this->device = DemoSeeder::id('device');
     $this->post('/administration/site/zones', ['name' => 'Hall commun fictif'])->assertSessionHasNoErrors();
-    $this->siteZone = (string) DB::table('zones')->whereNull('event_id')->where('name', 'Hall commun fictif')->value('id');
+    $this->siteZone = (string) DB::table('zones')->where('name', 'Hall commun fictif')->value('id');
     $this->checkpoint = (string) DB::table('checkpoints')->where('code', 'poste_2')->value('id');
     DB::table('devices')->where('id', $this->device)->update(['checkpoint_id' => $this->checkpoint]);
     $this->selectZones = function (array $zoneIds) {
@@ -38,18 +37,7 @@ it('laisse une catégorie choisir une zone du site, en plus des zones de son act
     $own = DB::table('category_zone')->where('category_id', $this->category)->pluck('zone_id')->all();
     ($this->selectZones)([...$own, $this->siteZone])->assertSessionHasNoErrors();
     expect(DB::table('category_zone')->where('category_id', $this->category)->where('zone_id', $this->siteZone)->where('event_id', $this->event)->exists())->toBeTrue();
-    $this->get('/administration/categories')->assertOk()->assertInertia(fn ($page) => $page->where('zones', fn ($zones) => collect($zones)->contains(fn ($z) => $z['id'] === $this->siteZone && $z['event_id'] === null)));
-});
-
-it('refuse en base une zone d’une AUTRE activité, mais accepte une zone du site', function () {
-    $otherEvent = (string) Str::uuid();
-    DB::table('events')->insert(['id' => $otherEvent, 'name' => 'Autre activité fictive', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
-    $foreign = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $foreign, 'event_id' => $otherEvent, 'name' => 'Zone étrangère', 'created_at' => now(), 'updated_at' => now()]);
-    $row = fn (string $zone) => ['id' => (string) Str::uuid(), 'event_id' => $this->event, 'category_id' => $this->category, 'zone_id' => $zone, 'created_at' => now(), 'updated_at' => now()];
-    expect(fn () => DB::transaction(fn () => DB::table('category_zone')->insert($row($foreign))))->toThrow(QueryException::class, 'sa propre activité');
-    DB::table('category_zone')->insert($row($this->siteZone));
-    expect(DB::table('category_zone')->where('zone_id', $this->siteZone)->exists())->toBeTrue();
+    $this->get('/administration/categories')->assertOk()->assertInertia(fn ($page) => $page->where('zones', fn ($zones) => collect($zones)->contains(fn ($z) => $z['id'] === $this->siteZone)));
 });
 
 it('ne change pas le jugement d’un poste tant que l’activité ne réutilise pas la zone du site qu’il garde', function () {

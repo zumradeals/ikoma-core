@@ -38,9 +38,9 @@ final class DemoCleanup
                     throw new RuntimeException('Événement de démonstration modifié : suppression refusée.');
                 }
 
-                // Les zones de la démonstration sont des zones du site (identifiants fixes), plus des zones propres à l'activité.
+                // Les zones de la démonstration sont des zones du site (identifiants fixes).
                 $demoZones = array_map($id, array_map(static fn ($i) => 'zone'.$i, range(0, 5)));
-                $actualZones = DB::table('zones')->whereIn('id', $demoZones)->where(static fn ($q) => $q->whereNull('event_id')->orWhere('event_id', $eventId))->pluck('id')->all();
+                $actualZones = DB::table('zones')->whereIn('id', $demoZones)->pluck('id')->all();
                 sort($actualZones);
                 $sortedZones = $demoZones;
                 sort($sortedZones);
@@ -153,7 +153,6 @@ final class DemoCleanup
                 DB::table('hosts')->where('event_id', $eventId)->delete();
                 DB::table('category_zone')->where('event_id', $eventId)->delete();
                 DB::table('categories')->where('event_id', $eventId)->delete();
-                DB::table('zones')->where('event_id', $eventId)->delete();
                 // Zones du site de la démonstration : retirées seulement si plus rien ne s'y rattache (jamais une zone utilisée ailleurs).
                 $unused = DB::table('zones')->whereIn('id', array_map($id, array_map(static fn ($i) => 'zone'.$i, range(0, 5))))
                     ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('category_zone')->whereColumn('category_zone.zone_id', 'zones.id'))

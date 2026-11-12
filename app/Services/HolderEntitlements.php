@@ -23,8 +23,8 @@ final class HolderEntitlements
     /** @return list<object> */
     public function zones(string $eventId): array
     {
-        return ActivityZones::query($eventId, 'z')->leftJoin('site_zone_policies as sp', 'sp.zone_id', '=', 'z.id')->orderBy('z.name')
-            ->get(['z.id', 'z.name', 'z.event_id', 'sp.classification', 'sp.permanent_allowed', 'sp.offline_entry_allowed'])->all();
+        return ActivityZones::query('z')->leftJoin('site_zone_policies as sp', 'sp.zone_id', '=', 'z.id')->orderBy('z.name')
+            ->get(['z.id', 'z.name', 'sp.classification', 'sp.permanent_allowed', 'sp.offline_entry_allowed'])->all();
     }
 
     public function savePolicy(string $eventId, string $zoneId, string $classification, bool $permanentAllowed, bool $offlineAllowed, User $actor): void
@@ -37,7 +37,7 @@ final class HolderEntitlements
             throw ValidationException::withMessages(['offline' => 'Une zone fermée aux titulaires permanents ne peut pas les accepter hors ligne.']);
         }
         $this->eventOrFail($eventId);
-        if (! ActivityZones::allows($eventId, $zoneId)) {
+        if (! ActivityZones::allows($zoneId)) {
             throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
         }
         // Toute zone est une zone du site : une seule politique, celle du site.
@@ -77,7 +77,7 @@ final class HolderEntitlements
             if ($holder->status === 'clos') {
                 throw ValidationException::withMessages(['holder_id' => 'Ce titulaire est clos : aucune habilitation ne peut lui être accordée.']);
             }
-            if (! ActivityZones::allows($eventId, $zoneId)) {
+            if (! ActivityZones::allows($zoneId)) {
                 throw ValidationException::withMessages(['zone_id' => 'Zone inconnue pour cet événement.']);
             }
             $overlap = DB::table('holder_entitlements')->where('holder_id', $holderId)->where('zone_id', $zoneId)->whereNull('revoked_at')

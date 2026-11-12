@@ -56,7 +56,7 @@ function pxEvent(string $token, bool $policy = true, bool $offline = false): arr
     $event = (string) Str::uuid();
     DB::table('events')->insert(['id' => $event, 'name' => 'Événement fictif A06 '.Str::random(4), 'starts_at' => now()->subDay(), 'ends_at' => now()->addDays(10), 'created_at' => now(), 'updated_at' => now()]);
     $zone = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone, 'event_id' => null, 'name' => 'Zone P '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone, 'name' => 'Zone P '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
     if ($policy) {
         DB::table('site_zone_policies')->insert(['zone_id' => $zone, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => $offline, 'created_at' => now(), 'updated_at' => now()]);
     }
@@ -226,7 +226,7 @@ it('refuse sans habilitation, hors zone habilitée, après expiration ou retrait
     pxControl($token)->assertJson(['valid' => true]);
     // Une autre zone de l'événement, non habilitée.
     $other = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $other, 'event_id' => null, 'name' => 'Zone interdite '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $other, 'name' => 'Zone interdite '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
     DB::table('site_zone_policies')->insert(['zone_id' => $other, 'classification' => 'NEUTRE-TEST', 'permanent_allowed' => true, 'offline_entry_allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
     pxControl($token, ['type' => 'zone', 'id' => $other])->assertJson(['valid' => false, 'reason' => 'habilitation_absente']);
     // Aucune catégorie AILCT ne donne de zone : la catégorie d'événement créée pour la participation n'a aucune zone.
@@ -565,7 +565,7 @@ it('imprime plusieurs cartes par la route d’impression unique avec un tirage t
 it('accorde l’accès à plusieurs personnes et zones d’un coup : un accès individuel par couple, doublons ignorés, jamais par catégorie', function () {
     $this->actingAs($this->admin);
     $zone2 = (string) Str::uuid();
-    DB::table('zones')->insert(['id' => $zone2, 'event_id' => null, 'name' => 'Zone Q '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('zones')->insert(['id' => $zone2, 'name' => 'Zone Q '.Str::random(5), 'est_accueil' => false, 'created_at' => now(), 'updated_at' => now()]);
     [$a] = pxCard('AILCT-01');
     [$b] = pxCard('AILCT-02');
     $payload = ['event_id' => $this->event, 'holders' => [$a, $b], 'zones' => [$this->zone, $zone2], 'whole_event' => true];

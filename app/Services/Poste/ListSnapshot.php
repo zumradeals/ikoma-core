@@ -34,7 +34,6 @@ final class ListSnapshot
             (SELECT count(*) FROM photos p JOIN visitors v ON v.id = p.visitor_id WHERE v.event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM access_events WHERE event_id = ? AND type <> 'controle'),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM categories WHERE event_id = ?),
-            (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM zones WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM hosts WHERE event_id = ?),
             (SELECT count(*) FROM category_zone WHERE event_id = ?),
             (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '') FROM devices WHERE event_id = ?),
@@ -44,9 +43,9 @@ final class ListSnapshot
             (SELECT value FROM settings WHERE key = 'module_f06_active'),
             (SELECT md5(string_agg(key || '=' || value, ',' ORDER BY key)) FROM settings WHERE key IN ('poste_delai_appel_minutes', 'poste_hors_reseau_max_heures', 'poste_hors_reseau_approuve', 'poste_badges_bas_pourcent', 'poste_badges_bas_minimum', 'poste_inactivite_minutes', 'poste_ecart_horloge_secondes', 'poste_echecs_pin_max', 'identite_piece_active')),
             (SELECT list_revision FROM events WHERE id = ?),
-            (SELECT coalesce(md5(string_agg(z.id::text || z.name || z.est_accueil::text, ',' ORDER BY z.id)), '') FROM zones z WHERE z.event_id IS NULL AND z.id IN (SELECT zone_id FROM category_zone WHERE event_id = ? UNION SELECT zone_id FROM participation_entitlements WHERE event_id = ?)),
+            (SELECT coalesce(md5(string_agg(z.id::text || z.name || z.est_accueil::text, ',' ORDER BY z.id)), '') FROM zones z WHERE z.id IN (SELECT zone_id FROM category_zone WHERE event_id = ? UNION SELECT zone_id FROM participation_entitlements WHERE event_id = ?)),
             (SELECT coalesce(md5(string_agg(zone_id::text, ',' ORDER BY zone_id)), '') FROM checkpoint_site_zones WHERE checkpoint_id = ?),
-            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->checkpoint_id, $poste->id]);
+            ?::text) AS v", [$e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $e, $poste->checkpoint_id, $poste->id]);
 
         // Cartes permanentes, habilitations et politiques de zone : toute révocation ou habilitation modifiée change la version et est donc reprise à la prochaine synchronisation.
         // Le point de contrôle du poste (et donc ses capacités) fait partie de la copie : le modifier change la version.
@@ -126,8 +125,8 @@ final class ListSnapshot
             'event' => DB::table('events')->where('id', $e)->first(['id', 'name', 'starts_at', 'ends_at', 'site']),
             'settings' => $this->settings($setting, $f06Active),
             'categories' => DB::table('categories')->where('event_id', $e)->orderBy('name')->get(['id', 'name', 'color', 'priority_circuit']),
-            // Zones de l'activité (ancien chemin) et zones du site réutilisées par l'activité (catégories, habilitations de participants, zones gardées par ce poste).
-            'zones' => DB::table('zones')->where(fn ($q) => $q->where('event_id', $e)->orWhere(fn ($s) => $s->whereNull('event_id')->where(fn ($u) => $u->whereIn('id', $this->usedSiteZones($e))->orWhere('est_accueil', true))))->orderBy('name')->get(['id', 'name', 'est_accueil']),
+            // Zones du site réutilisées par l'activité (catégories, habilitations de participants) et zones d'accueil du site.
+            'zones' => DB::table('zones')->where(fn ($q) => $q->whereIn('id', $this->usedSiteZones($e))->orWhere('est_accueil', true))->orderBy('name')->get(['id', 'name', 'est_accueil']),
             'category_zone' => DB::table('category_zone')->where('event_id', $e)->get(['category_id', 'zone_id']),
             // S06 : zones gardées par chaque point, et habilitations de participation actives (ni retirées ni suspendues) ; la période est jugée par la tablette.
             // La correspondance est portée par le poste : chaque tablette de l'activité affectée à ce poste en hérite (format inchangé pour les tablettes).

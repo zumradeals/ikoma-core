@@ -34,7 +34,7 @@ final class ZoneAccessController
 
         return Inertia::render('Admin/AccesZones', [
             'events' => $events, 'eventId' => $eventId, 'q' => $q,
-            'zones' => $eventId ? ActivityZones::query($eventId)->orderBy('name')->get(['id', 'name']) : [],
+            'zones' => $eventId ? ActivityZones::query()->orderBy('name')->get(['id', 'name']) : [],
             'entitlements' => $eventId ? $entitlements->forEvent($eventId) : [],
             'participants' => $participants,
             'maxHours' => ParticipationEntitlements::maxExceptionalHours(),

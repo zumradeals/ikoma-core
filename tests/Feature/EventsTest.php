@@ -49,8 +49,7 @@ it('cree un evenement, sans zone propre, avec une zone d accueil du site, puis l
     expect($event)->not->toBeNull()
         ->and(DB::table('events')->count())->toBe($before + 1)
         ->and($event->site)->toBe('Abidjan - Cocody')
-        ->and(DB::table('zones')->where('event_id', $event->id)->count())->toBe(0)
-        ->and(DB::table('zones')->whereNull('event_id')->where('est_accueil', true)->exists())->toBeTrue()
+        ->and(DB::table('zones')->where('est_accueil', true)->exists())->toBeTrue()
         ->and(DB::table('audit_logs')->where('action', 'evenement.cree')->exists())->toBeTrue();
 
     $response->assertRedirect('/administration?event='.$event->id)

@@ -50,7 +50,7 @@ it('refuse un chevauchement, une période inversée et une personne clôturée',
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $this->zone, 'valid_from' => now()->addDay()->toIso8601String(), 'valid_until' => now()->toIso8601String()])->assertSessionHasErrors('valid_until');
 
     app(PermanentHolders::class)->close($this->holder, 'Départ fictif', $this->admin);
-    $other = (string) DB::table('zones')->whereNull('event_id')->value('id');
+    $other = (string) DB::table('zones')->value('id');
     $this->post('/administration/habilitations/site', ['holder_id' => $this->holder, 'zone_id' => $other] + ['valid_from' => now()->addYear()->toIso8601String(), 'valid_until' => now()->addYears(2)->toIso8601String()])->assertSessionHasErrors('holder_id');
 });
 

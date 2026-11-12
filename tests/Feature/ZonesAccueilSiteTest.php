@@ -17,11 +17,11 @@ beforeEach(function () {
 });
 
 it('crée une zone d’accueil du site et refuse de retirer la dernière', function () {
-    DB::table('zones')->whereNull('event_id')->update(['est_accueil' => false]);
+    DB::table('zones')->update(['est_accueil' => false]);
     $name = 'Accueil fictif '.Str::uuid();
     $this->actingAs($this->admin)->post('/administration/site/zones', ['name' => $name, 'est_accueil' => true])->assertRedirect();
     $zone = DB::table('zones')->where('name', $name)->first();
-    expect($zone->event_id)->toBeNull()->and((bool) $zone->est_accueil)->toBeTrue();
+    expect((bool) $zone->est_accueil)->toBeTrue();
 
     $this->actingAs($this->admin)->put('/administration/site/zones/'.$zone->id.'/accueil', ['est_accueil' => false])->assertSessionHasErrors('est_accueil');
     expect((bool) DB::table('zones')->where('id', $zone->id)->value('est_accueil'))->toBeTrue();
@@ -36,11 +36,11 @@ it('crée une zone d’accueil du site et refuse de retirer la dernière', funct
 });
 
 it('garantit une zone d’accueil du site sans en créer de seconde, et l’ancien écran Zones redirige vers Site et accès', function () {
-    DB::table('zones')->whereNull('event_id')->update(['est_accueil' => false]);
+    DB::table('zones')->update(['est_accueil' => false]);
     ActivityZones::ensureSiteReception();
-    $count = DB::table('zones')->whereNull('event_id')->where('est_accueil', true)->count();
+    $count = DB::table('zones')->where('est_accueil', true)->count();
     expect($count)->toBe(1);
     ActivityZones::ensureSiteReception();
-    expect(DB::table('zones')->whereNull('event_id')->where('est_accueil', true)->count())->toBe(1);
+    expect(DB::table('zones')->where('est_accueil', true)->count())->toBe(1);
     $this->actingAs($this->admin)->get('/administration/zones')->assertRedirect('/administration/site');
 });
