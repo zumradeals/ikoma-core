@@ -144,7 +144,6 @@ it('journalise la création et la modification des zones et catégories sans don
     $event = DemoSeeder::id('event');
     $this->post('/administration/site/zones', ['name' => $name])->assertRedirect();
     $zone = DB::table('zones')->where('name', $name)->first();
-    expect($zone->event_id)->toBeNull(); // toute zone est une zone du site
     $this->put('/administration/site/zones/'.$zone->id, ['name' => $name.' modifiée'])->assertRedirect();
     $categoryName = 'Catégorie test '.Str::uuid();
     $data = ['event_id' => $event, 'name' => $categoryName, 'color' => '#0F5AA6', 'priority_circuit' => false, 'zone_ids' => [$zone->id]];

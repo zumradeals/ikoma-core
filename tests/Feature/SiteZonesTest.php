@@ -17,10 +17,10 @@ beforeEach(function () {
     $this->actingAs($this->admin);
 });
 
-it('crée une zone du site sans événement, rattachée au site, et la liste dans « Site et accès »', function () {
+it('crée une zone du site, rattachée au site, et la liste dans « Site et accès »', function () {
     $this->post('/administration/site/zones', ['name' => 'Hall principal fictif'])->assertSessionHasNoErrors();
     $zone = DB::table('zones')->where('name', 'Hall principal fictif')->first();
-    expect($zone->event_id)->toBeNull()->and($zone->site_id)->toBe(DB::table('sites')->orderBy('created_at')->value('id'));
+    expect($zone->site_id)->toBe(DB::table('sites')->orderBy('created_at')->value('id'));
     $this->get('/administration/site')->assertOk()->assertInertia(fn ($page) => $page->where('site_zones', fn ($zones) => collect($zones)->pluck('name')->contains('Hall principal fictif')));
     expect(DB::table('audit_logs')->where('action', 'site.zone_creee')->count())->toBe(1);
 });

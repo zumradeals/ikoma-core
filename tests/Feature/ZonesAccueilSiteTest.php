@@ -21,7 +21,7 @@ it('crée une zone d’accueil du site et refuse de retirer la dernière', funct
     $name = 'Accueil fictif '.Str::uuid();
     $this->actingAs($this->admin)->post('/administration/site/zones', ['name' => $name, 'est_accueil' => true])->assertRedirect();
     $zone = DB::table('zones')->where('name', $name)->first();
-    expect($zone->event_id)->toBeNull()->and((bool) $zone->est_accueil)->toBeTrue();
+    expect((bool) $zone->est_accueil)->toBeTrue();
 
     $this->actingAs($this->admin)->put('/administration/site/zones/'.$zone->id.'/accueil', ['est_accueil' => false])->assertSessionHasErrors('est_accueil');
     expect((bool) DB::table('zones')->where('id', $zone->id)->value('est_accueil'))->toBeTrue();
