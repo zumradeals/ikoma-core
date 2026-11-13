@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue';
 import PosteApp from './PosteApp.vue';
 import ControleApp from './ControleApp.vue';
 import GroupeApp from './GroupeApp.vue';
@@ -24,6 +24,12 @@ const lockedUntil = ref(0); const now = ref(Date.now()); const remaining = ref<n
 const conflicts = shallowRef<LocalOp[]>([]);
 const resetConfirm = ref(false); const resetPending = ref(0);
 const openKey = ref(0);
+// Fusion (test de faisabilité) : un seul écran déverrouillé ; poste, contrôle et groupes sont des VUES internes qui partagent le même coffre, la même copie et la même synchronisation.
+// Aucune visite de page : le changement de vue marche donc aussi sans réseau. Les adresses /poste, /controle et /groupe restent des points d'entrée (vue de départ).
+type View = 'poste' | 'controle' | 'groupe';
+const view = ref<View>(props.app ?? 'poste');
+const viewMode = ref<string | null>(null);
+provide('agentNavigate', (next: View, mode: string | null = null) => { view.value = next; viewMode.value = mode; });
 let idleTimer: number | undefined; let tick: number | undefined; let loop: number | undefined;
 let idleMs = 300_000;
 
@@ -162,9 +168,9 @@ onBeforeUnmount(() => {
   </main>
 
   <template v-else>
-    <SiteModeNotice v-if="app !== 'controle' && runtime.repo && siteMode()" :key="openKey" :repository="runtime.repo" :online="sync?.online ?? true" />
-    <GroupeApp v-else-if="app === 'groupe' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
-    <ControleApp v-else-if="app === 'controle' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as SitePosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
+    <SiteModeNotice v-if="view !== 'controle' && runtime.repo && siteMode()" :key="openKey" :repository="runtime.repo" :online="sync?.online ?? true" />
+    <GroupeApp v-else-if="view === 'groupe' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
+    <ControleApp v-else-if="view === 'controle' && runtime.repo" :key="openKey + 'c' + (viewMode ?? '')" :initial-mode="viewMode" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as SitePosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <PosteApp v-else :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
     <section v-if="conflicts.length" class="mx-auto max-w-4xl px-4 pb-8" aria-labelledby="conflits-titre" data-testid="conflits">
       <div class="rounded-2xl border-2 border-red-700 bg-red-50 p-5">

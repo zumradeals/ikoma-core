@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { PosteRepository } from '../../poste/repository';
 import ExpectedVisits from './ExpectedVisits.vue';
 import IncidentsPanel from './IncidentsPanel.vue';
@@ -12,6 +12,7 @@ import VehicleSearch from './VehicleSearch.vue';
 const props = defineProps<{ repository: PosteRepository; reasons?: Record<string, string> }>();
 const emit = defineEmits<{ open: [id: string] }>();
 const panel = ref<'attendus' | 'incidents' | null>(null);
+const navigate = inject<((view: 'poste' | 'controle' | 'groupe', mode?: string | null) => void) | null>('agentNavigate', null);
 const online = ref(navigator.onLine);
 const setOnline = () => { online.value = navigator.onLine; };
 onMounted(() => { window.addEventListener('online', setOnline); window.addEventListener('offline', setOnline); });
@@ -20,9 +21,9 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
 const caps = computed(() => props.repository.capabilities?.() ?? []);
 const can = (capability: string) => caps.value.includes(capability);
 const links = computed(() => [
-  { key: 'controle', href: '/controle?mode=controle', label: 'Scanner un badge', hint: 'Contrôle d’accès d’un badge', show: can('scan') },
-  { key: 'sortie', href: '/controle?mode=sortie', label: 'Enregistrer une sortie', hint: 'Sortie individuelle : le badge n’est pas restitué', show: can('sortie') },
-  { key: 'restitution', href: '/controle?mode=restitution', label: 'Restituer un badge', hint: 'Acte distinct de la sortie ; nécessite le réseau', show: can('sortie') },
+  { key: 'controle', mode: 'controle', href: '/controle?mode=controle', label: 'Scanner un badge', hint: 'Contrôle d’accès d’un badge', show: can('scan') },
+  { key: 'sortie', mode: 'sortie', href: '/controle?mode=sortie', label: 'Enregistrer une sortie', hint: 'Sortie individuelle : le badge n’est pas restitué', show: can('sortie') },
+  { key: 'restitution', mode: 'restitution', href: '/controle?mode=restitution', label: 'Restituer un badge', hint: 'Acte distinct de la sortie ; nécessite le réseau', show: can('sortie') },
 ].filter(l => l.show));
 const toggle = (next: 'attendus' | 'incidents') => { panel.value = panel.value === next ? null : next; };
 </script>
@@ -33,7 +34,7 @@ const toggle = (next: 'attendus' | 'incidents') => { panel.value = panel.value =
     <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="operations-hors-ligne"><span aria-hidden="true">⚠</span> Sans réseau : changer d’écran, consulter les visites attendues ou les incidents nécessite le réseau.</p>
     <ul class="grid gap-3 sm:grid-cols-3" aria-label="Opérations">
       <li v-for="l in links" :key="l.key">
-        <a v-if="online" :href="l.href" class="btn-soft !h-full !flex-col !items-start text-left" :data-testid="'operation-' + l.key"><strong>{{ l.label }}</strong><span class="text-base font-normal">{{ l.hint }}</span></a>
+        <a v-if="(online || navigate) && !(l.key === 'restitution' && !online)" :href="l.href" class="btn-soft !h-full !flex-col !items-start text-left" :data-testid="'operation-' + l.key" @click="navigate && ($event.preventDefault(), navigate('controle', l.mode))"><strong>{{ l.label }}</strong><span class="text-base font-normal">{{ l.hint }}</span></a>
         <span v-else class="btn-soft !h-full !flex-col !items-start text-left opacity-60" aria-disabled="true" :data-testid="'operation-' + l.key"><strong>{{ l.label }}</strong><span class="text-base font-normal">Réseau requis</span></span>
       </li>
     </ul>

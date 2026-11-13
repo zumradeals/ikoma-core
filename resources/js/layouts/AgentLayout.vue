@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, inject, ref } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
 import BrandName from '../components/BrandName.vue';
@@ -9,6 +9,9 @@ import { useInstitution } from '../composables/useInstitution';
 const props = withDefaults(defineProps<{ active: 'home' | 'poste' | 'groupe' | 'controle' | 'securite'; agent?: string; online?: boolean; permissions?: string[]; capabilities?: string[] | null; syncLabel?: string | null; notifications?: number | null; siteName?: string | null }>(), { agent: '', online: true, permissions: undefined, capabilities: null });
 const page = usePage<{ auth?: { name: string; permissions: string[] } | null }>();
 const open = ref(false);
+// Fusion (faisabilité) : dans l'écran déverrouillé du poste, les trois vues se changent par état Vue, sans visite de page ni réseau.
+const navigate = inject<((view: 'poste' | 'controle' | 'groupe', mode?: string | null) => void) | null>('agentNavigate', null);
+const inGate = (key: string) => navigate !== null && ['poste', 'groupe', 'controle'].includes(key);
 const institution = useInstitution();
 const rights = computed(() => props.permissions ?? page.props?.auth?.permissions ?? []);
 const items = [
@@ -39,7 +42,7 @@ const allowed = computed(() => items.filter(item => props.active === item.key ||
       </div>
     </header>
     <div class="agent-frame">
-      <aside class="agent-sidebar"><div class="agent-sidebar-stick"><nav id="menu-agent" aria-label="Navigation de l’agent" :class="{ 'is-open': open }" @keydown.esc="open = false"><p class="agent-nav-caption">Accueil et contrôle</p><template v-for="item in allowed" :key="item.key"><a v-if="online" :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="agent-nav-link" :data-testid="'agent-nav-' + item.key"><AdminIcon :name="item.icon" :size="24" />{{ item.label }}</a><span v-else class="agent-nav-link" aria-disabled="true" :aria-current="active === item.key ? 'page' : undefined"><AdminIcon :name="item.icon" :size="24" />{{ item.label }}</span></template><p v-if="!online" class="agent-nav-help">Connexion indisponible : poursuivez dans l’écran ouvert. Les autres espaces demandent une connexion.</p></nav><slot name="sidebar-extra" /></div><div class="agent-sidebar-site" aria-hidden="true"><SiteIllustration :width="150" /><p><strong>{{ institution.name }}</strong><span v-if="siteName">{{ siteName }}</span></p></div></aside>
+      <aside class="agent-sidebar"><div class="agent-sidebar-stick"><nav id="menu-agent" aria-label="Navigation de l’agent" :class="{ 'is-open': open }" @keydown.esc="open = false"><p class="agent-nav-caption">Accueil et contrôle</p><template v-for="item in allowed" :key="item.key"><button v-if="inGate(item.key)" type="button" class="agent-nav-link w-full text-left" :aria-current="active === item.key ? 'page' : undefined" :data-testid="'agent-nav-' + item.key" @click="navigate!(item.key as 'poste' | 'controle' | 'groupe'); open = false"><AdminIcon :name="item.icon" :size="24" />{{ item.label }}</button><a v-else-if="online" :href="item.href" :aria-current="active === item.key ? 'page' : undefined" class="agent-nav-link" :data-testid="'agent-nav-' + item.key"><AdminIcon :name="item.icon" :size="24" />{{ item.label }}</a><span v-else class="agent-nav-link" aria-disabled="true" :aria-current="active === item.key ? 'page' : undefined"><AdminIcon :name="item.icon" :size="24" />{{ item.label }}</span></template><p v-if="!online" class="agent-nav-help">Connexion indisponible : poursuivez dans l’écran ouvert. Les autres espaces demandent une connexion.</p></nav><slot name="sidebar-extra" /></div><div class="agent-sidebar-site" aria-hidden="true"><SiteIllustration :width="150" /><p><strong>{{ institution.name }}</strong><span v-if="siteName">{{ siteName }}</span></p></div></aside>
       <main id="contenu" class="agent-main" tabindex="-1"><slot name="status" /><slot /></main>
     </div>
   </div>

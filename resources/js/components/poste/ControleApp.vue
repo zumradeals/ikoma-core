@@ -9,7 +9,7 @@ import type { SitePosteRepository } from '../../poste/repository';
 import type { SyncState } from '../../poste/local/sync';
 import { ApiError, type Checkpoint, type ControlResult, type ExitResult, type GiveBackResult, type PassageDirection } from '../../poste/types';
 
-const props = defineProps<{ agent: string; repository: SitePosteRepository; sync?: SyncState | null }>();
+const props = defineProps<{ agent: string; repository: SitePosteRepository; sync?: SyncState | null; initialMode?: string | null }>();
 const emit = defineEmits<{ sync: []; lock: [] }>();
 const STORAGE_KEY = 'ikoma.controle.point';
 type Mode = 'controle' | 'sortie' | 'restitution';
@@ -22,7 +22,7 @@ const caps = computed(() => props.repository.capabilities?.() ?? null);
 const MODE_CAPABILITY: Record<Mode, string> = { controle: 'scan', sortie: 'sortie', restitution: 'sortie' };
 const MODE_LABEL: Record<Mode, string> = { controle: 'Contrôle d’un badge', sortie: 'Sortie individuelle', restitution: 'Restitution d’un badge' };
 const allowedModes = computed<Mode[]>(() => (['controle', 'sortie', 'restitution'] as Mode[]).filter(m => caps.value === null || caps.value.includes(MODE_CAPABILITY[m])));
-const requestedMode = new URLSearchParams(window.location.search).get('mode') as Mode | null;
+const requestedMode = (props.initialMode ?? new URLSearchParams(window.location.search).get('mode')) as Mode | null;
 const mode = ref<Mode>(requestedMode && requestedMode in MODE_CAPABILITY ? requestedMode : 'controle');
 const showIncidents = ref(false);
 // Sens du passage (S10) : à la soute, l'agent choisit Entrée ou Sortie AVANT de scanner ; le choix reste affiché tant qu'il ne le change pas.
