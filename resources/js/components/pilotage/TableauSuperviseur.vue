@@ -10,6 +10,8 @@ export type Tableau = { postes: Poste[]; activites: { en_cours: number; stages: 
 type Site = { presents: { total: number }; mouvements: { entrees: number; sorties: number; controles: number; refus: number }; postes: { total: number; actifs: number; silencieux: number } };
 
 const props = defineProps<{ tableau: Tableau; site?: Site | null; openAlerts: number; href: (path: string) => string; canAlerts: boolean }>();
+/** Fichier statique servi tel quel (dossier public) : il ne passe pas par le build. */
+const PHOTO_URL = '/brand/ailct-batiment.jpg';
 const institution = useInstitution();
 const showPhoto = computed(() => institution.value.custom === true);
 const operational = computed(() => props.openAlerts === 0 && (props.site?.postes.silencieux ?? 0) === 0);
@@ -57,7 +59,7 @@ const period = (a: Activite) => (a.starts_at && a.ends_at && fmt(a.starts_at) !=
         </ul>
         <p v-else class="pilotage-empty">Aucune activité ouverte.</p>
       </section>
-      <figure v-if="showPhoto" class="tdb-photo" data-testid="tdb-photo"><img src="/brand/ailct-batiment.jpg" alt="Bâtiment de l’AILCT" width="1600" height="900" loading="lazy"><figcaption>{{ institution.fullName || institution.name }}</figcaption></figure>
+      <figure v-if="showPhoto" class="tdb-photo" data-testid="tdb-photo"><img :src="PHOTO_URL" alt="Bâtiment de l’AILCT" width="1600" height="900" loading="lazy"><figcaption>{{ institution.fullName || institution.name }}</figcaption></figure>
       <section v-else-if="canAlerts" class="tdb-card"><h3>Alertes</h3><Link :href="href('/pilotage/alertes')" class="pilotage-text-link">Voir les alertes</Link></section>
     </div>
   </section>
