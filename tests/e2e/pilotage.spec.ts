@@ -67,7 +67,7 @@ async function refuse(page: Page, name: string, motif: string) {
 test('un compteur et une alerte créés par un autre poste apparaissent en moins de 5 secondes sur le smartphone', async () => {
   test.setTimeout(180_000);
   await sup.goto(forEvent('/pilotage'));
-  await expect(sup.getByRole('heading', { name: 'Tableau de bord' })).toBeVisible(); await noOverflow(sup);
+  await expect(sup.getByRole('heading', { name: 'Centre de supervision des accès' })).toBeVisible(); await noOverflow(sup);
   const before = { presents: Number(await counter(sup, 'presents').innerText()), arrives: Number(await counter(sup, 'arrives').innerText()), refuses: Number(await counter(sup, 'refuses').innerText()) };
   await shot(sup, 'l8-tableau-avant');
   const agent = await tablet.newPage();

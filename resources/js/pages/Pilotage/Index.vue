@@ -52,9 +52,9 @@ const arrivedPercent = computed(() => (props.counters && props.counters.attendus
 const levelClass = { critique: 'border-red-700 bg-red-50', attention: 'border-orange-600 bg-orange-50', calme: 'border-emerald-700 bg-emerald-50' } as const;
 </script>
 <template>
-  <PilotageLayout active="tableau" :event="event" :events="events" :open-alerts="openAlerts" title="Tableau de bord">
+  <PilotageLayout active="tableau" :event="event" :events="events" :open-alerts="openAlerts" title="Centre de supervision des accès">
     <template #heading-actions><p v-if="counters" class="pilotage-updated" role="status"><AdminIcon name="clock" /><span>Mis à jour à <strong data-testid="mis-a-jour">{{ updated }}</strong><br><span class="pilotage-muted">Actualisation automatique</span></span></p></template>
-    <TableauSuperviseur v-if="tableau" :tableau="tableau" :site="site" :open-alerts="openAlerts" :href="href" :can-alerts="can('alertes.consulter')" />
+    <TableauSuperviseur v-if="tableau" :tableau="tableau" :site="site" :centre="centre" :open-alerts="openAlerts" :href="href" :can-alerts="can('alertes.consulter')" />
     <template v-if="event && counters">
       <section aria-label="Situation" class="pilotage-situation" :class="levelClass[situation.level as keyof typeof levelClass]" :data-level="situation.level" data-testid="situation">
         <span class="pilotage-situation-icon" aria-hidden="true">{{ situation.icon }}</span><div><h2 data-testid="situation-titre">{{ situation.title }}</h2><p>{{ situation.text }}</p></div>

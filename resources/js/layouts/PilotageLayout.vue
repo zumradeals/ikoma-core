@@ -7,6 +7,7 @@ import BrandLogo from '../components/BrandLogo.vue';
 import { useAlertSound } from '../pilotage/useAlertSound';
 import { wipePilotageLocal } from '../pilotage/evacuation';
 import { pilotageHref } from '../pilotage/navigation';
+import { useInstitution } from '../composables/useInstitution';
 
 defineOptions({ inheritAttrs: false });
 type EventRef = { id: string; name: string };
@@ -18,15 +19,16 @@ const events = computed(() => props.events.length ? props.events : page.props.pi
 const openAlerts = computed(() => page.props.pilotageContext?.openAlerts ?? props.openAlerts);
 const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
 const sound = useAlertSound(() => openAlerts.value, () => page.props.criticalAlerts ?? page.props.pilotageContext?.criticalAlerts ?? 0);
+const institution = useInstitution();
 const open = ref(false);
 const now = ref(new Date());
 let tick: ReturnType<typeof setInterval> | undefined;
 onMounted(() => { tick = setInterval(() => { now.value = new Date(); }, 1000); });
 onBeforeUnmount(() => { if (tick) clearInterval(tick); });
-const clockDate = computed(() => now.value.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+const clockDate = computed(() => now.value.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }));
 const clockTime = computed(() => now.value.toLocaleTimeString('fr-FR'));
 const items = [
-  { key: 'tableau', label: 'Tableau de bord', short: 'Tableau', icon: 'home', href: '/pilotage', permission: 'pilotage.consulter' },
+  { key: 'tableau', label: 'Supervision', short: 'Tableau', icon: 'home', href: '/pilotage', permission: 'pilotage.consulter' },
   { key: 'alertes', label: 'Alertes', short: 'Alertes', icon: 'alert', href: '/pilotage/alertes', permission: 'alertes.consulter' },
   { key: 'presents', label: 'Personnes présentes', short: 'Présents', icon: 'users', href: '/pilotage/presents', permission: 'presences.consulter' },
   { key: 'mouvements', label: 'Mouvements', short: 'Mouvements', icon: 'arrow', href: '/pilotage/mouvements', permission: 'presences.consulter' },
@@ -48,14 +50,14 @@ function change(event: Event) {
   <div class="pilotage-shell" :class="{ 'is-bare': bare }" data-testid="pilotage-layout">
     <a href="#contenu" class="pilotage-skip no-print">Aller au contenu</a>
     <header v-if="!bare" class="pilotage-header no-print">
-      <div class="pilotage-brand"><span class="pilotage-logo"><BrandLogo :size="36" /></span><p><BrandName variant="strong" /> <span class="pilotage-caption">Pilotage</span></p></div>
+      <div class="pilotage-brand"><span class="pilotage-logo"><BrandLogo :size="36" /></span><p><BrandName variant="strong" /> <span class="pilotage-caption">Pilotage</span></p><p v-if="institution.custom && institution.fullName" class="pilotage-fullname" data-testid="nom-complet">{{ institution.fullName }}</p></div>
       <div v-if="currentEvent" class="pilotage-event">
         <label v-if="events.length > 1">Événement de référence<select :value="currentEvent.id" data-testid="evenement" @change="change"><option v-for="e in events" :key="e.id" :value="e.id">{{ e.name }}</option></select></label>
         <p v-else data-testid="evenement"><span class="pilotage-caption">Événement de référence</span>{{ currentEvent.name }}</p>
       </div>
       <div class="pilotage-session">
         <p class="pilotage-clock" data-testid="horloge-entete"><span class="pilotage-muted">{{ clockDate }}</span><strong>{{ clockTime }}</strong></p>
-        <Link v-if="can('alertes.consulter')" :href="href('/pilotage/alertes')" class="pilotage-bell" :aria-label="openAlerts ? openAlerts + ' alerte(s) à traiter' : 'Aucune alerte à traiter'" data-testid="cloche-alertes"><AdminIcon name="alert" :size="24" /><span v-if="openAlerts" class="pilotage-count">{{ openAlerts }}</span></Link>
+        <Link v-if="can('alertes.consulter')" :href="href('/pilotage/alertes')" class="pilotage-bell" :aria-label="openAlerts ? openAlerts + ' alerte(s) à traiter' : 'Aucune alerte à traiter'" data-testid="cloche-alertes"><AdminIcon name="bell" :size="24" /><span v-if="openAlerts" class="pilotage-count">{{ openAlerts }}</span></Link>
         <button type="button" class="pilotage-sound" :title="'Son des alertes : ' + (sound.enabled.value ? 'activé' : 'désactivé')" :aria-pressed="sound.enabled.value" data-testid="son-alertes" @click="sound.toggle"><AdminIcon :name="sound.enabled.value ? 'speaker' : 'speakerOff'" :size="24" /><span>Son des alertes : {{ sound.enabled.value ? 'activé' : 'désactivé' }}</span></button>
         <details class="pilotage-account"><summary :aria-label="'Session de ' + (page.props.auth?.name ?? 'superviseur')"><span class="pilotage-avatar" aria-hidden="true">{{ page.props.auth?.name?.charAt(0).toUpperCase() ?? 'S' }}</span><span class="pilotage-user">{{ page.props.auth?.name ?? 'Session' }}</span><span aria-hidden="true">⌄</span></summary><div><Link href="/securite">Sécurité du compte</Link><Link as="button" method="post" href="/logout" @click="wipePilotageLocal">Se déconnecter</Link></div></details>
         <button type="button" class="pilotage-menu-toggle" :aria-expanded="open" aria-controls="menu-pilotage" data-testid="ouvrir-menu-pilotage" @click="open = !open"><AdminIcon name="menu" /><span>Menu superviseur</span></button>
@@ -69,8 +71,8 @@ function change(event: Event) {
         </nav>
       </aside>
       <main id="contenu" class="pilotage-main" tabindex="-1">
-        <div v-if="title" class="pilotage-heading no-print"><div><h1>{{ title }}</h1><p v-if="active === 'tableau'" class="pilotage-muted">Surveiller, décider, agir.</p></div><slot name="heading-actions" /></div>
-        <p v-if="!currentEvent && !bare && active !== 'journal'" role="status" class="pilotage-card">Aucun événement n’est encore créé.</p>
+        <div v-if="title" class="pilotage-heading no-print"><div><h1>{{ title }}</h1><p v-if="active === 'tableau'" class="pilotage-muted">Suivi en temps réel des entrées, sorties et activités.</p></div><slot name="heading-actions" /></div>
+        <p v-if="!currentEvent && !bare && active !== 'journal' && active !== 'tableau'" role="status" class="pilotage-card">Aucun événement n’est encore créé.</p>
         <slot />
       </main>
     </div>
