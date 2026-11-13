@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Services\Alerts;
 use App\Services\Pilotage;
+use App\Services\SupervisionTableau;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
@@ -96,4 +97,14 @@ it('montre l’escalade à l’administrateur et au superviseur, et compte les a
     // une fois prise en compte, l'alerte disparaît du tableau de l'administrateur
     DB::table('alerts')->where('id', $id)->update(['acknowledged_by' => $this->supervisor->id, 'acknowledged_at' => now()]);
     $this->actingAs($admin)->get('/administration')->assertInertia(fn (Assert $p) => expect(collect($p->toArray()['props']['watch'])->pluck('title')->all())->not->toContain('1 alerte sans prise en compte'));
+});
+
+it('fournit au tableau du superviseur les postes du site et les activités, sans nom de personne', function () {
+    $t = app(SupervisionTableau::class)->build();
+    expect($t)->toHaveKeys(['postes', 'activites'])->and($t['activites'])->toHaveKeys(['en_cours', 'stages', 'evenements', 'rows']);
+    foreach ($t['postes'] as $p) {
+        expect($p)->toHaveKeys(['id', 'code', 'name', 'function_label', 'state', 'passages'])->and($p['state'])->toBeIn(['actif', 'silencieux', 'inactif'])->and($p['passages'])->toBeInt();
+    }
+    expect(count($t['activites']['rows']))->toBeLessThanOrEqual(4);
+    expect(json_encode($t))->not->toContain('Superviseur fictif vue');
 });

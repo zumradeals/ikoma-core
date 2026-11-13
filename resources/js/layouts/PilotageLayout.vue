@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminIcon from '../components/admin/AdminIcon.vue';
 import BrandName from '../components/BrandName.vue';
@@ -19,6 +19,12 @@ const openAlerts = computed(() => page.props.pilotageContext?.openAlerts ?? prop
 const can = (permission: string) => page.props.auth?.permissions?.includes(permission) ?? false;
 const sound = useAlertSound(() => openAlerts.value, () => page.props.criticalAlerts ?? page.props.pilotageContext?.criticalAlerts ?? 0);
 const open = ref(false);
+const now = ref(new Date());
+let tick: ReturnType<typeof setInterval> | undefined;
+onMounted(() => { tick = setInterval(() => { now.value = new Date(); }, 1000); });
+onBeforeUnmount(() => { if (tick) clearInterval(tick); });
+const clockDate = computed(() => now.value.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+const clockTime = computed(() => now.value.toLocaleTimeString('fr-FR'));
 const items = [
   { key: 'tableau', label: 'Tableau de bord', short: 'Tableau', icon: 'home', href: '/pilotage', permission: 'pilotage.consulter' },
   { key: 'alertes', label: 'Alertes', short: 'Alertes', icon: 'alert', href: '/pilotage/alertes', permission: 'alertes.consulter' },
@@ -48,6 +54,8 @@ function change(event: Event) {
         <p v-else data-testid="evenement"><span class="pilotage-caption">Événement de référence</span>{{ currentEvent.name }}</p>
       </div>
       <div class="pilotage-session">
+        <p class="pilotage-clock" data-testid="horloge-entete"><span class="pilotage-muted">{{ clockDate }}</span><strong>{{ clockTime }}</strong></p>
+        <Link v-if="can('alertes.consulter')" :href="href('/pilotage/alertes')" class="pilotage-bell" :aria-label="openAlerts ? openAlerts + ' alerte(s) à traiter' : 'Aucune alerte à traiter'" data-testid="cloche-alertes"><AdminIcon name="alert" :size="24" /><span v-if="openAlerts" class="pilotage-count">{{ openAlerts }}</span></Link>
         <button type="button" class="pilotage-sound" :title="'Son des alertes : ' + (sound.enabled.value ? 'activé' : 'désactivé')" :aria-pressed="sound.enabled.value" data-testid="son-alertes" @click="sound.toggle"><AdminIcon :name="sound.enabled.value ? 'speaker' : 'speakerOff'" :size="24" /><span>Son des alertes : {{ sound.enabled.value ? 'activé' : 'désactivé' }}</span></button>
         <details class="pilotage-account"><summary :aria-label="'Session de ' + (page.props.auth?.name ?? 'superviseur')"><span class="pilotage-avatar" aria-hidden="true">{{ page.props.auth?.name?.charAt(0).toUpperCase() ?? 'S' }}</span><span class="pilotage-user">{{ page.props.auth?.name ?? 'Session' }}</span><span aria-hidden="true">⌄</span></summary><div><Link href="/securite">Sécurité du compte</Link><Link as="button" method="post" href="/logout" @click="wipePilotageLocal">Se déconnecter</Link></div></details>
         <button type="button" class="pilotage-menu-toggle" :aria-expanded="open" aria-controls="menu-pilotage" data-testid="ouvrir-menu-pilotage" @click="open = !open"><AdminIcon name="menu" /><span>Menu superviseur</span></button>
