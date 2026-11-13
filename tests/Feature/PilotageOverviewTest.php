@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Services\Alerts;
 use App\Services\Pilotage;
+use App\Services\SupervisionTableau;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
@@ -99,7 +100,7 @@ it('montre l’escalade à l’administrateur et au superviseur, et compte les a
 });
 
 it('fournit au tableau du superviseur les postes du site et les activités, sans nom de personne', function () {
-    $t = app(\App\Services\SupervisionTableau::class)->build();
+    $t = app(SupervisionTableau::class)->build();
     expect($t)->toHaveKeys(['postes', 'activites'])->and($t['activites'])->toHaveKeys(['en_cours', 'stages', 'evenements', 'rows']);
     foreach ($t['postes'] as $p) {
         expect($p)->toHaveKeys(['id', 'code', 'name', 'function_label', 'state', 'passages'])->and($p['state'])->toBeIn(['actif', 'silencieux', 'inactif'])->and($p['passages'])->toBeInt();
