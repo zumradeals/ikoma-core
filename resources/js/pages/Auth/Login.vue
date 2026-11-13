@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import LoginLayout from '../../layouts/LoginLayout.vue';
 import { useInstitution } from '../../composables/useInstitution';
@@ -8,6 +8,9 @@ const institution = useInstitution();
 const form = useForm({ email: '', password: '' });
 const page = usePage<{ flash?: { status?: string | null } }>();
 const passwordVisible = ref(false);
+const emailInput = ref<HTMLInputElement | null>(null);
+// Focus automatique seulement sur tablette et ordinateur, sans défilement : sur téléphone il ferait disparaître le bandeau d'identité et ouvrirait le clavier d'emblée.
+onMounted(() => { if (window.matchMedia?.('(min-width: 768px)').matches) emailInput.value?.focus({ preventScroll: true }); });
 function submit() {
   form.post('/login', { onFinish: () => form.reset('password') });
 }
@@ -16,17 +19,17 @@ function submit() {
 <template>
   <LoginLayout title="Connexion">
     <div class="mb-1 h-1.5 w-24 rounded-full bg-[#D4A72C]" aria-hidden="true"></div>
-    <p v-if="institution.loginGreeting" class="mt-6 text-sm font-bold uppercase tracking-wider text-[#8A6A12]" data-testid="accroche-connexion">{{ institution.loginGreeting }}</p>
-    <h1 class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Connexion sécurisée</h1>
+    <p v-if="institution.loginGreeting" class="mt-4 text-sm font-bold uppercase sm:mt-6 tracking-wider text-[#8A6A12]" data-testid="accroche-connexion">{{ institution.loginGreeting }}</p>
+    <h1 class="mt-2 text-[1.75rem] font-extrabold tracking-tight sm:mt-3 sm:text-4xl">Connexion sécurisée</h1>
     <p class="mt-3 text-lg text-[#4D6685]">Accès réservé aux utilisateurs habilités.</p>
 
     <p v-if="page.props.flash?.status" role="status" data-testid="statut" class="mt-6 rounded-lg border border-green-300 bg-green-50 p-4 text-sm font-semibold text-green-900">{{ page.props.flash.status }}</p>
 
-    <form class="mt-8 space-y-6" @submit.prevent="submit">
+    <form class="mt-5 space-y-5 sm:mt-8 sm:space-y-6" @submit.prevent="submit">
       <label class="block text-lg font-bold">Adresse électronique
         <span class="relative mt-2 block">
           <svg class="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-[#1B3A63]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3.5 7 8.5 6 8.5-6" /></svg>
-          <input v-model="form.email" type="email" name="email" autocomplete="username" inputmode="email" required autofocus placeholder="Ex. : nom@organisation.com" :aria-invalid="form.errors.email ? 'true' : undefined" class="block min-h-14 w-full rounded-lg border border-[#C5D1DD] bg-white py-3 pl-14 pr-4 text-base font-normal text-[var(--inst-primary)] placeholder:text-[#7C8DA3] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#0F5AA6]">
+          <input ref="emailInput" v-model="form.email" type="email" name="email" autocomplete="username" inputmode="email" required placeholder="Ex. : nom@organisation.com" :aria-invalid="form.errors.email ? 'true' : undefined" class="block min-h-14 w-full rounded-lg border border-[#C5D1DD] bg-white py-3 pl-14 pr-4 text-base font-normal text-[var(--inst-primary)] placeholder:text-[#7C8DA3] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#0F5AA6]">
         </span>
       </label>
 
@@ -48,7 +51,7 @@ function submit() {
       </button>
     </form>
 
-    <div class="mt-8 flex items-start gap-4 rounded-lg bg-[#E4ECF6] p-4 text-base leading-relaxed text-[#2F4C70]">
+    <div class="mt-6 flex items-start gap-4 rounded-lg bg-[#E4ECF6] sm:mt-8 p-4 text-base leading-relaxed text-[#2F4C70]">
       <svg class="mt-0.5 h-6 w-6 shrink-0 text-[#17407A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
       <p><strong class="text-[var(--inst-primary)]">Accès nominatif et sécurisé.</strong> Les comptes sont fournis par votre administrateur.</p>
     </div>
