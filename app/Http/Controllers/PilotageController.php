@@ -14,6 +14,7 @@ use App\Services\Presence;
 use App\Services\SiteMovements;
 use App\Services\Supervision;
 use App\Services\SupervisionCentre;
+use App\Services\SupervisionTableau;
 use App\Services\SupervisorClosure;
 use App\Services\Vehicles;
 use App\Services\Visits;
@@ -31,7 +32,7 @@ use Inertia\Response;
  */
 final class PilotageController
 {
-    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision, private readonly Visits $visits, private readonly Vehicles $vehicles, private readonly SupervisorClosure $closure, private readonly SupervisionCentre $centre, private readonly OperationsOverview $site) {}
+    public function __construct(private readonly Pilotage $pilotage, private readonly Alerts $alerts, private readonly Audit $audit, private readonly BadgeService $badges, private readonly Supervision $supervision, private readonly Visits $visits, private readonly Vehicles $vehicles, private readonly SupervisorClosure $closure, private readonly SupervisionCentre $centre, private readonly OperationsOverview $site, private readonly SupervisionTableau $tableau) {}
 
     private function event(Request $r): ?object
     {
@@ -63,6 +64,8 @@ final class PilotageController
             'centre' => fn () => $event ? $this->centre->build($event->id, $r->user()) : null,
             // Vue du site entier : les passages des titulaires permanents et des personnes hors activité restent visibles quelle que soit l'activité consultée.
             'site' => fn () => $this->site->general(),
+            // Tableau du superviseur : postes de contrôle du site et activités ouvertes (lecture seule, sans nom de personne).
+            'tableau' => fn () => $this->tableau->build(),
         ]);
     }
 
