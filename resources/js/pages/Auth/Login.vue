@@ -2,7 +2,9 @@
 import { ref } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import LoginLayout from '../../layouts/LoginLayout.vue';
+import { useInstitution } from '../../composables/useInstitution';
 
+const institution = useInstitution();
 const form = useForm({ email: '', password: '' });
 const page = usePage<{ flash?: { status?: string | null } }>();
 const passwordVisible = ref(false);
@@ -14,7 +16,8 @@ function submit() {
 <template>
   <LoginLayout title="Connexion">
     <div class="mb-1 h-1.5 w-24 rounded-full bg-[#D4A72C]" aria-hidden="true"></div>
-    <h1 class="mt-7 text-3xl font-extrabold tracking-tight sm:text-4xl">Connexion sécurisée</h1>
+    <p v-if="institution.loginGreeting" class="mt-6 text-sm font-bold uppercase tracking-wider text-[#8A6A12]" data-testid="accroche-connexion">{{ institution.loginGreeting }}</p>
+    <h1 class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Connexion sécurisée</h1>
     <p class="mt-3 text-lg text-[#4D6685]">Accès réservé aux utilisateurs habilités.</p>
 
     <p v-if="page.props.flash?.status" role="status" data-testid="statut" class="mt-6 rounded-lg border border-green-300 bg-green-50 p-4 text-sm font-semibold text-green-900">{{ page.props.flash.status }}</p>

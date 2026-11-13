@@ -15,7 +15,7 @@ import Login from '../../resources/js/pages/Auth/Login.vue';
 
 const ailct: Institution = {
   custom: true, name: 'AILCT', fullName: 'Académie Internationale de Lutte Contre le Terrorisme', tagline: '', logoUrl: '/institution/logo?v=1',
-  homeTitle: '', homeDescription: '', loginGreeting: '', footer: '', primary: '#0B3C6B', secondary: '#0F5AA6', accent: '#D4A72C',
+  homeTitle: '', homeDescription: '', loginGreeting: 'Bienvenue à AILCT', footer: '', primary: '#0B3C6B', secondary: '#0F5AA6', accent: '#D4A72C',
 };
 
 describe('page de connexion institutionnelle', () => {
@@ -27,6 +27,7 @@ describe('page de connexion institutionnelle', () => {
     expect(wrapper.get('[data-testid="bandeau-connexion"]').text()).toContain('AILCT');
     expect(wrapper.get('aside').text()).toContain('Académie Internationale de Lutte Contre le Terrorisme');
     expect(wrapper.get('h1').text()).toBe('Connexion sécurisée');
+    expect(wrapper.get('[data-testid="accroche-connexion"]').text()).toBe('Bienvenue à AILCT'); // accroche configurée dans l’identité
     expect(wrapper.text()).toContain('Accès réservé aux utilisateurs habilités.');
     expect(wrapper.text()).toContain('Accès nominatif et sécurisé. Les comptes sont fournis par votre administrateur.');
     expect(wrapper.get('footer').text()).toContain('Besoin d’aide pour votre compte ? Contactez l’administrateur de votre organisation.');
@@ -61,5 +62,6 @@ describe('page de connexion institutionnelle', () => {
     expect(wrapper.get('[data-testid="bandeau-connexion"]').text()).toContain('IKOMA ACCESS');
     expect(wrapper.get('footer').text()).toContain('© IKOMA ACCESS');
     expect(wrapper.get('h1').text()).toBe('Connexion sécurisée');
+    expect(wrapper.get('[data-testid="accroche-connexion"]').text()).toBe('Bienvenue sur IKOMA ACCESS');
   });
 });
