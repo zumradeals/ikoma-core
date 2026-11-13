@@ -35,6 +35,12 @@ describe('page de connexion institutionnelle', () => {
     expect(wrapper.get('button[type="submit"]').text()).toContain('Se connecter');
   });
 
+  it('montre l’identité institutionnelle aussi sur téléphone (bandeau non masqué)', () => {
+    const aside = mount(Login).get('aside');
+    expect(aside.classes()).not.toContain('hidden');
+    expect(aside.classes()).toContain('flex-col');
+  });
+
   it('garde les champs, la validation native et la visibilité du mot de passe', async () => {
     const wrapper = mount(Login);
     const email = wrapper.get('input[type="email"]');

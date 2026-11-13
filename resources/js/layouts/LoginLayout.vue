@@ -37,20 +37,20 @@ const plated = computed(() => !institution.value.custom || !institution.value.lo
     </header>
 
     <div class="grid flex-1 md:grid-rows-[auto_1fr] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-1">
-      <!-- Identité institutionnelle : bande compacte sur tablette, composition complète sur ordinateur, absente sur téléphone (le formulaire passe en premier). -->
-      <aside class="login-identity relative hidden items-center justify-center gap-6 overflow-hidden px-8 py-6 text-center text-white md:flex lg:flex-col lg:gap-0 lg:px-12 lg:py-16" aria-label="Identité de l'institution">
+      <!-- Identité institutionnelle : bandeau complet centré sur téléphone (la carte de connexion le chevauche), bande compacte sur tablette, composition complète sur ordinateur. -->
+      <aside class="login-identity relative flex flex-col items-center justify-center overflow-hidden px-6 pb-16 pt-6 text-center text-white md:flex-row md:gap-6 md:px-8 md:py-6 lg:flex-col lg:gap-0 lg:px-12 lg:py-16" aria-label="Identité de l'institution">
         <div aria-hidden="true" class="login-arcs pointer-events-none absolute inset-0"></div>
-        <span class="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full lg:h-56 lg:w-56 xl:h-64 xl:w-64" :class="plated ? 'bg-white p-4 lg:p-8' : ''"><BrandLogo :size="256" class="h-full w-full" /></span>
-        <div class="relative min-w-0 text-left lg:mt-6 lg:text-center">
-          <p class="text-3xl font-extrabold tracking-wide lg:text-6xl">{{ institution.name }}</p>
-          <div class="login-gold mx-auto my-3 hidden h-px w-60 lg:block" aria-hidden="true"></div>
-          <p v-if="institution.fullName && institution.fullName !== institution.name" class="max-w-md text-lg leading-snug text-white/90 lg:text-[1.7rem] lg:leading-snug">{{ institution.fullName }}</p>
+        <span class="relative grid h-24 w-24 shrink-0 md:h-20 md:w-20 place-items-center overflow-hidden rounded-full lg:h-56 lg:w-56 xl:h-64 xl:w-64" :class="plated ? 'bg-white p-4 lg:p-8' : ''"><BrandLogo :size="256" class="h-full w-full" /></span>
+        <div class="relative mt-3 min-w-0 text-center md:mt-0 md:text-left lg:mt-6 lg:text-center">
+          <p class="text-4xl font-extrabold tracking-wide md:text-3xl lg:text-6xl">{{ institution.name }}</p>
+          <div class="login-gold mx-auto my-3 block h-px w-32 md:hidden lg:block lg:w-60" aria-hidden="true"></div>
+          <p v-if="institution.fullName && institution.fullName !== institution.name" class="max-w-md text-[15px] leading-snug text-white/90 md:text-lg lg:text-[1.7rem] lg:leading-snug">{{ institution.fullName }}</p>
           <p v-else-if="institution.tagline" class="max-w-md text-lg text-white/90 lg:text-2xl">{{ institution.tagline }}</p>
         </div>
       </aside>
 
-      <main id="formulaire-auth" class="login-form-zone flex min-w-0 items-start justify-center px-4 py-8 sm:px-8 md:items-center lg:px-12 lg:py-16">
-        <section class="w-full max-w-[620px] rounded-2xl bg-white p-6 shadow-[0_18px_55px_rgba(11,47,92,.10)] sm:p-9 lg:p-12">
+      <main id="formulaire-auth" class="login-form-zone relative -mt-11 flex min-w-0 items-start justify-center px-4 pb-8 sm:px-8 md:mt-0 md:items-center md:py-8 lg:px-12 lg:py-16">
+        <section class="w-full max-w-[620px] rounded-2xl bg-white p-5 shadow-[0_18px_55px_rgba(11,47,92,.10)] sm:p-9 lg:p-12">
           <slot />
         </section>
       </main>
