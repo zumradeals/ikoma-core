@@ -16,7 +16,7 @@ export async function loginWithSecondFactor(
   for (let attempt = 0; attempt < 2; attempt++) {
     onStage?.('login.open');
     await page.goto('/login');
-    await expect(page.getByRole('heading', { name: 'Se connecter', exact: true })).toBeVisible({ timeout: 12_000 });
+    await expect(page.getByRole('heading', { name: 'Connexion sécurisée', exact: true })).toBeVisible({ timeout: 12_000 });
     const field = page.getByLabel('Adresse électronique');
     await expect(field).toBeVisible();
     await field.fill(email);
