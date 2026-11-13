@@ -961,3 +961,9 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 
 ## Zones du site : Z5b et Z5c, retrait de l'ancien chemin
 - Une zone n'appartient plus à une activité : colonne `zones.event_id` et tables `checkpoint_zones`, `zone_policies` supprimées (migration non réversible) ; politique et garde des zones uniquement côté site ; « règles d'accès » de Site et accès lues dans les zones du site gardées.
+
+## Page de connexion institutionnelle (refonte visuelle)
+- Refonte de la présentation de `/login` selon la maquette validée (bandeau marine et filet doré, identité à gauche, carte de connexion, encadré, pied de page), responsive ordinateur / tablette / téléphone. Gabarit dédié `LoginLayout` : `AuthLayout` (double authentification, etc.) n'est pas modifié.
+- Aucun changement fonctionnel : même route `POST /login`, mêmes champs et validations natives, mêmes messages d'erreur et de statut, même gestion de session et de limitation (côté serveur, inchangés).
+- L'identité (nom, nom complet, logo, couleur principale) vient de l'identité institutionnelle enregistrée ; sans identité, IKOMA ACCESS s'affiche (logo posé sur un disque blanc). La photographie du bâtiment de la maquette n'est pas reprise : aucune ressource institutionnelle authentifiée dans le dépôt, fond graphique sobre à la place.
+- Le titre devient « Connexion sécurisée » (parcours e2e adaptés) ; l'accroche « connexion_accroche » de l'identité, (« Bienvenue sur IKOMA ACCESS » par défaut), si elle est renseignée, reste affichée en petit au-dessus du titre (parcours e2e de l'identité) ; la vider la masque.

@@ -14,7 +14,7 @@ test('IKOMA ACCESS : landing et connexion utilisent la largeur des dashboards su
     await page.screenshot({ path: `test-results/ikoma-access-landing-${width}x${height}.png`, fullPage: true });
 
     await page.goto('/login');
-    await expect(page.getByRole('heading', { name: 'Se connecter' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Connexion sécurisée' })).toBeVisible();
     await expect(page.getByLabel('Adresse électronique')).toBeVisible();
     await expect(page.getByLabel('Mot de passe', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
