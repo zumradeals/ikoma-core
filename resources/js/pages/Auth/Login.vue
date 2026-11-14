@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { lockSharedRuntime } from '../../poste/local/session';
 import { useForm, usePage } from '@inertiajs/vue3';
 import LoginLayout from '../../layouts/LoginLayout.vue';
 import { useInstitution } from '../../composables/useInstitution';
@@ -10,7 +11,10 @@ const page = usePage<{ flash?: { status?: string | null } }>();
 const passwordVisible = ref(false);
 const emailInput = ref<HTMLInputElement | null>(null);
 // Focus automatique seulement sur tablette et ordinateur, sans défilement : sur téléphone il ferait disparaître le bandeau d'identité et ouvrirait le clavier d'emblée.
-onMounted(() => { if (window.matchMedia?.('(min-width: 768px)').matches) emailInput.value?.focus({ preventScroll: true }); });
+onMounted(() => {
+  lockSharedRuntime(); // la page de connexion ferme toujours le coffre : le PIN est redemandé après toute (re)connexion
+  if (window.matchMedia?.('(min-width: 768px)').matches) emailInput.value?.focus({ preventScroll: true });
+});
 function submit() {
   form.post('/login', { onFinish: () => form.reset('password') });
 }

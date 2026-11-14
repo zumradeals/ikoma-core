@@ -998,3 +998,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Implémentation de la maquette validée : cadre institutionnel, actions du poste selon ses capacités, fusion poste/contrôle/groupes sur une page déverrouillée, résultats « Accès autorisé / refusé » avec état d'enregistrement et alerte du superviseur seulement pour les causes réelles. Aucune route, migration, API, règle métier ni permission modifiée ; fusion non faite, validation du dirigeant requise.
 - Mots du verdict remplacés (« VALIDE / NON VALIDE » → « ACCÈS AUTORISÉ / ACCÈS REFUSÉ ») : changement de vocabulaire d'interface, tests adaptés sans affaiblissement.
 - « Derniers passages » enrichis : non réalisés (voir `V3-CONCEPTION.md`).
+
+## PIN demandé une seule fois par connexion (décision du propriétaire)
+- Le propriétaire précise la règle : le PIN une seule fois pendant la connexion, sans le retaper en changeant de page ; après une déconnexion, le PIN est redemandé. Cela remplace, pour le moment, la suppression complète du PIN (« bail de poste », `LOT-B-COFFRE-SANS-PIN.md`, en attente).
+- Réalisation sans toucher au chiffrement : coffre unique en mémoire pour la page entière, changements d'écran de l'agent par visite Inertia en ligne, fermeture du coffre à la déconnexion et sur la page de connexion, inactivité indépendante de l'écran. Aucune clé ni aucun secret supplémentaire n'est conservé. Détails et limites : `docs/AUTH_HORS_LIGNE.md`, addendum.
+- À décider : le verrouillage à l'inactivité (5 minutes par défaut) redemande toujours le PIN ; l'allonger se règle dans l'Administration (décision d'exploitation).

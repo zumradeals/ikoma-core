@@ -15,6 +15,9 @@ import { OperationIds, type PosteRepository } from '../../resources/js/poste/rep
 import { ApiError, type Fiche, type SearchResult } from '../../resources/js/poste/types';
 import { closeCamera, openCamera } from '../../resources/js/poste/media';
 
+// Le cadre Agent change d'écran par visite Inertia (le coffre ouvert est conservé) : ces tests ne simulent pas la navigation, un simple lien suffit.
+vi.mock('@inertiajs/vue3', async importOriginal => ({ ...(await importOriginal<typeof import('@inertiajs/vue3')>()), Link: { props: ['href'], template: '<a :href="href"><slot /></a>' } }));
+
 vi.mock('../../resources/js/poste/media', () => ({
   DOCUMENT_MAX_SIDE: 1280, PHOTO_MAX_SIDE: 640, openCamera: vi.fn(async () => ({ getTracks: () => [] })), closeCamera: vi.fn(), captureJpeg: vi.fn(async () => new Blob(['x'], { type: 'image/jpeg' })), startScan: vi.fn(async () => ({ stop: vi.fn() })),
 }));
