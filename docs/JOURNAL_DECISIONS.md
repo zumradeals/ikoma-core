@@ -1005,3 +1005,8 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - **Conservé** : serveur qui accepte encore un point explicite (anciennes opérations en file), choix d'une autre zone de l'activité pour la session. À décider : retirer ce choix et refuser côté serveur tout point autre que le poste de la tablette (recommandé, lot A2).
 - Tests PHP existants qui décrivaient « postes 1, 3 et 4 sans capacité » adaptés à la nouvelle décision (les refus de sortie, d'accueil, de l'hôtel et des tablettes sans poste sont conservés).
 - Lot B (retrait du PIN) : conception séparée, validation du propriétaire requise avant tout changement du chiffrement (`docs/ailct/LOT-B-COFFRE-SANS-PIN.md`).
+
+## PIN demandé une seule fois par connexion (décision du propriétaire)
+- Le propriétaire précise la règle : le PIN une seule fois pendant la connexion, sans le retaper en changeant de page ; après une déconnexion, le PIN est redemandé. Cela remplace, pour le moment, la suppression complète du PIN (« bail de poste », `LOT-B-COFFRE-SANS-PIN.md`, en attente).
+- Réalisation sans toucher au chiffrement : coffre unique en mémoire pour la page entière, changements d'écran de l'agent par visite Inertia en ligne, fermeture du coffre à la déconnexion et sur la page de connexion, inactivité indépendante de l'écran. Aucune clé ni aucun secret supplémentaire n'est conservé. Détails et limites : `docs/AUTH_HORS_LIGNE.md`, addendum.
+- À décider : le verrouillage à l'inactivité (5 minutes par défaut) redemande toujours le PIN ; l'allonger se règle dans l'Administration (décision d'exploitation).
