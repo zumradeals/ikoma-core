@@ -6,6 +6,7 @@ import GroupeApp from './GroupeApp.vue';
 import SiteModeNotice from './SiteModeNotice.vue';
 import type { GroupPosteRepository, SitePosteRepository } from '../../poste/repository';
 import { PosteRuntime, syncRequiredMessage, type WipeReason } from '../../poste/local/runtime';
+import { armIdleLock, lockSharedRuntime, sharedRuntime } from '../../poste/local/session';
 import { getMeta } from '../../poste/local/db';
 import { pinProblem, PinError } from '../../poste/local/vault';
 import type { LocalOp } from '../../poste/local/apply';
@@ -53,7 +54,8 @@ provide('agentNavigate', (next: View, mode: string | null = null) => {
 let idleTimer: number | undefined; let tick: number | undefined; let loop: number | undefined;
 let idleMs = 300_000;
 
-const runtime = props.runtime ?? new PosteRuntime();
+// Coffre partagé pendant toute la connexion : le PIN n'est saisi qu'une fois (voir session.ts).
+const runtime = props.runtime ?? sharedRuntime();
 /** Vrai quand la copie de la tablette n'a pas d'activité (mode site) : seul le contrôle des cartes permanentes est ouvert. */
 const siteMode = () => runtime.repo?.list.snapshot.event === null;
 runtime.handlers = {
@@ -84,11 +86,12 @@ function resetIdle() {
   clearTimeout(idleTimer);
   if (phase.value === 'ouvert') idleTimer = window.setTimeout(lock, idleMs);
 }
-function lock() { runtime.lock(); phase.value = 'verrouille'; pin.value = ''; message.value = null; clearTimeout(idleTimer); openKey.value++; }
+function lock() { lockSharedRuntime(); runtime.lock(); phase.value = 'verrouille'; pin.value = ''; message.value = null; clearTimeout(idleTimer); openKey.value++; }
 
 async function afterOpen() {
   const settings = await getMeta(runtime.db, 'settings');
   idleMs = (settings?.inactivity_minutes ?? 5) * 60_000;
+  armIdleLock(settings?.inactivity_minutes ?? 5);
   chooseStartView();
   phase.value = 'ouvert'; wiped.value = null; resetIdle(); await loadConflicts();
 }
@@ -147,6 +150,11 @@ onMounted(async () => {
     if (required !== null && !navigator.onLine) { lock(); message.value = syncRequiredMessage(required); return; }
     if (navigator.onLine) void runtime.sync.sync();
   }, 60_000);
+  // PIN déjà saisi pendant cette connexion (changement d'écran sans rechargement) : on reprend le coffre ouvert, sauf si ce n'est pas le compte connecté.
+  if (runtime.vault.unlocked) {
+    if (!props.agent || !runtime.profile || runtime.profile.id === props.agent.id) { await afterOpen(); runtime.sync.kick(); return; }
+    runtime.lock();
+  }
   phase.value = (await runtime.state()) === 'vide' ? 'vide' : 'verrouille';
 });
 onBeforeUnmount(() => {
