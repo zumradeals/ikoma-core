@@ -5,9 +5,8 @@ import { loginWithSecondFactor } from './otp';
 type Fixtures = { email: string; password: string; poste: string; names: Record<string, string>; takenBadge: string; vipBadges: string[]; freeBadges: string[]; qrSvg: string; qrBadge: string; enrolCode: string; bulk: string[]; bulkPrefix: string; admin: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
 const shots = process.env.L5_CAPTURES === '1' || process.env.L6_CAPTURES === '1';
-const PIN = '482915';
 
-// Une seule tablette (un seul contexte de navigateur) pour tout le fichier : elle est enrôlée une fois, puis verrouillée/déverrouillée par PIN comme sur le terrain.
+// Une seule tablette (un seul contexte de navigateur) pour tout le fichier : elle est enrôlée une fois, puis s'ouvre toute seule (aucun PIN).
 let tablet: BrowserContext;
 
 test.describe.configure({ mode: 'serial' });
@@ -16,20 +15,18 @@ test.beforeAll(async ({ browser }, info) => {
   tablet = await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 1280, height: 800 }, permissions: ['camera'] });
   const page = await tablet.newPage();
   await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(fx.email); await page.getByLabel('Mot de passe', { exact: true }).fill(fx.password); await page.getByRole('button', { name: 'Se connecter' }).click();
-  await expect(page).toHaveURL(/\/espace/);
+  await expect(page).not.toHaveURL(/\/login/);
   await page.close();
 });
 test.afterAll(async () => { await tablet.close(); });
 
-/** Enrôle la tablette si elle ne l'est pas encore, ou la déverrouille avec son PIN. */
+/** Enrôle la tablette si elle ne l'est pas encore ; sinon elle s'est ouverte toute seule. */
 async function openDesk(page: Page): Promise<void> {
-  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou'); const step = page.getByText('Étape 1 sur 7');
-  await enrol.or(lock).or(step).first().waitFor();
+  const enrol = page.getByTestId('ecran-enrolement'); const step = page.getByText('Étape 1 sur 7');
+  await enrol.or(step).first().waitFor();
   if (await enrol.isVisible()) {
-    await page.getByTestId('code-enrolement').fill(fx.enrolCode); await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN);
+    await page.getByTestId('code-enrolement').fill(fx.enrolCode);
     await page.getByTestId('enroler').click();
-  } else if (await lock.isVisible()) {
-    await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click();
   }
   await expect(step).toBeVisible();
 }
@@ -208,15 +205,17 @@ test('captures mobile du parcours', async () => {
   await page.close();
 });
 
-test('la tablette se verrouille, refuse un mauvais PIN et se rouvre avec le bon', async () => {
+test('« Fermer ma session » ramène à la connexion ; après reconnexion la tablette se rouvre toute seule, sans aucun PIN', async () => {
   const page = await desk();
   await shot(page, 'l6-tablette-statut');
-  await button(page, 'Verrouiller').click();
-  await expect(page.getByRole('heading', { name: 'Tablette verrouillée' })).toBeVisible(); await expect(page.getByText('Étape 1 sur 7')).toHaveCount(0); await shot(page, 'l6-verrou');
-  await page.getByTestId('pin-deverrouillage').fill('999111'); await page.getByTestId('deverrouiller').click();
-  await expect(page.getByTestId('erreur-gate')).toContainText('PIN incorrect'); await shot(page, 'l6-pin-incorrect');
-  await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click();
+  await page.getByTestId('verrouiller').click();
+  await expect(page).toHaveURL(/\/login/); await shot(page, 'l6-session-fermee');
+  // nouvelle connexion : plus aucun PIN, le poste s'ouvre directement
+  await page.getByLabel('Adresse électronique').fill(fx.email); await page.getByLabel('Mot de passe', { exact: true }).fill(fx.password); await page.getByRole('button', { name: 'Se connecter' }).click();
+  await expect(page).not.toHaveURL(/\/login/);
+  await page.goto('/poste');
   await expect(page.getByText('Étape 1 sur 7')).toBeVisible();
+  await expect(page.getByTestId('ecran-verrou')).toHaveCount(0);
   await page.close();
 });
 

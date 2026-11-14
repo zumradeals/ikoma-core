@@ -8,7 +8,6 @@ type Fixtures = {
   holders: { valid: Holder; none: Holder; revoked: Holder; conflict: Holder; leaver: Holder };
 };
 const fx = JSON.parse(readFileSync('.secrets/permanent-fixtures.json', 'utf8')) as Fixtures;
-const PIN = '739261';
 
 let tablet: BrowserContext;
 test.describe.configure({ mode: 'serial' });
@@ -24,21 +23,15 @@ test.afterAll(async () => { await tablet.close(); });
 
 const button = (page: Page, name: string | RegExp) => page.getByRole('button', { name });
 
-/** Enrôle la tablette la première fois, la déverrouille ensuite (même PIN), puis attend l'écran de contrôle. */
+/** Enrôle la tablette la première fois, l'ouvre ensuite toute seule (aucun PIN), puis attend l'écran de contrôle. */
 async function open(page: Page): Promise<void> {
   await page.goto('/controle');
-  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou'); const ready = page.getByTestId('choix-point').or(page.getByTestId('point'));
-  await enrol.or(lock).or(ready).first().waitFor();
+  const enrol = page.getByTestId('ecran-enrolement'); const ready = page.getByTestId('choix-point').or(page.getByTestId('point'));
+  await enrol.or(ready).first().waitFor();
   if (await enrol.isVisible()) {
-    await page.getByTestId('code-enrolement').fill(fx.enrolCode); await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN); await page.getByTestId('enroler').click();
-  } else if (await lock.isVisible()) {
-    await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click();
+    await page.getByTestId('code-enrolement').fill(fx.enrolCode); await page.getByTestId('enroler').click();
   }
   await expect(ready).toBeVisible();
-}
-async function unlockIfLocked(page: Page): Promise<void> {
-  const lock = page.getByTestId('ecran-verrou');
-  if (await lock.isVisible().catch(() => false)) { await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click(); }
 }
 async function choosePoint(page: Page, name: string): Promise<void> {
   if (await page.getByTestId('choix-point').isVisible()) await button(page, new RegExp(name)).first().click();
@@ -46,7 +39,6 @@ async function choosePoint(page: Page, name: string): Promise<void> {
   await expect(page.getByTestId('point')).toHaveText(name);
 }
 async function scan(page: Page, mode: 'controle' | 'sortie', code: string): Promise<void> {
-  await unlockIfLocked(page);
   await page.getByTestId(mode === 'controle' ? 'mode-controle' : 'mode-sortie').click();
   await page.getByTestId('code-manuel').fill(code); await page.getByTestId('valider-code').click();
   await expect(page.getByTestId('resultat')).toBeVisible();
@@ -120,7 +112,6 @@ test('confiance hors ligne : entrée autorisée, refus sans habilitation et cart
 
   // 5. La confiance expire PENDANT la session : plus aucune nouvelle entrée, bandeau explicite. Les sorties restent possibles.
   await page.clock.fastForward('40:00');
-  await unlockIfLocked(page);
   await expect(page.getByTestId('confiance-expiree')).toContainText('EXPIRÉE');
   await scan(page, 'controle', fx.holders.valid.qr);
   await expect(page.getByTestId('verdict')).toContainText('ACCÈS REFUSÉ'); await expect(page.getByTestId('raison')).toContainText('Confiance hors ligne expirée'); await next(page);

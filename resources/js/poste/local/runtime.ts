@@ -2,11 +2,12 @@ import { ApiError } from '../types';
 import { cookie } from '../repository';
 import type { LocalOp } from './apply';
 import { PosteDb, getMeta, setMeta } from './db';
+import { fromB64 } from './crypto';
 import { LocalPosteRepository } from './local';
 import type { Snapshot } from './list';
 import { PosteStore } from './store';
 import { SyncManager, type SyncState } from './sync';
-import { PosteVault } from './vault';
+import { PosteVault, LeaseError, PinError, type Lease } from './vault';
 
 export const WIPE_AFTER_EVENT_MS = 24 * 3_600_000;
 export type WipeReason = 'echecs_pin' | 'deconnexion' | 'fin_evenement' | 'manuel' | 'poste_supprime' | 'compte_change';
@@ -38,7 +39,7 @@ export class PosteRuntime {
   }
   private readonly fetcher: typeof fetch;
 
-  state(): ReturnType<PosteVault['state']> { return this.vault.state(); }
+  state(): ReturnType<PosteVault['agentState']> { return this.vault.agentState(); }
 
   private async afterSnapshot(snapshot: Snapshot): Promise<void> {
     await setMeta(this.db, 'settings', snapshot.settings);
@@ -48,13 +49,14 @@ export class PosteRuntime {
     if (this.repo) { this.repo.setClockOffset(offset); await this.repo.replaceSnapshot(snapshot); }
   }
 
-  async enrol(code: string, pin: string, agent: { id: string; name: string }): Promise<void> {
+  async enrol(code: string, agent: { id: string; name: string }): Promise<void> {
     // S02 / C3 : un nouvel enrôlement ne remplace jamais un coffre qui garde des opérations non envoyées.
     if ((await this.store.count('pending')) > 0) throw new ApiError('operations_en_attente', 'Des opérations non envoyées restent sur cette tablette : elles doivent être synchronisées par leur auteur avant un nouvel enrôlement.', null, 409);
     const response = await this.fetcher('/poste/api/enroler', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN') }, body: JSON.stringify({ code }), credentials: 'same-origin' }).catch(() => { throw new ApiError('reseau', 'Pas de connexion au serveur : l’enrôlement demande le réseau.'); });
     const data = await response.json().catch(() => null) as (Enrolled & { message?: string; code?: string; errors?: Record<string, string[]> }) | null;
     if (!response.ok || !data?.device_token) throw new ApiError(data?.code ?? 'erreur', data?.message ?? Object.values(data?.errors ?? {})[0]?.[0] ?? 'Enrôlement impossible. Vérifiez le code ou demandez-en un nouveau.', null, response.status);
-    await this.vault.enrol({ token: data.device_token, secret: data.device_secret, pin, agent, poste: { id: data.poste.id, name: data.poste.station || data.poste.name }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    const lease = await this.fetchLease(data.poste.id);
+    await this.vault.enrolLease({ token: data.device_token, lease, agent, poste: { id: data.poste.id, name: data.poste.station || data.poste.name }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
     this.sync.resetAfterEnrollment();
     await this.sync.sync();
     if (!(await this.db.chunks.get('list:head'))) {
@@ -64,9 +66,64 @@ export class PosteRuntime {
     await this.open();
   }
 
-  async unlock(pin: string, expectedAgentId?: string): Promise<void> {
-    try { await this.vault.unlock(pin); }
+  /** Bail de poste demandé au serveur (session de l'agent exigée) : secret propre à cet appareil ET à ce compte, remis sur HTTPS, jamais conservé en clair. */
+  async fetchLease(posteId: string): Promise<Lease> {
+    let response: Response;
+    try { response = await this.fetcher(`/poste/api/coffre/bail?poste=${encodeURIComponent(posteId)}`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' }); }
+    catch { throw new ApiError('reseau', 'Le réseau est indisponible : la tablette ne peut pas s’ouvrir sans lui pour le moment. Rien n’est perdu.'); }
+    const data = await response.json().catch(() => null) as (Lease & { message?: string; code?: string }) | null;
+    if (!response.ok || !data?.secret) throw new ApiError(data?.code ?? 'bail_refuse', data?.message ?? 'Le serveur n’a pas ouvert cette tablette : reconnectez-vous ou contactez l’administrateur.', null, response.status);
+    return { secret: data.secret, expires_at: data.expires_at };
+  }
+
+  /**
+   * Ouvre le coffre SANS saisie : avec le bail conservé s'il est encore valable, sinon avec un bail demandé au serveur (en ligne, session valide).
+   * Résultats : « vide » (rien d'enrôlé), « migration » (ancien coffre par PIN, à migrer une fois), « ouvert », « ferme » (réseau ou connexion nécessaire, `reason` dit pourquoi).
+   * Le coffre d'un autre compte n'est jamais ouvert ni effacé tant que des opérations attendent leur auteur (S02 / C3).
+   */
+  async resume(expectedAgentId?: string): Promise<{ state: 'vide' | 'migration' | 'ouvert' | 'ferme'; reason?: string }> {
+    const current = await this.vault.agentState();
+    if (current === 'vide') return { state: 'vide' };
+    if (current === 'migration') return { state: 'migration' };
+    if (current === 'deverrouille') { await this.afterUnlock(expectedAgentId); return { state: this.vault.unlocked ? 'ouvert' : 'vide' }; }
+    const posteId = await getMeta(this.db, 'posteId');
+    const stored = await this.vault.storedLease();
+    try {
+      if (stored) await this.vault.openWithLease(stored.secret);
+      else throw new LeaseError('bail_absent', 'Aucun bail valable sur cette tablette.');
+    } catch (first) {
+      // Bail absent, échu ou remplacé : un nouveau bail demandé au serveur (en ligne, session valide) ; sinon la tablette attend le réseau.
+      if (!posteId) return { state: 'ferme', reason: 'Cette tablette n’est pas identifiée : réenrôlez-la.' };
+      let lease: Lease;
+      try { lease = await this.fetchLease(posteId); }
+      catch (e) { return { state: 'ferme', reason: e instanceof ApiError ? e.message : 'La tablette ne peut pas s’ouvrir pour le moment.' }; }
+      try { await this.vault.openWithLease(fromB64Lease(lease)); }
+      catch {
+        // Le bail du compte connecté n'ouvre pas ce coffre : la tablette appartient à un autre agent.
+        const pending = await this.store.count('pending');
+        if (pending > 0) return { state: 'ferme', reason: `Cette tablette garde ${pending} opération${pending > 1 ? 's' : ''} non envoyée${pending > 1 ? 's' : ''}, saisie${pending > 1 ? 's' : ''} par un autre agent : reconnectez-vous avec son compte pour les envoyer. Rien n’est perdu.` };
+        await this.wipe('compte_change', false);
+        return { state: 'vide' };
+      }
+      await this.vault.saveLease(lease);
+      void first;
+    }
+    await this.afterUnlock(expectedAgentId);
+    return { state: this.vault.unlocked ? 'ouvert' : 'vide' };
+  }
+
+  /** Migration unique d'un ancien coffre par PIN : le PIN est saisi une dernière fois ; ni les données ni la file d'opérations ne sont touchées. */
+  async migrate(pin: string, expectedAgentId?: string): Promise<void> {
+    const posteId = await getMeta(this.db, 'posteId');
+    if (!posteId) throw new PinError('vide', 'Cette tablette n’est pas enrôlée.');
+    const lease = await this.fetchLease(posteId);
+    try { await this.vault.migrate(pin, lease); }
     catch (e) { if (e instanceof Error && 'code' in e && (e as { code: string }).code === 'efface') this.handlers.onWiped('echecs_pin'); throw e; }
+    await this.afterUnlock(expectedAgentId);
+  }
+
+  /** Après ouverture : fin d'activité, compte différent, ouverture du dépôt local et synchronisation. */
+  private async afterUnlock(expectedAgentId?: string): Promise<void> {
     if (await this.expired()) {
       this.vault.lock();
       await this.wipe('fin_evenement', true);
@@ -82,7 +139,7 @@ export class PosteRuntime {
         const pending = await this.store.count('pending');
         if (pending > 0) {
           this.lock();
-          throw new ApiError('operations_en_attente_autre_agent', `Cette tablette garde ${pending} opération${pending > 1 ? 's' : ''} non envoyée${pending > 1 ? 's' : ''}, saisie${pending > 1 ? 's' : ''} par ${formerAgent?.name ?? 'un autre agent'} : cet agent doit se reconnecter et les envoyer avant tout changement d’agent. Rien n’est perdu.`, null, 409);
+          throw new ApiError('operations_en_attente_autre_agent', `Cette tablette garde ${pending} opération${pending > 1 ? 's' : ''} non envoyée${pending > 1 ? 's' : ''}, saisie${pending > 1 ? 's' : ''} par ${formerAgent?.name ?? 'un autre agent'} : reconnectez-vous avec son compte pour les envoyer. Rien n’est perdu.`, null, 409);
         }
         await this.wipe('compte_change', false);
         return;
@@ -96,6 +153,23 @@ export class PosteRuntime {
       if ((await this.syncRequiredHours()) !== null) { this.lock(); throw new ApiError('synchronisation_requise', syncRequiredMessage(hours)); }
     }
     this.sync.kick();
+  }
+
+  /** Renouvelle le bail en silence (en ligne) quand il approche de son échéance : la tablette ne se ferme jamais pendant le travail. Échec sans effet. */
+  async renewLease(): Promise<void> {
+    if (!this.vault.unlocked || !navigator.onLine) return;
+    const posteId = await getMeta(this.db, 'posteId');
+    const stored = await this.vault.storedLease();
+    if (!posteId) return;
+    // Renouvelé dès que la moitié du temps est passée (ou si le bail a disparu) ; la durée vient du serveur.
+    if (stored && stored.expiresAt - Date.now() > 3_600_000 * 3) return;
+    try { await this.vault.saveLease(await this.fetchLease(posteId)); } catch { /* session échue ou réseau coupé : le bail courant continue jusqu'à son échéance */ }
+  }
+
+  /** Ferme la tablette jusqu'à une nouvelle connexion en ligne (déconnexion, page de connexion). Les données et la file restent chiffrées. */
+  async closeSession(): Promise<void> {
+    this.sync.stop(); this.repo = null; this.profile = null;
+    await this.vault.dropLease();
   }
 
   /** Nombre d'heures au-delà duquel le réseau est exigé, si la dernière synchronisation est plus ancienne ; sinon null (0 dans les réglages : jamais). */
@@ -136,3 +210,6 @@ export class PosteRuntime {
 
   conflicts(): Promise<LocalOp[]> { return this.store.ops('conflict'); }
 }
+
+/** Bail du serveur en octets. */
+function fromB64Lease(lease: Lease): Uint8Array { return fromB64(lease.secret); }

@@ -1010,3 +1010,11 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Le propriétaire précise la règle : le PIN une seule fois pendant la connexion, sans le retaper en changeant de page ; après une déconnexion, le PIN est redemandé. Cela remplace, pour le moment, la suppression complète du PIN (« bail de poste », `LOT-B-COFFRE-SANS-PIN.md`, en attente).
 - Réalisation sans toucher au chiffrement : coffre unique en mémoire pour la page entière, changements d'écran de l'agent par visite Inertia en ligne, fermeture du coffre à la déconnexion et sur la page de connexion, inactivité indépendante de l'écran. Aucune clé ni aucun secret supplémentaire n'est conservé. Détails et limites : `docs/AUTH_HORS_LIGNE.md`, addendum.
 - À décider : le verrouillage à l'inactivité (5 minutes par défaut) redemande toujours le PIN ; l'allonger se règle dans l'Administration (décision d'exploitation).
+
+## Suppression totale du PIN de l'espace agent (décision du propriétaire)
+- Demande du propriétaire (site militaire, exigence du client) : plus aucun PIN pour l'agent. Remplace « PIN une seule fois par connexion » et le verrou d'inactivité.
+- Solution : bail de poste (secret délivré par le serveur à la session connectée, conservé scellé sur la tablette avec échéance, renouvelé en ligne, supprimé à la déconnexion). Coffre v2 ; migration des tablettes v1 par une dernière saisie du PIN, avec vérification avant remplacement.
+- Nouveau point d'accès `GET /poste/api/coffre/bail` (authentifié, tracé, limité). « Verrouiller » devient « Fermer ma session ».
+- Inchangé : PIN d'évacuation du superviseur.
+- Risque résiduel et exigences d'exploitation : voir `docs/AUTH_HORS_LIGNE.md` (addendum) et `docs/ailct/LOT-B-COFFRE-SANS-PIN.md`.
+- Non exécuté localement : tests PHP et e2e (PHP 8.4 requis, absent ici) ; ils tournent en CI.

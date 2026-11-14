@@ -23,6 +23,28 @@ final class PosteSyncController
         return response()->json($devices->enrol($data['code'], $r->user()));
     }
 
+    /**
+     * Bail de poste : secret de 32 octets qui ouvre le coffre de CETTE tablette pour CE compte. Calculé (jamais stocké) à partir de la clé de l'application, de l'identifiant de
+     * l'appareil, de l'identifiant du compte et du hachage du jeton d'appareil : un autre compte, un autre appareil ou un appareil révoqué ou réenrôlé obtiennent un autre secret
+     * (ou aucun). Remis sur HTTPS à une session authentifiée seulement ; la durée vient du réglage « délai hors ligne » (12 heures si aucun).
+     */
+    public function bail(Request $r, Audit $audit): JsonResponse
+    {
+        $data = $r->validate(['poste' => 'required|uuid']);
+        $user = $r->user();
+        abort_unless($user->canAny(['visiteurs.rechercher', 'badges.controler', 'groupes.appel_nominal']), 403);
+        $device = Device::query()->whereKey($data['poste'])->whereNotNull('token_hash')->whereNull('revoked_at')->first();
+        if ($device === null) {
+            return response()->json(['code' => 'appareil_inconnu', 'message' => 'Cette tablette n’est pas enrôlée ou a été révoquée : contactez l’administrateur.'], 404);
+        }
+        $secret = hash_hmac('sha256', 'ikoma-bail-v1|'.$device->id.'|'.$user->id.'|'.$device->token_hash, (string) config('app.key'), true);
+        $hours = (int) DB::table('settings')->where('key', 'poste_hors_reseau_max_heures')->value('value');
+        $hours = $hours > 0 ? $hours : 12;
+        $audit->append('poste.bail_emis', $user->id, ['device_id' => $device->id, 'duree_heures' => $hours]);
+
+        return response()->json(['secret' => base64_encode($secret), 'expires_at' => now()->addHours($hours)->utc()->format('Y-m-d\TH:i:s.u\Z')]);
+    }
+
     public function liste(Request $r, ListSnapshot $snapshot): JsonResponse
     {
         return response()->json($snapshot->build($this->poste($r)));
