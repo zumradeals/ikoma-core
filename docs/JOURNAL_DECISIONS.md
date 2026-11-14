@@ -998,3 +998,7 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Implémentation de la maquette validée : cadre institutionnel, actions du poste selon ses capacités, fusion poste/contrôle/groupes sur une page déverrouillée, résultats « Accès autorisé / refusé » avec état d'enregistrement et alerte du superviseur seulement pour les causes réelles. Aucune route, migration, API, règle métier ni permission modifiée ; fusion non faite, validation du dirigeant requise.
 - Mots du verdict remplacés (« VALIDE / NON VALIDE » → « ACCÈS AUTORISÉ / ACCÈS REFUSÉ ») : changement de vocabulaire d'interface, tests adaptés sans affaiblissement.
 - « Derniers passages » enrichis : non réalisés (voir `V3-CONCEPTION.md`).
+
+## Lot B : retirer le code PIN de l'espace Agent (conception, en attente de validation)
+- Décision du propriétaire : le PIN ne fait plus partie de l'expérience quotidienne de l'agent. Aucun code ni chiffrement modifié à ce stade.
+- Proposition de l'architecte : « bail de poste » (option A), contrat de protection, analyse des risques et contrat de migration sans perte d'opération dans `docs/ailct/LOT-B-COFFRE-SANS-PIN.md`. Le retrait du PIN affaiblit la protection d'une tablette déverrouillée pendant la durée du bail : décision du propriétaire requise (questions section 9).
