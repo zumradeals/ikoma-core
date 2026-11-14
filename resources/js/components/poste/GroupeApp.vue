@@ -8,11 +8,11 @@ import type { ArrivalResult, BoardResult, GroupMemberView, GroupSummary, GroupVi
 import type { SyncState } from '../../poste/local/sync';
 import { ApiError } from '../../poste/types';
 
-const props = defineProps<{ agent: string; repository: GroupPosteRepository; sync?: SyncState | null }>();
+const props = defineProps<{ agent: string; repository: GroupPosteRepository; sync?: SyncState | null; initialTab?: string | null }>();
 const emit = defineEmits<{ sync: []; lock: [] }>();
 type Tab = 'appel' | 'embarquement' | 'arrivee';
 
-const tab = ref<Tab>('appel');
+const tab = ref<Tab>(props.initialTab === 'arrivee' || props.initialTab === 'embarquement' ? props.initialTab : 'appel');
 const groups = ref<GroupSummary[]>([]);
 const groupId = ref<string | null>(null);
 const view = ref<GroupView | null>(null);
@@ -189,7 +189,7 @@ function statusOf(m: GroupMemberView): string {
 </script>
 
 <template>
-  <AgentLayout active="groupe" :agent="agent" :online="online">
+  <AgentLayout active="groupe" :agent="agent" :online="online" :pending="sync?.pending ?? null">
     <template #header-context><span v-if="view?.group.bus_number ?? view?.group.name ?? null">Groupe : {{ view?.group.bus_number ?? view?.group.name ?? null }}</span></template>
     <template #status><StatusBar context-label="Groupe" :poste="view?.group.bus_number ?? view?.group.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" /></template>
     <div class="agent-workspace agent-groupe-workspace" :data-busy="busy">

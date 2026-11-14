@@ -99,16 +99,16 @@ test('confiance hors ligne : entrée autorisée, refus sans habilitation et cart
 
   // 1. Entrée autorisée : confiance valide et habilitation explicite.
   await scan(page, 'controle', fx.holders.valid.qr);
-  await expect(page.getByTestId('verdict')).toContainText('VALIDE');
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS AUTORISÉ');
   await expect(page.getByTestId('connu-a')).toContainText('Hors ligne : situation connue à'); await next(page);
   // 2. Sans habilitation valide : refus. Carte révoquée connue localement : refus immédiat.
   await scan(page, 'controle', fx.holders.none.qr);
-  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('raison')).toContainText('Habilitation absente'); await next(page);
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS REFUSÉ'); await expect(page.getByTestId('raison')).toContainText('Habilitation absente'); await next(page);
   await scan(page, 'controle', fx.holders.revoked.qr);
-  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('raison')).toContainText('Carte perdue'); await next(page);
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS REFUSÉ'); await expect(page.getByTestId('raison')).toContainText('Carte perdue'); await next(page);
   // 3. Un titulaire encore valide pour la tablette : l'autorité finale sera le serveur.
   await scan(page, 'controle', fx.holders.conflict.qr);
-  await expect(page.getByTestId('verdict')).toContainText('VALIDE'); await next(page);
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS AUTORISÉ'); await next(page);
 
   // 4. Le serveur révoque cette carte pendant que la tablette est hors ligne.
   await admin.goto(`/administration/titulaires/${fx.holders.conflict.id}/carte`);
@@ -123,7 +123,7 @@ test('confiance hors ligne : entrée autorisée, refus sans habilitation et cart
   await unlockIfLocked(page);
   await expect(page.getByTestId('confiance-expiree')).toContainText('EXPIRÉE');
   await scan(page, 'controle', fx.holders.valid.qr);
-  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('raison')).toContainText('Confiance hors ligne expirée'); await next(page);
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS REFUSÉ'); await expect(page.getByTestId('raison')).toContainText('Confiance hors ligne expirée'); await next(page);
   await scan(page, 'sortie', fx.holders.leaver.qr); // carte déclarée volée, titulaire présent : il doit pouvoir sortir
   await expect(page.getByTestId('verdict')).toContainText('SORTIE ENREGISTRÉE'); await next(page);
   await scan(page, 'sortie', fx.holders.valid.qr); // sortie de sécurité malgré la confiance expirée

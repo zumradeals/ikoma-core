@@ -74,7 +74,7 @@ describe('écran de contrôle', () => {
     const overlay = wrapper.get('[data-testid="resultat"]');
     expect(overlay.attributes('data-verdict')).toBe('valide');
     expect(wrapper.get('[data-testid="verdict"]').text()).toContain('✓');
-    expect(wrapper.get('[data-testid="verdict"]').text()).toContain('VALIDE');
+    expect(wrapper.get('[data-testid="verdict"]').text()).toContain('ACCÈS AUTORISÉ');
     expect(wrapper.get('[data-testid="nom"]').text()).toBe('Koné Mariam');
     expect(wrapper.get('[data-testid="zones"]').text()).toContain('Hall, Salle');
     expect(wrapper.get('[data-testid="zone-non-autorisee"]').text()).toContain('ZONE NON AUTORISÉE : Espace VIP');
@@ -87,7 +87,7 @@ describe('écran de contrôle', () => {
     expect(wrapper.find('[data-testid="resultat"]').exists()).toBe(false);
   });
 
-  it('affiche NON VALIDE en rouge avec la raison, et la sortie avec le compteur', async () => {
+  it('affiche ACCÈS REFUSÉ en rouge avec la raison, et la sortie avec le compteur', async () => {
     const wrapper = mountApp(repo());
     await flushPromises();
     await wrapper.findAll('button').find(b => b.text().includes('Poste A'))!.trigger('click');
@@ -98,7 +98,7 @@ describe('écran de contrôle', () => {
     expect(wrapper.get('[data-testid="resultat"]').attributes('data-verdict')).toBe('refuse');
     expect(wrapper.get('[data-testid="resultat"]').classes()).toContain('bg-red-700');
     expect(wrapper.get('[data-testid="verdict"]').text()).toContain('✕');
-    expect(wrapper.get('[data-testid="verdict"]').text()).toContain('NON VALIDE');
+    expect(wrapper.get('[data-testid="verdict"]').text()).toContain('ACCÈS REFUSÉ');
     expect(wrapper.get('[data-testid="raison"]').text()).toBe('Badge annulé');
     await wrapper.get('[data-testid="suivant"]').trigger('click');
     await wrapper.get('[data-testid="mode-sortie"]').trigger('click');

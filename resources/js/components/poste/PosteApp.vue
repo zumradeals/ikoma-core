@@ -7,7 +7,7 @@ import { HttpPosteRepository, OperationIds, type PosteRepository } from '../../p
 import { ApiError, type ActivityChoice, type Avis, type DeskContext, type DeskSummary, type Fiche, type IdentityDocument, type Poste, type SearchResult, type UnlistedInput } from '../../poste/types';
 import StatusBar from './StatusBar.vue'; import StepTracker from './StepTracker.vue'; import PosteSelect from './PosteSelect.vue'; import StepSearch from './StepSearch.vue'; import StepFiche from './StepFiche.vue';
 import StepIdentity from './StepIdentity.vue'; import StepDecision from './StepDecision.vue'; import StepBadge from './StepBadge.vue'; import StepHandover from './StepHandover.vue'; import StepDone from './StepDone.vue';
-import VisitorPanel from './VisitorPanel.vue'; import PosteFooter from './PosteFooter.vue'; import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
+import PosteActions from './PosteActions.vue'; import VisitorPanel from './VisitorPanel.vue'; import PosteFooter from './PosteFooter.vue'; import DeskPanel from './DeskPanel.vue'; import StepRefused from './StepRefused.vue'; import UnlistedForm from './UnlistedForm.vue'; import StepWaitHost from './StepWaitHost.vue';
 
 import type { SyncState } from '../../poste/local/sync';
 const props = defineProps<{ agent: string; repository?: PosteRepository; sync?: SyncState | null; autoSelect?: boolean }>();
@@ -25,6 +25,14 @@ let clock: number | undefined;
 const posteName = computed(() => { const p = postes.value.find(x => x.id === posteId.value); return p ? (p.station || p.name) : null; });
 const elapsed = computed(() => (ctx.value.startedAt === null ? 0 : Math.max(0, Math.round((now.value - ctx.value.startedAt) / 1000))));
 const clockLabel = computed(() => `${Math.floor(elapsed.value / 60)}:${String(elapsed.value % 60).padStart(2, '0')}`);
+// Ce que ce poste permet (capacités du contrat V1) : le titre le dit, et l'accueil des visiteurs n'est proposé qu'avec la capacité « accueil ».
+const caps = computed<string[] | null>(() => (repo.capabilities ? repo.capabilities() : null));
+const showAccueil = computed(() => caps.value === null || caps.value.includes('accueil'));
+const deskLine = computed(() => {
+  if (caps.value === null) return 'Accueil, identification et enregistrement de l’entrée.';
+  const parts = [caps.value.includes('accueil') ? 'accueil des visiteurs' : null, caps.value.includes('scan') ? 'contrôle des accès' : null, caps.value.includes('sortie') ? 'sorties' : null].filter(Boolean) as string[];
+  return parts.length ? parts.join(', ').replace(/^./, c => c.toUpperCase()) + '.' : 'Aucune opération numérique à ce poste.';
+});
 const blockedReason = computed(() => validateBlockedReason(ctx.value));
 
 // Données du bandeau d'événement et de l'en-tête : tout vient du contexte du poste et de l'état réel de la synchronisation.
@@ -200,7 +208,7 @@ onBeforeUnmount(() => { if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.val
 </script>
 
 <template>
-  <AgentLayout active="poste" :agent="agent" :online="online" :sync-label="context ? syncLabel : null" :notifications="sync?.conflicts ?? 0" :site-name="context?.event.site ?? null">
+  <AgentLayout active="poste" :agent="agent" :online="online" :sync-label="context ? syncLabel : null" :notifications="sync?.conflicts ?? 0" :site-name="context?.event.site ?? null" :capabilities="repo.capabilities?.() ?? null" :pending="sync ? sync.pending : null">
     <template v-if="context" #sidebar-extra>
       <div class="agent-sidebar-device" role="group" aria-label="Appareil et connexion" data-testid="menu-appareil"><p class="agent-nav-caption">Appareil &amp; connexion</p>
         <a class="agent-nav-link" href="#poste-barre-basse"><AdminIcon name="tablet" :size="24" />Appareil et poste</a>
@@ -218,7 +226,7 @@ onBeforeUnmount(() => { if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.val
       <PosteSelect v-if="!context" :postes="postes" @select="choosePoste" />
       <template v-else>
         <div class="poste-titlebar">
-          <div class="poste-title-block"><span class="poste-title-icon" aria-hidden="true"><AdminIcon name="users" :size="32" /></span><div><h1 class="poste-title" data-testid="titre-poste">Poste d’accueil <span>– Enregistrement d’un visiteur</span></h1><p>Accueil, identification et enregistrement de l’entrée.</p></div></div>
+          <div class="poste-title-block"><span class="poste-title-icon" aria-hidden="true"><AdminIcon name="users" :size="32" /></span><div><h1 class="poste-title" data-testid="titre-poste">{{ posteName ?? 'Mon poste' }} <span v-if="showAccueil">– Accueil d’un visiteur</span></h1><p data-testid="poste-fonctions">{{ deskLine }}</p></div></div>
           <div class="poste-title-chips">
             <p v-if="choices.length > 1" class="poste-chip-box" data-testid="selecteur-activite"><AdminIcon name="calendar" :size="22" /> <label for="activite-du-jour">Événement :</label> <select id="activite-du-jour" class="poste-activity-select" :value="context.event.id" :disabled="!canSwitch" @change="onSwitchActivity"><option v-for="c in choices" :key="c.id" :value="c.id">{{ c.name }}</option></select></p>
             <p v-else class="poste-chip-box"><AdminIcon name="calendar" :size="22" /> Événement : <strong>{{ context.event.name }}</strong></p>
@@ -227,7 +235,8 @@ onBeforeUnmount(() => { if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.val
             <p v-if="summary" class="poste-chip-box" data-testid="badges-disponibles"><AdminIcon name="tag" :size="22" /> Badges disponibles : <strong>{{ summary.badges.restants }}</strong></p>
           </div>
         </div>
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <PosteActions v-if="ctx.step === 'recherche'" :repository="repo" />
+        <div v-if="showAccueil" class="flex flex-wrap items-center justify-between gap-3">
           <StepTracker :current="stepNumber[ctx.step]" class="min-w-64 flex-1" />
           <p v-if="ctx.startedAt !== null && ctx.step !== 'entree'" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xl font-bold" aria-label="Chrono du parcours" data-testid="chrono-live"><AdminIcon name="clock" /> {{ clockLabel }}</p>
         </div>
@@ -239,7 +248,7 @@ onBeforeUnmount(() => { if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.val
           <span v-if="eventState" class="poste-chip ml-auto" :class="eventState.tone" data-testid="evt-etat">{{ eventState.label }}</span>
         </p>
         <template v-if="ctx.step === 'recherche'">
-          <StepSearch :repository="repo" :refresh-key="sync?.lastSyncAt ?? null" :event-name="context.event.name" :categories="context.categories" :total="context.visitor_count ?? null" :period="eventPeriod" @select="onSelect" @open="id => selectVisitor(id, 1)" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
+          <StepSearch v-if="showAccueil" :repository="repo" :refresh-key="sync?.lastSyncAt ?? null" :event-name="context.event.name" :categories="context.categories" :total="context.visitor_count ?? null" :period="eventPeriod" @select="onSelect" @open="id => selectVisitor(id, 1)" @started="send({ type: 'START' })" @unlisted="send({ type: 'NEW_UNLISTED' })" @error="e => (error = e)" />
           <DeskPanel v-if="summary" :summary="summary" :online="online" :syncing="sync?.syncing" @sync="emit('sync')" @select="id => selectVisitor(id, 1)" />
         </template>
         <UnlistedForm v-else-if="ctx.step === 'non_liste'" :context="context" :busy="busy" @submit="onCreateUnlisted" @back="onBack" />

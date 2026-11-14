@@ -29,7 +29,27 @@ const openKey = ref(0);
 type View = 'poste' | 'controle' | 'groupe';
 const view = ref<View>(props.app ?? 'poste');
 const viewMode = ref<string | null>(null);
-provide('agentNavigate', (next: View, mode: string | null = null) => { view.value = next; viewMode.value = mode; });
+/** Vue de départ selon le poste (capacités du contrat V1) : sans « accueil » mais avec scan ou sortie (la soute), on ouvre le contrôle ; la tablette sans poste (hôtel) ouvre les groupes. Seulement quand l'adresse ouverte est celle du poste. */
+function chooseStartView() {
+  if (props.app !== undefined && props.app !== 'poste') return;
+  const list = runtime.repo?.list;
+  const caps = runtime.repo?.capabilities?.() ?? null;
+  if (!list || caps === null) return;
+  if (!caps.includes('accueil') && (caps.includes('scan') || caps.includes('sortie'))) view.value = 'controle';
+  else if (caps.length === 0 && list.snapshot.poste.point_code === 'hotel') view.value = 'groupe';
+}
+/** L'adresse suit la vue (retour du navigateur, rechargement et liens directs restent cohérents) ; l'état de la page Inertia est conservé. */
+const pathOf = (v: View, mode: string | null) => (v === 'controle' ? '/controle' + (mode ? '?mode=' + encodeURIComponent(mode) : '') : v === 'groupe' ? '/groupe' + (mode ? '?mode=' + encodeURIComponent(mode) : '') : '/poste');
+function viewFromLocation(): { v: View; mode: string | null } {
+  const mode = new URLSearchParams(window.location.search).get('mode');
+  const path = window.location.pathname;
+  return path.startsWith('/controle') ? { v: 'controle', mode } : path.startsWith('/groupe') ? { v: 'groupe', mode } : { v: 'poste', mode: null };
+}
+function onPopState() { const { v, mode } = viewFromLocation(); view.value = v; viewMode.value = mode; }
+provide('agentNavigate', (next: View, mode: string | null = null) => {
+  view.value = next; viewMode.value = mode;
+  try { window.history.pushState({ ...(window.history.state ?? {}), ikomaView: { view: next, mode } }, '', pathOf(next, mode)); } catch { /* l'adresse est un confort : la vue a déjà changé */ }
+});
 let idleTimer: number | undefined; let tick: number | undefined; let loop: number | undefined;
 let idleMs = 300_000;
 
@@ -69,6 +89,7 @@ function lock() { runtime.lock(); phase.value = 'verrouille'; pin.value = ''; me
 async function afterOpen() {
   const settings = await getMeta(runtime.db, 'settings');
   idleMs = (settings?.inactivity_minutes ?? 5) * 60_000;
+  chooseStartView();
   phase.value = 'ouvert'; wiped.value = null; resetIdle(); await loadConflicts();
 }
 
@@ -115,6 +136,7 @@ async function resetThisBrowser() {
 async function syncNow() { await runtime.sync.sync(); }
 
 onMounted(async () => {
+  window.addEventListener('popstate', onPopState);
   tick = window.setInterval(() => { now.value = Date.now(); }, 1000);
   for (const name of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(name, resetIdle, { passive: true });
   window.addEventListener('online', () => { if (phase.value === 'ouvert') runtime.sync.kick(); });
@@ -128,6 +150,7 @@ onMounted(async () => {
   phase.value = (await runtime.state()) === 'vide' ? 'vide' : 'verrouille';
 });
 onBeforeUnmount(() => {
+  window.removeEventListener('popstate', onPopState);
   clearInterval(tick); clearInterval(loop); clearTimeout(idleTimer); runtime.sync.stop();
   for (const name of ['pointerdown', 'keydown', 'touchstart']) window.removeEventListener(name, resetIdle);
 });
@@ -169,7 +192,7 @@ onBeforeUnmount(() => {
 
   <template v-else>
     <SiteModeNotice v-if="view !== 'controle' && runtime.repo && siteMode()" :key="openKey" :repository="runtime.repo" :online="sync?.online ?? true" />
-    <GroupeApp v-else-if="view === 'groupe' && runtime.repo" :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
+    <GroupeApp v-else-if="view === 'groupe' && runtime.repo" :key="openKey + 'g' + (viewMode ?? '')" :initial-tab="viewMode" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as GroupPosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <ControleApp v-else-if="view === 'controle' && runtime.repo" :key="openKey + 'c' + (viewMode ?? '')" :initial-mode="viewMode" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo as SitePosteRepository" :sync="sync" @sync="syncNow" @lock="lock" />
     <PosteApp v-else :key="openKey" :agent="runtime.profile?.name ?? agent?.name ?? ''" :repository="runtime.repo ?? undefined" :sync="sync" :auto-select="true" @sync="syncNow" @lock="lock" />
     <section v-if="conflicts.length" class="mx-auto max-w-4xl px-4 pb-8" aria-labelledby="conflits-titre" data-testid="conflits">

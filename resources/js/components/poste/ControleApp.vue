@@ -49,6 +49,16 @@ let dismissTimer: number | undefined; let presentTimer: number | undefined;
 watch(allowedModes, modes => { if (modes.length && !modes.includes(mode.value)) mode.value = modes[0]; }, { immediate: true });
 const showing = computed(() => control.value !== null || exit.value !== null);
 const good = computed(() => (control.value ? control.value.valid : exit.value?.ok === true));
+// Après un résultat, l'agent doit savoir deux choses : l'opération est-elle enregistrée, et le superviseur est-il prévenu ? Rien n'est promis hors des causes qui créent réellement une alerte
+// (ControlAlerts, SiteControl : badge annulé, restitué, non associé, invité retiré, autre événement, inconnu, hors période, zone non autorisée, carte permanente refusée ; sortie d'un badge annulé).
+const ALERTING = new Set(['annule', 'restitue', 'non_associe', 'invite_retire', 'autre_evenement', 'inconnu', 'hors_periode']);
+const resultSource = computed(() => (control.value ?? exit.value)?.source ?? 'serveur');
+const recorded = computed(() => (control.value ? control.value.reason !== 'sens_requis' : exit.value !== null));
+const supervisorAlerted = computed(() => {
+  const c = control.value;
+  if (c) return c.valid ? c.zone_ok === false : ALERTING.has(c.reason ?? '') || (c.reason ?? '').startsWith('carte_') || !!c.permanent;
+  return exit.value !== null && !exit.value.ok && exit.value.reason === 'annule';
+});
 const known = computed(() => {
   const at = control.value?.known_at ?? exit.value?.known_at ?? null;
   return at ? new Date(at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null;
@@ -148,7 +158,7 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
 </script>
 
 <template>
-  <AgentLayout active="controle" :agent="agent" :online="online" :capabilities="caps">
+  <AgentLayout active="controle" :agent="agent" :online="online" :capabilities="caps" :pending="sync ? sync.pending : null">
     <template #header-context><span v-if="point?.name ?? null">Point de contrôle : {{ point?.name ?? null }}</span></template>
     <template #status><StatusBar context-label="Point de contrôle" :poste="point?.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" /></template>
     <div class="agent-workspace agent-controle-workspace">
@@ -210,7 +220,7 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
 
     <div v-if="showing" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 px-6 py-8 text-center text-white" :class="good ? 'bg-green-700' : 'bg-red-700'" role="alertdialog" aria-modal="true" :aria-label="good ? 'Résultat : valide' : 'Résultat : refusé'" :data-latency-ms="latency ?? undefined" data-testid="resultat" :data-verdict="good ? 'valide' : 'refuse'" @click="dismiss">
       <template v-if="control">
-        <p class="text-[clamp(3rem,12vw,6rem)] font-extrabold leading-none" data-testid="verdict"><span aria-hidden="true">{{ control.valid ? '✓' : '✕' }}</span> {{ control.valid ? 'VALIDE' : 'NON VALIDE' }}</p>
+        <p class="text-[clamp(3rem,12vw,6rem)] font-extrabold leading-none" data-testid="verdict"><span aria-hidden="true">{{ control.valid ? '✓' : '✕' }}</span> {{ control.valid ? 'ACCÈS AUTORISÉ' : 'ACCÈS REFUSÉ' }}</p>
         <template v-if="control.valid && control.person">
           <p v-if="control.direction" class="rounded-2xl bg-white px-4 py-2 text-3xl font-extrabold text-ikoma-navy" data-testid="sens-resultat">{{ DIRECTION_LABEL[control.direction] }}</p>
           <p class="text-4xl font-bold" data-testid="nom">{{ control.person.name }}</p>
@@ -239,7 +249,9 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
         </template>
       </template>
       <p v-if="known" class="rounded-xl bg-white/20 px-4 py-2 text-xl font-semibold" data-testid="connu-a">Hors ligne : situation connue à {{ known }}</p>
-      <button type="button" class="btn-soft !bg-white !text-xl" data-testid="suivant" @click.stop="dismiss">Badge suivant</button>
+      <p v-if="recorded" class="rounded-xl bg-white px-4 py-2 text-xl font-bold text-ikoma-navy" data-testid="enregistrement"><span aria-hidden="true">{{ resultSource === 'local' ? '◷' : '✓' }}</span> {{ resultSource === 'local' ? 'Enregistré sur la tablette · sera envoyé au retour du réseau' : 'Enregistré · envoyé au serveur' }}</p>
+      <p v-if="supervisorAlerted" class="rounded-xl bg-white px-4 py-2 text-xl font-bold text-red-900" data-testid="superviseur-prevenu"><span aria-hidden="true">▲</span> {{ resultSource === 'local' ? 'Le superviseur sera prévenu dès le retour du réseau.' : 'Le superviseur est prévenu.' }}</p>
+      <button type="button" class="btn-soft !bg-white !text-xl" data-testid="suivant" @click.stop="dismiss">Personne suivante</button>
     </div>
   </AgentLayout>
 </template>

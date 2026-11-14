@@ -56,6 +56,10 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await open(page, '/poste');
     await expect(page.getByText('Étape 1 sur 7')).toBeVisible();
     await captures(page, '02-etape-1-recherche');
+    // Téléphone : la navigation du bas remplace le menu replié (poste, cars, contrôle, sécurité) ; tablette paysage : menu replié.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId('agent-bottom')).toBeVisible();
+    await page.setViewportSize({ width: 1024, height: 768 });
     const toggle = page.getByTestId('menu-agent-toggle');
     await expect(toggle).toHaveAttribute('aria-expanded', 'false'); await toggle.click();
     await expect(page.getByTestId('agent-nav-controle')).toBeVisible(); await toggle.click();
