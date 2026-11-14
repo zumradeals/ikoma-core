@@ -233,9 +233,8 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
         </form>
         <button type="button" class="btn-soft" :aria-expanded="showIncidents" data-testid="ouvrir-incidents" @click="showIncidents = !showIncidents">{{ showIncidents ? 'Fermer les refus et incidents' : 'Refus et incidents de ce poste' }}</button>
         <IncidentsPanel v-if="showIncidents && repository.incidents" :repository="repository" :reasons="reasonLabels" />
-        <button v-if="!ownPoint" type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Changer de point de contrôle</button>
-        <button v-else-if="!isOwn" type="button" class="btn-soft" data-testid="revenir-poste" @click="backToOwnPoint">Revenir au poste de cette tablette</button>
-        <button v-else-if="points.length > 1" type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Contrôler une autre zone de l’activité</button>
+        <button v-if="!ownPoint || points.length > 1" type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">{{ ownPoint ? 'Contrôler une autre zone de l’activité' : 'Changer de point de contrôle' }}</button>
+        <button v-if="ownPoint && !isOwn" type="button" class="btn-soft" data-testid="revenir-poste" @click="backToOwnPoint">Revenir au poste de cette tablette</button>
       </template>
     </div>
 

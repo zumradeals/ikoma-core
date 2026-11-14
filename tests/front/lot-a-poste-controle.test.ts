@@ -110,6 +110,7 @@ describe('écran de contrôle : plus de choix redondant du poste', () => {
     await w.get('[data-testid=code-manuel]').setValue('ID-1'); await w.get('form[aria-label="Saisir le code du badge"]').trigger('submit'); await flushPromises();
     expect(r.control).toHaveBeenLastCalledWith(expect.any(String), 'ID-1', { type: 'zone', id: 'z1' }, undefined);
     await w.get('[data-testid=resultat]').trigger('click');
+    expect(w.find('[data-testid=changer-point]').exists()).toBe(true); // d'autres zones restent choisissables sans repasser par le poste
     await w.get('[data-testid=revenir-poste]').trigger('click');
     expect(w.get('[data-testid=point]').text()).toBe('Poste 1');
   });
