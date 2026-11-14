@@ -314,3 +314,64 @@
   .poste-visitor { position:static; flex-direction:row; flex-wrap:wrap; align-items:center; }
   .poste-visitor-photo { width:96px; height:96px; }
 }
+
+/* ===== Agent V3 : poste de travail AILCT (présentation uniquement) ===== */
+/* En-tête institutionnel : dégradé marine, filet doré, nom complet. */
+.agent-header { background:linear-gradient(90deg, var(--inst-primary), color-mix(in srgb, var(--inst-primary) 78%, black)); border-bottom:3px solid #c9962b; }
+.agent-fullname { display:none; }
+@media (min-width:1200px) { .agent-fullname { display:block; padding-left:16px; margin-left:4px; border-left:1px solid rgba(255,255,255,.4); font-size:1rem; font-weight:500; max-width:380px; line-height:1.25; } }
+.agent-network { padding:6px 14px; border-radius:999px; font-weight:700; font-size:14px; }
+.agent-network[data-online=true] { background:#e2f5ea; color:#14532d; }
+.agent-network[data-online=false], .agent-network[data-clean=false] { background:#fff1e0; color:#7c3a00; }
+.agent-role { display:block; opacity:.85; font-size:12px; }
+/* Actions du poste */
+.agent-actions { display:grid; gap:12px; }
+.agent-actions h2 { display:flex; align-items:center; gap:10px; margin:0; }
+.agent-actions-hint { color:#506d94; margin-top:-6px; }
+.agent-action-main { display:flex; align-items:center; justify-content:center; gap:14px; min-height:72px; padding:14px 20px; border-radius:12px; background:#0b5bd3; color:white; font-size:22px; font-weight:800; text-decoration:none; }
+.agent-action-main:hover { background:#0a4fb9; }
+.agent-action-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.agent-action-soft { display:flex; align-items:center; gap:14px; min-height:64px; padding:12px 16px; border:2px solid #bbd2ec; border-radius:12px; background:white; color:#0f4c97; text-decoration:none; }
+.agent-action-soft strong { display:block; font-size:18px; }
+.agent-action-soft small, .agent-action-main small { display:block; font-size:14px; font-weight:500; color:#506d94; }
+.agent-action-main small { color:rgba(255,255,255,.9); }
+.agent-action-main.is-off, .agent-action-soft.is-off { opacity:.6; }
+.agent-action-car { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; padding:12px; border-radius:12px; background:#f2f7fc; }
+.agent-action-car strong { font-size:20px; }
+.agent-actions-none { display:flex; gap:16px; align-items:center; padding:18px; border:2px solid #bbd2ec; border-radius:14px; background:#f2f7fc; }
+.agent-actions-none h2 { margin:0; font-size:20px; } .agent-actions-none p { margin-top:4px; color:#2f4c70; }
+@media (min-width:1200px) { .agent-desk-workspace > .agent-actions { max-width:none; } }
+/* Navigation du bas : tablette portrait et téléphone */
+.agent-bottom { display:none; }
+@media (max-width:900px) {
+  .agent-sidebar, .agent-menu-toggle { display:none !important; }
+  .agent-shell { padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+  .agent-bottom { display:block; position:fixed; left:0; right:0; bottom:0; z-index:40; background:white; border-top:1px solid #dfebf6; padding:6px 6px calc(6px + env(safe-area-inset-bottom)); box-shadow:0 -4px 16px rgba(11,60,107,.08); }
+  .agent-bottom ul { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:4px; list-style:none; margin:0; padding:0; }
+  .agent-bottom :is(a,button,span.agent-bottom-off) { display:grid; justify-items:center; align-content:center; gap:2px; width:100%; min-height:56px; border-radius:10px; color:#506d94; font-size:12px; font-weight:700; text-decoration:none; background:transparent; }
+  .agent-bottom [aria-current=page] { background:#e6f0fd; color:#0b5bd3; }
+  .agent-bottom .agent-bottom-off { opacity:.55; }
+  .agent-action-row { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:767px) {
+  .agent-network-detail.is-clean { display:none; } .agent-network { font-size:13px; padding:5px 10px; }
+  .agent-action-main { font-size:20px; min-height:68px; }
+  .agent-header { min-height:60px; }
+}
+
+/* Mon espace : le poste de travail est l'action principale */
+@media (min-width:768px) { .agent-home-grid > a:first-child { grid-column:1 / -1; min-height:132px; background:#e9f2fd; border-color:#9ec0ea; } }
+.agent-home-grid > a:first-child h2 { font-size:26px; }
+
+.agent-logo.is-plain { width:52px; height:52px; padding:0; border-radius:50%; background:transparent; }
+.agent-logo.is-plain img { width:100%; height:100%; object-fit:contain; }
+
+.agent-actions-grid { display:grid; gap:16px; }
+@media (min-width:1200px) { .agent-actions-grid { grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); align-items:start; } }
+.agent-actions-grid:empty { display:none; }
+.agent-user { white-space:nowrap; }
+@media (max-width:767px) {
+  .poste-title-chips { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .poste-title-chips .poste-chip-box { font-size:14px; padding:8px 10px; min-width:0; }
+  .poste-title-chips .poste-chip-box:first-child { grid-column:1 / -1; }
+}

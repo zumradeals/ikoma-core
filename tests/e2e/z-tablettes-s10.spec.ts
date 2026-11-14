@@ -96,13 +96,13 @@ test('soute P5 : sens Entrée / Sortie choisi avant le scan, habilitations dans 
   // Entrée
   await page.getByTestId('sens-entree').click();
   await scan(page, fx.s10.badges[0]);
-  await expect(page.getByTestId('verdict')).toContainText('VALIDE');
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS AUTORISÉ');
   await expect(page.getByTestId('sens-resultat')).toHaveText('Entrée');
   await page.getByTestId('suivant').click();
   // Sortie, avec un autre badge
   await page.getByTestId('sens-sortie').click();
   await scan(page, fx.s10.badges[1]);
-  await expect(page.getByTestId('verdict')).toContainText('VALIDE');
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS AUTORISÉ');
   await expect(page.getByTestId('sens-resultat')).toHaveText('Sortie');
   await page.getByTestId('suivant').click();
   // habilitation : la zone VIP n'est pas autorisée à la catégorie « Visiteur », dans le sens choisi

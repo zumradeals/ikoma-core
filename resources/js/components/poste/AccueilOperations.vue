@@ -19,11 +19,6 @@ onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.
 
 const caps = computed(() => props.repository.capabilities?.() ?? []);
 const can = (capability: string) => caps.value.includes(capability);
-const links = computed(() => [
-  { key: 'controle', href: '/controle?mode=controle', label: 'Scanner un badge', hint: 'Contrôle d’accès d’un badge', show: can('scan') },
-  { key: 'sortie', href: '/controle?mode=sortie', label: 'Enregistrer une sortie', hint: 'Sortie individuelle : le badge n’est pas restitué', show: can('sortie') },
-  { key: 'restitution', href: '/controle?mode=restitution', label: 'Restituer un badge', hint: 'Acte distinct de la sortie ; nécessite le réseau', show: can('sortie') },
-].filter(l => l.show));
 const toggle = (next: 'attendus' | 'incidents') => { panel.value = panel.value === next ? null : next; };
 </script>
 
@@ -31,12 +26,6 @@ const toggle = (next: 'attendus' | 'incidents') => { panel.value = panel.value =
   <section class="space-y-4" aria-labelledby="operations-titre" data-testid="operations-accueil">
     <h2 id="operations-titre" class="text-2xl font-bold">Autres opérations</h2>
     <p v-if="!online" role="status" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="operations-hors-ligne"><span aria-hidden="true">⚠</span> Sans réseau : changer d’écran, consulter les visites attendues ou les incidents nécessite le réseau.</p>
-    <ul class="grid gap-3 sm:grid-cols-3" aria-label="Opérations">
-      <li v-for="l in links" :key="l.key">
-        <a v-if="online" :href="l.href" class="btn-soft !h-full !flex-col !items-start text-left" :data-testid="'operation-' + l.key"><strong>{{ l.label }}</strong><span class="text-base font-normal">{{ l.hint }}</span></a>
-        <span v-else class="btn-soft !h-full !flex-col !items-start text-left opacity-60" aria-disabled="true" :data-testid="'operation-' + l.key"><strong>{{ l.label }}</strong><span class="text-base font-normal">Réseau requis</span></span>
-      </li>
-    </ul>
     <div class="flex flex-wrap gap-3">
       <button v-if="repository.expectedVisits && can('accueil')" type="button" class="btn-soft" :aria-expanded="panel === 'attendus'" :disabled="!online" data-testid="ouvrir-attendus" @click="toggle('attendus')">{{ panel === 'attendus' ? 'Fermer les visites attendues' : 'Visites attendues' }}</button>
       <button v-if="repository.incidents" type="button" class="btn-soft" :aria-expanded="panel === 'incidents'" :disabled="!online" data-testid="ouvrir-incidents" @click="toggle('incidents')">{{ panel === 'incidents' ? 'Fermer les refus et incidents' : 'Refus et incidents' }}</button>

@@ -988,3 +988,13 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Présentation seulement (`LoginLayout.vue`, espacements de `Login.vue`) : aucune règle de connexion, de 2FA ni de session modifiée.
 - Focus automatique de l'adresse électronique limité aux écrans d'au moins 768 px et sans défilement : sur téléphone, il faisait défiler la page et masquait le bandeau, et ouvrait le clavier d'emblée.
 - Sur très petit écran (360 × 640), le bouton « Se connecter » demande un court défilement ; sur 390 × 844 il est visible sans défiler. Réduction possible du médaillon à 72 px si le client le demande.
+
+## Agent V3 : maquette validée et faisabilité de la fusion (phase A)
+- Le dirigeant valide la maquette du poste de travail AILCT (`docs/refonte-agent/V3-CONCEPTION.md`) et approuve les recommandations : fusion poste/contrôle/groupes sur une seule page déverrouillée (faisabilité d'abord), derniers passages enrichis seulement si l'historique local le permet sans modifier le moteur, conception consignée dans le dépôt.
+- Précision du dirigeant : pour certains problèmes rencontrés par l'agent, c'est le superviseur qui est informé et alerté. La consigne affichée après un refus ne mentionne le superviseur que pour les causes qui créent réellement une alerte (liste dans le document de conception).
+- Faisabilité : démontrée par `tests/front/agent-fusion.test.ts` (vues internes de `PosteGate`, réseau coupé, même coffre et même copie). Aucun changement de route, de migration, d'API, de règle métier ni de permission. Phase B non commencée.
+
+## Agent V3 : phase B (poste de travail AILCT)
+- Implémentation de la maquette validée : cadre institutionnel, actions du poste selon ses capacités, fusion poste/contrôle/groupes sur une page déverrouillée, résultats « Accès autorisé / refusé » avec état d'enregistrement et alerte du superviseur seulement pour les causes réelles. Aucune route, migration, API, règle métier ni permission modifiée ; fusion non faite, validation du dirigeant requise.
+- Mots du verdict remplacés (« VALIDE / NON VALIDE » → « ACCÈS AUTORISÉ / ACCÈS REFUSÉ ») : changement de vocabulaire d'interface, tests adaptés sans affaiblissement.
+- « Derniers passages » enrichis : non réalisés (voir `V3-CONCEPTION.md`).

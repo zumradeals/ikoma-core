@@ -113,7 +113,7 @@ test('contrôle d’un badge valide : QR lu par la caméra en moins de 5 s, verd
   expect(elapsed, `${elapsed} ms entre l'ouverture de la caméra et le verdict`).toBeLessThan(5000);
   await expect(page.getByTestId('resultat')).toHaveAttribute('data-verdict', 'valide');
   expect(Number(await page.getByTestId('resultat').getAttribute('data-latency-ms'))).toBeLessThan(1000);
-  await expect(page.getByTestId('verdict')).toContainText('VALIDE'); await expect(page.getByTestId('nom')).toContainText(fx.controlNames[0]);
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS AUTORISÉ'); await expect(page.getByTestId('nom')).toContainText(fx.controlNames[0]);
   await expect(page.getByTestId('zones')).toContainText('Salle principale'); await expect(page.getByTestId('zone-non-autorisee')).toHaveCount(0); await shot(page, 'l7-valide');
   await next(page);
   await page.close();
@@ -129,7 +129,7 @@ test('zone non autorisée, badge non associé : verdict et raison précis', asyn
   await next(page);
   // badge non associé
   await scan(page, 'controle', fx.controlBadges[20]);
-  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('raison')).toContainText('non associé'); await shot(page, 'l7-non-valide');
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS REFUSÉ'); await expect(page.getByTestId('raison')).toContainText('non associé'); await shot(page, 'l7-non-valide');
   await next(page);
   await page.close();
 });
@@ -145,7 +145,7 @@ test('sortie : le compteur baisse, le badge n’est plus valable, une deuxième 
   await next(page);
   await expect.poll(() => presents(page)).toBe(before - 1);
   await scan(page, 'controle', fx.controlBadges[0]);
-  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('raison')).toContainText('Personne sortie');
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS REFUSÉ'); await expect(page.getByTestId('raison')).toContainText('Personne sortie');
   await next(page);
   await scan(page, 'sortie', fx.controlBadges[0]);
   await expect(page.getByTestId('verdict')).toContainText('SORTIE REFUSÉE'); await expect(page.getByTestId('raison')).toContainText('Déjà sorti'); await shot(page, 'l7-sortie-refusee');
@@ -176,14 +176,14 @@ test('sans réseau : contrôles et sortie sur la situation connue, puis resynchr
   await choosePoint(page, 'Hall d’accueil');
   await expect(page.getByTestId('situation-connue')).toContainText('situation connue à'); await expect(page.getByTestId('presents')).toContainText('—');
   await scan(page, 'controle', fx.controlBadges[1]);
-  await expect(page.getByTestId('verdict')).toContainText('VALIDE'); await expect(page.getByTestId('connu-a')).toContainText('Hors ligne : situation connue à'); await shot(page, 'l7-hors-ligne-valide');
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS AUTORISÉ'); await expect(page.getByTestId('connu-a')).toContainText('Hors ligne : situation connue à'); await shot(page, 'l7-hors-ligne-valide');
   await next(page);
   await scan(page, 'sortie', fx.controlBadges[1]);
   await expect(page.getByTestId('verdict')).toContainText('SORTIE ENREGISTRÉE'); await next(page);
   await scan(page, 'sortie', fx.controlBadges[1]);
   await expect(page.getByTestId('verdict')).toContainText('SORTIE REFUSÉE'); await expect(page.getByTestId('raison')).toContainText('Déjà sorti'); await next(page);
   await scan(page, 'controle', fx.controlBadges[2]);
-  await expect(page.getByTestId('verdict')).toContainText('VALIDE'); await next(page);
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS AUTORISÉ'); await next(page);
   await expect(page.getByTestId('en-attente')).toHaveText('3'); await shot(page, 'l7-hors-ligne-file');
 
   // retour du réseau : la première réponse du serveur est perdue, le renvoi ne doit rien doubler
@@ -199,7 +199,7 @@ test('sans réseau : contrôles et sortie sur la situation connue, puis resynchr
   expect(after.received - before.received).toBe(3); expect(after.applied - before.applied).toBe(3); expect(after.conflicts - before.conflicts).toBe(0);
   await expect.poll(() => presents(page), { timeout: 30_000 }).toBe(presentBefore - 1);
   await scan(page, 'controle', fx.controlBadges[1]);
-  await expect(page.getByTestId('verdict')).toContainText('NON VALIDE'); await expect(page.getByTestId('connu-a')).toHaveCount(0);
+  await expect(page.getByTestId('verdict')).toContainText('ACCÈS REFUSÉ'); await expect(page.getByTestId('connu-a')).toHaveCount(0);
   await adminContext.close();
   await page.close();
 });

@@ -7,6 +7,7 @@ vi.mock('../../resources/js/poste/media', () => ({
 }));
 
 import AccueilOperations from '../../resources/js/components/poste/AccueilOperations.vue';
+import PosteActions from '../../resources/js/components/poste/PosteActions.vue';
 import ControleApp from '../../resources/js/components/poste/ControleApp.vue';
 import ExpectedVisits from '../../resources/js/components/poste/ExpectedVisits.vue';
 import IncidentsPanel from '../../resources/js/components/poste/IncidentsPanel.vue';
@@ -74,21 +75,23 @@ describe('refus et incidents du poste', () => {
 
 describe('autres opérations de l’accueil', () => {
   it('propose scan, sortie et restitution vers l’écran de contrôle, avec le bon mode', () => {
-    const wrapper = mount(AccueilOperations, { props: { repository: fake() } });
+    const wrapper = mount(PosteActions, { props: { repository: fake() } });
     expect(wrapper.get('[data-testid=operation-controle]').attributes('href')).toBe('/controle?mode=controle');
     expect(wrapper.get('[data-testid=operation-sortie]').attributes('href')).toBe('/controle?mode=sortie');
     expect(wrapper.get('[data-testid=operation-restitution]').text()).toContain('distinct de la sortie');
-    expect(wrapper.find('[data-testid=ouvrir-attendus]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid=ouvrir-incidents]').exists()).toBe(true);
+    const others = mount(AccueilOperations, { props: { repository: fake() } });
+    expect(others.find('[data-testid=ouvrir-attendus]').exists()).toBe(true);
+    expect(others.find('[data-testid=ouvrir-incidents]').exists()).toBe(true);
   });
 
   it('n’offre que ce que la capacité du poste permet', () => {
-    const scanOnly = mount(AccueilOperations, { props: { repository: fake({ capabilities: () => ['scan'] }) } });
+    const scanOnly = mount(PosteActions, { props: { repository: fake({ capabilities: () => ['scan'] }) } });
     expect(scanOnly.find('[data-testid=operation-controle]').exists()).toBe(true);
     expect(scanOnly.find('[data-testid=operation-sortie]').exists()).toBe(false);
-    expect(scanOnly.find('[data-testid=ouvrir-attendus]').exists()).toBe(false);
-    const none = mount(AccueilOperations, { props: { repository: fake({ capabilities: () => [], searchVehicles: undefined, expectedVisits: undefined }) } });
+    expect(mount(AccueilOperations, { props: { repository: fake({ capabilities: () => ['scan'] }) } }).find('[data-testid=ouvrir-attendus]').exists()).toBe(false);
+    const none = mount(PosteActions, { props: { repository: fake({ capabilities: () => [], searchVehicles: undefined, expectedVisits: undefined }) } });
     expect(none.find('[data-testid=operation-controle]').exists()).toBe(false);
+    expect(none.get('[data-testid=poste-sans-operation]').text()).toContain('Aucune opération numérique à ce poste');
   });
 
   it('ouvre et ferme les panneaux, et signale le mode hors ligne', async () => {
@@ -101,7 +104,7 @@ describe('autres opérations de l’accueil', () => {
     const offline = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
     const cut = mount(AccueilOperations, { props: { repository: fake() } });
     expect(cut.get('[data-testid=operations-hors-ligne]').text()).toContain('nécessite le réseau');
-    expect(cut.get('[data-testid=operation-sortie]').attributes('aria-disabled')).toBe('true');
+    expect(mount(PosteActions, { props: { repository: fake() } }).get('[data-testid=operation-sortie]').attributes('aria-disabled')).toBe('true');
     expect(cut.get('[data-testid=ouvrir-attendus]').attributes('disabled')).toBeDefined();
     offline.mockRestore();
   });
