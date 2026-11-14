@@ -15,9 +15,9 @@ use Illuminate\Support\Str;
  * copie d'une tablette sans activité. Données fictives uniquement.
  */
 
-const SC_TOKEN = '6666666666666666666666666666666666666666666666666666666666666666';
+const CP_TOKEN = '8888888888888888888888888888888888888888888888888888888888888888';
 
-function scUser(string $role): User
+function cpUser(string $role): User
 {
     $user = User::create(['name' => 'Compte fictif SC', 'email' => Str::uuid().'@exemple.test', 'password' => Str::password(24)]);
     $user->assignRole($role);
@@ -26,12 +26,12 @@ function scUser(string $role): User
     return $user;
 }
 
-function scHeaders(): array
+function cpHeaders(): array
 {
-    return ['X-Device-Token' => SC_TOKEN, 'X-Operation-Id' => (string) Str::uuid(), 'Accept' => 'application/json'];
+    return ['X-Device-Token' => CP_TOKEN, 'X-Operation-Id' => (string) Str::uuid(), 'Accept' => 'application/json'];
 }
 
-function scPoint(?string $point): void
+function cpPoint(?string $point): void
 {
     DB::table('devices')->where('id', DemoSeeder::id('device'))->update(['point_code' => $point]);
 }
@@ -40,9 +40,9 @@ beforeEach(function () {
     $this->seed(RoleSeeder::class);
     $this->seed(DemoSeeder::class);
     $this->travelTo('2027-01-10 10:00:00');
-    $this->agent = scUser('agent_accueil');
+    $this->agent = cpUser('agent_accueil');
     $this->actingAs($this->agent);
-    DB::table('devices')->where('id', DemoSeeder::id('device'))->update(['token_hash' => hash('sha256', SC_TOKEN)]);
+    DB::table('devices')->where('id', DemoSeeder::id('device'))->update(['token_hash' => hash('sha256', CP_TOKEN)]);
 });
 
 it('livre la capacité de scan aux cinq postes en gardant leurs différences', function () {
@@ -56,31 +56,31 @@ it('livre la capacité de scan aux cinq postes en gardant leurs différences', f
 });
 
 it('applique la capacité aux tablettes : scan permis aux cinq postes, sortie et accueil seulement au poste 2, rien à l’hôtel ni sans poste', function (string $point, bool $sortie, bool $accueil) {
-    scPoint($point);
+    cpPoint($point);
     $direction = $point === 'soute' ? ['direction' => 'entree'] : [];
-    expect($this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'] + $direction, scHeaders())->status())->not->toBe(403);
-    $out = $this->postJson('/poste/api/sortie', ['code' => 'B-INCONNU'], scHeaders());
+    expect($this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'] + $direction, cpHeaders())->status())->not->toBe(403);
+    $out = $this->postJson('/poste/api/sortie', ['code' => 'B-INCONNU'], cpHeaders());
     $sortie ? expect($out->status())->not->toBe(403) : $out->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
-    $refuse = $this->postJson('/poste/api/refuser', ['visitor_id' => DemoSeeder::id('visitor1'), 'motif' => 'essai'], scHeaders());
+    $refuse = $this->postJson('/poste/api/refuser', ['visitor_id' => DemoSeeder::id('visitor1'), 'motif' => 'essai'], cpHeaders());
     $accueil ? expect($refuse->status())->not->toBe(403) : $refuse->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
 })->with([['poste_1', false, false], ['poste_2', true, true], ['poste_3', false, false], ['poste_4', false, false], ['soute', false, false]]);
 
 it('refuse le scan à une tablette sans poste ou dont le poste est désactivé', function () {
     foreach (['hotel', null] as $point) {
-        scPoint($point);
-        $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], scHeaders())->assertForbidden();
+        cpPoint($point);
+        $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], cpHeaders())->assertForbidden();
     }
-    scPoint('poste_3');
+    cpPoint('poste_3');
     DB::table('checkpoints')->where('code', 'poste_3')->update(['active' => false]);
     expect(PostCapabilities::capabilities(Device::findOrFail(DemoSeeder::id('device'))))->toBe([]);
-    $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], scHeaders())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
+    $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], cpHeaders())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
 });
 
 it('refuse le scan à un compte qui n’a pas la permission de contrôle, même au poste 2', function () {
-    scPoint('poste_2');
+    cpPoint('poste_2');
     foreach (['hote', 'encadreur'] as $role) {
-        $this->actingAs(scUser($role));
-        $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], scHeaders())->assertForbidden();
+        $this->actingAs(cpUser($role));
+        $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], cpHeaders())->assertForbidden();
     }
 });
 
@@ -118,7 +118,7 @@ it('reprend la configuration des installations existantes : ajoute seulement « 
 });
 
 it('change la version de la copie de la tablette quand les capacités changent, pour qu’elle se mette à jour toute seule', function () {
-    scPoint('poste_1');
+    cpPoint('poste_1');
     DB::table('checkpoints')->where('code', 'poste_1')->update(['capabilities' => '[]']);
     $before = app(ListSnapshot::class)->version(Device::findOrFail(DemoSeeder::id('device')));
     DB::table('checkpoints')->where('code', 'poste_1')->update(['capabilities' => '["scan"]']);
@@ -126,7 +126,7 @@ it('change la version de la copie de la tablette quand les capacités changent, 
 });
 
 it('sert à une tablette sans activité affectée au poste 1 son poste, ses capacités et les zones qu’il garde (jamais d’événement fictif)', function () {
-    $admin = scUser('administrateur');
+    $admin = cpUser('administrateur');
     $device = Device::create(['event_id' => null, 'name' => 'Tablette fictive site', 'station' => 'Poste 1', 'point_code' => 'poste_1']);
     $postId = (string) DB::table('checkpoints')->where('code', 'poste_1')->value('id');
     app(SiteConfiguration::class)->mapSiteZone($postId, DemoSeeder::id('zone1'), $admin);
