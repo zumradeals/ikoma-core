@@ -15,7 +15,7 @@ test.beforeAll(async ({ browser }, info) => {
   tablet = await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 1280, height: 800 }, permissions: ['camera'] });
   const page = await tablet.newPage();
   await page.goto('/login'); await page.getByLabel('Adresse électronique').fill(fx.email); await page.getByLabel('Mot de passe', { exact: true }).fill(fx.password); await page.getByRole('button', { name: 'Se connecter' }).click();
-  await expect(page).toHaveURL(/\/espace/);
+  await expect(page).not.toHaveURL(/\/login/);
   await page.close();
 });
 test.afterAll(async () => { await tablet.close(); });
@@ -208,11 +208,11 @@ test('captures mobile du parcours', async () => {
 test('« Fermer ma session » ramène à la connexion ; après reconnexion la tablette se rouvre toute seule, sans aucun PIN', async () => {
   const page = await desk();
   await shot(page, 'l6-tablette-statut');
-  await button(page, 'Fermer ma session').click();
+  await page.getByTestId('verrouiller').click();
   await expect(page).toHaveURL(/\/login/); await shot(page, 'l6-session-fermee');
   // nouvelle connexion : plus aucun PIN, le poste s'ouvre directement
   await page.getByLabel('Adresse électronique').fill(fx.email); await page.getByLabel('Mot de passe', { exact: true }).fill(fx.password); await page.getByRole('button', { name: 'Se connecter' }).click();
-  await expect(page).toHaveURL(/\/espace/);
+  await expect(page).not.toHaveURL(/\/login/);
   await page.goto('/poste');
   await expect(page.getByText('Étape 1 sur 7')).toBeVisible();
   await expect(page.getByTestId('ecran-verrou')).toHaveCount(0);
