@@ -52,7 +52,7 @@ it('livre la capacité de scan aux cinq postes en gardant leurs différences', f
     }
     // l'accueil et la sortie ne sont ouverts qu'au poste 2 ; seul le sens obligatoire de la soute est posé
     expect(DB::table('checkpoints')->where('direction_required', true)->pluck('code')->all())->toBe(['soute']);
-    expect(DB::table('checkpoints')->whereIn('code', ['poste_1', 'poste_3', 'poste_4', 'soute'])->whereRaw("jsonb_exists(capabilities, 'accueil') OR jsonb_exists(capabilities, 'sortie')")->count())->toBe(0);
+    expect(DB::table('checkpoints')->whereIn('code', ['poste_1', 'poste_3', 'poste_4', 'soute'])->whereRaw("(jsonb_exists(capabilities, 'accueil') OR jsonb_exists(capabilities, 'sortie'))")->count())->toBe(0);
 });
 
 it('applique la capacité aux tablettes : scan permis aux cinq postes, sortie et accueil seulement au poste 2, rien à l’hôtel ni sans poste', function (string $point, bool $sortie, bool $accueil) {
@@ -66,10 +66,10 @@ it('applique la capacité aux tablettes : scan permis aux cinq postes, sortie et
 })->with([['poste_1', false, false], ['poste_2', true, true], ['poste_3', false, false], ['poste_4', false, false], ['soute', false, false]]);
 
 it('refuse le scan à une tablette sans poste ou dont le poste est désactivé', function () {
-    foreach (['hotel', null] as $point) {
-        cpPoint($point);
-        $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], cpHeaders())->assertForbidden();
-    }
+    cpPoint('hotel');
+    $this->postJson('/poste/api/controle', ['code' => 'B-INCONNU'], cpHeaders())->assertForbidden();
+    // une tablette sans point (non enrôlée) n'a aucune capacité ; une tablette enrôlée ne peut pas être laissée sans point (contrainte de la base)
+    expect(PostCapabilities::capabilities(Device::create(['event_id' => DemoSeeder::id('event'), 'name' => 'Tablette fictive sans point', 'station' => null, 'point_code' => null])))->toBe([]);
     cpPoint('poste_3');
     DB::table('checkpoints')->where('code', 'poste_3')->update(['active' => false]);
     expect(PostCapabilities::capabilities(Device::findOrFail(DemoSeeder::id('device'))))->toBe([]);
