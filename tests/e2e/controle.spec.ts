@@ -5,9 +5,8 @@ import { loginWithSecondFactor } from './otp';
 type Fixtures = { email: string; password: string; names: Record<string, string>; enrolCode2: string; poste2: string; controlNames: string[]; controlBadges: string[]; controlQrSvg: string; admin: { email: string; password: string; secret: string } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
 const shots = process.env.L7_CAPTURES === '1';
-const PIN = '739261';
 
-// Une seule tablette pour tout le fichier : accueil et contrôle partagent son enrôlement et son PIN.
+// Une seule tablette pour tout le fichier : accueil et contrôle partagent son enrôlement (aucun PIN : la tablette s'ouvre toute seule).
 let tablet: BrowserContext;
 test.describe.configure({ mode: 'serial' });
 
@@ -26,13 +25,11 @@ const button = (page: Page, name: string | RegExp) => page.getByRole('button', {
 /** Enrôle la tablette si besoin, sinon la déverrouille, puis attend l'écran demandé. */
 async function open(page: Page, url: '/poste' | '/controle'): Promise<void> {
   await page.goto(url);
-  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou');
+  const enrol = page.getByTestId('ecran-enrolement');
   const ready = url === '/poste' ? page.getByText('Étape 1 sur 7') : page.getByTestId('choix-point').or(page.getByTestId('point'));
-  await enrol.or(lock).or(ready).first().waitFor();
+  await enrol.or(ready).first().waitFor();
   if (await enrol.isVisible()) {
-    await page.getByTestId('code-enrolement').fill(fx.enrolCode2); await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN); await page.getByTestId('enroler').click();
-  } else if (await lock.isVisible()) {
-    await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click();
+    await page.getByTestId('code-enrolement').fill(fx.enrolCode2); await page.getByTestId('enroler').click();
   }
   await expect(ready).toBeVisible();
 }

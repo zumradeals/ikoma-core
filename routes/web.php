@@ -159,6 +159,8 @@ Route::middleware(['auth'])->group(function (): void {
             Route::get('/groupe', fn () => Inertia::render('Groupe'))->middleware(['can:groupes.appel_nominal', EnsureF06Active::class]);
             Route::get('/poste/api/postes', [PosteApiController::class, 'postes'])->middleware('can:visiteurs.rechercher');
             Route::post('/poste/api/enroler', [PosteSyncController::class, 'enroler'])->middleware('can:visiteurs.rechercher');
+            // Bail de poste (coffre sans PIN) : demandé avec la session de l'agent ; le jeton d'appareil est dans le coffre fermé, l'appareil est donc désigné par son identifiant.
+            Route::get('/poste/api/coffre/bail', [PosteSyncController::class, 'bail'])->middleware('throttle:30,1');
             Route::middleware(ResolvePoste::class)->group(function (): void {
                 Route::get('/poste/api/liste', [PosteSyncController::class, 'liste'])->middleware('can:visiteurs.rechercher');
                 Route::get('/poste/api/liste/version', [PosteSyncController::class, 'version'])->middleware('can:visiteurs.rechercher');
