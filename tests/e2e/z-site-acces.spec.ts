@@ -30,18 +30,21 @@ test('Site et accès : registre des postes, configuration à la sélection, enre
   // vue synthétique : aucune configuration détaillée tant qu'aucun poste n'est sélectionné
   await expect(page.getByTestId('detail-poste')).toHaveCount(0);
   await expect(page.getByTestId('operations-poste_2')).toContainText('Accueil');
-  await expect(page.getByTestId('operations-poste_1')).toContainText('Aucune opération');
+  // lot A : les cinq postes scannent ; l'accueil et la sortie restent au poste 2
+  await expect(page.getByTestId('operations-poste_1')).not.toContainText('Aucune opération');
+  await expect(page.getByTestId('operations-poste_1')).not.toContainText('Accueil');
   await expect(page.getByTestId('kpi-postes')).toHaveText('5');
 
-  // configuration par défaut = contrat V1 antérieur, lue à la sélection
+  // configuration par défaut (lot A : scan aux cinq postes), lue à la sélection
   await configure(page, 'poste_2');
   await expect(page.getByTestId('capacite-poste_2-accueil')).toBeChecked();
   await expect(page.getByTestId('capacite-poste_2-sortie')).toBeChecked();
   // les tablettes de la recette sont affectées à leur poste (plusieurs possibles) et l'historique existe
   await expect(page.getByTestId('tablettes-poste_2').locator('li').first()).toBeVisible();
   await configure(page, 'poste_1');
-  await expect(page.getByTestId('capacite-poste_1-scan')).not.toBeChecked();
-  await expect(page.getByTestId('sens-poste_1')).toBeDisabled();
+  await expect(page.getByTestId('capacite-poste_1-scan')).toBeChecked();
+  await expect(page.getByTestId('capacite-poste_1-accueil')).not.toBeChecked();
+  await expect(page.getByTestId('sens-poste_1')).not.toBeChecked();
   await configure(page, 'soute');
   await expect(page.getByTestId('capacite-soute-scan')).toBeChecked();
   await expect(page.getByTestId('sens-soute')).toBeChecked();
@@ -59,22 +62,24 @@ test('Site et accès : registre des postes, configuration à la sélection, enre
   await expect(page.getByTestId('resume-regles')).toBeVisible();
   await expect(page.getByTestId('infos-site')).toBeVisible();
 
-  // activer le contrôle de badge au poste 1, enregistrer, retrouver la configuration après rechargement
+  // activer l'accueil au poste 1 (le scan y est déjà), enregistrer, retrouver la configuration après rechargement
   await configure(page, 'poste_1');
-  await page.getByTestId('capacite-poste_1-scan').check();
+  await page.getByTestId('capacite-poste_1-accueil').check();
   await page.getByTestId('enregistrer-poste_1').click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuration du poste enregistrée' })).toBeVisible();
   await page.reload();
   await configure(page, 'poste_1');
-  await expect(page.getByTestId('capacite-poste_1-scan')).toBeChecked();
+  await expect(page.getByTestId('capacite-poste_1-accueil')).toBeChecked();
+  await expect(page.getByTestId('capacite-poste_1-scan')).toBeChecked(); // l'autre réglage n'a pas bougé
 
   // retour à l'état initial
-  await page.getByTestId('capacite-poste_1-scan').uncheck();
+  await page.getByTestId('capacite-poste_1-accueil').uncheck();
   await page.getByTestId('enregistrer-poste_1').click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuration du poste enregistrée' })).toBeVisible();
   await page.reload();
   await configure(page, 'poste_1');
-  await expect(page.getByTestId('capacite-poste_1-scan')).not.toBeChecked();
+  await expect(page.getByTestId('capacite-poste_1-accueil')).not.toBeChecked();
+  await expect(page.getByTestId('capacite-poste_1-scan')).toBeChecked();
 
   // ── Téléphone : mêmes capacités, ergonomie mesurée ──
   const context = await browser.newContext({ baseURL: test.info().project.use.baseURL, storageState: await page.context().storageState(), viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });

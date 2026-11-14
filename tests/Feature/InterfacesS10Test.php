@@ -169,7 +169,7 @@ it('limite la soute à ses propres contrôles refusés et lui interdit les visit
 });
 
 it('refuse la consultation des incidents à un poste sans capacité', function () {
-    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'poste_1']);
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'hotel']);
     $this->actingAs($this->agent)->getJson('/poste/api/incidents', s10Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
 });
 
@@ -346,8 +346,8 @@ it('rejoue à la soute les contrôles Entrée et Sortie faits hors ligne, avec l
     expect($refused)->toHaveCount(1)->and(json_decode($refused[0]->details, true))->toMatchArray(['verdict' => 'refuse', 'direction' => 'sortie'])
         ->and($presence->count($this->event))->toBe($present);
 
-    // le poste redevenu non habilité à la soute est refusé par la même règle qu'en ligne (S02), sans mouvement
-    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'poste_1']);
+    // le poste redevenu non habilité à la soute (tablette sans poste, sans capacité de scan) est refusé par la même règle qu'en ligne (S02), sans mouvement
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'hotel']);
     $count = DB::table('access_events')->where('type', 'controle')->count();
     $notAllowed = s10SouteOp(7, $code1, 'entree', $zone1);
     s10SouteSync([$notAllowed])->assertOk()->assertJsonPath('results.0.status', 'conflit')->assertJsonPath('results.0.code', 'poste_non_habilite');

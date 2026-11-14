@@ -153,15 +153,24 @@ it('réserve la clôture globale d’une activité à l’administrateur', funct
 
 // --- Postes : un agent ne dispose que des capacités de son point de contrôle --------------------------------------------------------
 
-it('refuse tout scan, toute sortie et toute opération d’accueil aux points sans capacité (poste 1, poste 3 et poste 4 en V1)', function (string $point) {
-    s02Point($point);
+it('refuse tout scan, toute sortie et toute opération d’accueil à la tablette sans poste (hôtel)', function () {
+    s02Point('hotel');
     $code = $this->badges[0]->code;
     $this->postJson('/poste/api/controle', ['code' => $code], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
     $this->postJson('/poste/api/sortie', ['code' => $code], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
     $this->postJson('/poste/api/refuser', ['visitor_id' => DemoSeeder::id('visitor1'), 'motif' => 'essai'], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
     expect(DB::table('access_events')->count())->toBe(0)
         ->and(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('status'))->not->toBe('refuse');
-})->with(['poste_1', 'poste_3', 'poste_4', 'hotel']);
+});
+
+it('permet le scan aux postes 1, 3 et 4 (décision du lot A) mais leur refuse toujours la sortie et l’accueil', function (string $point) {
+    s02Point($point);
+    $code = $this->badges[0]->code;
+    expect($this->postJson('/poste/api/controle', ['code' => $code], s02Headers())->status())->not->toBe(403);
+    $this->postJson('/poste/api/sortie', ['code' => $code], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
+    $this->postJson('/poste/api/refuser', ['visitor_id' => DemoSeeder::id('visitor1'), 'motif' => 'essai'], s02Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
+    expect(DB::table('visitors')->where('id', DemoSeeder::id('visitor1'))->value('status'))->not->toBe('refuse');
+})->with(['poste_1', 'poste_3', 'poste_4']);
 
 it('limite la soute au contrôle individuel et le poste 2 à l’ensemble des opérations d’agent', function () {
     s02Point('soute');
@@ -180,7 +189,7 @@ it('limite la soute au contrôle individuel et le poste 2 à l’ensemble des op
 });
 
 it('applique les mêmes limites de poste au rejeu hors ligne : mise en quarantaine, aucun mouvement enregistré', function () {
-    s02Point('poste_1');
+    s02Point('hotel');
     $op = s02Op($this->agent, 1);
     $this->postJson('/poste/api/sync', ['operations' => [$op]], ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'])
         ->assertOk()->assertJsonPath('summary.conflicts', 1)->assertJsonPath('results.0.code', 'poste_non_habilite');
@@ -319,7 +328,7 @@ it('enrôle un poste identifié et lui donne ses capacités dans la réponse du 
 
 it('remet à la tablette son point de contrôle et ses capacités, et change de version quand le point change', function () {
     $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
-    foreach (['poste_1' => [], 'poste_2' => ['accueil', 'scan', 'sortie'], 'poste_3' => [], 'poste_4' => [], 'soute' => ['scan'], 'hotel' => []] as $point => $capabilities) {
+    foreach (['poste_1' => ['scan'], 'poste_2' => ['accueil', 'scan', 'sortie'], 'poste_3' => ['scan'], 'poste_4' => ['scan'], 'soute' => ['scan'], 'hotel' => []] as $point => $capabilities) {
         s02Point($point);
         $this->getJson('/poste/api/liste', $headers)->assertOk()->assertJsonPath('poste.point_code', $point)->assertJsonPath('poste.capabilities', $capabilities);
     }
@@ -518,11 +527,11 @@ it('distingue l’hôtel des postes de l’Académie : préparation et badges pa
     // la remise de badge de groupe (hôtel) relève de la permission de rôle groupes.remettre_badges : aucun refus de capacité de poste
     expect($codeOf(fn () => app(Groups::class)->deliver($hotel, $this->agent, $group, DemoSeeder::id('visitor270'), $this->badges[0]->code)))->not->toBe('poste_non_habilite');
     // l'arrivée d'un car est un scan physique à un poste de l'Académie : refusée à l'hôtel, comme à tout point sans capacité de scan
-    foreach (['hotel', 'poste_1', 'poste_3', 'poste_4'] as $point) {
+    foreach (['hotel'] as $point) {
         s02Point($point);
         expect($codeOf(fn () => app(Groups::class)->arrive(Device::findOrFail(DemoSeeder::id('device')), $this->agent, $this->badges[0]->code)))->toBe('poste_non_habilite');
     }
-    foreach (['poste_2', 'soute'] as $point) {
+    foreach (['poste_1', 'poste_2', 'poste_3', 'poste_4', 'soute'] as $point) {
         s02Point($point);
         expect($codeOf(fn () => app(Groups::class)->arrive(Device::findOrFail(DemoSeeder::id('device')), $this->agent, $this->badges[0]->code)))->not->toBe('poste_non_habilite');
     }
@@ -546,12 +555,12 @@ it('distingue l’hôtel des postes de l’Académie : préparation et badges pa
 
 it('revérifie au rejeu le point courant du poste, même si la copie locale était plus ancienne', function () {
     $headers = ['X-Device-Token' => S02_TOKEN, 'Accept' => 'application/json'];
-    // la tablette a décidé quand le poste était un poste 2 ; l'administrateur l'a ensuite changé en poste 1
+    // la tablette a décidé quand le poste était un poste 2 ; l'administrateur l'a ensuite changé en tablette sans poste (hôtel)
     $op = s02Op($this->agent, 1);
     $op['payload']['local_valid'] = true;
     $op['payload']['offline'] = false;
     $op['payload']['known_at'] = now()->subMinutes(10)->toIso8601String();
-    s02Point('poste_1');
+    s02Point('hotel');
     $this->postJson('/poste/api/sync', ['operations' => [$op]], $headers)->assertOk()->assertJsonPath('results.0.code', 'poste_non_habilite');
     expect(DB::table('access_events')->where('type', 'controle')->count())->toBe(0);
 });

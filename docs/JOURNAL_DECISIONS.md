@@ -999,6 +999,13 @@ Contrat de conception validé par le dirigeant ; aucune règle métier, permissi
 - Mots du verdict remplacés (« VALIDE / NON VALIDE » → « ACCÈS AUTORISÉ / ACCÈS REFUSÉ ») : changement de vocabulaire d'interface, tests adaptés sans affaiblissement.
 - « Derniers passages » enrichis : non réalisés (voir `V3-CONCEPTION.md`).
 
+## Lot A : contrôle aux cinq postes et point officiel de la tablette
+- **Décision du propriétaire** : les cinq postes physiques scannent les badges et les cartes. Capacité « scan » ajoutée aux postes 1, 3 et 4 (Poste 2 et Soute l'avaient) par la migration `2026_12_17_000000_enable_scan_on_five_posts` (reprise sans écraser les autres réglages, idempotente, testée). Accueil et sortie : Poste 2 seulement ; sens obligatoire : Soute seulement.
+- **Cause réelle de l'anomalie du Poste 1** : copie sans activité avec `zones` et `postes` vides, et écran de contrôle qui y cherchait ses points (+ Poste 1 sans capacité de scan). Correction à la source : le point de contrôle est le poste d'affectation de la tablette (`ownPoint`), sans choix de l'agent ni valeur du navigateur ; sans affectation valide, instruction claire et contrôle impossible.
+- **Conservé** : serveur qui accepte encore un point explicite (anciennes opérations en file), choix d'une autre zone de l'activité pour la session. À décider : retirer ce choix et refuser côté serveur tout point autre que le poste de la tablette (recommandé, lot A2).
+- Tests PHP existants qui décrivaient « postes 1, 3 et 4 sans capacité » adaptés à la nouvelle décision (les refus de sortie, d'accueil, de l'hôtel et des tablettes sans poste sont conservés).
+- Lot B (retrait du PIN) : conception séparée, validation du propriétaire requise avant tout changement du chiffrement (`docs/ailct/LOT-B-COFFRE-SANS-PIN.md`).
+
 ## PIN demandé une seule fois par connexion (décision du propriétaire)
 - Le propriétaire précise la règle : le PIN une seule fois pendant la connexion, sans le retaper en changeant de page ; après une déconnexion, le PIN est redemandé. Cela remplace, pour le moment, la suppression complète du PIN (« bail de poste », `LOT-B-COFFRE-SANS-PIN.md`, en attente).
 - Réalisation sans toucher au chiffrement : coffre unique en mémoire pour la page entière, changements d'écran de l'agent par visite Inertia en ligne, fermeture du coffre à la déconnexion et sur la page de connexion, inactivité indépendante de l'écran. Aucune clé ni aucun secret supplémentaire n'est conservé. Détails et limites : `docs/AUTH_HORS_LIGNE.md`, addendum.

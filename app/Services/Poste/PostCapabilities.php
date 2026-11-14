@@ -11,10 +11,10 @@ use Illuminate\Support\Facades\DB;
  *
  * V1 : les postes sont des objets PERMANENTS du site (table `checkpoints`) et leur configuration est une DONNÉE, administrable sans toucher au code
  * (docs/ailct/V1-INVARIANTS-SITE-ET-CONTROLE.md). Le catalogue des capacités, lui, est celui qui est réellement implémenté ; le serveur refuse toute autre valeur.
- * Configuration par défaut = contrat antérieur validé (S02) :
+ * Configuration par défaut (décision du propriétaire, lot A : les cinq postes physiques scannent les badges et les cartes ; les différences entre postes sont conservées) :
  *  - poste 2 : contrôle individuel à l'entrée, accueil (identité, badge, admission) et sortie ;
  *  - soute (point 5) : contrôle individuel, sens Entrée / Sortie obligatoire, rien d'autre ;
- *  - postes 1, 3 et 4 : aucune opération (procédures numériques non décidées) ; refus par défaut ;
+ *  - postes 1, 3 et 4 : contrôle individuel (scan) seulement ; ni accueil, ni sortie ;
  *  - tablette sans poste (ancien point « hotel », groupes et cars) : aucune capacité de poste ; les opérations de groupe restent autorisées par leurs permissions de rôle.
  * Un poste désactivé n'a plus aucune capacité. Poste non identifié (point_code nul) : AUCUNE capacité (refus par défaut).
  *

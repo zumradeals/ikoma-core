@@ -17,8 +17,19 @@ export async function resolveBadge(list: LocalList, input: string): Promise<stri
   return list.badges.has(value.toUpperCase()) ? value.toUpperCase() : null;
 }
 
+/**
+ * Point de contrôle OFFICIEL de la tablette : le poste auquel elle est affectée (copie du serveur). Aucun choix de l'agent, aucune valeur du navigateur.
+ * Null quand la tablette n'a aucune affectation valide (aucun point de contrôle) : le contrôle est alors impossible et l'écran le dit.
+ */
+export function ownPointOf(list: LocalList): Checkpoint | null {
+  const p = list.snapshot.poste;
+  return p.point_code ? { type: 'poste', id: p.id, name: p.station || p.name } : null;
+}
+
 export function checkpointsOf(list: LocalList): Checkpoint[] {
   const s = list.snapshot;
+  // Sans activité (mode site), la copie ne porte ni zones d'activité ni autres postes : le seul point contrôlable est le poste de cette tablette.
+  if (s.event === null) { const own = ownPointOf(list); return own ? [own] : []; }
   return [...s.zones.map(z => ({ type: 'zone' as const, id: z.id, name: z.name })), ...s.postes.map(p => ({ type: 'poste' as const, id: p.id, name: p.name }))];
 }
 

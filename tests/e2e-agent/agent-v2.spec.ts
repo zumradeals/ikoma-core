@@ -80,7 +80,7 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await captures(page, '06-etape-7-entree');
     await page.getByRole('button', { name: 'Visiteur suivant' }).click();
     await open(page, '/groupe'); await expect(page.getByTestId('choisir-groupe').first()).toBeVisible(); await captures(page, '07-groupes-cars');
-    await open(page, '/controle'); await page.getByTestId('choix-point').getByRole('button').first().click();
+    await open(page, '/controle'); await expect(page.getByTestId('point')).toBeVisible(); // le poste de la tablette est repris tel quel
     await captures(page, '08-controle-site');
     await page.goto('/securite');
     if (await page.getByLabel('Mot de passe', { exact: true }).isVisible()) {
