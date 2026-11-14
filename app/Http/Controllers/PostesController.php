@@ -135,7 +135,7 @@ final class PostesController
                     $control[$key] = (int) $data[$field];
                 }
             }
-            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['piece_identite' => isset($data['identityDocument']) ? (bool) $data['identityDocument'] : null, 'inactivite_minutes' => (int) $data['inactivity'], 'ecart_horloge_s' => (int) $data['skew'], 'echecs_pin_max' => (int) $data['pin'], 'hors_ligne_approuve' => $approve] + $control);
+            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['piece_identite' => isset($data['identityDocument']) ? (bool) $data['identityDocument'] : null, 'ecart_horloge_s' => (int) $data['skew'], 'hors_ligne_approuve' => $approve] + $control);
         });
 
         return back();
