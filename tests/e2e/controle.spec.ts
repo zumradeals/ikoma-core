@@ -100,7 +100,9 @@ test('contrôle d’un badge valide : QR lu par la caméra en moins de 5 s, verd
     };
   }, fx.controlQrSvg);
   await open(page, '/controle');
-  await expect(page.getByTestId('choix-point')).toBeVisible(); await shot(page, 'l7-choix-point');
+  // La tablette est affectée à un poste : le contrôle s'ouvre directement sur ce poste (plus de choix redondant) ; une autre zone de l'activité reste proposée à part.
+  await expect(page.getByTestId('point')).toBeVisible(); await expect(page.getByTestId('choix-point')).toHaveCount(0);
+  await page.getByTestId('changer-point').click(); await expect(page.getByTestId('choix-point')).toBeVisible(); await shot(page, 'l7-choix-point');
   // Le flux simulé du navigateur de test reste parfois muet à la première ouverture (constaté en intégration continue) : on rouvre la caméra,
   // et le délai mesuré est celui de la dernière ouverture jusqu'au verdict.
   let elapsed = 0;

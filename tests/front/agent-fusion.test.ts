@@ -69,7 +69,10 @@ describe('fusion : une seule page déverrouillée, trois vues', () => {
       await sortie.trigger('click');
       await flushPromises();
       expect(wrapper.get('[data-testid="agent-layout"]').attributes('data-active')).toBe('controle');
-      expect(wrapper.text()).toContain('Où effectuez-vous les contrôles'); // l'écran de contrôle existant est bien monté (choix du point, comme aujourd'hui)
+      // L'écran de contrôle s'ouvre directement sur le poste de la tablette (plus de choix du point) et dans le mode demandé.
+      expect(wrapper.text()).not.toContain('Où effectuez-vous les contrôles');
+      expect(wrapper.get('[data-testid="point"]').text()).toBe('Poste A');
+      expect(wrapper.get('[data-testid="mode-sortie"]').attributes('aria-pressed')).toBe('true');
     }
 
     // Retour puis groupes : même coffre, même file.

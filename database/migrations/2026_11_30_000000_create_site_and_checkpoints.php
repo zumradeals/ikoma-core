@@ -79,10 +79,10 @@ END $$;
 CREATE TRIGGER checkpoints_guard BEFORE UPDATE OR DELETE ON checkpoints FOR EACH ROW EXECUTE FUNCTION public.ikoma_checkpoint_guard();
 SQL);
         foreach ([
-            ['poste_1', 'Poste 1', 'Entrée principale', [], false],
+            ['poste_1', 'Poste 1', 'Entrée principale', ['scan'], false], // lot A : les cinq postes scannent (reprise des installations existantes : migration 2026_12_17_000000)
             ['poste_2', 'Poste 2', 'Accès Académie', ['accueil', 'scan', 'sortie'], false],
-            ['poste_3', 'Poste 3', 'Chef du village', [], false],
-            ['poste_4', 'Poste 4', 'Le Porton', [], false],
+            ['poste_3', 'Poste 3', 'Chef du village', ['scan'], false],
+            ['poste_4', 'Poste 4', 'Le Porton', ['scan'], false],
             ['soute', 'Point 5', 'La Soute', ['scan'], true],
         ] as [$code, $name, $label, $capabilities, $direction]) {
             DB::table('checkpoints')->insert(['id' => (string) Str::uuid(), 'site_id' => $siteId, 'code' => $code, 'name' => $name, 'function_label' => $label,

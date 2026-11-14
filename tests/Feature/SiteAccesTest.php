@@ -48,8 +48,8 @@ beforeEach(function () {
 
 // --- Équivalence avec le contrat V1 antérieur (S02) ------------------------------------------------------------------------------
 
-it('livre les cinq postes permanents du site avec la configuration du contrat V1 antérieur', function () {
-    $legacy = ['poste_1' => [], 'poste_2' => ['accueil', 'scan', 'sortie'], 'poste_3' => [], 'poste_4' => [], 'soute' => ['scan']];
+it('livre les cinq postes permanents du site avec la configuration du lot A (scan partout, accueil et sortie au poste 2 seulement, sens obligatoire à la soute)', function () {
+    $legacy = ['poste_1' => ['scan'], 'poste_2' => ['accueil', 'scan', 'sortie'], 'poste_3' => ['scan'], 'poste_4' => ['scan'], 'soute' => ['scan']];
     expect(DB::table('checkpoints')->orderBy('code')->pluck('code')->all())->toBe(['poste_1', 'poste_2', 'poste_3', 'poste_4', 'soute']);
     foreach ($legacy as $code => $capabilities) {
         $device = saDevice('Tablette fictive '.$code, $code);
@@ -77,15 +77,15 @@ it('refuse en base un point de contrôle inconnu et garde la synchronisation ent
 it('active une capacité réellement implémentée sur un poste, la trace, et la fait suivre à la copie de la tablette', function () {
     $device = saDevice('Tablette fictive P1', 'poste_1');
     $before = app(ListSnapshot::class)->version($device);
-    expect(PostCapabilities::allows($device, 'scan'))->toBeFalse();
-    $this->site->updateCheckpoint(saPost('poste_1'), ['name' => 'Poste 1', 'function_label' => 'Entrée principale', 'capabilities' => ['scan'], 'direction_required' => false], 1, $this->admin);
-    expect(PostCapabilities::capabilities($device->fresh()))->toBe(['scan'])
+    expect(PostCapabilities::allows($device, 'scan'))->toBeTrue()->and(PostCapabilities::allows($device, 'accueil'))->toBeFalse();
+    $this->site->updateCheckpoint(saPost('poste_1'), ['name' => 'Poste 1', 'function_label' => 'Entrée principale', 'capabilities' => ['accueil', 'scan'], 'direction_required' => false], 1, $this->admin);
+    expect(PostCapabilities::capabilities($device->fresh()))->toBe(['accueil', 'scan'])
         ->and(app(ListSnapshot::class)->version($device->fresh()))->not->toBe($before);
     $audit = DB::table('audit_logs')->where('action', 'poste.configure')->latest('id')->first();
     expect(json_decode($audit->details, true))->toMatchArray(['code' => 'poste_1'])
-        ->and(json_decode($audit->details, true)['apres']['capacites'])->toBe(['scan']);
+        ->and(json_decode($audit->details, true)['apres']['capacites'])->toBe(['accueil', 'scan']);
     $snapshot = app(ListSnapshot::class)->build($device->fresh());
-    expect($snapshot['poste']['capabilities'])->toBe(['scan'])->and($snapshot['poste']['direction_required'])->toBeFalse();
+    expect($snapshot['poste']['capabilities'])->toBe(['accueil', 'scan'])->and($snapshot['poste']['direction_required'])->toBeFalse();
 });
 
 it('refuse toute configuration incohérente ou non implémentée', function () {
@@ -99,10 +99,10 @@ it('refuse toute configuration incohérente ou non implémentée', function () {
 
 it('maîtrise la concurrence : une modification fondée sur une version dépassée est refusée', function () {
     $post = saPost('poste_4');
-    $this->site->updateCheckpoint($post, ['name' => 'Poste 4', 'function_label' => 'Le Porton', 'capabilities' => ['scan']], 1, $this->admin);
+    $this->site->updateCheckpoint($post, ['name' => 'Poste 4', 'function_label' => 'Le Porton', 'capabilities' => ['accueil', 'scan']], 1, $this->admin);
     expect((int) DB::table('checkpoints')->where('id', $post)->value('version'))->toBe(2);
     expect(fn () => $this->site->updateCheckpoint($post, ['name' => 'Poste 4', 'capabilities' => []], 1, $this->admin))->toThrow(ValidationException::class)
-        ->and(PostCapabilities::ofCheckpoint('poste_4'))->toBe(['scan']);
+        ->and(PostCapabilities::ofCheckpoint('poste_4'))->toBe(['accueil', 'scan']);
 });
 
 it('désactive un poste sans le supprimer : il perd ses capacités, refuse de nouvelles tablettes et garde son code', function () {

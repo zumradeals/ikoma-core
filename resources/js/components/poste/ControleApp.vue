@@ -16,6 +16,11 @@ type Mode = 'controle' | 'sortie' | 'restitution';
 
 const points = ref<Checkpoint[]>([]);
 const point = ref<Checkpoint | null>(null);
+// Point OFFICIEL : le poste d'affectation de la tablette, donné par la copie du serveur. L'agent n'a rien à choisir ; l'adresse du poste est envoyée au serveur comme « ce poste » (null).
+// Sans affectation valide (ownPoint renvoie null), aucun contrôle n'est possible et l'écran le dit. Dépôt sans ownPoint : ancien comportement (choix manuel).
+const ownPoint = ref<Checkpoint | null>(null);
+const noAssignment = ref(false);
+const isOwn = computed(() => ownPoint.value !== null && point.value !== null && point.value.type === ownPoint.value.type && point.value.id === ownPoint.value.id);
 // Capacités du point tenu par la tablette (S02) : l'écran n'offre que les opérations permises ; le serveur les revérifie à chaque opération.
 // Contrôle d'un badge = « scan » ; sortie et restitution = « sortie ». Sans capacités connues, aucune restriction n'est appliquée ici.
 const caps = computed(() => props.repository.capabilities?.() ?? null);
@@ -83,9 +88,12 @@ function readStored(): { type: string; id: string } | null {
 }
 function choose(p: Checkpoint) {
   point.value = p;
+  if (ownPoint.value) return; // tablette affectée : le point officiel est celui du poste, jamais une valeur retenue par le navigateur
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ type: p.type, id: p.id })); } catch { /* le point reste valable pour cette session */ }
 }
 function changePoint() { stopCamera(); point.value = null; direction.value = null; dismiss(); }
+/** Retour au poste de la tablette après avoir contrôlé une autre zone de l'activité. */
+function backToOwnPoint() { stopCamera(); point.value = ownPoint.value; direction.value = null; dismiss(); }
 
 async function startCamera() {
   scanError.value = '';
@@ -122,7 +130,7 @@ async function submit(raw: string, fromCamera = false) {
   if (fromCamera) lastCamera.text = value;
   busy.value = true; error.value = null;
   const started = performance.now();
-  const where = { type: point.value.type, id: point.value.id };
+  const where = isOwn.value ? null : { type: point.value.type, id: point.value.id };
   try {
     const operationId = crypto.randomUUID();
     if (mode.value === 'restitution') {
@@ -147,9 +155,14 @@ const setOnline = () => { online.value = navigator.onLine; if (online.value) voi
 onMounted(async () => {
   window.addEventListener('online', setOnline); window.addEventListener('offline', setOnline);
   points.value = await props.repository.checkpoints();
-  const saved = readStored();
-  const found = saved ? points.value.find(p => p.type === saved.type && p.id === saved.id) : undefined;
-  if (found) choose(found);
+  if (props.repository.ownPoint) {
+    const own = props.repository.ownPoint();
+    if (own) { ownPoint.value = own; point.value = own; } else noAssignment.value = true;
+  } else {
+    const saved = readStored();
+    const found = saved ? points.value.find(p => p.type === saved.type && p.id === saved.id) : undefined;
+    if (found) choose(found);
+  }
   void refreshPresent();
   presentTimer = window.setInterval(() => { if (navigator.onLine) void refreshPresent(); }, 15000);
 });
@@ -162,7 +175,13 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
     <template #header-context><span v-if="point?.name ?? null">Point de contrôle : {{ point?.name ?? null }}</span></template>
     <template #status><StatusBar context-label="Point de contrôle" :poste="point?.name ?? null" :agent="agent" :online="online" :pending="sync?.pending ?? 0" :sync="sync" @sync="emit('sync')" @lock="emit('lock')" /></template>
     <div class="agent-workspace agent-controle-workspace">
-      <section v-if="!point" aria-labelledby="point-titre" class="space-y-4" data-testid="choix-point">
+      <section v-if="noAssignment" role="alert" aria-labelledby="sans-poste-titre" class="space-y-3 rounded-2xl border-2 border-red-700 bg-red-50 p-6 text-red-950" data-testid="tablette-sans-poste">
+        <h1 id="sans-poste-titre" class="text-heading font-bold"><span aria-hidden="true">⚠</span> Cette tablette n’est affectée à aucun poste</h1>
+        <p class="text-xl">Aucun contrôle n’est possible tant que l’administrateur ne l’a pas affectée à un poste de contrôle (Administration, « Site et accès »).</p>
+        <p class="text-lg">Prévenez le superviseur ou l’administrateur, puis touchez « Synchroniser » : la tablette se mettra à jour toute seule.</p>
+      </section>
+
+      <section v-else-if="!point" aria-labelledby="point-titre" class="space-y-4" data-testid="choix-point">
         <h1 id="point-titre" class="text-display font-bold">Où effectuez-vous les contrôles ?</h1>
         <p>Choisissez votre point de contrôle : il sera retenu sur cet appareil.</p>
         <ul class="space-y-3">
@@ -214,7 +233,9 @@ onBeforeUnmount(() => { window.clearInterval(trustTimer); stopCamera(); window.c
         </form>
         <button type="button" class="btn-soft" :aria-expanded="showIncidents" data-testid="ouvrir-incidents" @click="showIncidents = !showIncidents">{{ showIncidents ? 'Fermer les refus et incidents' : 'Refus et incidents de ce poste' }}</button>
         <IncidentsPanel v-if="showIncidents && repository.incidents" :repository="repository" :reasons="reasonLabels" />
-        <button type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Changer de point de contrôle</button>
+        <button v-if="!ownPoint" type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Changer de point de contrôle</button>
+        <button v-else-if="!isOwn" type="button" class="btn-soft" data-testid="revenir-poste" @click="backToOwnPoint">Revenir au poste de cette tablette</button>
+        <button v-else-if="points.length > 1" type="button" class="btn-soft" data-testid="changer-point" @click="changePoint">Contrôler une autre zone de l’activité</button>
       </template>
     </div>
 

@@ -7,7 +7,7 @@ import { getMeta } from './db';
 import { applyGroupOp, groupSummaries, groupView, type ArrivalResult, type BoardResult, type GroupSummary, type GroupView } from './group';
 import { LocalList, type Snapshot } from './list';
 import { PERMANENT_PREFIX, searchPermanentDirectory, type PermanentResult } from './permanent';
-import { checkpointsOf, controlLocal, exitLocal, refusedControl, refusedExit, resolveBadge } from './site';
+import { checkpointsOf, ownPointOf, controlLocal, exitLocal, refusedControl, refusedExit, resolveBadge } from './site';
 import type { PosteStore } from './store';
 import type { SyncManager } from './sync';
 import type { PosteVault } from './vault';
@@ -210,6 +210,7 @@ export class LocalPosteRepository implements GroupPosteRepository {
   }
 
   async checkpoints(): Promise<Checkpoint[]> { return checkpointsOf(this.list); }
+  ownPoint(): Checkpoint | null { return ownPointOf(this.list); }
 
   async groups(): Promise<GroupSummary[]> { return groupSummaries(this.list); }
   async groupView(groupId: string): Promise<GroupView> { return groupView(this.list, groupId); }

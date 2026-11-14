@@ -169,7 +169,7 @@ it('limite la soute à ses propres contrôles refusés et lui interdit les visit
 });
 
 it('refuse la consultation des incidents à un poste sans capacité', function () {
-    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'poste_1']);
+    DB::table('devices')->where('id', $this->deviceId)->update(['point_code' => 'hotel']);
     $this->actingAs($this->agent)->getJson('/poste/api/incidents', s10Headers())->assertForbidden()->assertJsonPath('code', 'poste_non_habilite');
 });
 

@@ -50,6 +50,8 @@ export interface PosteRepository {
  */
 export interface SitePosteRepository extends PosteRepository {
   checkpoints(): Promise<Checkpoint[]>;
+  /** Point de contrôle officiel de la tablette (son poste d'affectation) ; null sans affectation valide. Absent : ancien comportement (choix manuel). */
+  ownPoint?(): Checkpoint | null;
   control(operationId: string, code: string, point: PointRef | null, direction?: PassageDirection): Promise<ControlResult>;
   /** Vrai à la soute : le sens du passage (Entrée ou Sortie) est choisi avant le scan et obligatoire. */
   requiresDirection?(): boolean;
