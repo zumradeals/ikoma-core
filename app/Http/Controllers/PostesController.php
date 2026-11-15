@@ -100,7 +100,8 @@ final class PostesController
     {
         Gate::authorize('postes.gerer');
         $data = $r->validate([
-            'inactivity' => 'required|integer|min:1|max:60', 'skew' => 'required|integer|min:30|max:3600', 'pin' => 'required|integer|min:3|max:30',
+            // Le code PIN n'existe plus dans l'espace Agent : « inactivité » et « échecs de PIN » ne sont plus demandés (acceptés s'ils sont envoyés, sans effet sur l'écran).
+            'inactivity' => 'sometimes|integer|min:1|max:60', 'skew' => 'required|integer|min:30|max:3600', 'pin' => 'sometimes|integer|min:3|max:30',
             // Alertes du contrôle d'accès (audit global B2, B3) : facultatifs pour rester compatibles avec l'ancien formulaire.
             'identityDocument' => 'sometimes|boolean',
             'pointsDelay' => 'sometimes|integer|min:1|max:3600', 'burstCount' => 'sometimes|integer|min:2|max:100', 'burstMinutes' => 'sometimes|integer|min:1|max:120',
@@ -117,9 +118,13 @@ final class PostesController
         }
         DB::transaction(function () use ($data, $approve): void {
             DB::table('settings')->updateOrInsert(['key' => 'poste_hors_reseau_approuve'], ['value' => $approve ? '1' : '0']);
-            DB::table('settings')->where('key', 'poste_inactivite_minutes')->update(['value' => (string) $data['inactivity']]);
+            if (isset($data['inactivity'])) {
+                DB::table('settings')->where('key', 'poste_inactivite_minutes')->update(['value' => (string) $data['inactivity']]);
+            }
             DB::table('settings')->where('key', 'poste_ecart_horloge_secondes')->update(['value' => (string) $data['skew']]);
-            DB::table('settings')->where('key', 'poste_echecs_pin_max')->update(['value' => (string) $data['pin']]);
+            if (isset($data['pin'])) {
+                DB::table('settings')->where('key', 'poste_echecs_pin_max')->update(['value' => (string) $data['pin']]);
+            }
             if (isset($data['identityDocument'])) {
                 DB::table('settings')->where('key', 'identite_piece_active')->update(['value' => $data['identityDocument'] ? '1' : '0']);
             }
@@ -130,7 +135,7 @@ final class PostesController
                     $control[$key] = (int) $data[$field];
                 }
             }
-            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['piece_identite' => isset($data['identityDocument']) ? (bool) $data['identityDocument'] : null, 'inactivite_minutes' => (int) $data['inactivity'], 'ecart_horloge_s' => (int) $data['skew'], 'echecs_pin_max' => (int) $data['pin'], 'hors_ligne_approuve' => $approve] + $control);
+            app(Audit::class)->append('poste.reglage_modifie', auth()->id(), ['piece_identite' => isset($data['identityDocument']) ? (bool) $data['identityDocument'] : null, 'ecart_horloge_s' => (int) $data['skew'], 'hors_ligne_approuve' => $approve] + $control);
         });
 
         return back();

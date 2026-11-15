@@ -24,6 +24,7 @@ pest()->use(DatabaseTransactions::class)->in('Feature/SiteControlTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/SupervisorTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/ScanCinqPostesTest.php'); // lot A : les postes sont des données permanentes du site, ce fichier les modifie
 pest()->use(DatabaseTransactions::class)->in('Feature/GroupsTest.php');
+pest()->use(DatabaseTransactions::class)->in('Feature/BailPosteTest.php');
 
 pest()->use(DatabaseTransactions::class)->in('Feature/HostSpaceTest.php');
 pest()->use(DatabaseTransactions::class)->in('Feature/AdminDashboardTest.php');

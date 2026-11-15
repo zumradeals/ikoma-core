@@ -7,7 +7,6 @@ const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fi
 /** Les écrans de supervision choisissent l'événement de la recette de façon explicite : aucune dépendance à l'ordre chronologique global des événements. */
 const forEvent = (path: string) => `${path}${path.includes('?') ? '&' : '?'}event=${fx.event}`;
 const shots = process.env.L8_CAPTURES === '1';
-const TABLET_PIN = '739261';
 const EVAC_PIN = '583614';
 
 // Deux appareils : le smartphone du superviseur (380 px) et la tablette d'un agent d'accueil, qui travaille de son côté.
@@ -38,10 +37,9 @@ test.afterAll(async () => { await phone.close(); await tablet.close(); });
 async function openDesk(page: Page): Promise<void> {
   const response = await page.goto('/poste');
   expect(response?.status(), `Réponse HTTP /poste : ${await page.locator('body').innerText().catch(() => 'page indisponible')}`).toBe(200);
-  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou'); const ready = page.getByText('Étape 1 sur 7');
-  await enrol.or(lock).or(ready).first().waitFor();
-  if (await enrol.isVisible()) { await page.getByTestId('code-enrolement').fill(fx.enrolCode3); await page.getByTestId('pin').fill(TABLET_PIN); await page.getByTestId('pin-confirmation').fill(TABLET_PIN); await page.getByTestId('enroler').click(); }
-  else if (await lock.isVisible()) { await page.getByTestId('pin-deverrouillage').fill(TABLET_PIN); await page.getByTestId('deverrouiller').click(); }
+  const enrol = page.getByTestId('ecran-enrolement'); const ready = page.getByText('Étape 1 sur 7');
+  await enrol.or(ready).first().waitFor();
+  if (await enrol.isVisible()) { await page.getByTestId('code-enrolement').fill(fx.enrolCode3); await page.getByTestId('enroler').click(); }
   await expect(ready).toBeVisible();
 }
 async function toDecision(page: Page, name: string) {

@@ -6,9 +6,9 @@ import GroupeApp from './GroupeApp.vue';
 import SiteModeNotice from './SiteModeNotice.vue';
 import type { GroupPosteRepository, SitePosteRepository } from '../../poste/repository';
 import { PosteRuntime, syncRequiredMessage, type WipeReason } from '../../poste/local/runtime';
-import { armIdleLock, lockSharedRuntime, sharedRuntime } from '../../poste/local/session';
-import { getMeta } from '../../poste/local/db';
-import { pinProblem, PinError } from '../../poste/local/vault';
+import { closeSharedSession, sharedRuntime } from '../../poste/local/session';
+import { cookie } from '../../poste/repository';
+import { PinError } from '../../poste/local/vault';
 import type { LocalOp } from '../../poste/local/apply';
 import type { SyncState } from '../../poste/local/sync';
 import { ApiError } from '../../poste/types';
@@ -16,11 +16,12 @@ import { useInstitution } from '../../composables/useInstitution';
 
 const props = defineProps<{ agent: { id: string; name: string } | null; runtime?: PosteRuntime; app?: 'poste' | 'controle' | 'groupe' }>();
 const institution = useInstitution();
-const phase = ref<'chargement' | 'vide' | 'verrouille' | 'ouvert'>('chargement');
+// vide : enrôlement ; migration : ancien coffre par PIN, à migrer une dernière fois ; ferme : réseau ou connexion nécessaire pour s'ouvrir ; ouvert. Plus aucun PIN au quotidien.
+const phase = ref<'chargement' | 'vide' | 'migration' | 'ferme' | 'ouvert'>('chargement');
 const sync = ref<SyncState | null>(null);
 const wiped = ref<WipeReason | null>(null);
 const message = ref<string | null>(null);
-const code = ref(''); const pin = ref(''); const pin2 = ref(''); const busy = ref(false);
+const code = ref(''); const pin = ref(''); const busy = ref(false);
 const lockedUntil = ref(0); const now = ref(Date.now()); const remaining = ref<number | null>(null);
 const conflicts = shallowRef<LocalOp[]>([]);
 const resetConfirm = ref(false); const resetPending = ref(0);
@@ -51,8 +52,7 @@ provide('agentNavigate', (next: View, mode: string | null = null) => {
   view.value = next; viewMode.value = mode;
   try { window.history.pushState({ ...(window.history.state ?? {}), ikomaView: { view: next, mode } }, '', pathOf(next, mode)); } catch { /* l'adresse est un confort : la vue a déjà changé */ }
 });
-let idleTimer: number | undefined; let tick: number | undefined; let loop: number | undefined;
-let idleMs = 300_000;
+let tick: number | undefined; let loop: number | undefined;
 
 // Coffre partagé pendant toute la connexion : le PIN n'est saisi qu'une fois (voir session.ts).
 const runtime = props.runtime ?? sharedRuntime();
@@ -60,7 +60,7 @@ const runtime = props.runtime ?? sharedRuntime();
 const siteMode = () => runtime.repo?.list.snapshot.event === null;
 runtime.handlers = {
   onState: (s: SyncState) => { sync.value = s; if (phase.value === 'ouvert') void loadConflicts(); },
-  onWiped: (r: WipeReason) => { wiped.value = r; message.value = null; phase.value = 'vide'; clearTimeout(idleTimer); },
+  onWiped: (r: WipeReason) => { wiped.value = r; message.value = null; phase.value = 'vide'; },
 };
 
 const waiting = computed(() => (lockedUntil.value > now.value ? Math.ceil((lockedUntil.value - now.value) / 1000) : 0));
@@ -82,18 +82,17 @@ function visitorName(op: LocalOp): string {
 }
 async function dismiss(op: LocalOp) { await runtime.store.dismissConflict(op.id); await runtime.sync.refreshCounts(); await loadConflicts(); }
 
-function resetIdle() {
-  clearTimeout(idleTimer);
-  if (phase.value === 'ouvert') idleTimer = window.setTimeout(lock, idleMs);
+/** « Fermer ma session » : supprime le bail de la tablette puis déconnecte le compte ; le coffre ne se rouvrira qu'après une nouvelle connexion en ligne. Les données et la file restent chiffrées. */
+async function lock() {
+  await closeSharedSession();
+  openKey.value++;
+  try { await fetch('/logout', { method: 'POST', headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': cookie('XSRF-TOKEN') }, credentials: 'same-origin' }); } catch { /* hors ligne : le bail est déjà supprimé */ }
+  window.location.href = '/login';
 }
-function lock() { lockSharedRuntime(); runtime.lock(); phase.value = 'verrouille'; pin.value = ''; message.value = null; clearTimeout(idleTimer); openKey.value++; }
 
 async function afterOpen() {
-  const settings = await getMeta(runtime.db, 'settings');
-  idleMs = (settings?.inactivity_minutes ?? 5) * 60_000;
-  armIdleLock(settings?.inactivity_minutes ?? 5);
   chooseStartView();
-  phase.value = 'ouvert'; wiped.value = null; resetIdle(); await loadConflicts();
+  phase.value = 'ouvert'; wiped.value = null; message.value = null; await loadConflicts();
 }
 
 function explain(e: unknown): string {
@@ -104,24 +103,31 @@ function explain(e: unknown): string {
 async function enrol() {
   message.value = null;
   if (!props.agent) return;
-  const problem = pin.value !== pin2.value ? 'Les deux PIN ne sont pas identiques.' : pinProblem(pin.value);
-  if (problem) { message.value = problem; return; }
   busy.value = true;
-  try { await runtime.enrol(code.value, pin.value, props.agent); pin.value = ''; pin2.value = ''; code.value = ''; await afterOpen(); }
+  try { await runtime.enrol(code.value, props.agent); code.value = ''; await afterOpen(); }
   catch (e) { message.value = explain(e); }
   finally { busy.value = false; }
 }
 
-async function unlock() {
-  message.value = null; busy.value = true;
+/** Ouverture automatique, sans saisie : bail conservé ou demandé au serveur. */
+async function begin() {
+  message.value = null;
   try {
-    await runtime.unlock(pin.value, props.agent?.id); pin.value = '';
-    if (runtime.vault.unlocked) await afterOpen();
-  } catch (e) {
+    const result = await runtime.resume(props.agent?.id);
+    if (result.state === 'ouvert') await afterOpen();
+    else if (result.state === 'migration') phase.value = 'migration';
+    else if (result.state === 'ferme') { phase.value = 'ferme'; message.value = result.reason ?? null; }
+    else phase.value = 'vide';
+  } catch (e) { phase.value = 'ferme'; message.value = explain(e); }
+}
+
+/** Migration unique d'une tablette enrôlée avant la suppression du PIN : dernière saisie du PIN, puis plus jamais. */
+async function migrate() {
+  message.value = null; busy.value = true;
+  try { await runtime.migrate(pin.value, props.agent?.id); pin.value = ''; if (runtime.vault.unlocked) await afterOpen(); else phase.value = (await runtime.state()) === 'vide' ? 'vide' : 'ferme'; }
+  catch (e) {
     pin.value = '';
-    if (e instanceof PinError) {
-      lockedUntil.value = e.lockedUntil; remaining.value = e.code === 'pin_incorrect' || e.code === 'verrouille' ? e.remaining : null;
-    }
+    if (e instanceof PinError) { lockedUntil.value = e.lockedUntil; remaining.value = e.code === 'pin_incorrect' || e.code === 'verrouille' ? e.remaining : null; }
     message.value = explain(e);
   } finally { busy.value = false; }
 }
@@ -138,29 +144,31 @@ async function resetThisBrowser() {
 }
 async function syncNow() { await runtime.sync.sync(); }
 
+/** Retour du réseau : la synchronisation reprend ; une tablette fermée faute de réseau s'ouvre toute seule. */
+function onOnline() { if (phase.value === 'ouvert') runtime.sync.kick(); else if (phase.value === 'ferme') void begin(); }
+
 onMounted(async () => {
   window.addEventListener('popstate', onPopState);
   tick = window.setInterval(() => { now.value = Date.now(); }, 1000);
-  for (const name of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(name, resetIdle, { passive: true });
-  window.addEventListener('online', () => { if (phase.value === 'ouvert') runtime.sync.kick(); });
+  window.addEventListener('online', onOnline);
   loop = window.setInterval(async () => {
     if (phase.value !== 'ouvert') return;
-    if (await runtime.expired()) { lock(); await runtime.wipe('fin_evenement'); return; }
+    if (await runtime.expired()) { runtime.lock(); phase.value = 'ferme'; await runtime.wipe('fin_evenement'); return; }
     const required = await runtime.syncRequiredHours();
-    if (required !== null && !navigator.onLine) { lock(); message.value = syncRequiredMessage(required); return; }
-    if (navigator.onLine) void runtime.sync.sync();
+    if (required !== null && !navigator.onLine) { runtime.lock(); phase.value = 'ferme'; message.value = syncRequiredMessage(required); return; }
+    if (navigator.onLine) { void runtime.sync.sync(); void runtime.renewLease(); }
   }, 60_000);
-  // PIN déjà saisi pendant cette connexion (changement d'écran sans rechargement) : on reprend le coffre ouvert, sauf si ce n'est pas le compte connecté.
+  // Coffre déjà ouvert pendant cette connexion (changement d'écran sans rechargement) : on le reprend, sauf s'il appartient à un autre compte.
   if (runtime.vault.unlocked) {
     if (!props.agent || !runtime.profile || runtime.profile.id === props.agent.id) { await afterOpen(); runtime.sync.kick(); return; }
     runtime.lock();
   }
-  phase.value = (await runtime.state()) === 'vide' ? 'vide' : 'verrouille';
+  await begin();
 });
 onBeforeUnmount(() => {
   window.removeEventListener('popstate', onPopState);
-  clearInterval(tick); clearInterval(loop); clearTimeout(idleTimer); runtime.sync.stop();
-  for (const name of ['pointerdown', 'keydown', 'touchstart']) window.removeEventListener(name, resetIdle);
+  window.removeEventListener('online', onOnline);
+  clearInterval(tick); clearInterval(loop); runtime.sync.stop();
 });
 </script>
 <template>
@@ -171,11 +179,9 @@ onBeforeUnmount(() => {
     <p v-if="wiped" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-900" data-testid="message-efface"><span aria-hidden="true">⚠</span> {{ wipeText[wiped] }}</p>
     <h1 class="text-display font-bold">Enrôler cette tablette</h1>
     <template v-if="agent">
-      <p>Demandez un code d’enrôlement à l’administrateur (valable 15 minutes, une seule fois), puis choisissez un PIN de 6 chiffres. Ce PIN déverrouille la tablette, même sans réseau.</p>
+      <p>Demandez un code d’enrôlement à l’administrateur (valable 15 minutes, une seule fois). Aucun code PIN n’est nécessaire : la tablette s’ouvre toute seule pour l’agent connecté.</p>
       <form class="space-y-4" @submit.prevent="enrol">
         <label class="block text-lg font-semibold">Code d’enrôlement<input v-model="code" class="field !text-2xl" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" data-testid="code-enrolement" required></label>
-        <label class="block text-lg font-semibold">Choisissez un PIN (6 chiffres)<input v-model="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" class="field !text-2xl" data-testid="pin" required></label>
-        <label class="block text-lg font-semibold">Confirmez le PIN<input v-model="pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" class="field !text-2xl" data-testid="pin-confirmation" required></label>
         <p v-if="message" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="erreur-gate"><span aria-hidden="true">⚠</span> {{ message }}</p>
         <button type="submit" class="btn-main" :disabled="busy" data-testid="enroler">{{ busy ? 'Copie de la liste en cours…' : 'Enrôler cette tablette' }}</button>
       </form>
@@ -186,15 +192,24 @@ onBeforeUnmount(() => {
     </template>
   </main>
 
-  <main v-else-if="phase === 'verrouille'" class="agent-lockscreen mx-auto min-h-screen max-w-xl space-y-5 bg-slate-50 px-4 py-8 text-ikoma-navy" data-testid="ecran-verrou">
+  <main v-else-if="phase === 'migration'" class="agent-lockscreen mx-auto min-h-screen max-w-xl space-y-5 bg-slate-50 px-4 py-8 text-ikoma-navy" data-testid="ecran-migration">
     <p class="text-2xl font-bold">{{ institution.custom ? institution.name : 'IKOMA' }} <span class="font-normal">Accueil</span></p>
-    <h1 class="text-display font-bold">Tablette verrouillée</h1>
-    <p>Saisissez votre PIN à 6 chiffres. Rien n’est lisible sur cette tablette tant qu’elle est verrouillée.</p>
-    <form class="space-y-4" @submit.prevent="unlock">
-      <label class="block text-lg font-semibold">PIN<input v-model="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" class="field !text-3xl tracking-widest" data-testid="pin-deverrouillage" autofocus required></label>
-      <p v-if="message" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="erreur-gate"><span aria-hidden="true">⚠</span> {{ message }}<template v-if="waiting"> Réessayez dans {{ waiting }} s.</template><template v-if="remaining !== null && remaining <= 5"> Essais restants avant l’effacement : {{ remaining }}.</template></p>
-      <button type="submit" class="btn-main" :disabled="busy || waiting > 0" data-testid="deverrouiller">Déverrouiller</button>
+    <h1 class="text-display font-bold">Une dernière fois : votre PIN</h1>
+    <p>Le code PIN est supprimé. Pour conserver vos données et vos opérations en attente, saisissez votre ancien PIN une dernière fois : il ne sera plus jamais demandé.</p>
+    <form class="space-y-4" @submit.prevent="migrate">
+      <label class="block text-lg font-semibold">Ancien PIN<input v-model="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" class="field !text-3xl tracking-widest" data-testid="pin-migration" required></label>
+      <p v-if="message" role="alert" class="rounded-xl border-2 border-red-700 bg-red-50 p-3 font-semibold text-red-900" data-testid="erreur-gate"><span aria-hidden="true">⚠</span> {{ message }}<template v-if="waiting"> Réessayez dans {{ waiting }} s.</template><template v-else-if="remaining !== null"> Essais restants : {{ remaining }}.</template></p>
+      <button type="submit" class="btn-main" :disabled="busy || waiting > 0" data-testid="migrer">Continuer</button>
     </form>
+    <button v-if="agent" type="button" class="btn-soft" data-testid="reinitialiser-tablette-verrouillee" @click="requestLocalReset">PIN oublié ? Réinitialiser ce navigateur pour le réenrôler</button>
+  </main>
+
+  <main v-else-if="phase === 'ferme'" class="agent-lockscreen mx-auto min-h-screen max-w-xl space-y-5 bg-slate-50 px-4 py-8 text-ikoma-navy" data-testid="ecran-ferme">
+    <p class="text-2xl font-bold">{{ institution.custom ? institution.name : 'IKOMA' }} <span class="font-normal">Accueil</span></p>
+    <h1 class="text-display font-bold">Connexion au serveur nécessaire</h1>
+    <p>Cette tablette ne peut pas s’ouvrir pour le moment. Vos données et vos opérations en attente restent chiffrées et ne sont pas perdues.</p>
+    <p v-if="message" role="alert" class="rounded-xl border-2 border-amber-700 bg-amber-50 p-3 font-semibold text-amber-950" data-testid="erreur-gate"><span aria-hidden="true">⚠</span> {{ message }}</p>
+    <button type="button" class="btn-main" data-testid="reessayer-ouverture" @click="begin">Réessayer</button>
     <button v-if="agent" type="button" class="btn-soft" data-testid="reinitialiser-tablette-verrouillee" @click="requestLocalReset">Ancien poste ? Réinitialiser ce navigateur pour le réenrôler</button>
   </main>
 

@@ -5,7 +5,7 @@ import AgentLayout from '../../layouts/AgentLayout.vue';
 import AdminIcon from '../admin/AdminIcon.vue';
 import { PosteDb, getMeta } from '../../poste/local/db';
 import { wipePilotageLocal } from '../../pilotage/evacuation';
-import { lockSharedRuntime } from '../../poste/local/session';
+import { closeSharedSession } from '../../poste/local/session';
 const page = usePage<{ f06Active?: boolean }>();
 const props = defineProps<{ agent: { id?: string; name: string; permissions: string[] } }>();
 const online = ref(navigator.onLine);
@@ -24,15 +24,15 @@ onMounted(async () => {
   try { const [vault, poste, last] = await Promise.all([getMeta(db, 'vault'), getMeta(db, 'posteName'), getMeta(db, 'lastSyncAt')]); local.value = { enrolled: !!vault, poste, last }; }
   catch { unavailable.value = true; }
 });
-// Déconnexion : le coffre ouvert est fermé (le PIN sera redemandé à la prochaine connexion) ; les opérations en attente restent chiffrées, rien n'est effacé.
-function logout() { void wipePilotageLocal(); lockSharedRuntime(); }
+// Déconnexion : le coffre est fermé et le bail de la tablette supprimé (rouvert seulement par une nouvelle connexion en ligne, sans PIN) ; les opérations en attente restent chiffrées, rien n'est effacé.
+function logout() { void wipePilotageLocal(); void closeSharedSession(); }
 onBeforeUnmount(() => { window.removeEventListener('online', setOnline); window.removeEventListener('offline', setOnline); db.close(); });
 </script>
 <template>
   <AgentLayout active="home" :agent="agent.name" :online="online" :permissions="agent.permissions">
     <div class="agent-page-heading"><div><h1>Mon espace</h1><p>Ouvrez votre poste pour commencer.</p></div><span class="agent-section-label">Accueil des visiteurs</span></div>
     <section class="agent-home-grid" aria-label="Fonctions de l’agent"><template v-for="card in cards" :key="card.href"><component :is="online ? Link : 'a'" v-if="(!card.right || props.agent.permissions.includes(card.right)) && (card.href !== '/groupe' || page.props.f06Active === true)" :href="online ? card.href : undefined" :aria-disabled="!online || undefined" class="agent-function-card" :class="'tone-' + card.tone"><span class="agent-function-icon"><AdminIcon :name="card.icon" :size="32" /></span><div><h2>{{ card.title }}</h2><p>{{ card.text }}</p></div><span aria-hidden="true">›</span></component></template></section>
-    <section class="agent-card agent-device-info" aria-labelledby="appareil-titre"><div class="agent-section-heading"><h2 id="appareil-titre"><AdminIcon name="shield" /> Informations de cet appareil</h2><Link v-if="online && agent.permissions.includes('visiteurs.rechercher')" href="/poste" class="agent-text-link">Ouvrir le poste</Link></div><p v-if="unavailable" role="status">Informations locales indisponibles. Ouvrez le poste pour vérifier l’appareil.</p><dl v-else-if="local" class="agent-device-grid"><div><dt>Poste mémorisé sur l’appareil</dt><dd>{{ local.poste || 'À définir lors de l’enrôlement' }}</dd></div><div><dt>Tablette</dt><dd>{{ local.enrolled ? 'Copie locale protégée · PIN requis' : 'À enrôler' }}</dd></div><div><dt>Dernière synchronisation connue</dt><dd>{{ local.last ? new Date(local.last).toLocaleString('fr-FR') : 'Aucune synchronisation connue' }}</dd></div></dl><p v-else role="status">Lecture de l’état de l’appareil…</p><p class="agent-help">L’affectation est vérifiée au déverrouillage du poste. Les informations de l’appareil ne remplacent pas ce contrôle.</p></section>
+    <section class="agent-card agent-device-info" aria-labelledby="appareil-titre"><div class="agent-section-heading"><h2 id="appareil-titre"><AdminIcon name="shield" /> Informations de cet appareil</h2><Link v-if="online && agent.permissions.includes('visiteurs.rechercher')" href="/poste" class="agent-text-link">Ouvrir le poste</Link></div><p v-if="unavailable" role="status">Informations locales indisponibles. Ouvrez le poste pour vérifier l’appareil.</p><dl v-else-if="local" class="agent-device-grid"><div><dt>Poste mémorisé sur l’appareil</dt><dd>{{ local.poste || 'À définir lors de l’enrôlement' }}</dd></div><div><dt>Tablette</dt><dd>{{ local.enrolled ? 'Copie locale protégée' : 'À enrôler' }}</dd></div><div><dt>Dernière synchronisation connue</dt><dd>{{ local.last ? new Date(local.last).toLocaleString('fr-FR') : 'Aucune synchronisation connue' }}</dd></div></dl><p v-else role="status">Lecture de l’état de l’appareil…</p><p class="agent-help">L’affectation est vérifiée au déverrouillage du poste. Les informations de l’appareil ne remplacent pas ce contrôle.</p></section>
     <Link as="button" method="post" href="/logout" class="agent-text-link" @click="logout">Se déconnecter</Link>
   </AgentLayout>
 </template>

@@ -13,7 +13,6 @@ const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fi
 /** Les écrans de supervision choisissent l'événement de la recette de façon explicite : aucune dépendance à l'ordre chronologique global des événements. */
 const forEvent = (path: string) => `${path}${path.includes('?') ? '&' : '?'}event=${fx.event}`;
 const shots = process.env.L9_CAPTURES === '1';
-const PIN = '482915';
 
 let tablet: BrowserContext; let phone: BrowserContext;
 test.describe.configure({ mode: 'serial' });
@@ -66,14 +65,13 @@ test.afterAll(async () => { await tablet.close(); await phone.close(); });
 
 const setQr = (page: Page, code: string | null, car?: Car) => page.evaluate(svg => Promise.race([(window as unknown as { __setQr: (s: string | null) => Promise<void> }).__setQr(svg), new Promise<void>((_, reject) => setTimeout(() => reject(new Error('setQr bloqué plus de 10 s')), 10_000))]), code && car ? car.qr[code] : null);
 
-/** Ouvre l'écran des groupes de la tablette (enrôlement la première fois, PIN ensuite). */
+/** Ouvre l'écran des groupes de la tablette (enrôlement la première fois, ouverture automatique ensuite). */
 async function openCars(page: Page): Promise<void> {
   const response = await page.goto('/groupe');
   expect(response?.status(), `Réponse HTTP /groupe : ${await page.locator('body').innerText().catch(() => 'page indisponible')}`).toBe(200);
-  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou'); const ready = page.getByTestId('choix-groupe');
-  await enrol.or(lock).or(ready).first().waitFor();
-  if (await enrol.isVisible()) { await page.getByTestId('code-enrolement').fill(fx.enrolCode4); await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN); await page.getByTestId('enroler').click(); }
-  else if (await lock.isVisible()) { await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click(); }
+  const enrol = page.getByTestId('ecran-enrolement'); const ready = page.getByTestId('choix-groupe');
+  await enrol.or(ready).first().waitFor();
+  if (await enrol.isVisible()) { await page.getByTestId('code-enrolement').fill(fx.enrolCode4); await page.getByTestId('enroler').click(); }
   await expect(ready).toBeVisible();
 }
 async function chooseCar(page: Page, car: Car): Promise<void> {
@@ -214,7 +212,7 @@ test('sans réseau pendant la remise : rien n’est perdu ni dupliqué à la res
   await expect(page.getByTestId('conflits')).toHaveCount(0);
   // Après resynchronisation, la copie du serveur donne le même résultat : six badges, ni plus ni moins.
   await page.reload();
-  await page.getByTestId('pin-deverrouillage').fill(PIN).catch(() => undefined); if (await page.getByTestId('deverrouiller').isVisible()) await page.getByTestId('deverrouiller').click();
+  // la tablette se rouvre toute seule (bail conservé) : aucun PIN
   await expect(page.getByTestId('choix-groupe')).toBeVisible(); await chooseCar(page, car); await progress(page, 6, 8);
   await page.close();
 });

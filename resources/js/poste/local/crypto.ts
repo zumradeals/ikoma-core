@@ -1,7 +1,9 @@
 /**
  * Chiffrement des données conservées sur la tablette (docs/AUTH_HORS_LIGNE.md, section 5).
- * Clé de données (DEK) aléatoire AES-256-GCM, enveloppée par une clé dérivée du PIN (PBKDF2-SHA256) et du secret d'appareil remis par le serveur
- * (HKDF), puis par une clé d'appareil non exportable conservée dans IndexedDB. Aucune dépendance : WebCrypto uniquement.
+ * Clé de données (DEK) aléatoire AES-256-GCM, jamais conservée en clair. Version 2 (sans PIN) : la DEK est enveloppée par une clé dérivée du BAIL de poste
+ * (secret propre à cet appareil et à ce compte, calculé par le serveur et remis à une session authentifiée), puis par une clé d'appareil non exportable
+ * conservée dans IndexedDB. Version 1 (ancienne, par PIN) : lue seulement pour migrer sans rien perdre (PBKDF2-SHA256 du PIN + secret d'appareil, HKDF).
+ * Aucune dépendance : WebCrypto uniquement.
  */
 
 export const PBKDF2_ITERATIONS = 600_000;
@@ -46,10 +48,37 @@ async function unseal(key: CryptoKey, blob: Uint8Array, aad: string): Promise<Ui
   return new Uint8Array(await subtle().decrypt({ name: 'AES-GCM', iv: blob.slice(0, 12) as BufferSource, additionalData: encoder.encode(aad) }, key, blob.slice(12) as BufferSource));
 }
 
-export type VaultRecord = { salt: string; iterations: number; wrapped: string };
+export type VaultRecordV1 = { salt: string; iterations: number; wrapped: string };
+export type VaultRecordV2 = { v: 2; wrapped: string };
+export type VaultRecord = VaultRecordV1 | VaultRecordV2;
+export const isV2 = (record: VaultRecord): record is VaultRecordV2 => (record as VaultRecordV2).v === 2;
 
-/** Crée le coffre : DEK aléatoire, enveloppée par la clé PIN puis par la clé d'appareil. */
-export async function createVault(pin: string, serverSecret: Uint8Array, deviceKey: CryptoKey, iterations = PBKDF2_ITERATIONS): Promise<{ record: VaultRecord; dek: CryptoKey }> {
+/** Clé d'enveloppe de la version 2 : dérivée du seul bail de poste (32 octets issus du serveur). */
+async function deriveLeaseKek(lease: Uint8Array): Promise<CryptoKey> {
+  const material = await subtle().importKey('raw', lease as BufferSource, 'HKDF', false, ['deriveKey']);
+  return subtle().deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: encoder.encode('ikoma-poste-v2') as BufferSource, info: encoder.encode('ikoma-poste-kek-v2') }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+/** Enveloppe une clé de données déjà connue (octets) dans le format sans PIN : bail puis clé d'appareil. */
+export async function wrapRawV2(raw: Uint8Array, lease: Uint8Array, deviceKey: CryptoKey): Promise<VaultRecordV2> {
+  const inner = await seal(await deriveLeaseKek(lease), raw, 'ikoma-dek');
+  return { v: 2, wrapped: toB64(await seal(deviceKey, inner, 'ikoma-dek-device')) };
+}
+
+/** Crée le coffre sans PIN : DEK aléatoire, enveloppée par le bail puis par la clé d'appareil. */
+export async function createVaultV2(lease: Uint8Array, deviceKey: CryptoKey): Promise<{ record: VaultRecordV2; dek: CryptoKey }> {
+  const raw = randomBytes(32);
+  return { record: await wrapRawV2(raw, lease, deviceKey), dek: await importDek(raw) };
+}
+
+/** Ouvre le coffre sans PIN. Un autre bail (autre appareil, autre compte), une autre clé d'appareil ou un enregistrement altéré font échouer le déchiffrement. */
+export async function openVaultV2(record: VaultRecordV2, lease: Uint8Array, deviceKey: CryptoKey): Promise<CryptoKey> {
+  const inner = await unseal(deviceKey, fromB64(record.wrapped), 'ikoma-dek-device');
+  return importDek(await unseal(await deriveLeaseKek(lease), inner, 'ikoma-dek'));
+}
+
+/** Ancien coffre par PIN (version 1) : création conservée pour les tests de migration. */
+export async function createVault(pin: string, serverSecret: Uint8Array, deviceKey: CryptoKey, iterations = PBKDF2_ITERATIONS): Promise<{ record: VaultRecordV1; dek: CryptoKey }> {
   const salt = randomBytes(16);
   const raw = randomBytes(32);
   const kek = await deriveKek(pin, salt, serverSecret, iterations);
@@ -58,11 +87,16 @@ export async function createVault(pin: string, serverSecret: Uint8Array, deviceK
   return { record: { salt: toB64(salt), iterations, wrapped: toB64(wrapped) }, dek: await importDek(raw) };
 }
 
-/** Ouvre le coffre. Un mauvais PIN, un autre secret ou une autre tablette font échouer le déchiffrement. */
-export async function openVault(pin: string, record: VaultRecord, serverSecret: Uint8Array, deviceKey: CryptoKey): Promise<CryptoKey> {
+/** Ancien coffre (version 1) : les octets de la clé de données, pour la migration seulement. Un mauvais PIN, un autre secret ou une autre tablette font échouer. */
+export async function unwrapV1Raw(pin: string, record: VaultRecordV1, serverSecret: Uint8Array, deviceKey: CryptoKey): Promise<Uint8Array> {
   const kek = await deriveKek(pin, fromB64(record.salt), serverSecret, record.iterations);
   const inner = await unseal(deviceKey, fromB64(record.wrapped), 'ikoma-dek-device');
-  return importDek(await unseal(kek, inner, 'ikoma-dek'));
+  return unseal(kek, inner, 'ikoma-dek');
+}
+
+/** Ouvre l'ancien coffre (version 1). */
+export async function openVault(pin: string, record: VaultRecordV1, serverSecret: Uint8Array, deviceKey: CryptoKey): Promise<CryptoKey> {
+  return importDek(await unwrapV1Raw(pin, record, serverSecret, deviceKey));
 }
 
 function importDek(raw: Uint8Array): Promise<CryptoKey> {

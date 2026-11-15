@@ -28,6 +28,7 @@ const CV_ROUTES = [
     ['POST', 'poste/api/sync', ['can:visiteurs.rechercher'], ['throttle:sync']],
     ['POST', 'poste/api/efface', ['can:visiteurs.rechercher'], []],
     ['GET', 'poste/api/contexte', ['can:visiteurs.rechercher'], []],
+    ['GET', 'poste/api/coffre/bail', [], ['throttle:30,1']],
     ['POST', 'poste/api/controle', ['can:badges.controler'], []],
     ['POST', 'poste/api/sortie', ['can:badges.controler'], []],
     ['POST', 'poste/api/restitution', ['can:badges.controler', 'can:badges.associer'], []],

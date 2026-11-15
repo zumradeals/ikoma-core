@@ -5,7 +5,7 @@ import AdminLayout from '../../layouts/AdminLayout.vue'; import BaseCard from '.
 import { displayDate } from '../../labels';
 type Poste = { id: string; name: string; station: string | null; point_code?: string | null; event_id: string | null; event_name: string; activities: string[]; wipe_acknowledged_at?: string | null; state: 'non_enrole' | 'enrole' | 'revoque'; enrolled_at: string | null; last_synced_at: string | null; code_pending: boolean; received: number; applied: number; conflicts: number };
 const props = defineProps<{
-  events: { id: string; name: string }[]; postes: Poste[]; points: Record<string, string>; settings: { inactivity: number; skew: number; pin: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; offlineApproved: boolean; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; lateMinutes: number; escalationMinutes: number; identityDocument: boolean };
+  events: { id: string; name: string }[]; postes: Poste[]; points: Record<string, string>; settings: { inactivity?: number; skew: number; pin?: number; pointsDelay: number; burstCount: number; burstMinutes: number; offlineCall: number; offlineMaxHours: number; offlineApproved: boolean; lowBadgesPercent: number; lowBadgesMin: number; silentMinutes: number; lateMinutes: number; escalationMinutes: number; identityDocument: boolean };
   newCode: { device_id: string; code: string } | null; conflicts: { id: string; kind: string; reason: string; operation_type: string | null; created_at: string; device_name: string }[];
 }>();
 const create = useForm({ event_ids: [] as string[], name: '', station: '', point_code: '' });
@@ -15,7 +15,7 @@ const chosen = reactive<Record<string, string[]>>({});
 const selection = (p: Poste) => (chosen[p.id] ??= [...p.activities]);
 const toggle = (p: Poste, id: string, on: boolean) => { const list = selection(p); const at = list.indexOf(id); if (on && at < 0) list.push(id); if (!on && at >= 0) list.splice(at, 1); };
 const saveActivities = (p: Poste) => router.put(`/administration/postes/${p.id}/activites`, { event_ids: selection(p) }, { preserveScroll: true });
-const settings = useForm({ inactivity: props.settings.inactivity, skew: props.settings.skew, pin: props.settings.pin, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, offlineApproved: props.settings.offlineApproved, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, lateMinutes: props.settings.lateMinutes, escalationMinutes: props.settings.escalationMinutes, identityDocument: props.settings.identityDocument });
+const settings = useForm({ skew: props.settings.skew, pointsDelay: props.settings.pointsDelay, burstCount: props.settings.burstCount, burstMinutes: props.settings.burstMinutes, offlineCall: props.settings.offlineCall, offlineMaxHours: props.settings.offlineMaxHours, offlineApproved: props.settings.offlineApproved, lowBadgesPercent: props.settings.lowBadgesPercent, lowBadgesMin: props.settings.lowBadgesMin, silentMinutes: props.settings.silentMinutes, lateMinutes: props.settings.lateMinutes, escalationMinutes: props.settings.escalationMinutes, identityDocument: props.settings.identityDocument });
 const states = { non_enrole: ['○', 'Non enrôlé'], enrole: ['●', 'Enrôlé'], revoque: ['⛔', 'Révoqué'] } as const;
 const reasons: Record<string, string> = { deja_associe: 'Badge déjà associé', autre_poste: 'Badge réservé à un autre poste', deja_present: 'Visiteur déjà entré', agent_desactive: 'Agent désactivé', fiche_modifiee: 'Fiche modifiée entre-temps', horloge_suspecte: 'Horloge de la tablette décalée', hote_en_attente: 'Accord de l’hôte manquant', visiteur_refuse: 'Visiteur refusé', annule: 'Badge annulé' };
 function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station || poste.name} » ? La tablette sera effacée à sa prochaine connexion.`)) router.post(`/administration/postes/${poste.id}/revoquer`); }
@@ -55,9 +55,7 @@ function revoke(poste: Poste) { if (window.confirm(`Révoquer « ${poste.station
 <BaseCard>
 <h2 class="mb-5 text-heading font-bold">Réglages des postes</h2>
 <form class="space-y-5" aria-label="Réglages des postes" @submit.prevent="settings.put('/administration/postes/reglages')">
-<label class="block">Verrouillage après inactivité (minutes)<input v-model.number="settings.inactivity" type="number" min="1" max="60" class="field" required></label>
 <label class="block">Écart d’horloge toléré avant alerte (secondes)<input v-model.number="settings.skew" type="number" min="30" max="3600" class="field" required></label>
-<label class="block">Échecs de PIN avant effacement de la tablette<input v-model.number="settings.pin" type="number" min="3" max="30" class="field" required></label>
 <fieldset class="space-y-5 rounded-xl border border-slate-300 p-4">
 <legend class="px-2 font-semibold">Alertes du contrôle des badges</legend>
 <label class="block">Délai minimal entre deux points de contrôle différents pour un même badge (secondes). En dessous, le superviseur est alerté d’une copie possible.<input v-model.number="settings.pointsDelay" type="number" min="1" max="3600" class="field" required data-testid="reglage-delai-points"></label>

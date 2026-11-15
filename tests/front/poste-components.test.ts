@@ -241,7 +241,7 @@ describe('écran de recherche conforme à la maquette', () => {
   it('la barre basse dit l’état réel : appareil, poste, dernière synchronisation, verrouillage', async () => {
     const sync = { online: true, syncing: false, pending: 0, conflicts: 0, lastSyncAt: '2027-01-10T10:42:00Z', lastError: null, needsLogin: false, revoked: false, stale: false, clockWarning: false };
     const wrapper = mount(PosteFooter, { props: { poste: 'Poste fictif A', device: 'Tablette fictive A', agent: 'Agent fictif', online: true, sync } });
-    expect(wrapper.text()).toContain('Enrôlé'); expect(wrapper.text()).toContain('Poste fictif A'); expect(wrapper.text()).toContain('Appareil : Tablette fictive A'); expect(wrapper.text()).toContain('Poste déverrouillé');
+    expect(wrapper.text()).toContain('Enrôlé'); expect(wrapper.text()).toContain('Poste fictif A'); expect(wrapper.text()).toContain('Appareil : Tablette fictive A'); expect(wrapper.text()).toContain('Poste ouvert');
     expect(wrapper.get('[data-testid="bloc-synchronisation"]').text()).toContain('À jour');
     await wrapper.get('[data-testid="verrouiller"]').trigger('click'); expect(wrapper.emitted('lock')).toHaveLength(1);
     await wrapper.get('[data-testid="synchroniser"]').trigger('click'); expect(wrapper.emitted('sync')).toHaveLength(1);

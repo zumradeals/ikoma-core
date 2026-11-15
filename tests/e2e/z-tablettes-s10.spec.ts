@@ -9,7 +9,6 @@ import { loginWithSecondFactor } from './otp';
 type Account = { email: string; password: string; secret: string };
 type Fixtures = { email: string; password: string; event: string; supervisor: Account; s10: { enrolCodeP2: string; enrolCodeSoute: string; posteP2: string; posteSoute: string; badges: string[]; names: string[] } };
 const fx = JSON.parse(readFileSync('.secrets/desk-fixtures.json', 'utf8')) as Fixtures;
-const PIN = '615243';
 
 test.describe.configure({ mode: 'serial' });
 test.use({ actionTimeout: 15_000 });
@@ -33,12 +32,10 @@ test.afterAll(async () => { await p2.close(); await soute.close(); });
 /** Enrôle la tablette si besoin, sinon la déverrouille, puis attend l'écran demandé. */
 async function open(page: Page, url: string, code: string, ready: ReturnType<Page['getByTestId']>): Promise<void> {
   await page.goto(url);
-  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou');
-  await enrol.or(lock).or(ready).first().waitFor();
+  const enrol = page.getByTestId('ecran-enrolement');
+  await enrol.or(ready).first().waitFor();
   if (await enrol.isVisible()) {
-    await page.getByTestId('code-enrolement').fill(code); await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN); await page.getByTestId('enroler').click();
-  } else if (await lock.isVisible()) {
-    await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click();
+    await page.getByTestId('code-enrolement').fill(code); await page.getByTestId('enroler').click();
   }
   await expect(ready).toBeVisible();
 }
@@ -70,9 +67,8 @@ test('poste d’accueil P2 : opérations contextuelles, visites attendues, refus
   // la restitution s'ouvre directement dans son mode, distinct de la sortie
   await page.getByTestId('operation-restitution').click();
   await expect(page).toHaveURL(/\/controle\?mode=restitution/);
-  const lock = page.getByTestId('ecran-verrou'); const ready = page.getByTestId('choix-point').or(page.getByTestId('point'));
-  await lock.or(ready).first().waitFor();
-  if (await lock.isVisible()) { await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click(); }
+  const ready = page.getByTestId('choix-point').or(page.getByTestId('point'));
+  await ready.first().waitFor();
   await expect(ready).toBeVisible();
   if (await page.getByTestId('choix-point').isVisible()) await page.getByRole('button', { name: /Hall/ }).first().click();
   await expect(page.getByTestId('mode-restitution')).toHaveAttribute('aria-pressed', 'true');

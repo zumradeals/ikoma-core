@@ -10,6 +10,7 @@ import { PosteRuntime } from '../../resources/js/poste/local/runtime';
 import { setMeta } from '../../resources/js/poste/local/db';
 import type { Snapshot, SnapVisitor } from '../../resources/js/poste/local/list';
 import type { DeskSummary } from '../../resources/js/poste/types';
+import { leaseOf } from './support/lease';
 import DeskPanel from '../../resources/js/components/poste/DeskPanel.vue';
 import StatusBar from '../../resources/js/components/poste/StatusBar.vue';
 
@@ -140,28 +141,28 @@ describe('tablette restée trop longtemps sans réseau (audit global F2)', () =>
   async function tablet(hoursAgo: number, maxHours: number) {
     const offline = (async () => { throw new TypeError('hors réseau'); }) as unknown as typeof fetch;
     const runtime = new PosteRuntime(undefined, { dbName: `f2-${Math.random()}`, iterations: 1000, fetcher: offline });
-    await runtime.vault.enrol({ token: 'd'.repeat(64), secret: toB64(randomBytes(32)), pin: '482915', agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, offline_max_hours: maxHours } });
+    await runtime.vault.enrolLease({ token: 'd'.repeat(64), lease: leaseOf(randomBytes(32)), agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15, offline_max_hours: maxHours } });
     await runtime.store.saveSnapshot(snapshot([visitor('v1', 'Koné Mariam')]));
     await setMeta(runtime.db, 'lastSyncAt', new Date(Date.now() - hoursAgo * 3_600_000).toISOString());
     runtime.lock();
     return runtime;
   }
 
-  it('refuse de rouvrir sans réseau après le délai réglé, garde le PIN valable et ne perd rien', async () => {
+  it('refuse de rouvrir sans réseau après le délai réglé, garde le bail valable et ne perd rien', async () => {
     const runtime = await tablet(20, 12);
     expect(await runtime.syncRequiredHours()).toBe(12);
-    await expect(runtime.unlock('482915')).rejects.toMatchObject({ code: 'synchronisation_requise', message: expect.stringContaining('plus de 12 heures') });
+    await expect(runtime.resume('u1')).rejects.toMatchObject({ code: 'synchronisation_requise', message: expect.stringContaining('plus de 12 heures') });
     expect(runtime.vault.unlocked).toBe(false);
-    expect(await runtime.state()).toBe('verrouille'); // verrouillée, pas effacée : les opérations en attente sont intactes
+    expect(await runtime.state()).toBe('ferme'); // fermée, pas effacée : les opérations en attente sont intactes
   });
 
   it('rouvre normalement dans le délai, et le réglage à 0 désactive le blocage', async () => {
     const recent = await tablet(1, 12);
     expect(await recent.syncRequiredHours()).toBeNull();
-    await recent.unlock('482915'); expect(recent.vault.unlocked).toBe(true); recent.lock();
+    await recent.resume('u1'); expect(recent.vault.unlocked).toBe(true); recent.lock();
     const disabled = await tablet(500, 0);
     expect(await disabled.syncRequiredHours()).toBeNull();
-    await disabled.unlock('482915'); expect(disabled.vault.unlocked).toBe(true); disabled.lock();
+    await disabled.resume('u1'); expect(disabled.vault.unlocked).toBe(true); disabled.lock();
   });
 });
 

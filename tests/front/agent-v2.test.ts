@@ -51,7 +51,7 @@ describe('cadre Agent V2', () => {
   it('présente l’état connu de cet appareil sans ouvrir le coffre ni exposer une clé', async () => {
     getMeta.mockImplementation((_db: unknown, key: string) => Promise.resolve({ vault: { opaque: true }, posteName: 'Poste fictif A', lastSyncAt: '2026-10-29T12:00:00Z' }[key as 'vault']));
     const w = mount(Home, { props: { agent: state.auth } }); wrappers.push(w); await flushPromises();
-    expect(w.text()).toContain('Poste fictif A'); expect(w.text()).toContain('PIN requis');
+    expect(w.text()).toContain('Poste fictif A'); expect(w.text()).toContain('Copie locale protégée'); expect(w.text()).not.toContain('PIN');
     expect(w.text()).not.toContain('opaque');
   });
 });

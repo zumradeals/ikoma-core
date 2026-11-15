@@ -213,7 +213,7 @@ onBeforeUnmount(() => { if (takenPhoto.value) URL.revokeObjectURL(takenPhoto.val
       <div class="agent-sidebar-device" role="group" aria-label="Appareil et connexion" data-testid="menu-appareil"><p class="agent-nav-caption">Appareil &amp; connexion</p>
         <a class="agent-nav-link" href="#poste-barre-basse"><AdminIcon name="tablet" :size="24" />Appareil et poste</a>
         <button type="button" class="agent-nav-link w-full text-left" :disabled="!sync || sync.syncing" data-testid="nav-synchroniser" @click="emit('sync')"><AdminIcon name="refresh" :size="24" />Synchronisation<span v-if="sync && sync.lastSyncAt && !sync.stale && !sync.lastError" class="agent-nav-ok" aria-label="À jour">✓</span></button>
-        <button type="button" class="agent-nav-link w-full text-left" data-testid="nav-verrouiller" @click="emit('lock')"><AdminIcon name="lock" :size="24" />Verrouillage</button>
+        <button type="button" class="agent-nav-link w-full text-left" data-testid="nav-verrouiller" @click="emit('lock')"><AdminIcon name="lock" :size="24" />Fermer ma session</button>
       </div>
     </template>
     <template #header-context><span v-if="posteName" class="agent-poste-chip" data-testid="poste-en-cours"><AdminIcon name="map" :size="24" /><span><small>Poste en cours</small><strong>{{ posteName }}</strong></span></span></template>

@@ -28,8 +28,8 @@ const synced = computed(() => !!props.sync && !!props.sync.lastSyncAt && !props.
     </div>
     <div class="poste-footer-block" data-testid="bloc-securite">
       <AdminIcon name="lock" :size="28" />
-      <div><p class="poste-footer-title">Sécurité</p><p>Poste déverrouillé</p></div>
+      <div><p class="poste-footer-title">Sécurité</p><p>Poste ouvert</p></div>
     </div>
-    <button type="button" class="btn-soft poste-footer-lock" data-testid="verrouiller" @click="emit('lock')"><AdminIcon name="lock" :size="20" /> Verrouiller le poste</button>
+    <button type="button" class="btn-soft poste-footer-lock" data-testid="verrouiller" @click="emit('lock')"><AdminIcon name="lock" :size="20" /> Fermer ma session</button>
   </section>
 </template>

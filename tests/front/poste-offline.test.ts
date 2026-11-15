@@ -485,7 +485,7 @@ describe('S02 — l’auteur initial des opérations en attente est préservé',
   async function runtimeWith(agent: { id: string; name: string }, pending: number) {
     const wiped = vi.fn();
     const runtime = new PosteRuntime({ onState: () => undefined, onWiped: wiped }, { dbName: dbName(), iterations: ITER, fetcher: quiet });
-    await runtime.vault.enrol({ token: 'c'.repeat(64), secret: SECRET, pin: PIN, agent, poste: { id: 'p1', name: 'Poste fictif' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
+    await runtime.vault.enrolLease({ token: 'c'.repeat(64), lease: { secret: SECRET, expires_at: new Date(Date.now() + 86_400_000).toISOString() }, agent, poste: { id: 'p1', name: 'Poste fictif' }, eventEndsAt: null, settings: { inactivity_minutes: 5, clock_skew_seconds: 300, pin_max_failures: 15 } });
     for (let i = 1; i <= pending; i++) await runtime.db.ops.put({ id: 'op-' + i, seq: i, type: 'refuser', status: 'pending', data: new Uint8Array([1]) });
     runtime.lock();
     return { runtime, wiped };
@@ -493,14 +493,14 @@ describe('S02 — l’auteur initial des opérations en attente est préservé',
 
   it('refuse qu’un autre compte ouvre la tablette tant que des opérations attendent : rien n’est effacé, envoyé ni repris', async () => {
     const { runtime, wiped } = await runtimeWith({ id: 'u1', name: 'Agent A' }, 2);
-    await expect(runtime.unlock(PIN, 'u2')).rejects.toMatchObject({ code: 'operations_en_attente_autre_agent', status: 409 });
+    await expect(runtime.resume('u2')).rejects.toMatchObject({ code: 'operations_en_attente_autre_agent', status: 409 });
     expect(wiped).not.toHaveBeenCalled();
     expect(runtime.vault.unlocked).toBe(false);
     expect(await runtime.db.ops.count()).toBe(2);
     expect(await runtime.store.count('pending')).toBe(2);
     expect(await runtime.vault.state()).not.toBe('vide');
     // l'auteur initial, authentifié, retrouve ses opérations intactes
-    await runtime.unlock(PIN, 'u1');
+    await runtime.resume('u1');
     expect(runtime.vault.unlocked).toBe(true);
     expect(await runtime.store.count('pending')).toBe(2);
     expect(wiped).not.toHaveBeenCalled();
@@ -509,7 +509,7 @@ describe('S02 — l’auteur initial des opérations en attente est préservé',
 
   it('garde l’ancien comportement, déclaré, quand aucune opération n’attend : un autre agent peut reprendre la tablette', async () => {
     const { runtime, wiped } = await runtimeWith({ id: 'u1', name: 'Agent A' }, 0);
-    await runtime.unlock(PIN, 'u2');
+    await runtime.resume('u2');
     expect(wiped).toHaveBeenCalledWith('compte_change');
     expect(await runtime.vault.state()).toBe('vide');
   });
@@ -518,7 +518,7 @@ describe('S02 — l’auteur initial des opérations en attente est préservé',
     const calls: string[] = [];
     const runtime = new PosteRuntime(undefined, { dbName: dbName(), iterations: ITER, fetcher: (async (url: string | URL | Request) => { calls.push(String(url)); throw new TypeError('network'); }) as typeof fetch });
     await runtime.db.ops.put({ id: 'op-1', seq: 1, type: 'refuser', status: 'pending', data: new Uint8Array([1]) });
-    await expect(runtime.enrol('ABCD-EFGH-2345', PIN, { id: 'u2', name: 'Agent B' })).rejects.toMatchObject({ code: 'operations_en_attente' });
+    await expect(runtime.enrol('ABCD-EFGH-2345', { id: 'u2', name: 'Agent B' })).rejects.toMatchObject({ code: 'operations_en_attente' });
     expect(calls).toEqual([]);
     expect(await runtime.db.ops.count()).toBe(1);
   });

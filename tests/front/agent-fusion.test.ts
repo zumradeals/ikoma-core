@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import PosteGate from '../../resources/js/components/poste/PosteGate.vue';
 import { PosteRuntime } from '../../resources/js/poste/local/runtime';
 import { PosteStore } from '../../resources/js/poste/local/store';
-import { randomBytes, toB64 } from '../../resources/js/poste/local/crypto';
+import { randomBytes } from '../../resources/js/poste/local/crypto';
+import { leaseOf } from './support/lease';
 import type { Snapshot } from '../../resources/js/poste/local/list';
 
 /**
@@ -20,7 +21,6 @@ vi.mock('../../resources/js/poste/media', () => ({
   startScan: vi.fn(async () => ({ stop: vi.fn() })),
 }));
 
-const PIN = '482915';
 const snapshot: Snapshot = {
   version: 'v1', server_time: new Date().toISOString(), poste: { id: 'p1', name: 'Tablette A', station: 'Poste A', event_id: 'e1', point_code: 'poste_2', capabilities: ['accueil', 'scan', 'sortie'] },
   event: { id: 'e1', name: 'Événement fictif', starts_at: new Date(Date.now() - 3_600_000).toISOString(), ends_at: new Date(Date.now() + 86_400_000).toISOString() } as never,
@@ -29,7 +29,7 @@ const snapshot: Snapshot = {
 
 async function enrolled(): Promise<PosteRuntime> {
   const runtime = new PosteRuntime(undefined, { dbName: `fusion-${Math.random()}`, iterations: 1000 });
-  await runtime.vault.enrol({ token: 'd'.repeat(64), secret: toB64(randomBytes(32)), pin: PIN, agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: snapshot.event?.ends_at ?? null, settings: snapshot.settings });
+  await runtime.vault.enrolLease({ token: 'd'.repeat(64), lease: leaseOf(randomBytes(32)), agent: { id: 'u1', name: 'Agent fictif' }, poste: { id: 'p1', name: 'Poste A' }, eventEndsAt: snapshot.event?.ends_at ?? null, settings: snapshot.settings });
   await new PosteStore(runtime.vault).saveSnapshot(snapshot);
   runtime.lock();
   return runtime;
@@ -38,14 +38,13 @@ async function enrolled(): Promise<PosteRuntime> {
 describe('fusion : une seule page déverrouillée, trois vues', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('passe de l’accueil au contrôle, aux groupes et retour, sans réseau, sans recharger la page et sans redemander le PIN', async () => {
+  it('passe de l’accueil au contrôle, aux groupes et retour, sans réseau, sans recharger la page et sans aucun PIN', async () => {
     vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
     const runtime = await enrolled();
     const wrapper = mount(PosteGate, { props: { agent: { id: 'u1', name: 'Agent fictif' }, runtime } });
-    await vi.waitFor(() => expect(wrapper.find('[data-testid="ecran-verrou"]').exists()).toBe(true));
-    await wrapper.get('[data-testid="pin-deverrouillage"]').setValue(PIN);
-    await wrapper.get('form').trigger('submit');
+    // ouverture automatique : aucun PIN, même sans réseau (bail conservé sur la tablette)
     await vi.waitFor(() => expect(wrapper.find('[data-testid="agent-layout"]').exists()).toBe(true));
+    expect(wrapper.find('[data-testid="ecran-verrou"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="agent-layout"]').attributes('data-active')).toBe('poste');
     const repo = runtime.repo;
     expect(repo).toBeTruthy();

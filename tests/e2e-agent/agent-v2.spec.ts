@@ -2,7 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { loginWithSecondFactor } from '../e2e/otp';
 const fx = JSON.parse(readFileSync('.secrets/agent-v2-fixtures.json', 'utf8')) as { email: string; password: string; enrolCode: string; names: Record<string, string>; freeBadges: string[]; admin: { email: string; password: string; secret: string } };
-const PIN = '583614';
 const sizes = [[1440, 900], [1024, 768], [768, 1024], [390, 844]];
 async function captures(page: Page, screen: string) {
   for (const [width, height] of sizes) {
@@ -14,13 +13,12 @@ async function captures(page: Page, screen: string) {
 async function open(page: Page, path: string) {
   const response = await page.goto(path);
   expect(response?.status(), `Réponse HTTP ${path} : ${await page.locator('body').innerText().catch(() => 'page indisponible')}`).toBe(200);
-  const enrol = page.getByTestId('ecran-enrolement'); const lock = page.getByTestId('ecran-verrou');
-  await enrol.or(lock).first().waitFor();
+  const enrol = page.getByTestId('ecran-enrolement');
+  await enrol.or(page.getByTestId('agent-layout')).first().waitFor();
   if (await enrol.isVisible()) {
     await page.getByTestId('code-enrolement').fill(fx.enrolCode);
-    await page.getByTestId('pin').fill(PIN); await page.getByTestId('pin-confirmation').fill(PIN);
     await page.getByTestId('enroler').click();
-  } else { await page.getByTestId('pin-deverrouillage').fill(PIN); await page.getByTestId('deverrouiller').click(); }
+  } // sinon la tablette s'est ouverte toute seule : plus aucun PIN
   await expect(page.getByTestId('agent-layout')).toBeVisible();
 }
 async function identity(page: Page, name: string) {
@@ -106,8 +104,9 @@ test('Agent V2 : parcours réel, pièce désactivée/activée, quatre formats et
     await captures(page, '10-etape-3-piece-activee');
     await page.getByRole('button', { name: 'Enregistrer et passer à la décision' }).click();
     await expect(page.getByText('Étape 4 sur 7')).toBeVisible();
-    await page.getByTestId('verrouiller').click(); await expect(page.getByTestId('ecran-verrou')).toBeVisible();
-    await captures(page, '11-verrouillage');
+    // « Fermer ma session » : le bail de la tablette est supprimé, le compte déconnecté, retour à la page de connexion (aucun PIN à saisir ensuite)
+    await page.getByTestId('verrouiller').click(); await expect(page).toHaveURL(/\/login/);
+    await captures(page, '11-fermeture-session');
   } catch (error) {
     failure = error;
   } finally {
